@@ -1,7 +1,47 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ChatMessage } from "../lib/types";
+import { copyText } from "../lib/format";
+
+function CodeBlock({ className, text }: { className?: string; text: string }) {
+  const [copied, setCopied] = useState(false);
+  const lang = (className || "").replace("language-", "");
+  const copy = async () => {
+    if (await copyText(text)) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1200);
+    }
+  };
+  return (
+    <div className="codeblock">
+      <div className="codeblock-bar">
+        <span className="cb-lang">{lang || "text"}</span>
+        <button className="cb-copy" onClick={copy}>{copied ? "✓ copied" : "copy"}</button>
+      </div>
+      <pre>
+        <code className={className}>{text}</code>
+      </pre>
+    </div>
+  );
+}
+
+const mdComponents = {
+  code({ inline, className, children, ...props }: any) {
+    if (inline) {
+      return (
+        <code className={className} {...props}>
+          {children}
+        </code>
+      );
+    }
+    return <CodeBlock className={className} text={String(children).replace(/\n$/, "")} />;
+  },
+  // CodeBlock provides its own <pre>; unwrap react-markdown's outer <pre>.
+  pre({ children }: any) {
+    return <>{children}</>;
+  },
+};
 
 function Bubble({ msg }: { msg: ChatMessage }) {
   const isUser = msg.role === "user";
@@ -14,7 +54,9 @@ function Bubble({ msg }: { msg: ChatMessage }) {
             <span style={{ whiteSpace: "pre-wrap" }}>{msg.content}</span>
           ) : msg.content ? (
             <div className="md">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+              <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
+                {msg.content}
+              </ReactMarkdown>
             </div>
           ) : msg.streaming ? (
             ""

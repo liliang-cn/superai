@@ -91,7 +91,7 @@ export function useChat(): UseChatResult {
                 const r = payload.result;
                 const failed =
                   r && typeof r === "object" && (r.ok === false || r.error || r.success === false);
-                next[i] = { ...next[i], status: failed ? "fail" : "ok" };
+                next[i] = { ...next[i], status: failed ? "fail" : "ok", result: r };
                 break;
               }
             }

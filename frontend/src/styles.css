@@ -106,6 +106,68 @@
 .md th { background: var(--bg-2); font-weight: 620; }
 .md hr { border: 0; border-top: 1px solid var(--border); margin: 12px 0; }
 
+/* code block with copy bar (markdown) */
+.codeblock {
+  margin: 8px 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--bg-3);
+}
+.codeblock-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 10px;
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--border);
+}
+.cb-lang { font-family: var(--font-mono); font-size: 11px; color: var(--text-3); text-transform: lowercase; }
+.cb-copy {
+  font-size: 11px;
+  color: var(--text-2);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+.cb-copy:hover { background: var(--bg-hover); color: var(--text-0); }
+.codeblock pre { margin: 0; border: 0; border-radius: 0; background: var(--bg-3); }
+
+/* tool-trace expandable JSON detail */
+.trace-row.clickable .tr-line { cursor: pointer; }
+.tr-line { display: flex; align-items: center; gap: 6px; }
+.tr-caret { width: 10px; color: var(--text-3); font-size: 10px; flex: none; }
+.tr-caret.ph { visibility: hidden; }
+.tr-detail { position: relative; margin: 4px 0 2px 16px; }
+.tr-copy {
+  position: absolute; top: 6px; right: 6px;
+  font-size: 10px; color: var(--text-2);
+  background: var(--bg-2); border: 1px solid var(--border);
+  border-radius: 4px; padding: 1px 6px; cursor: pointer; z-index: 1;
+}
+.tr-copy:hover { background: var(--bg-hover); color: var(--text-0); }
+.tr-json {
+  margin: 0;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.5;
+  max-height: 280px;
+  overflow: auto;
+  white-space: pre;
+  color: var(--text-1);
+}
+.tr-json .j-key { color: var(--accent); }
+.tr-json .j-str { color: var(--green); }
+.tr-json .j-num { color: var(--amber); }
+.tr-json .j-bool { color: var(--cyan); }
+.tr-json .j-null { color: var(--text-3); }
+
 /* theme toggle button (status bar) */
 .theme-toggle {
   background: var(--bg-2);

@@ -50,6 +50,7 @@ export interface TraceItem {
   args: Record<string, any>;
   inner: boolean;
   status: "running" | "ok" | "fail";
+  result?: any;
 }
 
 export function normalizeStatus(raw: Record<string, any> | null): AppStatus {
