@@ -160,8 +160,13 @@
 .md h1 { font-size: 1.3em; }
 .md h2 { font-size: 1.18em; }
 .md h3 { font-size: 1.06em; }
+/* Tailwind v4 preflight resets list markers; restore them for markdown. */
 .md ul, .md ol { margin: 4px 0 10px; padding-left: 22px; }
-.md li { margin: 2px 0; }
+.md ul { list-style: disc; }
+.md ol { list-style: decimal; }
+.md ul ul { list-style: circle; }
+.md li { margin: 2px 0; display: list-item; }
+.md li::marker { color: var(--text-2); }
 .md li > p { margin: 0; }
 .md strong { font-weight: 680; color: var(--text-0); }
 .md em { font-style: italic; }

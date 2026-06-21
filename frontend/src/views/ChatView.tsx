@@ -19,11 +19,12 @@ import {
 } from "@/components/ai-elements/prompt-input";
 import { Button } from "@/components/ui/button";
 import { CopyIcon, MessageSquareIcon, Trash2Icon } from "lucide-react";
-import ToolTrace from "../components/ToolTrace";
+import TracePanel from "../components/TracePanel";
 
 export default function ChatView({ status }: { status: AppStatus | null }) {
   const chat = useChat();
   const notReady = status !== null && !status.ready;
+  const messages = chat.messages;
 
   const onSubmit = (msg: { text: string }, e: React.FormEvent<HTMLFormElement>) => {
     const text = msg.text.trim();
@@ -37,7 +38,7 @@ export default function ChatView({ status }: { status: AppStatus | null }) {
       <div className="chat-layout">
         <div className="chat-main">
           <Conversation className="transcript">
-            {chat.messages.length === 0 ? (
+            {messages.length === 0 ? (
               <ConversationEmptyState
                 icon={<MessageSquareIcon className="size-10" />}
                 title="Start a conversation"
@@ -50,8 +51,8 @@ export default function ChatView({ status }: { status: AppStatus | null }) {
                 )}
               </ConversationEmptyState>
             ) : (
-              <ConversationContent autoScrollKey={chat.messages.map((m) => m.content).join("|")}>
-                {chat.messages.map((m) => (
+              <ConversationContent autoScrollKey={messages.map((m) => m.content).join("|")}>
+                {messages.map((m) => (
                   <div key={m.id}>
                     <Message from={m.role}>
                       <MessageContent variant="flat">
@@ -127,7 +128,7 @@ export default function ChatView({ status }: { status: AppStatus | null }) {
             </PromptInput>
           </div>
         </div>
-        <ToolTrace trace={chat.trace} />
+        <TracePanel trace={chat.trace} />
       </div>
     </div>
   );

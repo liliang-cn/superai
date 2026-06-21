@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useChat } from "../lib/useChat";
-import { AppStatus, TraceItem } from "../lib/types";
+import { AppStatus } from "../lib/types";
 import { copyText } from "../lib/format";
 import { Deliverables, ReadWorkspaceFile } from "../../wailsjs/go/main/App";
 import { agent } from "../../wailsjs/go/models";
@@ -12,14 +12,7 @@ import {
 import { Message, MessageContent } from "@/components/ai-elements/message";
 import { Response } from "@/components/ai-elements/response";
 import { Actions, Action } from "@/components/ai-elements/actions";
-import {
-  Tool,
-  ToolHeader,
-  ToolContent,
-  ToolInput,
-  ToolOutput,
-  ToolState,
-} from "@/components/ai-elements/tool";
+import TracePanel from "../components/TracePanel";
 import { Button } from "@/components/ui/button";
 import { BotIcon, CopyIcon, PlayIcon, Loader2Icon } from "lucide-react";
 
@@ -39,45 +32,6 @@ function iconFor(type: string, path: string): string {
   if (/\.(pdf)$/.test(p)) return "📕";
   if (/\.(html?|css|tsx?|jsx?|go|py)$/.test(p)) return "💻";
   return "📄";
-}
-
-function traceState(status: TraceItem["status"]): ToolState {
-  if (status === "ok") return "output-available";
-  if (status === "fail") return "output-error";
-  return "input-available";
-}
-
-function TraceTool({ t }: { t: TraceItem }) {
-  const state = traceState(t.status);
-  const r = t.result;
-  const errorText =
-    state === "output-error"
-      ? typeof r === "string"
-        ? r
-        : JSON.stringify(r?.error ?? r, null, 2)
-      : undefined;
-  return (
-    <Tool className={t.inner ? "ml-3 border-dashed" : ""}>
-      <ToolHeader type={(t.inner ? "↳ " : "") + t.tool} state={state} />
-      <ToolContent>
-        {t.args && Object.keys(t.args).length > 0 && <ToolInput input={t.args} />}
-        {state !== "input-available" && (
-          <ToolOutput
-            errorText={errorText}
-            output={
-              errorText ? undefined : (
-                <pre>
-                  <code>
-                    {typeof r === "string" ? r : JSON.stringify(r, null, 2)}
-                  </code>
-                </pre>
-              )
-            }
-          />
-        )}
-      </ToolContent>
-    </Tool>
-  );
 }
 
 export default function AgentView({ status }: { status: AppStatus | null }) {
@@ -195,23 +149,7 @@ export default function AgentView({ status }: { status: AppStatus | null }) {
           </Conversation>
         </div>
 
-        <div className="trace-panel">
-          <div className="trace-head">
-            <span>Tool Trace</span>
-            <span style={{ color: "var(--text-3)", fontWeight: 400 }}>{chat.trace.length}</span>
-          </div>
-          <div className="trace-list" style={{ display: "flex", flexDirection: "column", gap: 8, padding: 8 }}>
-            {chat.trace.length === 0 ? (
-              <div className="trace-empty">
-                No tool activity yet.
-                <br />
-                Tools run during a task appear here live.
-              </div>
-            ) : (
-              chat.trace.map((t) => <TraceTool key={t.id} t={t} />)
-            )}
-          </div>
-        </div>
+        <TracePanel trace={chat.trace} />
       </div>
 
       <DeliverablesBar

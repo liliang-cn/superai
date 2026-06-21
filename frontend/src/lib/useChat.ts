@@ -55,6 +55,11 @@ export function useChat(): UseChatResult {
   }, []);
 
   useEffect(() => {
+    // Wails runtime is only present inside the desktop webview; guard so the
+    // SPA can also render in a plain browser (dev inspection) without crashing.
+    if (typeof window === "undefined" || !(window as any).runtime) {
+      return;
+    }
     const offEvent = EventsOn("chat:event", (payload: ChatEvent) => {
       if (!payload) return;
       switch (payload.type) {
