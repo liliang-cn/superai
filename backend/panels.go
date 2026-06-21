@@ -7,8 +7,50 @@ import (
 	"os"
 
 	"github.com/liliang-cn/agent-go/v2/pkg/cortexbridge"
+	"github.com/liliang-cn/agent-go/v2/pkg/mcp"
+	"github.com/liliang-cn/agent-go/v2/pkg/skills"
 	"github.com/liliang-cn/cortexdb/v2/pkg/importflow"
 )
+
+// SkillInfo is one installed skill shown in the Skills panel.
+type SkillInfo struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	WhenToUse   string `json:"when_to_use"`
+	Collection  string `json:"collection"`
+}
+
+// SkillsDetailed returns the installed skills with descriptions for the Skills panel.
+func (s *Service) SkillsDetailed() []SkillInfo {
+	if s == nil || s.svc == nil || s.svc.Skills == nil {
+		return nil
+	}
+	list, err := s.svc.Skills.ListSkills(context.Background(), skills.SkillFilter{})
+	if err != nil {
+		return nil
+	}
+	out := make([]SkillInfo, 0, len(list))
+	for _, sk := range list {
+		if sk == nil {
+			continue
+		}
+		out = append(out, SkillInfo{
+			ID: sk.ID, Name: sk.Name, Description: sk.Description,
+			WhenToUse: sk.WhenToUse, Collection: sk.Collection,
+		})
+	}
+	return out
+}
+
+// MCPServers returns the configured MCP servers (built-in + user) with status
+// and tool counts for the MCP panel.
+func (s *Service) MCPServers() []mcp.ServerStatus {
+	if s == nil || s.svc == nil || s.svc.MCP == nil {
+		return nil
+	}
+	return s.svc.MCP.ListServers()
+}
 
 // LifeData is the snapshot the Life panel renders (schedules / records / persons
 // / reminders), read directly from the life-assistant store.

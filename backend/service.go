@@ -122,6 +122,15 @@ func NewService(s *Settings) (*Service, error) {
 		b = b.WithMemory(agent.WithMemoryStoreType("file"))
 	}
 
+	// MCP: built-in servers (websearch) plus any user-defined servers from
+	// ~/.superai-desktop/mcpServers.json. Drop that file in to add MCP servers.
+	mcpOpts := []agent.MCPOption{}
+	mcpCfgPath := filepath.Join(cfg.DataDir(), "mcpServers.json")
+	if _, statErr := os.Stat(mcpCfgPath); statErr == nil {
+		mcpOpts = append(mcpOpts, agent.WithMCPConfigPaths(mcpCfgPath))
+	}
+	b = b.WithMCP(mcpOpts...)
+
 	svc, err := b.Build()
 	if err != nil {
 		_ = sb.Close()

@@ -6,6 +6,8 @@ import AgentView from "./views/AgentView";
 import SettingsView from "./views/SettingsView";
 import AvatarView from "./views/AvatarView";
 import MemoryView from "./views/MemoryView";
+import SkillsView from "./views/SkillsView";
+import MCPView from "./views/MCPView";
 import DataView from "./views/DataView";
 import LifeView from "./views/LifeView";
 import { AppStatus, ViewKey, normalizeStatus } from "./lib/types";
@@ -58,6 +60,8 @@ export default function App() {
           {view === "settings" && <SettingsView onSaved={refreshStatus} />}
           {view === "avatar" && <AvatarView status={status} />}
           {view === "memory" && <MemoryView />}
+          {view === "skills" && <SkillsView />}
+          {view === "mcp" && <MCPView />}
           {view === "data" && <DataView />}
           {view === "life" && <LifeView />}
         </div>

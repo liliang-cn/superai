@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/liliang-cn/agent-go/v2/pkg/agent"
+	"github.com/liliang-cn/agent-go/v2/pkg/mcp"
 	"github.com/liliang-cn/superai-desktop/backend"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -248,6 +249,28 @@ func (a *App) MemorySkills() []string {
 		return nil
 	}
 	return svc.InstalledSkills()
+}
+
+// Skills returns the installed skills with descriptions for the Skills panel.
+func (a *App) Skills() []backend.SkillInfo {
+	a.mu.Lock()
+	svc := a.svc
+	a.mu.Unlock()
+	if svc == nil {
+		return nil
+	}
+	return svc.SkillsDetailed()
+}
+
+// MCP returns the configured MCP servers (built-in + user) for the MCP panel.
+func (a *App) MCP() []mcp.ServerStatus {
+	a.mu.Lock()
+	svc := a.svc
+	a.mu.Unlock()
+	if svc == nil {
+		return nil
+	}
+	return svc.MCPServers()
 }
 
 // ImportCSV imports a CSV file into RAG+KG; returns a JSON report (or an error string).

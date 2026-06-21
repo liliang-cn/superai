@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useState } from "react";
-import { MemoryRecall, MemorySkills } from "../../wailsjs/go/main/App";
+import React, { useCallback, useState } from "react";
+import { MemoryRecall } from "../../wailsjs/go/main/App";
 
 export default function MemoryView() {
   const [query, setQuery] = useState("");
@@ -7,27 +7,6 @@ export default function MemoryView() {
   const [searched, setSearched] = useState(false);
   const [searching, setSearching] = useState(false);
   const [recallErr, setRecallErr] = useState<string>("");
-
-  const [skills, setSkills] = useState<string[]>([]);
-  const [skillsLoading, setSkillsLoading] = useState(true);
-  const [skillsErr, setSkillsErr] = useState<string>("");
-
-  const loadSkills = useCallback(async () => {
-    setSkillsLoading(true);
-    setSkillsErr("");
-    try {
-      const res = await MemorySkills();
-      setSkills(Array.isArray(res) ? res : []);
-    } catch (e: any) {
-      setSkillsErr(String(e?.message || e));
-    } finally {
-      setSkillsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadSkills();
-  }, [loadSkills]);
 
   const search = useCallback(async () => {
     const q = query.trim();
@@ -59,7 +38,7 @@ export default function MemoryView() {
     <div className="view">
       <div className="view-header">
         <div className="view-title">Memory</div>
-        <div className="view-desc">Search what SuperAI remembers and review the skills it can call on.</div>
+        <div className="view-desc">Search what SuperAI remembers in long-term memory.</div>
       </div>
 
       <div className="panel-scroll">
@@ -94,30 +73,6 @@ export default function MemoryView() {
                 ) : (
                   <div className="prose-panel">{recall}</div>
                 )}
-              </div>
-            )}
-          </div>
-
-          <div className="card">
-            <div className="card-title">Skills</div>
-            <div className="card-desc">Installed skill IDs SuperAI can activate during a turn.</div>
-            {skillsLoading ? (
-              <div className="loading-row" style={{ padding: 0 }}>
-                <span className="spinner" style={{ borderTopColor: "var(--accent)" }} /> Loading skills…
-              </div>
-            ) : skillsErr ? (
-              <div className="report-error">⚠ {skillsErr}</div>
-            ) : skills.length === 0 ? (
-              <div className="inline-empty">
-                <div className="ie-icon">🧩</div>
-                <div>No skills installed.</div>
-                <div className="ie-hint">Drop SKILL.md folders into the skills directory to add capabilities.</div>
-              </div>
-            ) : (
-              <div className="chips">
-                {skills.map((s) => (
-                  <span className="chip" key={s}>{s}</span>
-                ))}
               </div>
             )}
           </div>

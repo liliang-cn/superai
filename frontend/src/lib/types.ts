@@ -4,6 +4,8 @@ export type ViewKey =
   | "settings"
   | "avatar"
   | "memory"
+  | "skills"
+  | "mcp"
   | "data"
   | "life";
 
