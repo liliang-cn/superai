@@ -30,6 +30,12 @@ type Settings struct {
 	MaxRounds int  `json:"max_rounds"`
 	Headless  bool `json:"headless"`
 
+	// DisablePTC turns off Programmatic Tool Calling (model writes JS that calls
+	// tools in a sandbox). PTC works great with capable models (gpt-5.x) but some
+	// providers' "code" models (e.g. DashScope qwen3.x) reject its function-call
+	// format — set true for them so the agent uses direct one-tool-per-round calling.
+	DisablePTC bool `json:"disable_ptc"`
+
 	// Avatar driver server port (127.0.0.1:AvatarPort).
 	AvatarPort int `json:"avatar_port"`
 }

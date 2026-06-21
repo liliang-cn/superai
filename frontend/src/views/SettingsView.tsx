@@ -162,6 +162,21 @@ export default function SettingsView({ onSaved }: { onSaved: () => void }) {
                 </span>
               </div>
             </div>
+            <div className="field">
+              <label>Disable PTC (programmatic tool calling)</label>
+              <div
+                className="toggle"
+                onClick={() => set("disable_ptc", !s.disable_ptc)}
+                style={{ cursor: "pointer", marginTop: 2 }}
+              >
+                <div className={`switch${s.disable_ptc ? " on" : ""}`}><div className="knob" /></div>
+                <span style={{ fontSize: 13, color: "var(--text-1)" }}>
+                  {s.disable_ptc
+                    ? "Direct one-tool-per-round calling (needed for DashScope qwen3.x)"
+                    : "PTC on — model writes JS that calls tools (best with gpt-5.x)"}
+                </span>
+              </div>
+            </div>
           </div>
 
           <div className="settings-actions">

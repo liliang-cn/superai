@@ -108,6 +108,9 @@ func NewService(s *Settings) (*Service, error) {
 		WithDeliverables(true).
 		WithAutonomy(agent.AutonomyProfile{MaxRounds: s.MaxRounds, Scratchpad: true}).
 		WithSkills()
+	if s.DisablePTC {
+		b = b.WithPTC(false) // direct tool-calling for models that reject PTC's format (e.g. DashScope qwen3.x)
+	}
 	if br != nil {
 		b = b.WithBrowser(br)
 	}

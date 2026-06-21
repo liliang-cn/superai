@@ -49,6 +49,7 @@ export namespace backend {
 	    workspace_dir: string;
 	    max_rounds: number;
 	    headless: boolean;
+	    disable_ptc: boolean;
 	    avatar_port: number;
 	
 	    static createFrom(source: any = {}) {
@@ -66,6 +67,7 @@ export namespace backend {
 	        this.workspace_dir = source["workspace_dir"];
 	        this.max_rounds = source["max_rounds"];
 	        this.headless = source["headless"];
+	        this.disable_ptc = source["disable_ptc"];
 	        this.avatar_port = source["avatar_port"];
 	    }
 	}
