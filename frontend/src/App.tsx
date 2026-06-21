@@ -1,0 +1,51 @@
+import React, { useCallback, useEffect, useState } from "react";
+import Sidebar from "./components/Sidebar";
+import StatusBar from "./components/StatusBar";
+import ChatView from "./views/ChatView";
+import AgentView from "./views/AgentView";
+import SettingsView from "./views/SettingsView";
+import AvatarView from "./views/AvatarView";
+import { MemoryView, DataView, LifeView } from "./views/Placeholder";
+import { AppStatus, ViewKey, normalizeStatus } from "./lib/types";
+import { GetStatus } from "../wailsjs/go/main/App";
+
+export default function App() {
+  const [view, setView] = useState<ViewKey>("chat");
+  const [status, setStatus] = useState<AppStatus | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const refreshStatus = useCallback(async () => {
+    try {
+      const raw = await GetStatus();
+      setStatus(normalizeStatus(raw));
+    } catch (e: any) {
+      setStatus(normalizeStatus({ ready: false, error: String(e?.message || e) }));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshStatus();
+    const t = setInterval(refreshStatus, 15000);
+    return () => clearInterval(t);
+  }, [refreshStatus]);
+
+  return (
+    <div className="app">
+      <Sidebar current={view} onNavigate={setView} />
+      <div className="main">
+        <StatusBar status={status} loading={loading} />
+        <div className="content">
+          {view === "chat" && <ChatView status={status} />}
+          {view === "agent" && <AgentView status={status} />}
+          {view === "settings" && <SettingsView onSaved={refreshStatus} />}
+          {view === "avatar" && <AvatarView status={status} />}
+          {view === "memory" && <MemoryView />}
+          {view === "data" && <DataView />}
+          {view === "life" && <LifeView />}
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,9 @@
+build/bin
+node_modules
+frontend/dist
+
+# build output
+/build/bin/
+# frontend
+/frontend/node_modules/
+/frontend/dist/
