@@ -152,6 +152,7 @@ func NewService(s *Settings) (*Service, error) {
 	out.store = newLifeStore(filepath.Join(cfg.DataDir(), "superai-store.json"))
 	out.store.load()
 	out.registerLifeTools()
+	out.registerInstallTools() // chat-driven install of skills + MCP servers
 
 	// --- CortexDB data-import + graphrag query + connector tools (best-effort). ---
 	if db, derr := cortexdb.Open(cortexdb.DefaultConfig(filepath.Join(cfg.DataDir(), "cortex.db"))); derr != nil {
