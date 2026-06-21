@@ -21,6 +21,24 @@ export namespace agent {
 
 export namespace backend {
 	
+	export class LifeData {
+	    schedules: any[];
+	    records: any[];
+	    persons: Record<string, any>;
+	    reminders: any[];
+	
+	    static createFrom(source: any = {}) {
+	        return new LifeData(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.schedules = source["schedules"];
+	        this.records = source["records"];
+	        this.persons = source["persons"];
+	        this.reminders = source["reminders"];
+	    }
+	}
 	export class Settings {
 	    llm_base_url: string;
 	    llm_key: string;

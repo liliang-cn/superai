@@ -11,6 +11,14 @@ export function GetSettings():Promise<backend.Settings>;
 
 export function GetStatus():Promise<Record<string, any>>;
 
+export function ImportCSV(arg1:string,arg2:string):Promise<string>;
+
+export function Life():Promise<backend.LifeData>;
+
+export function MemoryRecall(arg1:string):Promise<string>;
+
+export function MemorySkills():Promise<Array<string>>;
+
 export function ReadWorkspaceFile(arg1:string):Promise<string>;
 
 export function SaveSettings(arg1:backend.Settings):Promise<void>;

@@ -18,6 +18,22 @@ export function GetStatus() {
   return window['go']['main']['App']['GetStatus']();
 }
 
+export function ImportCSV(arg1, arg2) {
+  return window['go']['main']['App']['ImportCSV'](arg1, arg2);
+}
+
+export function Life() {
+  return window['go']['main']['App']['Life']();
+}
+
+export function MemoryRecall(arg1) {
+  return window['go']['main']['App']['MemoryRecall'](arg1);
+}
+
+export function MemorySkills() {
+  return window['go']['main']['App']['MemorySkills']();
+}
+
 export function ReadWorkspaceFile(arg1) {
   return window['go']['main']['App']['ReadWorkspaceFile'](arg1);
 }

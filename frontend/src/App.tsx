@@ -5,7 +5,9 @@ import ChatView from "./views/ChatView";
 import AgentView from "./views/AgentView";
 import SettingsView from "./views/SettingsView";
 import AvatarView from "./views/AvatarView";
-import { MemoryView, DataView, LifeView } from "./views/Placeholder";
+import MemoryView from "./views/MemoryView";
+import DataView from "./views/DataView";
+import LifeView from "./views/LifeView";
 import { AppStatus, ViewKey, normalizeStatus } from "./lib/types";
 import { GetStatus } from "../wailsjs/go/main/App";
 

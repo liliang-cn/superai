@@ -216,6 +216,56 @@ func (a *App) ReadWorkspaceFile(path string) string {
 }
 
 // EmitAvatarTest pushes a test emotion + speech event for the avatar test button.
+// Life returns the life-assistant data (schedules/records/persons/reminders) for the Life panel.
+func (a *App) Life() backend.LifeData {
+	a.mu.Lock()
+	svc := a.svc
+	a.mu.Unlock()
+	if svc == nil {
+		return backend.LifeData{Persons: map[string]map[string]any{}}
+	}
+	return svc.Life()
+}
+
+// MemoryRecall queries long-term memory and returns the formatted recall context.
+func (a *App) MemoryRecall(query string) string {
+	a.mu.Lock()
+	svc := a.svc
+	a.mu.Unlock()
+	if svc == nil {
+		return ""
+	}
+	out, _ := svc.MemoryRecall(context.Background(), query)
+	return out
+}
+
+// MemorySkills returns the installed skill IDs.
+func (a *App) MemorySkills() []string {
+	a.mu.Lock()
+	svc := a.svc
+	a.mu.Unlock()
+	if svc == nil {
+		return nil
+	}
+	return svc.InstalledSkills()
+}
+
+// ImportCSV imports a CSV file into RAG+KG; returns a JSON report (or an error string).
+func (a *App) ImportCSV(path, hint string) string {
+	a.mu.Lock()
+	svc := a.svc
+	a.mu.Unlock()
+	if svc == nil {
+		return "backend not ready"
+	}
+	out, err := svc.ImportCSV(context.Background(), path, hint)
+	if err != nil {
+		return "error: " + err.Error()
+	}
+	return out
+}
+
+// EmitAvatarTest pushes a test emotion + speech event for the avatar test button.
 func (a *App) EmitAvatarTest(emotion string) {
 	a.mu.Lock()
 	driver := a.avatar
