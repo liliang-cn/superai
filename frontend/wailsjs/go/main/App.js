@@ -26,6 +26,10 @@ export function Life() {
   return window['go']['main']['App']['Life']();
 }
 
+export function MCP() {
+  return window['go']['main']['App']['MCP']();
+}
+
 export function MemoryRecall(arg1) {
   return window['go']['main']['App']['MemoryRecall'](arg1);
 }
@@ -44,4 +48,8 @@ export function SaveSettings(arg1) {
 
 export function SendChat(arg1, arg2) {
   return window['go']['main']['App']['SendChat'](arg1, arg2);
+}
+
+export function Skills() {
+  return window['go']['main']['App']['Skills']();
 }

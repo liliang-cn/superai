@@ -1,10 +1,27 @@
 import React, { useEffect, useState } from "react";
 import { useChat } from "../lib/useChat";
-import Transcript from "../components/Transcript";
-import ToolTrace from "../components/ToolTrace";
-import { AppStatus } from "../lib/types";
+import { AppStatus, TraceItem } from "../lib/types";
+import { copyText } from "../lib/format";
 import { Deliverables, ReadWorkspaceFile } from "../../wailsjs/go/main/App";
 import { agent } from "../../wailsjs/go/models";
+import {
+  Conversation,
+  ConversationContent,
+  ConversationEmptyState,
+} from "@/components/ai-elements/conversation";
+import { Message, MessageContent } from "@/components/ai-elements/message";
+import { Response } from "@/components/ai-elements/response";
+import { Actions, Action } from "@/components/ai-elements/actions";
+import {
+  Tool,
+  ToolHeader,
+  ToolContent,
+  ToolInput,
+  ToolOutput,
+  ToolState,
+} from "@/components/ai-elements/tool";
+import { Button } from "@/components/ui/button";
+import { BotIcon, CopyIcon, PlayIcon, Loader2Icon } from "lucide-react";
 
 function fmtSize(n: number): string {
   if (n < 1024) return `${n} B`;
@@ -22,6 +39,45 @@ function iconFor(type: string, path: string): string {
   if (/\.(pdf)$/.test(p)) return "📕";
   if (/\.(html?|css|tsx?|jsx?|go|py)$/.test(p)) return "💻";
   return "📄";
+}
+
+function traceState(status: TraceItem["status"]): ToolState {
+  if (status === "ok") return "output-available";
+  if (status === "fail") return "output-error";
+  return "input-available";
+}
+
+function TraceTool({ t }: { t: TraceItem }) {
+  const state = traceState(t.status);
+  const r = t.result;
+  const errorText =
+    state === "output-error"
+      ? typeof r === "string"
+        ? r
+        : JSON.stringify(r?.error ?? r, null, 2)
+      : undefined;
+  return (
+    <Tool className={t.inner ? "ml-3 border-dashed" : ""}>
+      <ToolHeader type={(t.inner ? "↳ " : "") + t.tool} state={state} />
+      <ToolContent>
+        {t.args && Object.keys(t.args).length > 0 && <ToolInput input={t.args} />}
+        {state !== "input-available" && (
+          <ToolOutput
+            errorText={errorText}
+            output={
+              errorText ? undefined : (
+                <pre>
+                  <code>
+                    {typeof r === "string" ? r : JSON.stringify(r, null, 2)}
+                  </code>
+                </pre>
+              )
+            }
+          />
+        )}
+      </ToolContent>
+    </Tool>
+  );
 }
 
 export default function AgentView({ status }: { status: AppStatus | null }) {
@@ -67,14 +123,6 @@ export default function AgentView({ status }: { status: AppStatus | null }) {
     }
   };
 
-  const empty = (
-    <div className="empty-state">
-      <div className="big">🤖</div>
-      <h3>Autonomous Agent</h3>
-      <p>Give SuperAI a goal and it will plan, use tools, and produce deliverables in your workspace.</p>
-    </div>
-  );
-
   return (
     <div className="view">
       <div className="view-header">
@@ -92,18 +140,76 @@ export default function AgentView({ status }: { status: AppStatus | null }) {
               disabled={chat.sending}
             />
             <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-              <button className="btn" onClick={run} disabled={chat.sending || !task.trim()}>
-                {chat.sending ? <><span className="spinner" /> Running…</> : <>▶ Run task</>}
-              </button>
+              <Button onClick={run} disabled={chat.sending || !task.trim()}>
+                {chat.sending ? (
+                  <>
+                    <Loader2Icon className="size-4 animate-spin" /> Running…
+                  </>
+                ) : (
+                  <>
+                    <PlayIcon className="size-4" /> Run task
+                  </>
+                )}
+              </Button>
               {chat.error && <span style={{ color: "var(--red)", fontSize: 12 }}>⚠ {chat.error}</span>}
             </div>
           </div>
-          <Transcript className="agent-transcript" messages={chat.messages} empty={empty} />
+
+          <Conversation className="agent-transcript">
+            {chat.messages.length === 0 ? (
+              <ConversationEmptyState
+                icon={<BotIcon className="size-10" />}
+                title="Autonomous Agent"
+                description="Give SuperAI a goal and it will plan, use tools, and produce deliverables in your workspace."
+              />
+            ) : (
+              <ConversationContent autoScrollKey={chat.messages.map((m) => m.content).join("|")}>
+                {chat.messages.map((m) => (
+                  <div key={m.id}>
+                    <Message from={m.role}>
+                      <MessageContent variant="flat">
+                        {m.role === "assistant" ? (
+                          m.content ? (
+                            <Response>{m.content}</Response>
+                          ) : m.streaming ? (
+                            <span className="msg-cursor" />
+                          ) : (
+                            "…"
+                          )
+                        ) : (
+                          <span style={{ whiteSpace: "pre-wrap" }}>{m.content}</span>
+                        )}
+                      </MessageContent>
+                    </Message>
+                    {m.role === "assistant" && !m.streaming && m.content && (
+                      <Actions className="mt-1 ml-1">
+                        <Action label="Copy" tooltip="Copy message" onClick={() => copyText(m.content)}>
+                          <CopyIcon className="size-3.5" />
+                        </Action>
+                      </Actions>
+                    )}
+                  </div>
+                ))}
+              </ConversationContent>
+            )}
+          </Conversation>
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", minHeight: 0 }}>
-          <div style={{ flex: 1, minHeight: 0, display: "flex" }}>
-            <ToolTrace trace={chat.trace} />
+        <div className="trace-panel">
+          <div className="trace-head">
+            <span>Tool Trace</span>
+            <span style={{ color: "var(--text-3)", fontWeight: 400 }}>{chat.trace.length}</span>
+          </div>
+          <div className="trace-list" style={{ display: "flex", flexDirection: "column", gap: 8, padding: 8 }}>
+            {chat.trace.length === 0 ? (
+              <div className="trace-empty">
+                No tool activity yet.
+                <br />
+                Tools run during a task appear here live.
+              </div>
+            ) : (
+              chat.trace.map((t) => <TraceTool key={t.id} t={t} />)
+            )}
           </div>
         </div>
       </div>

@@ -24,6 +24,7 @@ interface UseChatResult {
   send: (text: string) => Promise<void>;
   onDone: (cb: () => void) => void;
   reset: () => void;
+  clear: () => void;
 }
 
 export function useChat(): UseChatResult {
@@ -171,5 +172,5 @@ export function useChat(): UseChatResult {
     setLastEmotion("");
   }, []);
 
-  return { sessionId, messages, trace, sending, lastEmotion, error, send, onDone, reset };
+  return { sessionId, messages, trace, sending, lastEmotion, error, send, onDone, reset, clear: reset };
 }

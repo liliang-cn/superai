@@ -71,6 +71,87 @@ export namespace backend {
 	        this.avatar_port = source["avatar_port"];
 	    }
 	}
+	export class SkillInfo {
+	    id: string;
+	    name: string;
+	    description: string;
+	    when_to_use: string;
+	    collection: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SkillInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.description = source["description"];
+	        this.when_to_use = source["when_to_use"];
+	        this.collection = source["collection"];
+	    }
+	}
+
+}
+
+export namespace mcp {
+	
+	export class ToolSummary {
+	    name: string;
+	    description: string;
+	    server_name: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ToolSummary(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.description = source["description"];
+	        this.server_name = source["server_name"];
+	    }
+	}
+	export class ServerStatus {
+	    name: string;
+	    description: string;
+	    command: string;
+	    running: boolean;
+	    tool_count: number;
+	    tools?: ToolSummary[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ServerStatus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.description = source["description"];
+	        this.command = source["command"];
+	        this.running = source["running"];
+	        this.tool_count = source["tool_count"];
+	        this.tools = this.convertValues(source["tools"], ToolSummary);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 
 }
 

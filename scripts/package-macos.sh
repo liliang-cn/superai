@@ -33,8 +33,13 @@ if [[ -n "${SIGN_ID:-}" ]]; then
   codesign --force --sign "$SIGN_ID" "$DMG"
 fi
 
-if [[ -n "${AC_APPLE_ID:-}" && -n "${AC_TEAM_ID:-}" && -n "${AC_PASSWORD:-}" ]]; then
-  echo "==> notarize + staple"
+if [[ -n "${NOTARY_PROFILE:-}" ]]; then
+  echo "==> notarize + staple (keychain profile: $NOTARY_PROFILE)"
+  xcrun notarytool submit "$DMG" --keychain-profile "$NOTARY_PROFILE" --wait
+  xcrun stapler staple "$DMG"
+  xcrun stapler staple "$APP"
+elif [[ -n "${AC_APPLE_ID:-}" && -n "${AC_TEAM_ID:-}" && -n "${AC_PASSWORD:-}" ]]; then
+  echo "==> notarize + staple (apple-id)"
   xcrun notarytool submit "$DMG" --apple-id "$AC_APPLE_ID" --team-id "$AC_TEAM_ID" --password "$AC_PASSWORD" --wait
   xcrun stapler staple "$DMG"
   xcrun stapler staple "$APP"

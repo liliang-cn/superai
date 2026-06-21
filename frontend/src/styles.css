@@ -1,3 +1,92 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+   Tailwind v4 dark-mode wiring: our app toggles theme via
+   document.documentElement.dataset.theme = "light" | "dark" (see App.tsx).
+   Make Tailwind's `dark:` variant follow [data-theme="dark"] so AI Elements
+   (shadcn) components react to the existing toggle.
+--------------------------------------------------------------------------- */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* shadcn / AI Elements design tokens mapped to Tailwind theme so utilities
+   like bg-background, text-foreground, border-border resolve. */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent-color);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border-color);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+/* shadcn CSS-variable theme — LIGHT (default + explicit). Brand accent is
+   our indigo/violet (#6d6cf0). Note: token names that would collide with the
+   hand-written app palette below are suffixed (-color / accent-color). */
+:root,
+[data-theme="light"] {
+  --background: #ffffff;
+  --foreground: #161a22;
+  --card: #ffffff;
+  --card-foreground: #161a22;
+  --popover: #ffffff;
+  --popover-foreground: #161a22;
+  --primary: #6d6cf0;
+  --primary-foreground: #ffffff;
+  --secondary: #f4f6fa;
+  --secondary-foreground: #161a22;
+  --muted: #f4f6fa;
+  --muted-foreground: #69728a;
+  --accent-color: #ececfd;
+  --accent-foreground: #2e2db0;
+  --destructive: #e23a52;
+  --destructive-foreground: #ffffff;
+  --border-color: #dde2ec;
+  --input: #dde2ec;
+  --ring: #6d6cf0;
+  --radius: 0.625rem;
+}
+
+/* shadcn CSS-variable theme — DARK, applied under [data-theme="dark"] so the
+   existing toggle drives it. */
+[data-theme="dark"] {
+  --background: #11141b;
+  --foreground: #f1f3f8;
+  --card: #161a23;
+  --card-foreground: #f1f3f8;
+  --popover: #1c212c;
+  --popover-foreground: #f1f3f8;
+  --primary: #6d6cf0;
+  --primary-foreground: #ffffff;
+  --secondary: #1c212c;
+  --secondary-foreground: #f1f3f8;
+  --muted: #1c212c;
+  --muted-foreground: #8b93a7;
+  --accent-color: #222836;
+  --accent-foreground: #c7c7fb;
+  --destructive: #f0556b;
+  --destructive-foreground: #ffffff;
+  --border-color: #262c39;
+  --input: #2a3140;
+  --ring: #6d6cf0;
+}
+
 :root {
   /* color system — deep slate + indigo/violet accent */
   --bg-0: #0b0d12;
