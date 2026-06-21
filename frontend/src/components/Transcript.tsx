@@ -1,4 +1,6 @@
 import React, { useEffect, useRef } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { ChatMessage } from "../lib/types";
 
 function Bubble({ msg }: { msg: ChatMessage }) {
@@ -8,7 +10,17 @@ function Bubble({ msg }: { msg: ChatMessage }) {
       <div className="msg-avatar">{isUser ? "U" : "AI"}</div>
       <div style={{ minWidth: 0 }}>
         <div className="msg-body">
-          {msg.content || (msg.streaming ? "" : "…")}
+          {isUser ? (
+            <span style={{ whiteSpace: "pre-wrap" }}>{msg.content}</span>
+          ) : msg.content ? (
+            <div className="md">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+            </div>
+          ) : msg.streaming ? (
+            ""
+          ) : (
+            "…"
+          )}
           {msg.streaming && <span className="msg-cursor" />}
         </div>
         {msg.emotion && !msg.streaming && (
