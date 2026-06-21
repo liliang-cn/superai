@@ -282,10 +282,16 @@
   border-color: var(--border-strong);
 }
 
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
+/* Base reset lives in @layer base so Tailwind's utilities layer (px-*, py-*,
+   p-*, m-*, gap-*) can override it — an UNLAYERED `* { padding:0; margin:0 }`
+   beats every layered utility and silently zeroes all AI Elements spacing.
+   The app's own unlayered component CSS still overrides this base reset. */
+@layer base {
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
 }
 
 html, body, #root {
@@ -435,27 +441,11 @@ input, textarea, select { font-family: inherit; }
 
 /* composer */
 .composer { padding: 14px 24px 18px; border-top: 1px solid var(--border); }
-.composer-box {
-  display: flex; align-items: flex-end; gap: 10px;
-  background: var(--bg-2); border: 1px solid var(--border-strong);
-  border-radius: var(--radius); padding: 8px 8px 8px 14px;
-  transition: border-color 0.15s;
-}
-.composer-box:focus-within { border-color: var(--accent-border); }
-.composer textarea {
-  flex: 1; background: none; border: none; color: var(--text-0);
-  resize: none; outline: none; font-size: 14px; line-height: 1.5;
-  max-height: 160px; user-select: text;
-}
-.composer textarea::placeholder { color: var(--text-3); }
-.send-btn {
-  background: var(--accent); color: white; border: none;
-  border-radius: 8px; width: 36px; height: 36px; font-size: 16px;
-  display: grid; place-items: center; flex-shrink: 0;
-  transition: background 0.12s, opacity 0.12s;
-}
-.send-btn:hover:not(:disabled) { background: var(--accent-hover); }
-.send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+/* Composer now uses the AI Elements <PromptInput>; legacy .composer-box /
+   .composer textarea / .send-btn rules were removed — the unlayered
+   `.composer textarea` was overriding the component's Tailwind px-4 py-3
+   padding (text hugged the edge). The textarea keeps text-selectable. */
+.composer textarea { user-select: text; }
 
 /* ---------------- Tool trace ---------------- */
 .trace-panel {
