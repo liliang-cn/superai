@@ -11,10 +11,24 @@ import LifeView from "./views/LifeView";
 import { AppStatus, ViewKey, normalizeStatus } from "./lib/types";
 import { GetStatus } from "../wailsjs/go/main/App";
 
+type Theme = "dark" | "light";
+
 export default function App() {
   const [view, setView] = useState<ViewKey>("chat");
   const [status, setStatus] = useState<AppStatus | null>(null);
   const [loading, setLoading] = useState(true);
+  const [theme, setTheme] = useState<Theme>(
+    () => (localStorage.getItem("superai-theme") as Theme) || "dark"
+  );
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    localStorage.setItem("superai-theme", theme);
+  }, [theme]);
+  const toggleTheme = useCallback(
+    () => setTheme((t) => (t === "dark" ? "light" : "dark")),
+    []
+  );
 
   const refreshStatus = useCallback(async () => {
     try {
@@ -37,7 +51,7 @@ export default function App() {
     <div className="app">
       <Sidebar current={view} onNavigate={setView} />
       <div className="main">
-        <StatusBar status={status} loading={loading} />
+        <StatusBar status={status} loading={loading} theme={theme} onToggleTheme={toggleTheme} />
         <div className="content">
           {view === "chat" && <ChatView status={status} />}
           {view === "agent" && <AgentView status={status} />}

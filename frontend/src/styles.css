@@ -33,6 +33,55 @@
   --font-mono: "SF Mono", "JetBrains Mono", "Fira Code", ui-monospace, Menlo, Consolas, monospace;
 }
 
+/* Light theme — same accent, inverted neutrals. Applied via data-theme="light"
+   on <html>; default (no attr / "dark") keeps the :root values above. */
+[data-theme="light"] {
+  --bg-0: #eef1f6;
+  --bg-1: #ffffff;
+  --bg-2: #f4f6fa;
+  --bg-3: #e9edf4;
+  --bg-hover: #e2e7f0;
+  --border: #dde2ec;
+  --border-strong: #c6cdda;
+
+  --text-0: #161a22;
+  --text-1: #3a4253;
+  --text-2: #69728a;
+  --text-3: #99a1b3;
+
+  --accent: #5b5be6;
+  --accent-hover: #4a4ad8;
+  --accent-soft: rgba(91, 91, 230, 0.10);
+  --accent-border: rgba(91, 91, 230, 0.34);
+
+  --green: #1fae73;
+  --red: #e23a52;
+  --amber: #d6920f;
+  --cyan: #1f9fc4;
+
+  --shadow: 0 10px 34px rgba(30, 42, 76, 0.12);
+}
+
+/* theme toggle button (status bar) */
+.theme-toggle {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  color: var(--text-1);
+  border-radius: var(--radius-sm);
+  width: 30px;
+  height: 26px;
+  font-size: 14px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, border-color 0.15s;
+}
+.theme-toggle:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
