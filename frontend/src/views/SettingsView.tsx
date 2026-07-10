@@ -177,6 +177,21 @@ export default function SettingsView({ onSaved }: { onSaved: () => void }) {
                 </span>
               </div>
             </div>
+            <div className="field">
+              <label>PII redaction (strip personal data before sending to the LLM)</label>
+              <div
+                className="toggle"
+                onClick={() => set("pii_redaction", !s.pii_redaction)}
+                style={{ cursor: "pointer", marginTop: 2 }}
+              >
+                <div className={`switch${s.pii_redaction ? " on" : ""}`}><div className="knob" /></div>
+                <span style={{ fontSize: 13, color: "var(--text-1)" }}>
+                  {s.pii_redaction
+                    ? "On — email / phone / 身份证 / 手机号 / 银行卡 masked before reaching the model (cloud-safe)"
+                    : "Off — the model sees your data as-is (needed when it must act on real PII)"}
+                </span>
+              </div>
+            </div>
           </div>
 
           <div className="settings-actions">

@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	github.com/google/uuid v1.6.0
-	github.com/liliang-cn/agent-go/v2 v2.101.0
+	github.com/liliang-cn/agent-go/v2 v2.105.0
 	github.com/liliang-cn/cortexdb/v2 v2.45.0
 	github.com/wailsapp/wails/v2 v2.12.0
 )
@@ -23,7 +23,7 @@ require (
 	github.com/andybalholm/cascadia v1.3.3 // indirect
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de // indirect
 	github.com/bep/debounce v1.2.1 // indirect
-	github.com/bits-and-blooms/bitset v1.24.2 // indirect
+	github.com/bits-and-blooms/bitset v1.24.4 // indirect
 	github.com/blevesearch/bleve/v2 v2.6.0 // indirect
 	github.com/blevesearch/bleve_index_api v1.3.11 // indirect
 	github.com/blevesearch/geo v0.2.5 // indirect

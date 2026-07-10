@@ -109,6 +109,9 @@ func NewService(s *Settings) (*Service, error) {
 		WithAutonomy(agent.AutonomyProfile{MaxRounds: s.MaxRounds, Scratchpad: true}).
 		WithSkills().
 		WithFileTools() // read_document: Word/Excel/PPT/PDF/images (sandbox-aware)
+	if s.PIIRedaction {
+		b = b.WithPIIRedaction() // strip PII before it reaches the LLM (cloud-safe)
+	}
 	if s.DisablePTC {
 		b = b.WithPTC(false) // direct tool-calling for models that reject PTC's format (e.g. DashScope qwen3.x)
 	}

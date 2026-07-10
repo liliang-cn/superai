@@ -50,6 +50,7 @@ export namespace backend {
 	    max_rounds: number;
 	    headless: boolean;
 	    disable_ptc: boolean;
+	    pii_redaction: boolean;
 	    avatar_port: number;
 	
 	    static createFrom(source: any = {}) {
@@ -68,6 +69,7 @@ export namespace backend {
 	        this.max_rounds = source["max_rounds"];
 	        this.headless = source["headless"];
 	        this.disable_ptc = source["disable_ptc"];
+	        this.pii_redaction = source["pii_redaction"];
 	        this.avatar_port = source["avatar_port"];
 	    }
 	}

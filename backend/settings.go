@@ -36,6 +36,12 @@ type Settings struct {
 	// format — set true for them so the agent uses direct one-tool-per-round calling.
 	DisablePTC bool `json:"disable_ptc"`
 
+	// PIIRedaction, when true, strips personal data (email/phone/中国身份证/
+	// 手机号/银行卡/…) from messages before they're sent to the LLM. Off by
+	// default — a personal assistant often needs to act on your real data; turn
+	// it on when you don't want PII leaving to a cloud provider.
+	PIIRedaction bool `json:"pii_redaction"`
+
 	// Avatar driver server port (127.0.0.1:AvatarPort).
 	AvatarPort int `json:"avatar_port"`
 }
