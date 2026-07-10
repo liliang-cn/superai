@@ -46,6 +46,9 @@ func main() {
 		BackgroundColour: &options.RGBA{R: 14, G: 17, B: 22, A: 1},
 		OnStartup:        app.startup,
 		OnShutdown:       app.shutdown,
+		DragAndDrop: &options.DragAndDrop{
+			EnableFileDrop: true, // native OS file drop -> runtime.OnFileDrop (host paths)
+		},
 		Bind: []interface{}{
 			app,
 		},

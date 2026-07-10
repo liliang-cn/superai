@@ -22,6 +22,10 @@ export function ImportCSV(arg1, arg2) {
   return window['go']['main']['App']['ImportCSV'](arg1, arg2);
 }
 
+export function ImportFiles(arg1) {
+  return window['go']['main']['App']['ImportFiles'](arg1);
+}
+
 export function Life() {
   return window['go']['main']['App']['Life']();
 }
@@ -36,6 +40,10 @@ export function MemoryRecall(arg1) {
 
 export function MemorySkills() {
   return window['go']['main']['App']['MemorySkills']();
+}
+
+export function PickFiles() {
+  return window['go']['main']['App']['PickFiles']();
 }
 
 export function ReadWorkspaceFile(arg1) {

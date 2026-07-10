@@ -14,6 +14,8 @@ export function GetStatus():Promise<Record<string, any>>;
 
 export function ImportCSV(arg1:string,arg2:string):Promise<string>;
 
+export function ImportFiles(arg1:Array<string>):Promise<Array<string>>;
+
 export function Life():Promise<backend.LifeData>;
 
 export function MCP():Promise<Array<mcp.ServerStatus>>;
@@ -21,6 +23,8 @@ export function MCP():Promise<Array<mcp.ServerStatus>>;
 export function MemoryRecall(arg1:string):Promise<string>;
 
 export function MemorySkills():Promise<Array<string>>;
+
+export function PickFiles():Promise<Array<string>>;
 
 export function ReadWorkspaceFile(arg1:string):Promise<string>;
 

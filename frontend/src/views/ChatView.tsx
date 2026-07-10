@@ -1,7 +1,9 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useChat } from "../lib/useChat";
 import { AppStatus } from "../lib/types";
 import { copyText } from "../lib/format";
+import { OnFileDrop, OnFileDropOff } from "../../wailsjs/runtime";
+import { ImportFiles, PickFiles } from "../../wailsjs/go/main/App";
 import {
   Conversation,
   ConversationContent,
@@ -18,25 +20,64 @@ import {
   PromptInputSubmit,
 } from "@/components/ai-elements/prompt-input";
 import { Button } from "@/components/ui/button";
-import { CopyIcon, MessageSquareIcon, Trash2Icon } from "lucide-react";
+import { CopyIcon, MessageSquareIcon, Trash2Icon, PaperclipIcon, XIcon, FileIcon } from "lucide-react";
 import TracePanel from "../components/TracePanel";
 
 export default function ChatView({ status }: { status: AppStatus | null }) {
   const chat = useChat();
   const notReady = status !== null && !status.ready;
   const messages = chat.messages;
+  const [attachments, setAttachments] = useState<string[]>([]);
+  const [importing, setImporting] = useState(false);
+
+  const addPaths = (rels: string[] | null) => {
+    if (!rels || rels.length === 0) return;
+    setAttachments((prev) => Array.from(new Set([...prev, ...rels])));
+  };
+
+  // Native OS file drop -> copy into the agent workspace -> attach the path.
+  useEffect(() => {
+    OnFileDrop((_x, _y, paths) => {
+      if (!paths || paths.length === 0) return;
+      setImporting(true);
+      ImportFiles(paths)
+        .then((rels) => addPaths(rels))
+        .catch(() => {})
+        .finally(() => setImporting(false));
+    }, true);
+    return () => OnFileDropOff();
+  }, []);
+
+  const pickFiles = () => {
+    setImporting(true);
+    PickFiles()
+      .then((rels) => addPaths(rels))
+      .catch(() => {})
+      .finally(() => setImporting(false));
+  };
+
+  const removeAttachment = (p: string) =>
+    setAttachments((prev) => prev.filter((x) => x !== p));
 
   const onSubmit = (msg: { text: string }, e: React.FormEvent<HTMLFormElement>) => {
     const text = msg.text.trim();
-    if (!text || chat.sending) return;
-    chat.send(text);
+    if (chat.sending) return;
+    if (!text && attachments.length === 0) return;
+    let payload = text;
+    if (attachments.length > 0) {
+      const list = attachments.map((p) => `- ${p}`).join("\n");
+      const instruction = text || "读取这些文件并总结要点。";
+      payload = `[附件文件，可用 read_document 工具读取]\n${list}\n\n${instruction}`;
+      setAttachments([]);
+    }
+    chat.send(payload);
     e.currentTarget.reset();
   };
 
   return (
     <div className="view">
       <div className="chat-layout">
-        <div className="chat-main">
+        <div className="chat-main" style={{ ["--wails-drop-target" as any]: "drop" }}>
           <Conversation className="transcript">
             {messages.length === 0 ? (
               <ConversationEmptyState
@@ -96,17 +137,55 @@ export default function ChatView({ status }: { status: AppStatus | null }) {
           )}
 
           <div className="composer">
+            {attachments.length > 0 && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, padding: "0 2px 8px" }}>
+                {attachments.map((p) => (
+                  <span
+                    key={p}
+                    title={p}
+                    style={{
+                      display: "inline-flex", alignItems: "center", gap: 6,
+                      fontSize: 12, padding: "3px 8px", borderRadius: 8,
+                      background: "var(--accent-soft)", color: "var(--accent-hover)",
+                      border: "1px solid var(--accent-border)", maxWidth: 260,
+                    }}
+                  >
+                    <FileIcon className="size-3.5" style={{ flex: "none" }} />
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {p.replace(/^uploads\//, "")}
+                    </span>
+                    <XIcon
+                      className="size-3.5"
+                      style={{ cursor: "pointer", flex: "none" }}
+                      onClick={() => removeAttachment(p)}
+                    />
+                  </span>
+                ))}
+              </div>
+            )}
             <PromptInput onSubmit={onSubmit}>
               <PromptInputTextarea
                 placeholder={
                   notReady
                     ? "Configure LLM in Settings first…"
-                    : "Message SuperAI…  (Enter to send, Shift+Enter for newline)"
+                    : "Message SuperAI…  (drag files in, or 📎, then ask)"
                 }
                 disabled={chat.sending}
               />
               <PromptInputToolbar>
                 <PromptInputTools>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-muted-foreground"
+                    onClick={pickFiles}
+                    disabled={chat.sending || importing}
+                    title="Attach files (Word / Excel / PPT / PDF / image)"
+                  >
+                    <PaperclipIcon className="size-3.5" />
+                    {importing ? "Importing…" : "Attach"}
+                  </Button>
                   <Button
                     type="button"
                     variant="ghost"
