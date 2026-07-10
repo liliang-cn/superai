@@ -108,7 +108,8 @@ func NewService(s *Settings) (*Service, error) {
 		WithDeliverables(true).
 		WithAutonomy(agent.AutonomyProfile{MaxRounds: s.MaxRounds, Scratchpad: true}).
 		WithSkills().
-		WithFileTools() // read_document: Word/Excel/PPT/PDF/images (sandbox-aware)
+		WithFileTools(). // read_document: Word/Excel/PPT/PDF/images (sandbox-aware)
+		WithOCR()        // ocr_image: local OCR via ollama glm-ocr (localhost:11434), stays offline
 	if s.PIIRedaction {
 		b = b.WithPIIRedaction() // strip PII before it reaches the LLM (cloud-safe)
 	}
