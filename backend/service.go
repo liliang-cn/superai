@@ -107,7 +107,8 @@ func NewService(s *Settings) (*Service, error) {
 		WithVision(true).
 		WithDeliverables(true).
 		WithAutonomy(agent.AutonomyProfile{MaxRounds: s.MaxRounds, Scratchpad: true}).
-		WithSkills()
+		WithSkills().
+		WithFileTools() // read_document: Word/Excel/PPT/PDF/images (sandbox-aware)
 	if s.DisablePTC {
 		b = b.WithPTC(false) // direct tool-calling for models that reject PTC's format (e.g. DashScope qwen3.x)
 	}
