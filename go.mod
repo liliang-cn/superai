@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	github.com/google/uuid v1.6.0
-	github.com/liliang-cn/agent-go/v2 v2.100.0
+	github.com/liliang-cn/agent-go/v2 v2.101.0
 	github.com/liliang-cn/cortexdb/v2 v2.45.0
 	github.com/wailsapp/wails/v2 v2.12.0
 )

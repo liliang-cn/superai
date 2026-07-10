@@ -130,7 +130,7 @@ func (a *App) GetStatus() map[string]any {
 // SendChat streams a chat turn. Streaming output is delivered via Wails events
 // ("chat:event", "chat:done", "chat:error"); avatar lifecycle/emotion events
 // are pushed through the avatar driver. Returns "ok" once the goroutine starts.
-func (a *App) SendChat(sessionID, message string) string {
+func (a *App) SendChat(sessionID, message string, imagePaths []string) string {
 	a.mu.Lock()
 	svc := a.svc
 	driver := a.avatar
@@ -147,7 +147,7 @@ func (a *App) SendChat(sessionID, message string) string {
 
 		driver.Emit(backend.AvatarEvent{Type: "state", State: backend.AvatarStateThinking})
 
-		final, err := svc.Stream(ctx, sessionID, message, func(ev *agent.Event) {
+		final, err := svc.Stream(ctx, sessionID, message, imagePaths, func(ev *agent.Event) {
 			runtime.EventsEmit(a.ctx, "chat:event", map[string]any{
 				"type":      string(ev.Type),
 				"content":   ev.Content,

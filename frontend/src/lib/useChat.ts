@@ -21,7 +21,7 @@ interface UseChatResult {
   sending: boolean;
   lastEmotion: string;
   error: string;
-  send: (text: string) => Promise<void>;
+  send: (text: string, imagePaths?: string[]) => Promise<void>;
   onDone: (cb: () => void) => void;
   reset: () => void;
   clear: () => void;
@@ -140,9 +140,9 @@ export function useChat(): UseChatResult {
   }, [finishStreaming]);
 
   const send = useCallback(
-    async (text: string) => {
+    async (text: string, imagePaths: string[] = []) => {
       const trimmed = text.trim();
-      if (!trimmed || sending) return;
+      if ((!trimmed && imagePaths.length === 0) || sending) return;
       setError("");
       setTrace([]);
       const userMsg: ChatMessage = { id: makeId(), role: "user", content: trimmed };
@@ -157,7 +157,7 @@ export function useChat(): UseChatResult {
       setMessages((prev) => [...prev, userMsg, assistantMsg]);
       setSending(true);
       try {
-        await SendChat(sessionId, trimmed);
+        await SendChat(sessionId, trimmed, imagePaths);
       } catch (e: any) {
         setError(String(e?.message || e));
         finishStreaming();

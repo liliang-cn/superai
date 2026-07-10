@@ -23,6 +23,8 @@ import { Button } from "@/components/ui/button";
 import { CopyIcon, MessageSquareIcon, Trash2Icon, PaperclipIcon, XIcon, FileIcon } from "lucide-react";
 import TracePanel from "../components/TracePanel";
 
+const IMAGE_RE = /\.(png|jpe?g|gif|webp|bmp|tiff?)$/i;
+
 export default function ChatView({ status }: { status: AppStatus | null }) {
   const chat = useChat();
   const notReady = status !== null && !status.ready;
@@ -63,14 +65,23 @@ export default function ChatView({ status }: { status: AppStatus | null }) {
     const text = msg.text.trim();
     if (chat.sending) return;
     if (!text && attachments.length === 0) return;
+    const images = attachments.filter((p) => IMAGE_RE.test(p));
+    const docs = attachments.filter((p) => !IMAGE_RE.test(p));
     let payload = text;
     if (attachments.length > 0) {
-      const list = attachments.map((p) => `- ${p}`).join("\n");
-      const instruction = text || "读取这些文件并总结要点。";
-      payload = `[附件文件，可用 read_document 工具读取]\n${list}\n\n${instruction}`;
+      const refs: string[] = [];
+      if (docs.length)
+        refs.push(`[文档附件，可用 read_document 工具读取]\n${docs.map((p) => `- ${p}`).join("\n")}`);
+      if (images.length)
+        refs.push(`[图片附件已随消息发送给视觉模型，可直接查看]\n${images.map((p) => `- ${p}`).join("\n")}`);
+      const instruction =
+        text || (images.length && !docs.length ? "描述这张图片。" : "读取这些文件并总结要点。");
+      payload = `${refs.join("\n\n")}\n\n${instruction}`;
       setAttachments([]);
     }
-    chat.send(payload);
+    // Images go straight to the vision model as multimodal input; docs are read
+    // via read_document from their workspace path referenced in the text.
+    chat.send(payload, images);
     e.currentTarget.reset();
   };
 

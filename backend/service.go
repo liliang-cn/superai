@@ -199,11 +199,29 @@ func (s *Service) Close() error {
 
 // Stream runs one turn, forwarding every agent event to emit, and returns the
 // final completion text.
-func (s *Service) Stream(ctx context.Context, sessionID, message string, emit func(ev *agent.Event)) (string, error) {
-	ch, err := s.svc.RunStreamWithOptions(ctx, message,
+func (s *Service) Stream(ctx context.Context, sessionID, message string, imagePaths []string, emit func(ev *agent.Event)) (string, error) {
+	opts := []agent.RunOption{
 		agent.WithSessionID(sessionID),
 		agent.WithMaxTurns(s.settings.MaxRounds),
-	)
+	}
+	// Route dropped images straight to the vision model as multimodal input
+	// (workspace-relative paths -> absolute, so the provider can read them).
+	if s.svc.VisionEnabled() && len(imagePaths) > 0 {
+		root := ""
+		if s.sb != nil {
+			root = s.sb.Workspace()
+		}
+		abs := make([]string, 0, len(imagePaths))
+		for _, p := range imagePaths {
+			if filepath.IsAbs(p) || root == "" {
+				abs = append(abs, p)
+			} else {
+				abs = append(abs, filepath.Join(root, p))
+			}
+		}
+		opts = append(opts, agent.WithInputImages(abs...))
+	}
+	ch, err := s.svc.RunStreamWithOptions(ctx, message, opts...)
 	if err != nil {
 		return "", err
 	}

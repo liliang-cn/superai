@@ -30,6 +30,6 @@ export function ReadWorkspaceFile(arg1:string):Promise<string>;
 
 export function SaveSettings(arg1:backend.Settings):Promise<void>;
 
-export function SendChat(arg1:string,arg2:string):Promise<string>;
+export function SendChat(arg1:string,arg2:string,arg3:Array<string>):Promise<string>;
 
 export function Skills():Promise<Array<backend.SkillInfo>>;
