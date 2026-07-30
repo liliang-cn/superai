@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/liliang-cn/agent-go/v2/pkg/agent"
 	"github.com/liliang-cn/agent-go/v2/pkg/mcp"
 	"github.com/liliang-cn/superai-desktop/backend"
@@ -27,6 +28,11 @@ type App struct {
 	// loginCh is non-nil while a provider login is waiting for the user; it
 	// carries the manually pasted callback URL.
 	loginCh chan string
+
+	// emitFn overrides where frontend events go. Only tests set it: the Wails
+	// runtime calls log.Fatalf when EventsEmit is handed a context it did not
+	// create, which would take the whole test binary down.
+	emitFn func(name string, payload map[string]any)
 
 	buildErr string
 	proxyErr string
@@ -367,11 +373,22 @@ func (a *App) CLIProxySubmitPrompt(value string) string {
 	}
 }
 
-func (a *App) emitLogin(status, provider, message string) {
+// emit delivers one payload to the frontend. Before startup there is no window
+// and nothing can be listening, so the event is dropped rather than emitted
+// against a nil context (which the Wails runtime treats as fatal).
+func (a *App) emit(name string, payload map[string]any) {
+	if a.emitFn != nil {
+		a.emitFn(name, payload)
+		return
+	}
 	if a.ctx == nil {
 		return
 	}
-	runtime.EventsEmit(a.ctx, "cliproxy:login", map[string]any{
+	runtime.EventsEmit(a.ctx, name, payload)
+}
+
+func (a *App) emitLogin(status, provider, message string) {
+	a.emit("cliproxy:login", map[string]any{
 		"status":   status,
 		"provider": provider,
 		"message":  message,
@@ -405,16 +422,33 @@ func (a *App) GetStatus() map[string]any {
 
 // SendChat streams a chat turn. Streaming output is delivered via Wails events
 // ("chat:event", "chat:done", "chat:error"); avatar lifecycle/emotion events
-// are pushed through the avatar driver. Returns "ok" once the goroutine starts.
+// are pushed through the avatar driver.
+//
+// The return value is the request id every one of those events is tagged with
+// under "requestId" — one conversation may have several asks in flight, and
+// without the tag the second ask's stream lands in the first one's bubble. An
+// empty string means nothing was started (the error event carries the reason).
 func (a *App) SendChat(sessionID, message string, imagePaths []string) string {
+	requestID := uuid.NewString()
+
 	a.mu.Lock()
 	svc := a.svc
 	driver := a.avatar
+	buildErr := a.buildErr
 	a.mu.Unlock()
 
 	if svc == nil {
-		runtime.EventsEmit(a.ctx, "chat:error", map[string]any{"error": "backend not ready: " + a.buildErr})
-		return "error"
+		// The id is returned even though nothing was started. Withholding it
+		// (returning "") orphans the error event below: the caller cannot bind
+		// an id it never received, so the reason the backend is unready — the
+		// build error — becomes unreachable and the UI can only show a generic
+		// message. Handing the id back costs nothing and lets the failure be
+		// reported against the ask that caused it.
+		a.emit("chat:error", map[string]any{
+			"requestId": requestID,
+			"error":     "backend not ready: " + buildErr,
+		})
+		return requestID
 	}
 
 	go func() {
@@ -424,7 +458,10 @@ func (a *App) SendChat(sessionID, message string, imagePaths []string) string {
 		driver.Emit(backend.AvatarEvent{Type: "state", State: backend.AvatarStateThinking})
 
 		final, err := svc.Stream(ctx, sessionID, message, imagePaths, func(ev *agent.Event) {
-			runtime.EventsEmit(a.ctx, "chat:event", map[string]any{
+			// Every type is forwarded, unfiltered: "thinking" and "state_update"
+			// are the only progress the UI has while PTC writes its code.
+			a.emit("chat:event", map[string]any{
+				"requestId": requestID,
 				"type":      string(ev.Type),
 				"content":   ev.Content,
 				"tool":      ev.ToolName,
@@ -444,7 +481,7 @@ func (a *App) SendChat(sessionID, message string, imagePaths []string) string {
 
 		if err != nil {
 			driver.Emit(backend.AvatarEvent{Type: "state", State: backend.AvatarStateIdle})
-			runtime.EventsEmit(a.ctx, "chat:error", map[string]any{"error": err.Error()})
+			a.emit("chat:error", map[string]any{"requestId": requestID, "error": err.Error()})
 			return
 		}
 
@@ -456,10 +493,10 @@ func (a *App) SendChat(sessionID, message string, imagePaths []string) string {
 			driver.Emit(backend.AvatarEvent{Type: "speech", Text: reply})
 		}
 		driver.Emit(backend.AvatarEvent{Type: "state", State: backend.AvatarStateIdle})
-		runtime.EventsEmit(a.ctx, "chat:done", map[string]any{"final": reply, "emotion": emotion})
+		a.emit("chat:done", map[string]any{"requestId": requestID, "final": reply, "emotion": emotion})
 	}()
 
-	return "ok"
+	return requestID
 }
 
 // Deliverables returns the files a conversation produced. An empty session id
