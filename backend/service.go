@@ -111,8 +111,14 @@ func NewService(s *Settings) (*Service, error) {
 	}
 
 	// --- Browser (optional; degrade gracefully if chromedp/Chrome is missing). ---
+	//
+	// Launching Chrome costs ~1s, every time. That is the single largest chunk of
+	// NewService, so it is skippable: a test that never browses should not pay
+	// for it, and neither should a launch where the user has no use for it.
 	var br browser.Browser
-	if b, berr := browser.NewChromedp(browser.WithHeadless(s.Headless)); berr != nil {
+	if s.DisableBrowser || strings.TrimSpace(os.Getenv("SUPERAI_NO_BROWSER")) != "" {
+		log.Printf("superai: browser disabled by configuration")
+	} else if b, berr := browser.NewChromedp(browser.WithHeadless(s.Headless)); berr != nil {
 		log.Printf("superai: browser disabled (%v)", berr)
 	} else {
 		br = b

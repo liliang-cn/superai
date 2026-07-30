@@ -30,6 +30,12 @@ type Settings struct {
 	MaxRounds int  `json:"max_rounds"`
 	Headless  bool `json:"headless"`
 
+	// DisableBrowser skips attaching a browser. Launching Chrome costs about a
+	// second of every startup, so it is worth turning off when the agent will
+	// not be browsing. The SUPERAI_NO_BROWSER env var does the same, which is
+	// what the tests use.
+	DisableBrowser bool `json:"disable_browser"`
+
 	// DisablePTC turns off Programmatic Tool Calling (the model writes JS that
 	// drives tools in a sandbox, so one round does several tool calls).
 	//

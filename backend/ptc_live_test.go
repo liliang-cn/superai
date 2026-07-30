@@ -56,6 +56,8 @@ func prepareLiveHome(t *testing.T) string {
 		}
 	}
 	t.Setenv("SUPERAI_DESKTOP_HOME", home)
+	// Chrome costs ~1s per NewService and no test here browses.
+	t.Setenv("SUPERAI_NO_BROWSER", "1")
 	return home
 }
 

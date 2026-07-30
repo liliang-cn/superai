@@ -79,6 +79,8 @@ func newConcurrentService(t *testing.T, delay time.Duration) (*Service, *slowLLM
 	t.Helper()
 	home := t.TempDir()
 	t.Setenv("SUPERAI_DESKTOP_HOME", home)
+	// Chrome costs ~1s per NewService and no test here browses.
+	t.Setenv("SUPERAI_NO_BROWSER", "1")
 
 	llm := &slowLLM{delay: delay}
 	svc, err := NewService(&Settings{
@@ -107,7 +109,7 @@ type askResult struct {
 // TestConcurrentAsksSameSession is the load-bearing question: two overlapping
 // asks on ONE session id.
 func TestConcurrentAsksSameSession(t *testing.T) {
-	svc, llm := newConcurrentService(t, 700*time.Millisecond)
+	svc, llm := newConcurrentService(t, 120*time.Millisecond)
 
 	tags := []string{"ALPHA", "BRAVO"}
 	results := make([]askResult, len(tags))
@@ -159,17 +161,18 @@ func TestConcurrentAsksSameSession(t *testing.T) {
 	}
 
 	// 3. They must actually have overlapped — otherwise something serialised
-	//    them and the test proved nothing about concurrency.
-	if elapsed > 1600*time.Millisecond {
-		t.Logf("NOTE: %.1fs for two %.1fs asks suggests they were serialised, not run in parallel",
-			elapsed.Seconds(), (700 * time.Millisecond).Seconds())
+	//    them and the test proved nothing about concurrency. The delay only has
+	//    to be long enough for that; keep it small, it is pure test latency.
+	if elapsed > 900*time.Millisecond {
+		t.Logf("NOTE: %.2fs for two 0.12s asks suggests they were serialised, not run in parallel",
+			elapsed.Seconds())
 	}
 }
 
 // TestConcurrentAsksSeparateSessions is the control: if this passes and the
 // shared-session test does not, the session is the thing that cannot be shared.
 func TestConcurrentAsksSeparateSessions(t *testing.T) {
-	svc, _ := newConcurrentService(t, 500*time.Millisecond)
+	svc, _ := newConcurrentService(t, 100*time.Millisecond)
 
 	tags := []string{"ALPHA", "BRAVO", "CHARLIE"}
 	results := make([]askResult, len(tags))
@@ -200,7 +203,7 @@ func TestConcurrentAsksSeparateSessions(t *testing.T) {
 // two overlapping asks, the stored conversation must contain both exchanges and
 // no torn or duplicated turns.
 func TestConcurrentSessionHistoryStaysCoherent(t *testing.T) {
-	svc, _ := newConcurrentService(t, 400*time.Millisecond)
+	svc, _ := newConcurrentService(t, 80*time.Millisecond)
 
 	var wg sync.WaitGroup
 	for _, tag := range []string{"ALPHA", "BRAVO"} {
@@ -241,7 +244,7 @@ func TestConcurrentSessionHistoryStaysCoherent(t *testing.T) {
 // does not store an assistant turn either, then nothing about concurrency is to
 // blame and the streaming path simply persists replies elsewhere.
 func TestSingleAskHistory(t *testing.T) {
-	svc, _ := newConcurrentService(t, 50*time.Millisecond)
+	svc, _ := newConcurrentService(t, 20*time.Millisecond)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
