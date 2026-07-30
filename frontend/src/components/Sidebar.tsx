@@ -1,13 +1,11 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
+import { PanelLeftCloseIcon, PanelLeftOpenIcon } from "lucide-react";
 import { ViewKey } from "../lib/types";
 
 const NAV: { section: string; items: { key: ViewKey; label: string; icon: string }[] }[] = [
   {
     section: "Workspace",
-    items: [
-      { key: "chat", label: "Chat", icon: "💬" },
-      { key: "agent", label: "Agent", icon: "🤖" },
-    ],
+    items: [{ key: "chat", label: "Chat", icon: "💬" }],
   },
   {
     section: "Knowledge",
@@ -28,6 +26,8 @@ const NAV: { section: string; items: { key: ViewKey; label: string; icon: string
   },
 ];
 
+const OPEN_KEY = "superai-sidebar-open";
+
 export default function Sidebar({
   current,
   onNavigate,
@@ -35,33 +35,54 @@ export default function Sidebar({
   current: ViewKey;
   onNavigate: (v: ViewKey) => void;
 }) {
+  const [open, setOpen] = useState(() => localStorage.getItem(OPEN_KEY) !== "0");
+
+  useEffect(() => {
+    localStorage.setItem(OPEN_KEY, open ? "1" : "0");
+  }, [open]);
+
+  // Collapsed keeps the icons rather than hiding the nav outright — navigation
+  // stays one click away, it just stops spending width on labels.
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar${open ? "" : " collapsed"}`}>
       <div className="brand">
         <div className="brand-logo">S</div>
-        <div>
-          <div className="brand-name">SuperAI</div>
-          <div className="brand-sub">Desktop</div>
-        </div>
+        {open && (
+          <div className="brand-text">
+            <div className="brand-name">SuperAI</div>
+            <div className="brand-sub">Desktop</div>
+          </div>
+        )}
       </div>
       <nav className="nav">
         {NAV.map((group) => (
           <div key={group.section}>
-            <div className="nav-section">{group.section}</div>
+            {open && <div className="nav-section">{group.section}</div>}
             {group.items.map((it) => (
               <button
                 key={it.key}
                 className={`nav-item${current === it.key ? " active" : ""}`}
                 onClick={() => onNavigate(it.key)}
+                title={open ? undefined : it.label}
               >
                 <span className="ic">{it.icon}</span>
-                {it.label}
+                {open && it.label}
               </button>
             ))}
           </div>
         ))}
       </nav>
-      <div className="sidebar-footer">AgentGo framework</div>
+      <div className="sidebar-footer">
+        <button
+          type="button"
+          className="panel-toggle"
+          onClick={() => setOpen((v) => !v)}
+          title={open ? "Collapse sidebar" : "Expand sidebar"}
+          aria-label={open ? "Collapse sidebar" : "Expand sidebar"}
+        >
+          {open ? <PanelLeftCloseIcon className="size-4" /> : <PanelLeftOpenIcon className="size-4" />}
+        </button>
+      </div>
     </aside>
   );
 }

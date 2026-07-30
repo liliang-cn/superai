@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* AIGUI block styles: KaTeX needs its own stylesheet to lay math out, and the
+   citation plugin ships the markup for source lists. */
+@import "@ai-gui/plugin-katex/style.css";
+
 /* ---------------------------------------------------------------------------
    Tailwind v4 dark-mode wiring: our app toggles theme via
    document.documentElement.dataset.theme = "light" | "dark" (see App.tsx).
@@ -319,20 +323,29 @@ input, textarea, select { font-family: inherit; }
 
 /* ---------------- App shell ---------------- */
 .app {
+  /* The sidebar sets its own width so it can collapse itself. */
   display: grid;
-  grid-template-columns: 232px 1fr;
+  grid-template-columns: auto 1fr;
   grid-template-rows: 100%;
   height: 100%;
 }
 
 /* ---------------- Sidebar ---------------- */
 .sidebar {
+  width: 232px;
   background: var(--bg-1);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   padding: 18px 12px;
+  transition: width 0.16s ease, padding 0.16s ease;
 }
+.sidebar.collapsed { width: 60px; padding: 18px 8px; }
+.sidebar.collapsed .brand { flex-direction: column; gap: 8px; padding: 0 0 14px; }
+.sidebar.collapsed .nav-item { justify-content: center; padding: 9px 0; }
+.sidebar.collapsed .nav-item .ic { margin: 0; }
+.sidebar.collapsed .nav > div + div { margin-top: 8px; }
+.brand-text { min-width: 0; }
 
 .brand {
   display: flex;
@@ -367,7 +380,12 @@ input, textarea, select { font-family: inherit; }
 .nav-item.active { background: var(--accent-soft); color: var(--accent-hover); }
 .nav-item .ic { width: 17px; text-align: center; opacity: 0.9; font-size: 15px; }
 
-.sidebar-footer { margin-top: auto; padding: 10px 8px 0; font-size: 11px; color: var(--text-3); }
+.sidebar-footer {
+  margin-top: auto; padding: 10px 4px 0;
+  display: flex; align-items: center;
+  border-top: 1px solid var(--border);
+}
+.sidebar.collapsed .sidebar-footer { justify-content: center; padding: 10px 0 0; }
 
 /* ---------------- Main column ---------------- */
 .main { display: flex; flex-direction: column; min-width: 0; background: var(--bg-0); }
@@ -404,7 +422,9 @@ input, textarea, select { font-family: inherit; }
 .view-desc { color: var(--text-2); font-size: 13px; margin-top: 3px; }
 
 /* ---------------- Chat ---------------- */
-.chat-layout { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 330px; }
+/* The trace panel owns its own width so it can collapse itself without the
+   layout having to know whether it is open. */
+.chat-layout { position: relative; flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; }
 .chat-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 
 .transcript { flex: 1; overflow-y: auto; padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; }
@@ -449,9 +469,38 @@ input, textarea, select { font-family: inherit; }
 
 /* ---------------- Tool trace ---------------- */
 .trace-panel {
+  width: 330px;
   border-left: 1px solid var(--border);
   background: var(--bg-1);
   display: flex; flex-direction: column; min-height: 0;
+  transition: width 0.16s ease;
+}
+.trace-panel.collapsed {
+  width: 0; border-left: none; overflow: visible;
+}
+.trace-panel.collapsed .panel-toggle {
+  position: absolute; top: 10px; right: 10px; z-index: 2;
+  background: var(--bg-1); border: 1px solid var(--border);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+.trace-panel.collapsed .panel-toggle:hover { background: var(--bg-hover); }
+
+/* Shared collapse/expand affordance for the side panels. */
+.panel-toggle {
+  position: relative;
+  display: grid; place-items: center;
+  width: 28px; height: 28px; border-radius: 7px; flex: none;
+  background: none; border: none; color: var(--text-2); cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.panel-toggle:hover { background: var(--bg-hover); color: var(--text-0); }
+.panel-toggle.inline { width: 22px; height: 22px; margin: -4px -4px -4px 0; }
+.panel-badge {
+  position: absolute; top: -3px; right: -4px;
+  min-width: 15px; height: 15px; padding: 0 3px;
+  display: grid; place-items: center;
+  border-radius: 8px; background: var(--accent); color: white;
+  font-size: 9.5px; font-weight: 700; line-height: 1;
 }
 .trace-head {
   padding: 13px 16px; border-bottom: 1px solid var(--border);
@@ -475,15 +524,6 @@ input, textarea, select { font-family: inherit; }
 .trace-event { color: var(--text-3); font-style: italic; padding: 4px 8px; font-size: 11px; }
 
 /* ---------------- Agent view ---------------- */
-.agent-layout { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 330px; }
-.agent-main { display: flex; flex-direction: column; min-height: 0; padding: 20px 24px; gap: 14px; }
-.task-input-wrap { display: flex; flex-direction: column; gap: 10px; }
-.task-textarea {
-  background: var(--bg-2); border: 1px solid var(--border-strong); border-radius: var(--radius);
-  color: var(--text-0); padding: 14px; font-size: 14px; resize: vertical; min-height: 92px; outline: none; user-select: text;
-}
-.task-textarea:focus { border-color: var(--accent-border); }
-.agent-transcript { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; padding-top: 4px; }
 
 /* deliverables */
 .deliverables-panel { border-left: 1px solid var(--border); background: var(--bg-1); display: flex; flex-direction: column; min-height: 0; }
@@ -683,4 +723,57 @@ input, textarea, select { font-family: inherit; }
 .report-error {
   background: rgba(240,85,107,0.08); border: 1px solid rgba(240,85,107,0.3); color: var(--red);
   border-radius: var(--radius); padding: 12px 14px; font-size: 13px; white-space: pre-wrap; word-break: break-word; user-select: text;
+}
+
+/* ---------------- Chat history ---------------- */
+.chat-toolbar {
+  display: flex; gap: 8px; align-items: center;
+  padding: 10px 24px 0;
+}
+.history-list {
+  flex: 1; overflow-y: auto; padding: 12px 24px 20px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.history-item {
+  display: flex; flex-direction: column; gap: 3px; text-align: left;
+  color: var(--text-0);
+}
+.history-title { font-size: 13px; font-weight: 500; }
+.history-meta { font-size: 11px; color: var(--text-3); }
+.history-row { display: flex; align-items: stretch; gap: 6px; }
+.history-row .history-item { flex: 1; }
+.history-delete { align-self: center; flex: none; }
+
+/* A history row is the conversation button plus its delete affordance. */
+.history-row {
+  display: flex; align-items: stretch; gap: 4px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-1); border: 1px solid var(--border);
+  transition: background 0.12s, border-color 0.12s;
+}
+.history-row:hover { background: var(--bg-hover); border-color: var(--border-strong); }
+.history-row.active { border-color: var(--accent); background: var(--accent-soft); }
+.history-row .history-item {
+  flex: 1; min-width: 0; background: none; border: none;
+  padding: 10px 12px; border-radius: var(--radius-sm);
+}
+.history-row .history-title { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.history-del { align-self: center; margin-right: 6px; opacity: 0; }
+.history-row:hover .history-del { opacity: 1; }
+
+/* ---------------- Files a conversation produced ---------------- */
+.deliv-bar {
+  border-top: 1px solid var(--border);
+  background: var(--bg-1);
+  max-height: 220px; display: flex; flex-direction: column;
+}
+.deliv-toggle {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: none; border: none; padding: 0; color: inherit;
+  font: inherit; text-transform: inherit; letter-spacing: inherit;
+}
+.deliv-toggle:hover { color: var(--text-0); }
+.deliv-grid {
+  overflow-y: auto; padding: 10px;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px;
 }

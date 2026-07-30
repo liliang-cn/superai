@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { EventsOn } from "../../wailsjs/runtime";
-import { SendChat } from "../../wailsjs/go/main/App";
+import { ChatHistory, SendChat } from "../../wailsjs/go/main/App";
 import { ChatEvent, ChatMessage, ChatDone, ChatError, TraceItem } from "./types";
 
 let sessionCounter = 0;
@@ -25,10 +25,16 @@ interface UseChatResult {
   onDone: (cb: () => void) => void;
   reset: () => void;
   clear: () => void;
+  /** Restore a past conversation into the transcript and continue it. */
+  loadSession: (id: string) => Promise<void>;
+  /** Start a fresh conversation, leaving the previous one in history. */
+  newSession: () => void;
 }
 
 export function useChat(): UseChatResult {
-  const sessionId = useRef<string>(makeId()).current;
+  // The session is state, not a fixed ref: picking a conversation out of
+  // history means continuing that session id, not starting a new one.
+  const [sessionId, setSessionId] = useState<string>(makeId);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [trace, setTrace] = useState<TraceItem[]>([]);
   const [sending, setSending] = useState(false);
@@ -177,5 +183,28 @@ export function useChat(): UseChatResult {
     setLastEmotion("");
   }, []);
 
-  return { sessionId, messages, trace, sending, lastEmotion, error, send, onDone, reset, clear: reset };
+  const loadSession = useCallback(async (id: string) => {
+    const turns = await ChatHistory(id);
+    setMessages(
+      (turns || []).map((t) => ({
+        id: makeId(),
+        role: t.role as ChatMessage["role"],
+        content: t.content,
+        emotion: t.emotion || undefined,
+      })),
+    );
+    setTrace([]);
+    setError("");
+    setSessionId(id);
+  }, []);
+
+  const newSession = useCallback(() => {
+    setSessionId(makeId());
+    reset();
+  }, [reset]);
+
+  return {
+    sessionId, messages, trace, sending, lastEmotion, error,
+    send, onDone, reset, clear: reset, loadSession, newSession,
+  };
 }

@@ -62,16 +62,16 @@ export const ConversationEmptyState = ({
     )}
     {...props}
   >
-    {children ?? (
-      <>
-        {icon && <div className="text-muted-foreground">{icon}</div>}
-        <div className="space-y-1">
-          <h3 className="font-medium text-sm">{title}</h3>
-          {description && (
-            <p className="text-muted-foreground text-sm">{description}</p>
-          )}
-        </div>
-      </>
-    )}
+    {icon && <div className="text-muted-foreground">{icon}</div>}
+    <div className="space-y-1">
+      <h3 className="font-medium text-sm">{title}</h3>
+      {description && (
+        <p className="text-muted-foreground text-sm">{description}</p>
+      )}
+    </div>
+    {/* Children add to the empty state rather than replacing it: callers pass a
+        conditional hint (`{notReady && …}`), and a false child used to swallow
+        the icon and title with it, leaving the pane blank. */}
+    {children}
   </div>
 );

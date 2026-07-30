@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
+import { PanelRightCloseIcon, PanelRightOpenIcon } from "lucide-react";
 import { TraceItem } from "../lib/types";
 import {
   Tool,
@@ -48,6 +49,8 @@ export function TraceTool({ t }: { t: TraceItem }) {
   );
 }
 
+const OPEN_KEY = "superai-trace-open";
+
 export default function TracePanel({
   trace,
   title = "Tool Trace",
@@ -55,11 +58,47 @@ export default function TracePanel({
   trace: TraceItem[];
   title?: string;
 }) {
+  const [open, setOpen] = useState(() => localStorage.getItem(OPEN_KEY) !== "0");
+
+  useEffect(() => {
+    localStorage.setItem(OPEN_KEY, open ? "1" : "0");
+  }, [open]);
+
+  // Collapsed: a rail wide enough for the toggle, keeping the tool count
+  // visible so activity while it is hidden is not silent.
+  if (!open) {
+    return (
+      <div className="trace-panel collapsed">
+        <button
+          type="button"
+          className="panel-toggle"
+          onClick={() => setOpen(true)}
+          title={`Show ${title.toLowerCase()}`}
+          aria-label={`Show ${title.toLowerCase()}`}
+        >
+          <PanelRightOpenIcon className="size-4" />
+          {trace.length > 0 && <span className="panel-badge">{trace.length}</span>}
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="trace-panel">
       <div className="trace-head">
         <span>{title}</span>
-        <span style={{ color: "var(--text-3)", fontWeight: 400 }}>{trace.length}</span>
+        <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ color: "var(--text-3)", fontWeight: 400 }}>{trace.length}</span>
+          <button
+            type="button"
+            className="panel-toggle inline"
+            onClick={() => setOpen(false)}
+            title={`Hide ${title.toLowerCase()}`}
+            aria-label={`Hide ${title.toLowerCase()}`}
+          >
+            <PanelRightCloseIcon className="size-4" />
+          </button>
+        </span>
       </div>
       <div
         className="trace-list"

@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useChat } from "../lib/useChat";
+import { useAttachments } from "../lib/useAttachments";
 import { AppStatus } from "../lib/types";
 import { copyText } from "../lib/format";
-import { OnFileDrop, OnFileDropOff } from "../../wailsjs/runtime";
-import { ImportFiles, PickFiles } from "../../wailsjs/go/main/App";
+import AttachmentChips from "../components/AttachmentChips";
 import {
   Conversation,
   ConversationContent,
@@ -20,67 +20,35 @@ import {
   PromptInputSubmit,
 } from "@/components/ai-elements/prompt-input";
 import { Button } from "@/components/ui/button";
-import { CopyIcon, MessageSquareIcon, Trash2Icon, PaperclipIcon, XIcon, FileIcon } from "lucide-react";
+import { CopyIcon, MessageSquareIcon, Trash2Icon, PaperclipIcon } from "lucide-react";
+import { HistoryBar, HistoryList, useHistory } from "../components/HistoryBar";
 import TracePanel from "../components/TracePanel";
-
-const IMAGE_RE = /\.(png|jpe?g|gif|webp|bmp|tiff?)$/i;
+import DeliverablesBar from "../components/DeliverablesBar";
 
 export default function ChatView({ status }: { status: AppStatus | null }) {
   const chat = useChat();
+  const attach = useAttachments();
   const notReady = status !== null && !status.ready;
   const messages = chat.messages;
-  const [attachments, setAttachments] = useState<string[]>([]);
-  const [importing, setImporting] = useState(false);
-
-  const addPaths = (rels: string[] | null) => {
-    if (!rels || rels.length === 0) return;
-    setAttachments((prev) => Array.from(new Set([...prev, ...rels])));
-  };
-
-  // Native OS file drop -> copy into the agent workspace -> attach the path.
+  const history = useHistory();
+  const [filesKey, setFilesKey] = useState(0);
   useEffect(() => {
-    OnFileDrop((_x, _y, paths) => {
-      if (!paths || paths.length === 0) return;
-      setImporting(true);
-      ImportFiles(paths)
-        .then((rels) => addPaths(rels))
-        .catch(() => {})
-        .finally(() => setImporting(false));
-    }, true);
-    return () => OnFileDropOff();
+    // A finished turn may have written files and definitely changed history.
+    chat.onDone(() => {
+      history.invalidate();
+      setFilesKey((k) => k + 1);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const pickFiles = () => {
-    setImporting(true);
-    PickFiles()
-      .then((rels) => addPaths(rels))
-      .catch(() => {})
-      .finally(() => setImporting(false));
-  };
-
-  const removeAttachment = (p: string) =>
-    setAttachments((prev) => prev.filter((x) => x !== p));
 
   const onSubmit = (msg: { text: string }, e: React.FormEvent<HTMLFormElement>) => {
     const text = msg.text.trim();
     if (chat.sending) return;
-    if (!text && attachments.length === 0) return;
-    const images = attachments.filter((p) => IMAGE_RE.test(p));
-    const docs = attachments.filter((p) => !IMAGE_RE.test(p));
-    let payload = text;
-    if (attachments.length > 0) {
-      const refs: string[] = [];
-      if (docs.length)
-        refs.push(`[文档附件，可用 read_document 工具读取]\n${docs.map((p) => `- ${p}`).join("\n")}`);
-      if (images.length)
-        refs.push(`[图片附件已随消息发送给视觉模型，可直接查看]\n${images.map((p) => `- ${p}`).join("\n")}`);
-      const instruction =
-        text || (images.length && !docs.length ? "描述这张图片。" : "读取这些文件并总结要点。");
-      payload = `${refs.join("\n\n")}\n\n${instruction}`;
-      setAttachments([]);
-    }
+    if (!text && attach.paths.length === 0) return;
     // Images go straight to the vision model as multimodal input; docs are read
     // via read_document from their workspace path referenced in the text.
+    const { payload, images } = attach.build(text);
+    attach.clear();
     chat.send(payload, images);
     e.currentTarget.reset();
   };
@@ -89,6 +57,15 @@ export default function ChatView({ status }: { status: AppStatus | null }) {
     <div className="view">
       <div className="chat-layout">
         <div className="chat-main" style={{ ["--wails-drop-target" as any]: "drop" }}>
+          <HistoryBar history={history} onNew={chat.newSession} busy={chat.sending} />
+
+          {history.sessions ? (
+            <HistoryList
+              history={history}
+              currentId={chat.sessionId}
+              onPick={(id) => chat.loadSession(id).catch(() => {})}
+            />
+          ) : (
           <Conversation className="transcript">
             {messages.length === 0 ? (
               <ConversationEmptyState
@@ -140,6 +117,7 @@ export default function ChatView({ status }: { status: AppStatus | null }) {
               </ConversationContent>
             )}
           </Conversation>
+          )}
 
           {chat.error && (
             <div style={{ padding: "0 24px", color: "var(--red)", fontSize: 12 }}>
@@ -147,33 +125,10 @@ export default function ChatView({ status }: { status: AppStatus | null }) {
             </div>
           )}
 
+          <DeliverablesBar sessionId={chat.sessionId} refreshKey={filesKey} />
+
           <div className="composer">
-            {attachments.length > 0 && (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, padding: "0 2px 8px" }}>
-                {attachments.map((p) => (
-                  <span
-                    key={p}
-                    title={p}
-                    style={{
-                      display: "inline-flex", alignItems: "center", gap: 6,
-                      fontSize: 12, padding: "3px 8px", borderRadius: 8,
-                      background: "var(--accent-soft)", color: "var(--accent-hover)",
-                      border: "1px solid var(--accent-border)", maxWidth: 260,
-                    }}
-                  >
-                    <FileIcon className="size-3.5" style={{ flex: "none" }} />
-                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {p.replace(/^uploads\//, "")}
-                    </span>
-                    <XIcon
-                      className="size-3.5"
-                      style={{ cursor: "pointer", flex: "none" }}
-                      onClick={() => removeAttachment(p)}
-                    />
-                  </span>
-                ))}
-              </div>
-            )}
+            <AttachmentChips paths={attach.paths} onRemove={attach.remove} />
             <PromptInput onSubmit={onSubmit}>
               <PromptInputTextarea
                 placeholder={
@@ -190,12 +145,12 @@ export default function ChatView({ status }: { status: AppStatus | null }) {
                     variant="ghost"
                     size="sm"
                     className="text-muted-foreground"
-                    onClick={pickFiles}
-                    disabled={chat.sending || importing}
+                    onClick={attach.pick}
+                    disabled={chat.sending || attach.importing}
                     title="Attach files (Word / Excel / PPT / PDF / image)"
                   >
                     <PaperclipIcon className="size-3.5" />
-                    {importing ? "Importing…" : "Attach"}
+                    {attach.importing ? "Importing…" : "Attach"}
                   </Button>
                   <Button
                     type="button"

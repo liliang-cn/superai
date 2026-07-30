@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useState } from "react";
 import Sidebar from "./components/Sidebar";
 import StatusBar from "./components/StatusBar";
 import ChatView from "./views/ChatView";
-import AgentView from "./views/AgentView";
 import SettingsView from "./views/SettingsView";
 import AvatarView from "./views/AvatarView";
 import MemoryView from "./views/MemoryView";
@@ -11,7 +10,8 @@ import MCPView from "./views/MCPView";
 import DataView from "./views/DataView";
 import LifeView from "./views/LifeView";
 import { AppStatus, ViewKey, normalizeStatus } from "./lib/types";
-import { GetStatus } from "../wailsjs/go/main/App";
+import { uiRules } from "./lib/aigui";
+import { GetStatus, SetUIRules } from "../wailsjs/go/main/App";
 
 type Theme = "dark" | "light";
 
@@ -27,6 +27,13 @@ export default function App() {
     document.documentElement.dataset.theme = theme;
     localStorage.setItem("superai-theme", theme);
   }, [theme]);
+
+  // Tell the agent which rich blocks this transcript can render. The rules come
+  // from the same registry + plugins the renderer uses, so they cannot drift;
+  // the backend only rebuilds when they actually changed.
+  useEffect(() => {
+    SetUIRules(uiRules()).catch(() => {});
+  }, []);
   const toggleTheme = useCallback(
     () => setTheme((t) => (t === "dark" ? "light" : "dark")),
     []
@@ -56,7 +63,6 @@ export default function App() {
         <StatusBar status={status} loading={loading} theme={theme} onToggleTheme={toggleTheme} />
         <div className="content">
           {view === "chat" && <ChatView status={status} />}
-          {view === "agent" && <AgentView status={status} />}
           {view === "settings" && <SettingsView onSaved={refreshStatus} />}
           {view === "avatar" && <AvatarView status={status} />}
           {view === "memory" && <MemoryView />}

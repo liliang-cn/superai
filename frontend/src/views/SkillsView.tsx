@@ -1,11 +1,26 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { Skills } from "../../wailsjs/go/main/App";
+import { InstallSkill, RemoveSkill, SearchSkills, Skills } from "../../wailsjs/go/main/App";
 import { backend } from "../../wailsjs/go/models";
 
 export default function SkillsView() {
   const [skills, setSkills] = useState<backend.SkillInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string>("");
+  const [query, setQuery] = useState("");
+  const [available, setAvailable] = useState<backend.SkillCandidate[] | null>(null);
+  const [busy, setBusy] = useState("");
+  const [note, setNote] = useState("");
+  const [confirmRemove, setConfirmRemove] = useState("");
+
+  const browse = useCallback(async (q: string) => {
+    setNote("");
+    try {
+      setAvailable(await SearchSkills(q));
+    } catch (e: any) {
+      setNote(String(e?.message || e));
+      setAvailable([]);
+    }
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -32,6 +47,12 @@ export default function SkillsView() {
           <div className="view-desc">Installed skills SuperAI can activate during a turn.</div>
         </div>
         <div className="vh-actions">
+          <button
+            className="btn ghost sm"
+            onClick={() => (available ? setAvailable(null) : browse(query))}
+          >
+            {available ? "Close" : "+ Add skill"}
+          </button>
           <button className="btn ghost sm" onClick={load} disabled={loading}>
             {loading ? <><span className="spinner" style={{ borderTopColor: "var(--text-1)" }} /> Loading…</> : "↻ Refresh"}
           </button>
@@ -39,6 +60,56 @@ export default function SkillsView() {
       </div>
 
       <div className="panel-scroll">
+        {available !== null && (
+          <div className="card" style={{ marginBottom: 14 }}>
+            <div className="card-title">Add a skill</div>
+            <div className="card-desc">
+              Skills already on this machine, including the ones Claude Code uses (~/.claude/skills).
+            </div>
+            <input
+              className="input"
+              value={query}
+              autoFocus
+              placeholder="Filter by name or what it does…"
+              onChange={(e) => {
+                setQuery(e.target.value);
+                browse(e.target.value);
+              }}
+            />
+            {note && <div className="hint err" style={{ marginTop: 8 }}>{note}</div>}
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10 }}>
+              {available.length === 0 && <div className="trace-empty">Nothing found on this machine.</div>}
+              {available.map((c) => (
+                <div key={c.name} className="record-card">
+                  <div className="rc-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span>{c.name}</span>
+                    <span style={{ marginLeft: "auto" }}>
+                      <button
+                        className="btn ghost sm"
+                        disabled={c.installed || busy === c.name}
+                        onClick={async () => {
+                          setBusy(c.name);
+                          const res = await InstallSkill(c.name, c.path);
+                          setBusy("");
+                          setNote(res === "ok" ? `Installed ${c.name}.` : res);
+                          load();
+                          browse(query);
+                        }}
+                      >
+                        {c.installed ? "Installed" : busy === c.name ? "Installing…" : "Install"}
+                      </button>
+                    </span>
+                  </div>
+                  {c.description && (
+                    <div className="rc-row">
+                      <span className="rc-val" style={{ fontSize: 12 }}>{c.description}</span>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         {err && <div className="report-error">⚠ {err}</div>}
         {!err && loading && skills.length === 0 && (
           <div className="loading-row">
@@ -49,7 +120,7 @@ export default function SkillsView() {
           <div className="inline-empty">
             <div className="ie-icon">🧩</div>
             <div>No skills installed.</div>
-            <div className="ie-hint">Drop SKILL.md folders in ~/.agentgo/skills.</div>
+            <div className="ie-hint">Use “+ Add skill” to install one already on this machine.</div>
           </div>
         )}
         {!err && skills.length > 0 && (
@@ -68,6 +139,25 @@ export default function SkillsView() {
                     {s.collection && (
                       <span className="chip" style={{ marginLeft: 8, verticalAlign: "middle" }}>{s.collection}</span>
                     )}
+                    <button
+                      className="btn ghost sm"
+                      style={{ float: "right" }}
+                      onClick={() => {
+                        const id = s.id || s.name;
+                        if (confirmRemove !== id) {
+                          setConfirmRemove(id);
+                          return;
+                        }
+                        setConfirmRemove("");
+                        RemoveSkill(id).then((res) => {
+                          setNote(res === "ok" ? `Removed ${id}.` : res);
+                          load();
+                          if (available) browse(query);
+                        });
+                      }}
+                    >
+                      {confirmRemove === (s.id || s.name) ? "Confirm" : "Remove"}
+                    </button>
                   </div>
                   {s.description && (
                     <div className="rc-row">

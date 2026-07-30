@@ -21,6 +21,80 @@ export namespace agent {
 
 export namespace backend {
 	
+	export class CLIProxyAccount {
+	    file: string;
+	    provider: string;
+	    account: string;
+	    project: string;
+	    expires: string;
+	    disabled: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new CLIProxyAccount(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.file = source["file"];
+	        this.provider = source["provider"];
+	        this.account = source["account"];
+	        this.project = source["project"];
+	        this.expires = source["expires"];
+	        this.disabled = source["disabled"];
+	    }
+	}
+	export class CLIProxyProvider {
+	    id: string;
+	    label: string;
+	    needs_project: boolean;
+	    note: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new CLIProxyProvider(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.label = source["label"];
+	        this.needs_project = source["needs_project"];
+	        this.note = source["note"];
+	    }
+	}
+	export class ChatSessionInfo {
+	    id: string;
+	    title: string;
+	    turns: number;
+	    updated_at: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ChatSessionInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.title = source["title"];
+	        this.turns = source["turns"];
+	        this.updated_at = source["updated_at"];
+	    }
+	}
+	export class ChatTurn {
+	    role: string;
+	    content: string;
+	    emotion?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ChatTurn(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.role = source["role"];
+	        this.content = source["content"];
+	        this.emotion = source["emotion"];
+	    }
+	}
 	export class LifeData {
 	    schedules: any[];
 	    records: any[];
@@ -52,6 +126,8 @@ export namespace backend {
 	    disable_ptc: boolean;
 	    pii_redaction: boolean;
 	    avatar_port: number;
+	    cliproxy_enabled: boolean;
+	    cliproxy_port: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new Settings(source);
@@ -71,6 +147,26 @@ export namespace backend {
 	        this.disable_ptc = source["disable_ptc"];
 	        this.pii_redaction = source["pii_redaction"];
 	        this.avatar_port = source["avatar_port"];
+	        this.cliproxy_enabled = source["cliproxy_enabled"];
+	        this.cliproxy_port = source["cliproxy_port"];
+	    }
+	}
+	export class SkillCandidate {
+	    name: string;
+	    description: string;
+	    path: string;
+	    installed: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new SkillCandidate(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.description = source["description"];
+	        this.path = source["path"];
+	        this.installed = source["installed"];
 	    }
 	}
 	export class SkillInfo {
