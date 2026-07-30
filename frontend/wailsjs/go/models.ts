@@ -123,6 +123,7 @@ export namespace backend {
 	    workspace_dir: string;
 	    max_rounds: number;
 	    headless: boolean;
+	    disable_browser: boolean;
 	    disable_ptc: boolean;
 	    pii_redaction: boolean;
 	    avatar_port: number;
@@ -144,6 +145,7 @@ export namespace backend {
 	        this.workspace_dir = source["workspace_dir"];
 	        this.max_rounds = source["max_rounds"];
 	        this.headless = source["headless"];
+	        this.disable_browser = source["disable_browser"];
 	        this.disable_ptc = source["disable_ptc"];
 	        this.pii_redaction = source["pii_redaction"];
 	        this.avatar_port = source["avatar_port"];
