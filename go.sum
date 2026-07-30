@@ -234,6 +234,8 @@ github.com/ledongthuc/pdf v0.0.0-20220302134840-0c2507a12d80 h1:6Yzfa6GP0rIo/kUL
 github.com/ledongthuc/pdf v0.0.0-20220302134840-0c2507a12d80/go.mod h1:imJHygn/1yfhB7XSJJKlFZKl/J+dCPAknuiaGOshXAs=
 github.com/leodido/go-urn v1.4.0 h1:WT9HwE9SGECu3lg4d/dIA+jxlljEa1/ffXKmRjqdmIQ=
 github.com/leodido/go-urn v1.4.0/go.mod h1:bvxc+MVxLKB4z00jd1z+Dvzr47oO32F/QSNjSBOlFxI=
+github.com/liliang-cn/agent-go/v2 v2.106.1 h1:zTXVut3lXf65BDQhvRySw7DeOY3P7oUfFkYSpgYe1gY=
+github.com/liliang-cn/agent-go/v2 v2.106.1/go.mod h1:vznqnwRi7oq3PetMb2IX3FNVTOHjWw8c1l3n3mXlqGg=
 github.com/liliang-cn/cortexdb/v2 v2.45.0 h1:XY8d/3FYQoAtbBdi3OtYRaKR2QB2sk8+1W9JpchnyJw=
 github.com/liliang-cn/cortexdb/v2 v2.45.0/go.mod h1:O4EPYRbBsEpEsRisT2Hs2jhKVoEMPuRm87xAXpwLMwc=
 github.com/liliang-cn/mcp-swagger-server v0.4.0 h1:vgcUvQp+ped++O1+hQz29oWtXiHE+QrC3wjeQvyT50o=
