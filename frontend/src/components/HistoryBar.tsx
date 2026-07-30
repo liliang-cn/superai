@@ -48,11 +48,9 @@ export function useHistory(): HistoryController {
 export function HistoryBar({
   history,
   onNew,
-  busy,
 }: {
   history: HistoryController;
   onNew: () => void;
-  busy?: boolean;
 }) {
   return (
     <div className="chat-toolbar">
@@ -65,7 +63,6 @@ export function HistoryBar({
           history.close();
           onNew();
         }}
-        disabled={busy}
         title="Start a new conversation"
       >
         <PlusIcon className="size-3.5" /> New chat

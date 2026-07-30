@@ -24,6 +24,7 @@ import { CopyIcon, MessageSquareIcon, Trash2Icon, PaperclipIcon } from "lucide-r
 import { HistoryBar, HistoryList, useHistory } from "../components/HistoryBar";
 import TracePanel from "../components/TracePanel";
 import DeliverablesBar from "../components/DeliverablesBar";
+import AgentProgress from "../components/AgentProgress";
 
 export default function ChatView({ status }: { status: AppStatus | null }) {
   const chat = useChat();
@@ -41,9 +42,10 @@ export default function ChatView({ status }: { status: AppStatus | null }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Asking again while an answer is still streaming is allowed: each ask gets
+  // its own bubble, so there is nothing to wait for.
   const onSubmit = (msg: { text: string }, e: React.FormEvent<HTMLFormElement>) => {
     const text = msg.text.trim();
-    if (chat.sending) return;
     if (!text && attach.paths.length === 0) return;
     // Images go straight to the vision model as multimodal input; docs are read
     // via read_document from their workspace path referenced in the text.
@@ -57,7 +59,9 @@ export default function ChatView({ status }: { status: AppStatus | null }) {
     <div className="view">
       <div className="chat-layout">
         <div className="chat-main" style={{ ["--wails-drop-target" as any]: "drop" }}>
-          <HistoryBar history={history} onNew={chat.newSession} busy={chat.sending} />
+          {/* Starting a new conversation mid-answer is safe: the running ask
+              finishes into its own conversation's history. */}
+          <HistoryBar history={history} onNew={chat.newSession} />
 
           {history.sessions ? (
             <HistoryList
@@ -80,19 +84,37 @@ export default function ChatView({ status }: { status: AppStatus | null }) {
                 )}
               </ConversationEmptyState>
             ) : (
-              <ConversationContent autoScrollKey={messages.map((m) => m.content).join("|")}>
+              <ConversationContent
+                autoScrollKey={messages
+                  .map((m) => `${m.content}#${m.progress?.length ?? 0}`)
+                  .join("|")}
+              >
                 {messages.map((m) => (
                   <div key={m.id}>
                     <Message from={m.role}>
                       <MessageContent variant="flat">
                         {m.role === "assistant" ? (
-                          m.content ? (
-                            <Response>{m.content}</Response>
-                          ) : m.streaming ? (
-                            <span className="msg-cursor" />
-                          ) : (
-                            "…"
-                          )
+                          <>
+                            {m.progress && m.progress.length > 0 && (
+                              <AgentProgress
+                                steps={m.progress}
+                                running={!!m.streaming}
+                                startedAt={m.startedAt}
+                                finishedAt={m.finishedAt}
+                              />
+                            )}
+                            {m.content ? (
+                              <Response>{m.content}</Response>
+                            ) : m.streaming ? (
+                              // The progress block carries its own spinner, so
+                              // the caret is only needed before the first sign
+                              // of life.
+                              !m.progress?.length && <span className="msg-cursor" />
+                            ) : (
+                              !m.error && !m.progress?.length && "…"
+                            )}
+                            {m.error && <div className="msg-error">⚠ {m.error}</div>}
+                          </>
                         ) : (
                           <span style={{ whiteSpace: "pre-wrap" }}>{m.content}</span>
                         )}
@@ -119,12 +141,6 @@ export default function ChatView({ status }: { status: AppStatus | null }) {
           </Conversation>
           )}
 
-          {chat.error && (
-            <div style={{ padding: "0 24px", color: "var(--red)", fontSize: 12 }}>
-              ⚠ {chat.error}
-            </div>
-          )}
-
           <DeliverablesBar sessionId={chat.sessionId} refreshKey={filesKey} />
 
           <div className="composer">
@@ -136,7 +152,6 @@ export default function ChatView({ status }: { status: AppStatus | null }) {
                     ? "Configure LLM in Settings first…"
                     : "Message SuperAI…  (drag files in, or 📎, then ask)"
                 }
-                disabled={chat.sending}
               />
               <PromptInputToolbar>
                 <PromptInputTools>
@@ -146,7 +161,7 @@ export default function ChatView({ status }: { status: AppStatus | null }) {
                     size="sm"
                     className="text-muted-foreground"
                     onClick={attach.pick}
-                    disabled={chat.sending || attach.importing}
+                    disabled={attach.importing}
                     title="Attach files (Word / Excel / PPT / PDF / image)"
                   >
                     <PaperclipIcon className="size-3.5" />
@@ -158,22 +173,21 @@ export default function ChatView({ status }: { status: AppStatus | null }) {
                     size="sm"
                     className="text-muted-foreground"
                     onClick={() => chat.clear()}
-                    disabled={chat.messages.length === 0 || chat.sending}
+                    disabled={chat.messages.length === 0}
                     title="Clear conversation"
                   >
                     <Trash2Icon className="size-3.5" />
                     Clear
                   </Button>
                 </PromptInputTools>
-                <PromptInputSubmit
-                  status={chat.sending ? "streaming" : "ready"}
-                  disabled={chat.sending}
-                />
+                {/* Stays enabled while streaming — the button is how a second
+                    question gets asked. */}
+                <PromptInputSubmit status="ready" />
               </PromptInputToolbar>
             </PromptInput>
           </div>
         </div>
-        <TracePanel trace={chat.trace} />
+        <TracePanel trace={chat.trace} asks={chat.asks} />
       </div>
     </div>
   );

@@ -1,7 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EventsOn } from "../../wailsjs/runtime";
 import { ChatHistory, SendChat } from "../../wailsjs/go/main/App";
-import { ChatEvent, ChatMessage, ChatDone, ChatError, TraceItem } from "./types";
+import {
+  AskSummary,
+  ChatDone,
+  ChatError,
+  ChatEvent,
+  ChatMessage,
+  ProgressStep,
+  TraceItem,
+} from "./types";
 
 let sessionCounter = 0;
 function makeId(): string {
@@ -14,13 +22,48 @@ function makeId(): string {
   return `id-${Date.now()}-${sessionCounter}`;
 }
 
+/** A payload waiting for its request id to be bound to an ask. */
+type Queued =
+  | { kind: "event"; payload: ChatEvent }
+  | { kind: "done"; payload: ChatDone }
+  | { kind: "error"; payload: ChatError };
+
+/**
+ * Progress text is written for a human but arrives with the model's markdown
+ * emphasis still on it ("**Designing synchronous JS tool call**"), and a status
+ * line is a single line.
+ */
+function cleanProgress(raw: string): string {
+  return (raw || "")
+    .replace(/\s+/g, " ")
+    .replace(/^[*_`\s]+/, "")
+    .replace(/[*_`\s]+$/, "")
+    .trim();
+}
+
+function summarizeAsks(messages: ChatMessage[]): AskSummary[] {
+  const out: AskSummary[] = [];
+  messages.forEach((m, i) => {
+    if (m.role !== "assistant" || !m.startedAt) return;
+    const prev = messages[i - 1];
+    out.push({
+      id: m.id,
+      prompt: prev && prev.role === "user" ? prev.content : "",
+      status: m.streaming ? "streaming" : m.error ? "error" : "done",
+    });
+  });
+  return out;
+}
+
 interface UseChatResult {
   sessionId: string;
   messages: ChatMessage[];
   trace: TraceItem[];
+  /** The asks this transcript owns, oldest first. */
+  asks: AskSummary[];
+  /** True while at least one ask is still streaming. Does not block sending. */
   sending: boolean;
   lastEmotion: string;
-  error: string;
   send: (text: string, imagePaths?: string[]) => Promise<void>;
   onDone: (cb: () => void) => void;
   reset: () => void;
@@ -37,28 +80,177 @@ export function useChat(): UseChatResult {
   const [sessionId, setSessionId] = useState<string>(makeId);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [trace, setTrace] = useState<TraceItem[]>([]);
-  const [sending, setSending] = useState(false);
   const [lastEmotion, setLastEmotion] = useState("");
-  const [error, setError] = useState("");
   const doneCb = useRef<(() => void) | null>(null);
-  const assistantId = useRef<string>("");
 
-  const finishStreaming = useCallback((finalText?: string, emotion?: string) => {
-    setMessages((prev) =>
-      prev.map((m) =>
-        m.id === assistantId.current
-          ? {
-              ...m,
-              content: finalText && finalText.length ? finalText : m.content,
-              emotion: emotion || m.emotion,
-              streaming: false,
+  // An ask is identified by its assistant message id. Nothing about a stream
+  // lives in a single "current" slot, so a second question asked while the
+  // first is still answering gets its own bubble, trace and progress.
+  const bound = useRef(new Map<string, string>()); // requestId -> ask id
+  const queue = useRef(new Map<string, Queued[]>()); // requestId -> events seen before the bind
+  const unbound = useRef(0); // sends whose SendChat call has not returned an id yet
+  const attached = useRef(new Set<string>()); // asks belonging to the transcript on screen
+  const running = useRef(new Set<string>()); // asks that have not finished
+
+  const patchMessage = useCallback(
+    (askId: string, patch: (m: ChatMessage) => ChatMessage) => {
+      setMessages((prev) => prev.map((m) => (m.id === askId ? patch(m) : m)));
+    },
+    [],
+  );
+
+  const pushProgress = useCallback(
+    (askId: string, step: Omit<ProgressStep, "id">) => {
+      patchMessage(askId, (m) => {
+        const steps = m.progress || [];
+        const last = steps[steps.length - 1];
+        // Agents repeat themselves ("Thinking..." twice in a row); the repeat
+        // carries no information, but the same line later in the run does.
+        if (last && last.kind === step.kind && last.text === step.text) return m;
+        return { ...m, progress: [...steps, { id: makeId(), ...step }] };
+      });
+    },
+    [patchMessage],
+  );
+
+  const finishAsk = useCallback(
+    (askId: string, opts: { final?: string; emotion?: string; error?: string }) => {
+      running.current.delete(askId);
+      patchMessage(askId, (m) => ({
+        ...m,
+        content: opts.final && opts.final.length ? opts.final : m.content,
+        emotion: opts.emotion || m.emotion,
+        error: opts.error || m.error,
+        streaming: false,
+        finishedAt: Date.now(),
+      }));
+      if (opts.emotion) setLastEmotion(opts.emotion);
+      // A tool still marked running when the turn ends never reports back, so
+      // resolve it here rather than leaving a clock spinning forever.
+      setTrace((prev) =>
+        prev.map((t) =>
+          t.askId === askId && t.status === "running"
+            ? { ...t, status: opts.error ? "fail" : "ok" }
+            : t,
+        ),
+      );
+    },
+    [patchMessage],
+  );
+
+  const applyEvent = useCallback(
+    (askId: string, ev: ChatEvent) => {
+      switch (ev.type) {
+        case "partial": {
+          if (!ev.content) return;
+          patchMessage(askId, (m) => ({ ...m, content: m.content + ev.content }));
+          break;
+        }
+        case "thinking":
+        case "state_update": {
+          const text = cleanProgress(ev.content);
+          if (!text) return;
+          pushProgress(askId, {
+            kind: ev.type === "thinking" ? "thinking" : "state",
+            text,
+          });
+          break;
+        }
+        case "tool_call": {
+          const inner = ev.debugType === "ptc_inner";
+          const tool = ev.tool || "tool";
+          setTrace((prev) => [
+            ...prev,
+            { id: makeId(), askId, tool, args: ev.args || {}, inner, status: "running" },
+          ]);
+          // Inner calls are the ones the model's own code makes; there can be
+          // dozens of them and the trace panel already shows them nested, so
+          // only top-level tools become a progress line.
+          if (!inner) pushProgress(askId, { kind: "tool", text: `Calling ${tool}`, tool });
+          break;
+        }
+        case "tool_result": {
+          setTrace((prev) => {
+            // Mark this ask's most recent running match as resolved. Scoping to
+            // the ask matters: a sibling turn may be running the same tool.
+            const next = [...prev];
+            for (let i = next.length - 1; i >= 0; i--) {
+              const t = next[i];
+              if (t.askId !== askId || t.status !== "running") continue;
+              if (ev.tool && t.tool !== ev.tool) continue;
+              const r = ev.result;
+              const failed =
+                r && typeof r === "object" && (r.ok === false || r.error || r.success === false);
+              next[i] = { ...t, status: failed ? "fail" : "ok", result: r };
+              break;
             }
-          : m
-      )
-    );
-    setSending(false);
-    if (emotion) setLastEmotion(emotion);
-  }, []);
+            return next;
+          });
+          break;
+        }
+        case "workflow_error": {
+          finishAsk(askId, { error: ev.content || "workflow error" });
+          break;
+        }
+        case "workflow_blocked": {
+          finishAsk(askId, { final: ev.content || undefined });
+          break;
+        }
+        default:
+          break;
+      }
+    },
+    [finishAsk, patchMessage, pushProgress],
+  );
+
+  const dispatch = useCallback(
+    (askId: string, item: Queued) => {
+      switch (item.kind) {
+        case "event":
+          applyEvent(askId, item.payload);
+          break;
+        case "done":
+          finishAsk(askId, {
+            final: item.payload?.final,
+            emotion: item.payload?.emotion,
+          });
+          if (doneCb.current) doneCb.current();
+          break;
+        case "error":
+          finishAsk(askId, { error: item.payload?.error || "unknown error" });
+          break;
+      }
+    },
+    [applyEvent, finishAsk],
+  );
+
+  const route = useCallback(
+    (requestId: string, item: Queued) => {
+      let askId = requestId ? bound.current.get(requestId) : undefined;
+      // An untagged payload can still be placed while exactly one ask is
+      // running. That keeps the transcript working against a backend build
+      // that does not tag some event type yet, and is unambiguous by
+      // construction — with two asks in flight it is dropped instead.
+      if (!requestId && running.current.size === 1) {
+        askId = running.current.values().next().value;
+      }
+      if (askId) {
+        if (attached.current.has(askId)) dispatch(askId, item);
+        return;
+      }
+      // The backend emits from a goroutine while the Wails call returns
+      // separately, so events routinely arrive before we know their id. Hold
+      // them until the bind, which replays them in arrival order. If no send is
+      // still waiting for an id, nothing can ever claim this payload (the
+      // "backend not ready" error is tagged with an id SendChat never returns),
+      // so dropping it is the only way it does not leak.
+      if (!requestId || unbound.current === 0) return;
+      const q = queue.current.get(requestId);
+      if (q) q.push(item);
+      else queue.current.set(requestId, [item]);
+    },
+    [dispatch],
+  );
 
   useEffect(() => {
     // Wails runtime is only present inside the desktop webview; guard so the
@@ -68,143 +260,145 @@ export function useChat(): UseChatResult {
     }
     const offEvent = EventsOn("chat:event", (payload: ChatEvent) => {
       if (!payload) return;
-      switch (payload.type) {
-        case "partial": {
-          if (!payload.content) return;
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === assistantId.current
-                ? { ...m, content: m.content + payload.content }
-                : m
-            )
-          );
-          break;
-        }
-        case "tool_call": {
-          const inner = payload.debugType === "ptc_inner";
-          setTrace((prev) => [
-            ...prev,
-            {
-              id: makeId(),
-              tool: payload.tool || "tool",
-              args: payload.args || {},
-              inner,
-              status: "running",
-            },
-          ]);
-          break;
-        }
-        case "tool_result": {
-          setTrace((prev) => {
-            // mark the most recent running matching tool as resolved
-            const next = [...prev];
-            for (let i = next.length - 1; i >= 0; i--) {
-              if (next[i].status === "running" && (!payload.tool || next[i].tool === payload.tool)) {
-                const r = payload.result;
-                const failed =
-                  r && typeof r === "object" && (r.ok === false || r.error || r.success === false);
-                next[i] = { ...next[i], status: failed ? "fail" : "ok", result: r };
-                break;
-              }
-            }
-            return next;
-          });
-          break;
-        }
-        case "workflow_error": {
-          setError(payload.content || "workflow error");
-          finishStreaming();
-          break;
-        }
-        case "workflow_blocked": {
-          finishStreaming(payload.content || undefined);
-          break;
-        }
-        default:
-          break;
-      }
+      route(payload.requestId || "", { kind: "event", payload });
     });
-
     const offDone = EventsOn("chat:done", (payload: ChatDone) => {
-      finishStreaming(payload?.final, payload?.emotion);
-      setTrace((prev) =>
-        prev.map((t) => (t.status === "running" ? { ...t, status: "ok" } : t))
-      );
-      if (doneCb.current) doneCb.current();
+      route(payload?.requestId || "", { kind: "done", payload });
     });
-
     const offErr = EventsOn("chat:error", (payload: ChatError) => {
-      setError(payload?.error || "unknown error");
-      finishStreaming();
+      route(payload?.requestId || "", { kind: "error", payload });
     });
-
     return () => {
       offEvent();
       offDone();
       offErr();
     };
-  }, [finishStreaming]);
+  }, [route]);
+
+  /**
+   * Tie a request id to the ask that started it and replay whatever arrived in
+   * the meantime. Must stay synchronous: an event delivered between the bind
+   * and the replay would otherwise overtake the buffered ones.
+   */
+  const bindAsk = useCallback(
+    (askId: string, requestId: string) => {
+      unbound.current -= 1;
+      const held = queue.current.get(requestId);
+      queue.current.delete(requestId);
+      if (attached.current.has(askId)) {
+        bound.current.set(requestId, askId);
+        held?.forEach((item) => dispatch(askId, item));
+      }
+      // Anything still held once every send knows its id is unclaimable.
+      if (unbound.current === 0) queue.current.clear();
+    },
+    [dispatch],
+  );
 
   const send = useCallback(
     async (text: string, imagePaths: string[] = []) => {
       const trimmed = text.trim();
-      if ((!trimmed && imagePaths.length === 0) || sending) return;
-      setError("");
-      setTrace([]);
+      if (!trimmed && imagePaths.length === 0) return;
+      const askId = makeId();
       const userMsg: ChatMessage = { id: makeId(), role: "user", content: trimmed };
-      const aId = makeId();
-      assistantId.current = aId;
       const assistantMsg: ChatMessage = {
-        id: aId,
+        id: askId,
         role: "assistant",
         content: "",
         streaming: true,
+        progress: [],
+        startedAt: Date.now(),
       };
+      attached.current.add(askId);
+      running.current.add(askId);
+      unbound.current += 1;
+      // A new ask retires the tool activity of asks that have already finished,
+      // which keeps the panel about what is happening now — but never touches a
+      // sibling that is still running.
+      setTrace((prev) => prev.filter((t) => running.current.has(t.askId)));
       setMessages((prev) => [...prev, userMsg, assistantMsg]);
-      setSending(true);
       try {
-        await SendChat(sessionId, trimmed, imagePaths);
+        const requestId = await SendChat(sessionId, trimmed, imagePaths);
+        if (requestId) {
+          bindAsk(askId, requestId);
+          return;
+        }
+        // Nothing was started. The backend also emits a tagged error, but it is
+        // tagged with an id we were never given, so report it from here.
+        unbound.current -= 1;
+        if (unbound.current === 0) queue.current.clear();
+        if (attached.current.has(askId)) {
+          finishAsk(askId, { error: "backend not ready — configure your LLM in Settings" });
+        }
       } catch (e: any) {
-        setError(String(e?.message || e));
-        finishStreaming();
+        unbound.current -= 1;
+        if (unbound.current === 0) queue.current.clear();
+        if (attached.current.has(askId)) {
+          finishAsk(askId, { error: String(e?.message || e) });
+        }
       }
     },
-    [sending, sessionId, finishStreaming]
+    [sessionId, bindAsk, finishAsk],
   );
 
   const onDone = useCallback((cb: () => void) => {
     doneCb.current = cb;
   }, []);
 
-  const reset = useCallback(() => {
-    setMessages([]);
-    setTrace([]);
-    setError("");
-    setLastEmotion("");
+  /**
+   * Let go of every ask on screen. The backend cannot be cancelled, so an ask
+   * in flight keeps running and its answer still lands in that conversation's
+   * history — it simply stops writing into a transcript it is no longer part of.
+   */
+  const detachAll = useCallback(() => {
+    attached.current.clear();
+    running.current.clear();
+    bound.current.clear();
+    queue.current.clear();
   }, []);
 
-  const loadSession = useCallback(async (id: string) => {
-    const turns = await ChatHistory(id);
-    setMessages(
-      (turns || []).map((t) => ({
-        id: makeId(),
-        role: t.role as ChatMessage["role"],
-        content: t.content,
-        emotion: t.emotion || undefined,
-      })),
-    );
+  const reset = useCallback(() => {
+    detachAll();
+    setMessages([]);
     setTrace([]);
-    setError("");
-    setSessionId(id);
-  }, []);
+    setLastEmotion("");
+  }, [detachAll]);
+
+  const loadSession = useCallback(
+    async (id: string) => {
+      const turns = await ChatHistory(id);
+      detachAll();
+      setMessages(
+        (turns || []).map((t) => ({
+          id: makeId(),
+          role: t.role as ChatMessage["role"],
+          content: t.content,
+          emotion: t.emotion || undefined,
+        })),
+      );
+      setTrace([]);
+      setSessionId(id);
+    },
+    [detachAll],
+  );
 
   const newSession = useCallback(() => {
     setSessionId(makeId());
     reset();
   }, [reset]);
 
+  const sending = messages.some((m) => m.streaming);
+  // Keyed on a signature rather than the array so the trace panel is not
+  // re-rendered by every streamed token; the prompts it reads never change
+  // after their message is appended.
+  const askSignature = messages
+    .map((m) => (m.startedAt ? `${m.id}:${m.streaming ? "s" : m.error ? "e" : "d"}` : ""))
+    .join("|");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const asks = useMemo(() => summarizeAsks(messages), [askSignature]);
+
   return {
-    sessionId, messages, trace, sending, lastEmotion, error,
+    sessionId, messages, trace, asks, sending, lastEmotion,
     send, onDone, reset, clear: reset, loadSession, newSession,
   };
 }

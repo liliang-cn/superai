@@ -447,6 +447,17 @@ input, textarea, select { font-family: inherit; }
 .msg-cursor { display: inline-block; width: 7px; height: 15px; background: var(--accent); margin-left: 2px; vertical-align: text-bottom; animation: blink 1s steps(2) infinite; border-radius: 1px; }
 @keyframes blink { 0%, 50% { opacity: 1; } 50.01%, 100% { opacity: 0; } }
 
+/* An ask that failed says so in its own bubble: a sibling may be streaming
+   happily and a single banner could not tell them apart. */
+.msg-error {
+  margin-top: 6px; padding: 7px 10px;
+  font-size: 12px; color: var(--red);
+  background: rgba(240, 85, 107, 0.08);
+  border: 1px solid rgba(240, 85, 107, 0.28);
+  border-radius: var(--radius-sm);
+  white-space: pre-wrap; word-break: break-word; user-select: text;
+}
+
 .emotion-chip {
   display: inline-flex; align-items: center; gap: 5px;
   font-size: 11px; margin-top: 8px; padding: 2px 8px;
@@ -521,6 +532,20 @@ input, textarea, select { font-family: inherit; }
 .tr-ok { color: var(--green); }
 .tr-fail { color: var(--red); }
 .trace-empty { color: var(--text-3); font-size: 12px; padding: 14px; text-align: center; font-family: var(--font-sans); }
+
+/* With two questions in flight the panel labels each ask's tools, otherwise
+   the two logs read as one interleaved run. */
+.trace-group { display: flex; flex-direction: column; gap: 8px; }
+.trace-group-head {
+  display: flex; align-items: center; gap: 6px; min-width: 0;
+  padding: 2px 2px 0;
+  font-family: var(--font-sans); font-size: 11px; color: var(--text-3);
+}
+.trace-group-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trace-dot { width: 6px; height: 6px; border-radius: 50%; flex: none; background: var(--text-3); }
+.trace-dot.streaming { background: var(--accent); animation: blink 1.2s steps(2) infinite; }
+.trace-dot.done { background: var(--green); }
+.trace-dot.error { background: var(--red); }
 .trace-event { color: var(--text-3); font-style: italic; padding: 4px 8px; font-size: 11px; }
 
 /* ---------------- Agent view ---------------- */
