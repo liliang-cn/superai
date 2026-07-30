@@ -51,7 +51,7 @@ func TestSmokeLive(t *testing.T) {
 	// 1) plain chat turn
 	ctx1, cancel1 := context.WithTimeout(context.Background(), 4*time.Minute)
 	defer cancel1()
-	reply, err := svc.Stream(ctx1, "smoke-chat", "用一句话介绍你自己。", trace("chat"))
+	reply, err := svc.Stream(ctx1, "smoke-chat", "用一句话介绍你自己。", nil, trace("chat"))
 	if err != nil {
 		t.Fatalf("chat stream: %v", err)
 	}
@@ -64,13 +64,13 @@ func TestSmokeLive(t *testing.T) {
 	ctx2, cancel2 := context.WithTimeout(context.Background(), 6*time.Minute)
 	defer cancel2()
 	task := "在你的工作区写一个文件 note.md，内容是一句话：SuperAI Desktop 可用。然后读回确认。"
-	final, err := svc.Stream(ctx2, "smoke-agent", task, trace("agent"))
+	final, err := svc.Stream(ctx2, "smoke-agent", task, nil, trace("agent"))
 	if err != nil {
 		t.Fatalf("agent stream: %v", err)
 	}
 	t.Logf("AGENT FINAL: %s", strings.TrimSpace(final))
 
-	ds, err := svc.Deliverables(ctx2)
+	ds, err := svc.Deliverables(ctx2, "smoke-agent")
 	if err != nil {
 		t.Fatalf("deliverables: %v", err)
 	}

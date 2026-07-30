@@ -2,10 +2,13 @@ package backend
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
+	mimepkg "mime"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -25,6 +28,10 @@ import (
 	"github.com/liliang-cn/cortexdb/v2/pkg/cortexdb"
 )
 
+// UploadsSubdir is where attachments land inside the agent workspace, so
+// read_document can resolve them through the sandbox as "uploads/<name>".
+const UploadsSubdir = "uploads"
+
 // Service wraps a maximally-configured AgentGo agent.Service plus the desktop
 // app's supporting pieces (sandbox, browser, cortexdb handle, life-assistant
 // store, settings).
@@ -35,14 +42,27 @@ type Service struct {
 	cortex   *cortexdb.DB
 	settings *Settings
 	store    *lifeStore
+	// files remembers which conversation produced which workspace file, so a
+	// chat shows its own deliverables rather than everything ever written.
+	files *sessionFiles
+	// brain is the same generator the agent runs on, kept so tools that need a
+	// single structured completion (reading an install page, say) can ask the
+	// model directly instead of going through a whole agent turn.
+	brain domain.Generator
+	// dataDir is the agent's own data directory (<home>/data), where agent-go
+	// keeps its sqlite database.
+	dataDir string
 
 	MemoryMode string
 }
 
 // NewService builds the full SuperAI agent service from the provided settings.
 func NewService(s *Settings) (*Service, error) {
-	if strings.TrimSpace(s.LLMKey) == "" {
-		return nil, fmt.Errorf("LLM key is empty: set it in Settings (or LLM_KEY / DASHSCOPE_API_KEY)")
+	if strings.TrimSpace(s.LLMKey) == "" || strings.TrimSpace(s.LLMBaseURL) == "" {
+		return nil, fmt.Errorf("no account yet: add one under Settings → Accounts")
+	}
+	if strings.TrimSpace(s.LLMModel) == "" {
+		return nil, fmt.Errorf("no model selected: pick one under Settings → Accounts")
 	}
 
 	// --- Brain (LLM): OpenAI-compatible pool. ---
@@ -100,7 +120,7 @@ func NewService(s *Settings) (*Service, error) {
 
 	// --- Build the agent service. ---
 	b := agent.New("SuperAI").
-		WithPrompt(buildPersona(time.Now())).
+		WithPrompt(buildPersona(time.Now()) + uiRulesSection()).
 		WithConfig(cfg).
 		WithLLM(brain).
 		WithSandbox(sb).
@@ -113,8 +133,13 @@ func NewService(s *Settings) (*Service, error) {
 	if s.PIIRedaction {
 		b = b.WithPIIRedaction() // strip PII before it reaches the LLM (cloud-safe)
 	}
+	// PTC is off in the builder by default, so it takes an explicit call to turn
+	// on — a lone WithPTC(false) in the disabled branch (what this used to be)
+	// left it off in both cases, making the setting a no-op.
 	if s.DisablePTC {
-		b = b.WithPTC(false) // direct tool-calling for models that reject PTC's format (e.g. DashScope qwen3.x)
+		b = b.WithPTC(false) // direct tool-calling for models that reject PTC's format
+	} else {
+		b = b.WithPTC() // model writes JS that drives tools in one round
 	}
 	if br != nil {
 		b = b.WithBrowser(br)
@@ -146,7 +171,8 @@ func NewService(s *Settings) (*Service, error) {
 	}
 
 	out := &Service{
-		svc: svc, sb: sb, br: br, settings: s, MemoryMode: memMode,
+		svc: svc, sb: sb, br: br, settings: s, MemoryMode: memMode, dataDir: cfg.DataDir(),
+		brain: brain,
 	}
 
 	// --- Built-in framework tools. ---
@@ -154,10 +180,12 @@ func NewService(s *Settings) (*Service, error) {
 	agent.RegisterFetchURLTool(svc)
 
 	// --- Life-assistant store + tools (ported from examples/superai). ---
+	out.files = newSessionFiles(filepath.Join(cfg.DataDir(), "session-files.json"))
 	out.store = newLifeStore(filepath.Join(cfg.DataDir(), "superai-store.json"))
 	out.store.load()
 	out.registerLifeTools()
-	out.registerInstallTools() // chat-driven install of skills + MCP servers
+	out.registerInstallTools()    // chat-driven install of skills + MCP servers
+	out.registerURLInstallTools() // "here's a URL, work out how to install it"
 
 	// --- CortexDB data-import + graphrag query + connector tools (best-effort). ---
 	if db, derr := cortexdb.Open(cortexdb.DefaultConfig(filepath.Join(cfg.DataDir(), "cortex.db"))); derr != nil {
@@ -225,6 +253,18 @@ func (s *Service) Stream(ctx context.Context, sessionID, message string, imagePa
 		}
 		opts = append(opts, agent.WithInputImages(abs...))
 	}
+	// Whatever the turn writes into the workspace belongs to this conversation.
+	root := ""
+	if s.sb != nil {
+		root = s.sb.Workspace()
+	}
+	before := snapshotWorkspace(root)
+	defer func() {
+		if s.files != nil {
+			s.files.record(sessionID, changedFiles(before, snapshotWorkspace(root)))
+		}
+	}()
+
 	ch, err := s.svc.RunStreamWithOptions(ctx, message, opts...)
 	if err != nil {
 		return "", err
@@ -242,8 +282,35 @@ func (s *Service) Stream(ctx context.Context, sessionID, message string, imagePa
 }
 
 // Deliverables returns the agent's produced artifacts.
-func (s *Service) Deliverables(ctx context.Context) ([]agent.Deliverable, error) {
-	return s.svc.Deliverables(ctx)
+func (s *Service) Deliverables(ctx context.Context, sessionID string) ([]agent.Deliverable, error) {
+	all, err := s.svc.Deliverables(ctx)
+	if err != nil {
+		return nil, err
+	}
+	// An empty session id means "everything" (used by tests and any caller that
+	// has no conversation in hand).
+	var owned map[string]bool
+	if strings.TrimSpace(sessionID) != "" && s.files != nil {
+		owned = map[string]bool{}
+		for _, p := range s.files.forSession(sessionID) {
+			owned[p] = true
+		}
+	}
+	// Attachments are copied into <workspace>/uploads, which the deliverables
+	// scan also sees. What the user handed in is not something the agent
+	// produced, so it does not belong in this list.
+	out := make([]agent.Deliverable, 0, len(all))
+	for _, d := range all {
+		rel := filepath.ToSlash(d.Path)
+		if strings.HasPrefix(rel, UploadsSubdir+"/") {
+			continue
+		}
+		if owned != nil && !owned[rel] {
+			continue
+		}
+		out = append(out, d)
+	}
+	return out, nil
 }
 
 // ReadWorkspaceFile reads a workspace-relative file via the sandbox.
@@ -253,6 +320,45 @@ func (s *Service) ReadWorkspaceFile(path string) (string, error) {
 		return "", err
 	}
 	return string(data), nil
+}
+
+// ReadWorkspaceFileDataURL returns a workspace file as a data: URL, so the
+// webview can render it natively — PDFs in an <embed>, images in an <img> —
+// instead of the UI dumping raw bytes as text.
+func (s *Service) ReadWorkspaceFileDataURL(path string) (string, error) {
+	data, err := s.svc.Sandbox().ReadFile(context.Background(), path)
+	if err != nil {
+		return "", err
+	}
+	mime := mimeTypeFor(path)
+	return "data:" + mime + ";base64," + base64.StdEncoding.EncodeToString(data), nil
+}
+
+// mimeTypeFor guesses a content type from the extension, falling back to a
+// generic binary type the webview will simply offer to download.
+func mimeTypeFor(path string) string {
+	if t := mimepkg.TypeByExtension(strings.ToLower(filepath.Ext(path))); t != "" {
+		return t
+	}
+	return "application/octet-stream"
+}
+
+// OpenWorkspaceFileExternal hands a workspace file to the OS default
+// application — the escape hatch for formats the webview cannot render
+// (Word, Excel, PowerPoint, archives).
+func (s *Service) OpenWorkspaceFileExternal(path string) error {
+	root := ""
+	if s.sb != nil {
+		root = s.sb.Workspace()
+	}
+	full := path
+	if !filepath.IsAbs(full) && root != "" {
+		full = filepath.Join(root, path)
+	}
+	if _, err := os.Stat(full); err != nil {
+		return err
+	}
+	return exec.Command("open", full).Start()
 }
 
 // InstalledSkills returns the skills discovered/installed for this service.
@@ -275,10 +381,26 @@ func buildPersona(now time.Time) string {
 - 只要用户在陈述发生的事或要求记录/提醒，必须先调用对应工具存下来再回复。
 - 需要阅读/审阅某个具体网址的真实页面内容时，用 fetch_url 抓取该网页正文。
 - 你有沙箱、浏览器、视觉、可交付物与技能可用，复杂任务可以自主多步完成。
+- 【能力不够时自己去装】任务需要你现在没有的能力时，不要直接说做不到：
+  · 缺工具（连数据库、访问某个服务、操作某类文件…）→ search_mcp_servers 搜，把结果里的 command/args 原样交给 add_mcp_server 装上再继续。
+  · 缺专门知识或固定流程（某语言的最佳实践、某种文档的写法…）→ search_skills 搜，用 install_skill 的 source_path 装上再继续。
+  · 搜到的 server 若有 required_env（API key 之类），先向用户要，别拿空值去装。
+  · 装完直接接着做原来的任务，不用等用户再说一次。同一个能力只装一次，装之前先看已有的工具够不够。
 - 回答用中文，简短、自然、有人情味。每条回复最后单独一行输出情绪标签，格式严格为：情绪: <中性|开心|思考|惊讶|关心|抱歉>。
 
 严禁输出英文、日文或韩文，一律用中文回复。`,
 		now.Format("2006-01-02"), now.Format("15:04:05"), weekdayCN(now), now.Format("-07:00"))
+}
+
+// uiRulesSection appends the transcript's rendering rules to the persona, so
+// the model knows which rich blocks the UI can actually draw. Empty until the
+// frontend has announced them once (see uirules.go).
+func uiRulesSection() string {
+	rules := LoadUIRules()
+	if rules == "" {
+		return ""
+	}
+	return "\n\n" + rules
 }
 
 func weekdayCN(t time.Time) string {

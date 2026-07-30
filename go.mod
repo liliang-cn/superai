@@ -1,15 +1,19 @@
 module github.com/liliang-cn/superai-desktop
 
-go 1.25.0
+go 1.26.0
 
 require (
+	github.com/JohannesKaufmann/html-to-markdown/v2 v2.5.0
 	github.com/google/uuid v1.6.0
 	github.com/liliang-cn/agent-go/v2 v2.105.0
 	github.com/liliang-cn/cortexdb/v2 v2.45.0
+	github.com/router-for-me/CLIProxyAPI/v6 v6.10.9
+	github.com/sirupsen/logrus v1.9.3
 	github.com/wailsapp/wails/v2 v2.12.0
 )
 
 require (
+	cloud.google.com/go/compute/metadata v0.9.0 // indirect
 	filippo.io/edwards25519 v1.2.0 // indirect
 	git.sr.ht/~jackmordaunt/go-toast/v2 v2.0.3 // indirect
 	github.com/0x51-dev/rdf v0.1.0 // indirect
@@ -17,9 +21,9 @@ require (
 	github.com/0x51-dev/upeg v0.1.0 // indirect
 	github.com/BurntSushi/toml v1.6.0 // indirect
 	github.com/JohannesKaufmann/dom v0.2.0 // indirect
-	github.com/JohannesKaufmann/html-to-markdown/v2 v2.5.0 // indirect
 	github.com/PuerkitoBio/goquery v1.10.3 // indirect
 	github.com/RoaringBitmap/roaring/v2 v2.14.5 // indirect
+	github.com/andybalholm/brotli v1.2.0 // indirect
 	github.com/andybalholm/cascadia v1.3.3 // indirect
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de // indirect
 	github.com/bep/debounce v1.2.1 // indirect
@@ -43,15 +47,23 @@ require (
 	github.com/blevesearch/zapx/v15 v15.4.3 // indirect
 	github.com/blevesearch/zapx/v16 v16.3.4 // indirect
 	github.com/blevesearch/zapx/v17 v17.1.2 // indirect
+	github.com/bytedance/sonic v1.11.6 // indirect
+	github.com/bytedance/sonic/loader v0.1.1 // indirect
 	github.com/chromedp/cdproto v0.0.0-20250724212937-08a3db8b4327 // indirect
 	github.com/chromedp/chromedp v0.14.1 // indirect
 	github.com/chromedp/sysutil v1.1.0 // indirect
+	github.com/cloudwego/base64x v0.1.4 // indirect
+	github.com/cloudwego/iasm v0.2.0 // indirect
 	github.com/coreos/go-semver v0.3.1 // indirect
 	github.com/creack/pty v1.1.21 // indirect
 	github.com/dlclark/regexp2 v1.11.5 // indirect
 	github.com/dop251/goja v0.0.0-20260226184354-913bd86fb70c // indirect
 	github.com/dslipak/pdf v0.0.2 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
+	github.com/fsnotify/fsnotify v1.9.0 // indirect
+	github.com/gabriel-vasile/mimetype v1.4.3 // indirect
+	github.com/gin-contrib/sse v0.1.0 // indirect
+	github.com/gin-gonic/gin v1.10.1 // indirect
 	github.com/go-json-experiment/json v0.0.0-20250725192818-e39067aee2d2 // indirect
 	github.com/go-mysql-org/go-mysql v1.15.0 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
@@ -65,6 +77,9 @@ require (
 	github.com/go-openapi/swag/stringutils v0.25.1 // indirect
 	github.com/go-openapi/swag/typeutils v0.25.1 // indirect
 	github.com/go-openapi/swag/yamlutils v0.25.1 // indirect
+	github.com/go-playground/locales v0.14.1 // indirect
+	github.com/go-playground/universal-translator v0.18.1 // indirect
+	github.com/go-playground/validator/v10 v10.20.0 // indirect
 	github.com/go-shiori/dom v0.0.0-20230515143342-73569d674e1c // indirect
 	github.com/go-shiori/go-readability v0.0.0-20251205110129-5db1dc9836f0 // indirect
 	github.com/go-sourcemap/sourcemap v2.1.3+incompatible // indirect
@@ -86,14 +101,16 @@ require (
 	github.com/jackc/pgx/v5 v5.10.0 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/jchv/go-winloader v0.0.0-20210711035445-715c2860da7e // indirect
-	github.com/json-iterator/go v0.0.0-20171115153421-f7279a603ede // indirect
+	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/compress v1.18.6 // indirect
+	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/labstack/echo/v4 v4.13.3 // indirect
 	github.com/labstack/gommon v0.4.2 // indirect
 	github.com/leaanthony/go-ansi-parser v1.6.1 // indirect
 	github.com/leaanthony/gosod v1.0.4 // indirect
 	github.com/leaanthony/slicer v1.6.0 // indirect
 	github.com/leaanthony/u v1.1.1 // indirect
+	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/liliang-cn/mcp-swagger-server v0.4.0 // indirect
 	github.com/liliang-cn/pipeit v0.1.0 // indirect
 	github.com/liliang-cn/skills-go v1.7.0 // indirect
@@ -101,9 +118,13 @@ require (
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/modelcontextprotocol/go-sdk v1.6.1 // indirect
+	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
+	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/mschoch/smat v0.2.0 // indirect
 	github.com/ncruces/go-strftime v0.1.9 // indirect
 	github.com/openai/openai-go/v3 v3.39.0 // indirect
+	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
+	github.com/pierrec/xxHash v0.1.5 // indirect
 	github.com/pingcap/errors v0.11.5-0.20260310054046-9c8b3586e4b2 // indirect
 	github.com/pingcap/failpoint v0.0.0-20260406204437-bbc9d102c19e // indirect
 	github.com/pingcap/log v1.1.1-0.20260227082333-572e590d08f1 // indirect
@@ -112,6 +133,7 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pkoukk/tiktoken-go v0.1.8 // indirect
 	github.com/qdrant/go-client v1.15.2 // indirect
+	github.com/refraction-networking/utls v1.8.2 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/richardlehane/mscfb v1.0.7 // indirect
 	github.com/richardlehane/msoleps v1.0.6 // indirect
@@ -122,13 +144,17 @@ require (
 	github.com/segmentio/asm v1.1.3 // indirect
 	github.com/segmentio/encoding v0.5.4 // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect
+	github.com/skratchdot/open-golang v0.0.0-20200116055534-eef842397966 // indirect
 	github.com/spf13/cast v1.9.2 // indirect
 	github.com/tidwall/gjson v1.18.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/tidwall/sjson v1.2.5 // indirect
 	github.com/tiendc/go-deepcopy v1.7.2 // indirect
+	github.com/tiktoken-go/tokenizer v0.7.0 // indirect
 	github.com/tkrajina/go-reflector v0.5.8 // indirect
+	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
+	github.com/ugorji/go/codec v1.2.12 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.2 // indirect
 	github.com/wailsapp/go-webview2 v1.0.22 // indirect
@@ -142,6 +168,7 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.28.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
+	golang.org/x/arch v0.8.0 // indirect
 	golang.org/x/crypto v0.53.0 // indirect
 	golang.org/x/exp v0.0.0-20250819193227-8b4c13bb791b // indirect
 	golang.org/x/image v0.44.0 // indirect
@@ -162,3 +189,5 @@ require (
 )
 
 // replace github.com/wailsapp/wails/v2 v2.12.0 => /Users/liliang/go/pkg/mod
+
+replace github.com/liliang-cn/agent-go/v2 => ../agent-go

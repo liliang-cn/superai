@@ -22,8 +22,14 @@ type App struct {
 	settings *backend.Settings
 	avatar   backend.AvatarDriver
 	sse      *backend.SSEServer
+	proxy    *backend.CLIProxy
+
+	// loginCh is non-nil while a provider login is waiting for the user; it
+	// carries the manually pasted callback URL.
+	loginCh chan string
 
 	buildErr string
+	proxyErr string
 }
 
 // NewApp creates a new App.
@@ -48,7 +54,42 @@ func (a *App) startup(ctx context.Context) {
 		a.avatar = sse
 	}
 
+	a.syncProxy()
 	a.rebuild()
+}
+
+// syncProxy brings the embedded CLIProxyAPI in line with the current settings:
+// started when enabled (and restarted when the port changes), stopped otherwise.
+// A failure here is non-fatal — it is reported through GetStatus and the agent
+// falls back to the configured LLM endpoint.
+func (a *App) syncProxy() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	want := a.settings != nil && a.settings.CLIProxyEnabled
+	if !want {
+		if a.proxy != nil {
+			_ = a.proxy.Close()
+			a.proxy = nil
+		}
+		a.proxyErr = ""
+		return
+	}
+	if a.proxy != nil && a.proxy.Port() == a.settings.CLIProxyPort {
+		return
+	}
+	if a.proxy != nil {
+		_ = a.proxy.Close()
+		a.proxy = nil
+	}
+
+	p, err := backend.StartCLIProxy(a.settings.CLIProxyPort)
+	if err != nil {
+		a.proxyErr = err.Error()
+		return
+	}
+	a.proxyErr = ""
+	a.proxy = p
 }
 
 // shutdown releases backend resources.
@@ -63,6 +104,10 @@ func (a *App) shutdown(ctx context.Context) {
 		_ = a.sse.Close()
 		a.sse = nil
 	}
+	if a.proxy != nil {
+		_ = a.proxy.Close()
+		a.proxy = nil
+	}
 }
 
 // rebuild (re)constructs the backend Service from current settings.
@@ -73,13 +118,28 @@ func (a *App) rebuild() {
 		_ = a.svc.Close()
 		a.svc = nil
 	}
-	svc, err := backend.NewService(a.settings)
+	svc, err := backend.NewService(a.effective())
 	if err != nil {
 		a.buildErr = err.Error()
 		return
 	}
 	a.buildErr = ""
 	a.svc = svc
+}
+
+// effective returns the settings the backend Service is actually built from:
+// the user's settings, with the brain redirected at the embedded CLIProxyAPI
+// when it is running. Callers must hold a.mu.
+func (a *App) effective() *backend.Settings {
+	if a.settings == nil {
+		return nil
+	}
+	s := *a.settings
+	if a.proxy != nil {
+		s.LLMBaseURL = a.proxy.BaseURL()
+		s.LLMKey = a.proxy.Key()
+	}
+	return &s
 }
 
 // GetSettings returns the current settings.
@@ -100,8 +160,222 @@ func (a *App) SaveSettings(s backend.Settings) error {
 	a.mu.Lock()
 	a.settings = &s
 	a.mu.Unlock()
+	a.syncProxy()
 	a.rebuild()
 	return nil
+}
+
+// CLIProxyStatus reports the embedded CLIProxyAPI state for the Settings page.
+func (a *App) CLIProxyStatus() map[string]any {
+	a.mu.Lock()
+	p := a.proxy
+	perr := a.proxyErr
+	a.mu.Unlock()
+
+	st := map[string]any{
+		"running": p != nil,
+		"error":   perr,
+		"baseURL": p.BaseURL(),
+		"authDir": p.AuthDir(),
+		"config":  p.ConfigPath(),
+		"models":  []string{},
+	}
+	if p != nil {
+		models, err := p.Models(context.Background())
+		if err != nil {
+			st["error"] = err.Error()
+		} else {
+			st["models"] = models
+		}
+	}
+	return st
+}
+
+// ensureProxy returns the running proxy, starting it if needed. Login and the
+// status panel both need it before the user has saved anything, so it must not
+// depend on the persisted enable flag.
+func (a *App) ensureProxy() (*backend.CLIProxy, error) {
+	a.mu.Lock()
+	if a.proxy != nil {
+		p := a.proxy
+		a.mu.Unlock()
+		return p, nil
+	}
+	port := backend.DefaultCLIProxyPort
+	if a.settings != nil && a.settings.CLIProxyPort > 0 {
+		port = a.settings.CLIProxyPort
+	}
+	a.mu.Unlock()
+
+	p, err := backend.StartCLIProxy(port)
+
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if err != nil {
+		a.proxyErr = err.Error()
+		return nil, err
+	}
+	// Another goroutine may have won the race; keep the first one.
+	if a.proxy != nil {
+		go p.Close()
+		return a.proxy, nil
+	}
+	a.proxyErr = ""
+	a.proxy = p
+	return p, nil
+}
+
+// SetUIRules receives the transcript's rendering rules from the frontend (which
+// owns the AIGUI registry and plugin list) and rebuilds the agent only when they
+// actually changed, so a restart with the same UI is not paying for a rebuild.
+func (a *App) SetUIRules(rules string) string {
+	changed, err := backend.SaveUIRules(rules)
+	if err != nil {
+		return err.Error()
+	}
+	if changed {
+		a.rebuild()
+	}
+	return "ok"
+}
+
+// CLIProxyProviders lists the providers the user can log into.
+func (a *App) CLIProxyProviders() []backend.CLIProxyProvider {
+	return backend.CLIProxyProviders()
+}
+
+// CLIProxyLogin runs a provider OAuth flow for the embedded proxy. It returns
+// immediately; progress is delivered as "cliproxy:login" events with a status of
+// started / prompt / done / error. On success the credential lands in the auth
+// dir and the proxy hot-loads it, so the new models appear without a restart.
+//
+// Only one login may be in flight at a time.
+func (a *App) CLIProxyLogin(provider, projectID string) string {
+	a.mu.Lock()
+	busy := a.loginCh != nil
+	a.mu.Unlock()
+
+	// Logging in only needs the proxy's config and auth dir, so start it on
+	// demand rather than making the user save settings first.
+	p, err := a.ensureProxy()
+	if err != nil {
+		a.emitLogin("error", provider, "could not start the CLI proxy: "+err.Error())
+		return "error"
+	}
+	if busy {
+		a.emitLogin("error", provider, "another login is already in progress")
+		return "error"
+	}
+
+	// Buffered so a late submission never blocks the frontend call.
+	ch := make(chan string, 1)
+	a.mu.Lock()
+	a.loginCh = ch
+	a.mu.Unlock()
+
+	go func() {
+		defer func() {
+			a.mu.Lock()
+			a.loginCh = nil
+			a.mu.Unlock()
+		}()
+
+		ctx, cancel := context.WithTimeout(context.Background(), 6*time.Minute)
+		defer cancel()
+
+		a.emitLogin("started", provider, "Opening your browser to sign in…")
+
+		prompt := func(text string) (string, error) {
+			a.emitLogin("prompt", provider, text)
+			select {
+			case v := <-ch:
+				return v, nil
+			case <-ctx.Done():
+				return "", ctx.Err()
+			}
+		}
+
+		saved, err := p.Login(ctx, provider, projectID, prompt)
+		if err != nil {
+			a.emitLogin("error", provider, err.Error())
+			return
+		}
+		_ = saved // the path is an implementation detail; the UI just needs the outcome
+		a.emitLogin("done", provider, "Signed in.")
+	}()
+
+	return "ok"
+}
+
+// CLIProxyAccounts lists the signed-in provider credentials (no tokens).
+func (a *App) CLIProxyAccounts() []backend.CLIProxyAccount {
+	a.mu.Lock()
+	p := a.proxy
+	a.mu.Unlock()
+	if p == nil {
+		return []backend.CLIProxyAccount{}
+	}
+	accounts, err := p.Accounts()
+	if err != nil {
+		return []backend.CLIProxyAccount{}
+	}
+	return accounts
+}
+
+// CLIProxySetAccountEnabled enables or disables one credential without deleting
+// it — the way to park an account or switch which one serves a shared model.
+func (a *App) CLIProxySetAccountEnabled(file string, enabled bool) string {
+	a.mu.Lock()
+	p := a.proxy
+	a.mu.Unlock()
+	if p == nil {
+		return "CLI proxy is not running"
+	}
+	if err := p.SetAccountDisabled(file, !enabled); err != nil {
+		return err.Error()
+	}
+	return "ok"
+}
+
+// CLIProxySignOut deletes a credential, signing that provider account out.
+func (a *App) CLIProxySignOut(file string) string {
+	a.mu.Lock()
+	p := a.proxy
+	a.mu.Unlock()
+	if p == nil {
+		return "CLI proxy is not running"
+	}
+	if err := p.RemoveAccount(file); err != nil {
+		return err.Error()
+	}
+	return "ok"
+}
+
+// CLIProxySubmitPrompt answers the pending login prompt (the pasted callback URL).
+func (a *App) CLIProxySubmitPrompt(value string) string {
+	a.mu.Lock()
+	ch := a.loginCh
+	a.mu.Unlock()
+	if ch == nil {
+		return "no login in progress"
+	}
+	select {
+	case ch <- value:
+		return "ok"
+	default:
+		return "not waiting for input"
+	}
+}
+
+func (a *App) emitLogin(status, provider, message string) {
+	if a.ctx == nil {
+		return
+	}
+	runtime.EventsEmit(a.ctx, "cliproxy:login", map[string]any{
+		"status":   status,
+		"provider": provider,
+		"message":  message,
+	})
 }
 
 // GetStatus reports backend readiness for the frontend.
@@ -109,12 +383,14 @@ func (a *App) GetStatus() map[string]any {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	st := map[string]any{
-		"ready":      a.svc != nil,
-		"error":      a.buildErr,
-		"skills":     []string{},
-		"memoryMode": "",
-		"browser":    false,
-		"avatarPort": 0,
+		"ready":         a.svc != nil,
+		"error":         a.buildErr,
+		"skills":        []string{},
+		"memoryMode":    "",
+		"browser":       false,
+		"avatarPort":    0,
+		"cliproxy":      a.proxy != nil,
+		"cliproxyError": a.proxyErr,
 	}
 	if a.settings != nil {
 		st["avatarPort"] = a.settings.AvatarPort
@@ -186,15 +462,16 @@ func (a *App) SendChat(sessionID, message string, imagePaths []string) string {
 	return "ok"
 }
 
-// Deliverables returns the agent's produced artifacts.
-func (a *App) Deliverables() []agent.Deliverable {
+// Deliverables returns the files a conversation produced. An empty session id
+// returns everything in the workspace.
+func (a *App) Deliverables(sessionID string) []agent.Deliverable {
 	a.mu.Lock()
 	svc := a.svc
 	a.mu.Unlock()
 	if svc == nil {
 		return nil
 	}
-	d, err := svc.Deliverables(context.Background())
+	d, err := svc.Deliverables(context.Background(), sessionID)
 	if err != nil {
 		return nil
 	}
@@ -214,6 +491,139 @@ func (a *App) ReadWorkspaceFile(path string) string {
 		return ""
 	}
 	return out
+}
+
+// ChatSessions lists past conversations, most recent first.
+func (a *App) ChatSessions() []backend.ChatSessionInfo {
+	a.mu.Lock()
+	svc := a.svc
+	a.mu.Unlock()
+	if svc == nil {
+		return []backend.ChatSessionInfo{}
+	}
+	return svc.Sessions(200)
+}
+
+// ChatHistory returns a past conversation's visible messages so the transcript
+// can be restored.
+func (a *App) ChatHistory(sessionID string) []backend.ChatTurn {
+	a.mu.Lock()
+	svc := a.svc
+	a.mu.Unlock()
+	if svc == nil {
+		return []backend.ChatTurn{}
+	}
+	return svc.SessionTurns(sessionID)
+}
+
+// SearchMCPServers finds installable MCP servers in the official registry, so
+// the panel can offer the same catalogue the agent searches.
+func (a *App) SearchMCPServers(query string) map[string]any {
+	candidates, err := backend.SearchMCPServers(context.Background(), query, 20)
+	if err != nil {
+		return map[string]any{"error": err.Error(), "servers": []backend.MCPCandidate{}}
+	}
+	return map[string]any{"error": "", "servers": candidates}
+}
+
+// SearchSkills finds skills available on this machine.
+func (a *App) SearchSkills(query string) []backend.SkillCandidate {
+	return backend.SearchSkills(query, 50)
+}
+
+// InstallMCPServer adds a server from the registry and starts it.
+func (a *App) InstallMCPServer(name, command string, args []string, env map[string]string) string {
+	a.mu.Lock()
+	svc := a.svc
+	a.mu.Unlock()
+	if svc == nil {
+		return "backend not ready"
+	}
+	if err := svc.InstallMCPServer(context.Background(), name, command, args, env); err != nil {
+		return err.Error()
+	}
+	return "ok"
+}
+
+// RemoveMCPServer forgets a server, so it is gone on the next launch too.
+func (a *App) RemoveMCPServer(name string) string {
+	if err := backend.RemoveMCPServer(name); err != nil {
+		return err.Error()
+	}
+	return "ok"
+}
+
+// InstallSkill copies a skill found on this machine into SuperAI.
+func (a *App) InstallSkill(name, sourcePath string) string {
+	a.mu.Lock()
+	svc := a.svc
+	a.mu.Unlock()
+	if svc == nil {
+		return "backend not ready"
+	}
+	if err := svc.InstallSkillFromPath(context.Background(), name, sourcePath); err != nil {
+		return err.Error()
+	}
+	return "ok"
+}
+
+// RemoveSkill uninstalls a skill.
+func (a *App) RemoveSkill(name string) string {
+	a.mu.Lock()
+	svc := a.svc
+	a.mu.Unlock()
+	if err := backend.RemoveSkill(name); err != nil {
+		return err.Error()
+	}
+	if svc != nil {
+		svc.ReloadSkills(context.Background())
+	}
+	return "ok"
+}
+
+// DeleteChatSession removes a past conversation permanently.
+func (a *App) DeleteChatSession(sessionID string) string {
+	a.mu.Lock()
+	svc := a.svc
+	a.mu.Unlock()
+	if svc == nil {
+		return "backend not ready"
+	}
+	if err := svc.DeleteSession(sessionID); err != nil {
+		return err.Error()
+	}
+	return "ok"
+}
+
+// ReadWorkspaceFileDataURL returns a workspace file as a data: URL so the
+// webview can render PDFs and images natively instead of showing raw bytes.
+func (a *App) ReadWorkspaceFileDataURL(path string) string {
+	a.mu.Lock()
+	svc := a.svc
+	a.mu.Unlock()
+	if svc == nil {
+		return ""
+	}
+	out, err := svc.ReadWorkspaceFileDataURL(path)
+	if err != nil {
+		return ""
+	}
+	return out
+}
+
+// OpenWorkspaceFileExternal opens a deliverable with the OS default app — the
+// way out for formats the webview cannot preview (Word, Excel, archives).
+func (a *App) OpenWorkspaceFileExternal(path string) string {
+	a.mu.Lock()
+	svc := a.svc
+	a.mu.Unlock()
+	if svc == nil {
+		return "backend not ready"
+	}
+	if err := svc.OpenWorkspaceFileExternal(path); err != nil {
+		return err.Error()
+	}
+	return "ok"
 }
 
 // EmitAvatarTest pushes a test emotion + speech event for the avatar test button.

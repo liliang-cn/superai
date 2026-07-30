@@ -30,10 +30,21 @@ type Settings struct {
 	MaxRounds int  `json:"max_rounds"`
 	Headless  bool `json:"headless"`
 
-	// DisablePTC turns off Programmatic Tool Calling (model writes JS that calls
-	// tools in a sandbox). PTC works great with capable models (gpt-5.x) but some
-	// providers' "code" models (e.g. DashScope qwen3.x) reject its function-call
-	// format — set true for them so the agent uses direct one-tool-per-round calling.
+	// DisablePTC turns off Programmatic Tool Calling (the model writes JS that
+	// drives tools in a sandbox, so one round does several tool calls).
+	//
+	// Default OFF — PTC is on. Measured with gpt-5.5 on 2026-07-29
+	// (backend/ptc_rounds_test.go counts provider calls through a proxy):
+	//
+	//	                 PTC on   direct
+	//	provider calls        5        8
+	//	prompt tokens    39,957   96,614
+	//	completion tok      638      415
+	//	wall clock         26.8s    33.4s
+	//
+	// Every round re-sends the whole history plus every tool definition, so
+	// fewer rounds is mostly a prompt-token win: ~59% cheaper here, and faster
+	// too. Set this true for a model that rejects PTC's format.
 	DisablePTC bool `json:"disable_ptc"`
 
 	// PIIRedaction, when true, strips personal data (email/phone/中国身份证/
@@ -44,12 +55,24 @@ type Settings struct {
 
 	// Avatar driver server port (127.0.0.1:AvatarPort).
 	AvatarPort int `json:"avatar_port"`
+
+	// CLIProxyEnabled runs an embedded CLIProxyAPI (127.0.0.1:CLIProxyPort) and
+	// routes the brain through it, so the agent uses the Claude Code / Codex /
+	// Gemini CLI subscriptions whose credentials live in <data>/cliproxy/auths
+	// instead of LLMBaseURL + LLMKey. LLMModel still selects the model — it must
+	// be one the proxy serves (see the model list in Settings).
+	CLIProxyEnabled bool `json:"cliproxy_enabled"`
+
+	// CLIProxyPort is the local port the embedded proxy binds (loopback only).
+	CLIProxyPort int `json:"cliproxy_port"`
 }
 
 const (
-	dashScopeBase  = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 	defaultMaxRds  = 40
 	defaultAvatarP = 47615
+	// DefaultCLIProxyPort is deliberately off the well-known range to avoid
+	// colliding with dev servers.
+	DefaultCLIProxyPort = 43517
 )
 
 // DataDir returns the SuperAI desktop data directory (~/.superai-desktop),
@@ -77,20 +100,23 @@ func expandHome(p string) string {
 func settingsPath() string { return filepath.Join(DataDir(), "settings.json") }
 
 // defaults returns a Settings populated with built-in defaults and environment
-// fallbacks (LLM_BASE / LLM_KEY / LLM_MODEL, DASHSCOPE_API_KEY).
+// fallbacks (LLM_BASE / LLM_KEY / LLM_MODEL, EMBED_BASE / EMBED_KEY /
+// EMBED_MODEL). Out of the box SuperAI runs on the embedded CLI proxy, so no
+// cloud endpoint or API key is assumed.
 func defaults() *Settings {
-	dash := strings.TrimSpace(os.Getenv("DASHSCOPE_API_KEY"))
 	s := &Settings{
-		LLMBaseURL:   envOr("LLM_BASE", dashScopeBase),
-		LLMKey:       envOr("LLM_KEY", dash),
-		LLMModel:     envOr("LLM_MODEL", "qwen-plus"),
-		EmbedBaseURL: envOr("EMBED_BASE", dashScopeBase),
-		EmbedKey:     envOr("EMBED_KEY", dash),
-		EmbedModel:   envOr("EMBED_MODEL", "text-embedding-v4"),
-		WorkspaceDir: filepath.Join(DataDir(), "workspace"),
-		MaxRounds:    defaultMaxRds,
-		Headless:     true,
-		AvatarPort:   defaultAvatarP,
+		LLMBaseURL:      envOr("LLM_BASE", ""),
+		LLMKey:          envOr("LLM_KEY", ""),
+		LLMModel:        envOr("LLM_MODEL", ""),
+		EmbedBaseURL:    envOr("EMBED_BASE", ""),
+		EmbedKey:        envOr("EMBED_KEY", ""),
+		EmbedModel:      envOr("EMBED_MODEL", ""),
+		WorkspaceDir:    filepath.Join(DataDir(), "workspace"),
+		MaxRounds:       defaultMaxRds,
+		Headless:        true,
+		AvatarPort:      defaultAvatarP,
+		CLIProxyEnabled: true,
+		CLIProxyPort:    DefaultCLIProxyPort,
 	}
 	return s
 }
@@ -136,6 +162,9 @@ func (s *Settings) backfill(def *Settings) {
 	}
 	if s.AvatarPort <= 0 {
 		s.AvatarPort = def.AvatarPort
+	}
+	if s.CLIProxyPort <= 0 {
+		s.CLIProxyPort = def.CLIProxyPort
 	}
 }
 

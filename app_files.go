@@ -7,12 +7,13 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/liliang-cn/superai-desktop/backend"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
-// uploadsSubdir is where dragged/attached files land inside the agent workspace,
-// so read_document can resolve them via the sandbox (path "uploads/<name>").
-const uploadsSubdir = "uploads"
+// uploadsSubdir is where dragged/attached files land inside the agent workspace.
+// Defined in backend so the deliverables list can exclude the same directory.
+const uploadsSubdir = backend.UploadsSubdir
 
 // workspaceDir returns the configured agent workspace root (the sandbox root).
 func (a *App) workspaceDir() string {
