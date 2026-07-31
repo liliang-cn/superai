@@ -8,3 +8,6 @@ frontend/dist
 /frontend/node_modules/
 /frontend/dist/
 .DS_Store
+
+# scratch from driving the app under Playwright
+/.playwright-mcp/

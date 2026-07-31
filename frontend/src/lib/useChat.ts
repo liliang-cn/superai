@@ -10,11 +10,13 @@ import {
   ProgressStep,
   TraceItem,
 } from "./types";
+import { visibleAnswer } from "./format";
 
 let sessionCounter = 0;
 function makeId(): string {
   try {
-    if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+    if (typeof crypto !== "undefined" && crypto.randomUUID)
+      return crypto.randomUUID();
   } catch {
     /* ignore */
   }
@@ -91,6 +93,10 @@ export function useChat(): UseChatResult {
   const unbound = useRef(0); // sends whose SendChat call has not returned an id yet
   const attached = useRef(new Set<string>()); // asks belonging to the transcript on screen
   const running = useRef(new Set<string>()); // asks that have not finished
+  // Raw stream per ask. The bubble shows visibleAnswer() of this rather than the
+  // deltas themselves, and stripping needs the whole text: a <code> block is cut
+  // across deltas wherever the provider happens to flush.
+  const streamed = useRef(new Map<string, string>());
 
   const patchMessage = useCallback(
     (askId: string, patch: (m: ChatMessage) => ChatMessage) => {
@@ -106,7 +112,8 @@ export function useChat(): UseChatResult {
         const last = steps[steps.length - 1];
         // Agents repeat themselves ("Thinking..." twice in a row); the repeat
         // carries no information, but the same line later in the run does.
-        if (last && last.kind === step.kind && last.text === step.text) return m;
+        if (last && last.kind === step.kind && last.text === step.text)
+          return m;
         return { ...m, progress: [...steps, { id: makeId(), ...step }] };
       });
     },
@@ -114,8 +121,12 @@ export function useChat(): UseChatResult {
   );
 
   const finishAsk = useCallback(
-    (askId: string, opts: { final?: string; emotion?: string; error?: string }) => {
+    (
+      askId: string,
+      opts: { final?: string; emotion?: string; error?: string },
+    ) => {
       running.current.delete(askId);
+      streamed.current.delete(askId);
       patchMessage(askId, (m) => ({
         ...m,
         content: opts.final && opts.final.length ? opts.final : m.content,
@@ -143,7 +154,12 @@ export function useChat(): UseChatResult {
       switch (ev.type) {
         case "partial": {
           if (!ev.content) return;
-          patchMessage(askId, (m) => ({ ...m, content: m.content + ev.content }));
+          const raw = (streamed.current.get(askId) || "") + ev.content;
+          streamed.current.set(askId, raw);
+          const shown = visibleAnswer(raw);
+          patchMessage(askId, (m) =>
+            m.content === shown ? m : { ...m, content: shown },
+          );
           break;
         }
         case "thinking":
@@ -161,12 +177,24 @@ export function useChat(): UseChatResult {
           const tool = ev.tool || "tool";
           setTrace((prev) => [
             ...prev,
-            { id: makeId(), askId, tool, args: ev.args || {}, inner, status: "running" },
+            {
+              id: makeId(),
+              askId,
+              tool,
+              args: ev.args || {},
+              inner,
+              status: "running",
+            },
           ]);
           // Inner calls are the ones the model's own code makes; there can be
           // dozens of them and the trace panel already shows them nested, so
           // only top-level tools become a progress line.
-          if (!inner) pushProgress(askId, { kind: "tool", text: `Calling ${tool}`, tool });
+          if (!inner)
+            pushProgress(askId, {
+              kind: "tool",
+              text: `Calling ${tool}`,
+              tool,
+            });
           break;
         }
         case "tool_result": {
@@ -180,7 +208,9 @@ export function useChat(): UseChatResult {
               if (ev.tool && t.tool !== ev.tool) continue;
               const r = ev.result;
               const failed =
-                r && typeof r === "object" && (r.ok === false || r.error || r.success === false);
+                r &&
+                typeof r === "object" &&
+                (r.ok === false || r.error || r.success === false);
               next[i] = { ...t, status: failed ? "fail" : "ok", result: r };
               break;
             }
@@ -300,7 +330,11 @@ export function useChat(): UseChatResult {
       const trimmed = text.trim();
       if (!trimmed && imagePaths.length === 0) return;
       const askId = makeId();
-      const userMsg: ChatMessage = { id: makeId(), role: "user", content: trimmed };
+      const userMsg: ChatMessage = {
+        id: makeId(),
+        role: "user",
+        content: trimmed,
+      };
       const assistantMsg: ChatMessage = {
         id: askId,
         role: "assistant",
@@ -328,7 +362,9 @@ export function useChat(): UseChatResult {
         unbound.current -= 1;
         if (unbound.current === 0) queue.current.clear();
         if (attached.current.has(askId)) {
-          finishAsk(askId, { error: "backend not ready — configure your LLM in Settings" });
+          finishAsk(askId, {
+            error: "backend not ready — configure your LLM in Settings",
+          });
         }
       } catch (e: any) {
         unbound.current -= 1;
@@ -373,7 +409,17 @@ export function useChat(): UseChatResult {
           id: makeId(),
           role: t.role as ChatMessage["role"],
           content: t.content,
+          kind: t.kind === "context" ? ("context" as const) : undefined,
           emotion: t.emotion || undefined,
+          // The working, recovered from the scripts the transcript hid, so a
+          // reopened conversation still shows what the agent did and not just
+          // what it concluded. Same progress block as a live turn, already
+          // collapsed — the run is over.
+          progress: (t.steps || []).map((text) => ({
+            id: makeId(),
+            kind: "tool" as const,
+            text,
+          })),
         })),
       );
       setTrace([]);
@@ -392,13 +438,25 @@ export function useChat(): UseChatResult {
   // re-rendered by every streamed token; the prompts it reads never change
   // after their message is appended.
   const askSignature = messages
-    .map((m) => (m.startedAt ? `${m.id}:${m.streaming ? "s" : m.error ? "e" : "d"}` : ""))
+    .map((m) =>
+      m.startedAt ? `${m.id}:${m.streaming ? "s" : m.error ? "e" : "d"}` : "",
+    )
     .join("|");
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const asks = useMemo(() => summarizeAsks(messages), [askSignature]);
 
   return {
-    sessionId, messages, trace, asks, sending, lastEmotion,
-    send, onDone, reset, clear: reset, loadSession, newSession,
+    sessionId,
+    messages,
+    trace,
+    asks,
+    sending,
+    lastEmotion,
+    send,
+    onDone,
+    reset,
+    clear: reset,
+    loadSession,
+    newSession,
   };
 }

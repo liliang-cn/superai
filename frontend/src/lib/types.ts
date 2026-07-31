@@ -1,5 +1,6 @@
 export type ViewKey =
   | "chat"
+  | "schedules"
   | "settings"
   | "avatar"
   | "memory"
@@ -41,6 +42,9 @@ export interface AppStatus {
   memoryMode: string;
   browser: boolean;
   avatarPort: number;
+  /** False only when the backend says so — see normalizeStatus. */
+  scheduler: boolean;
+  schedulerError: string;
 }
 
 /**
@@ -60,6 +64,12 @@ export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
+  /**
+   * "context" is what the agent was given to read before answering — recalled
+   * memory, injected as a user message. Shown folded rather than as a bubble:
+   * nobody typed it, but it is the reason the answer says what it says.
+   */
+  kind?: "context";
   emotion?: string;
   streaming?: boolean;
   /** Progress lines captured while this ask was running. */
@@ -102,6 +112,10 @@ export function normalizeStatus(raw: Record<string, any> | null): AppStatus {
     memoryMode: String(raw?.memoryMode ?? "—"),
     browser: Boolean(raw?.browser),
     avatarPort: Number(raw?.avatarPort ?? 0),
+    // Absent reads as running: the Schedules view warns when this is false, and
+    // a warning about a healthy scheduler is worse than none at all.
+    scheduler: raw?.scheduler !== false,
+    schedulerError: String(raw?.schedulerError ?? ""),
   };
 }
 

@@ -18,29 +18,62 @@ func write(t *testing.T, root, rel, body string) {
 	}
 }
 
-func TestSnapshotSkipsAttachmentsAndDotfiles(t *testing.T) {
+// The snapshot deliberately includes the uploads directory. Skipping it also hid
+// what the agent wrote there — and it writes beside its input, so converting
+// uploads/resume.pdf produces uploads/resume.docx, the file the user then went
+// looking for and could not find. Attachments are excluded by identity instead.
+func TestSnapshotCoversUploadsAndSkipsDotfiles(t *testing.T) {
 	root := t.TempDir()
 	write(t, root, "report.md", "hi")
 	write(t, root, "nested/data.json", "{}")
 	write(t, root, UploadsSubdir+"/resume.pdf", "%PDF")
+	write(t, root, UploadsSubdir+"/resume.docx", "PK")
 	write(t, root, ".hidden", "x")
 	write(t, root, ".cache/blob", "x")
 
 	snap := snapshotWorkspace(root)
-	if _, ok := snap["report.md"]; !ok {
-		t.Error("a produced file must be in the snapshot")
-	}
-	if _, ok := snap["nested/data.json"]; !ok {
-		t.Error("nested files must be in the snapshot")
-	}
-	if _, ok := snap[UploadsSubdir+"/resume.pdf"]; ok {
-		t.Error("attachments must be skipped — the user supplied them")
+	for _, want := range []string{
+		"report.md",
+		"nested/data.json",
+		UploadsSubdir + "/resume.docx",
+		UploadsSubdir + "/resume.pdf",
+	} {
+		if _, ok := snap[want]; !ok {
+			t.Errorf("%s must be in the snapshot", want)
+		}
 	}
 	if _, ok := snap[".hidden"]; ok {
 		t.Error("dotfiles must be skipped")
 	}
 	if _, ok := snap[".cache/blob"]; ok {
 		t.Error("dot directories must be skipped")
+	}
+}
+
+// TestSessionFilesTracksImports pins the distinction the directory rule could not
+// make: two files side by side in uploads/, one handed in and one produced.
+func TestSessionFilesTracksImports(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "session-files.json")
+	sf := newSessionFiles(path)
+
+	sf.noteImported([]string{UploadsSubdir + "/resume.pdf"})
+	sf.noteImported(nil)
+	sf.noteImported([]string{"  "})
+
+	if !sf.isImported(UploadsSubdir + "/resume.pdf") {
+		t.Error("an attachment must be remembered as the user's")
+	}
+	if sf.isImported(UploadsSubdir + "/resume.docx") {
+		t.Error("a file the agent wrote next to an attachment is not an attachment")
+	}
+	if sf.isImported("report.md") {
+		t.Error("unrelated files are not attachments")
+	}
+
+	// It has to survive a restart, or a conversation reopened tomorrow would
+	// start calling the user's own uploads deliverables.
+	if !newSessionFiles(path).isImported(UploadsSubdir + "/resume.pdf") {
+		t.Error("the import registry must persist")
 	}
 }
 

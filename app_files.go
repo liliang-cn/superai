@@ -61,6 +61,14 @@ func (a *App) ImportFiles(paths []string) ([]string, error) {
 			rels = append(rels, target)
 		}
 	}
+	// Registered as the user's, so that a file the agent later writes into the
+	// same directory is still recognised as something it produced.
+	a.mu.Lock()
+	svc := a.svc
+	a.mu.Unlock()
+	if svc != nil {
+		svc.NoteImported(rels)
+	}
 	return rels, nil
 }
 
@@ -113,4 +121,36 @@ func copyFile(src, dst string) error {
 		return err
 	}
 	return out.Sync()
+}
+
+// ExportWorkspaceFile copies a deliverable out of the workspace to wherever the
+// user chooses, through the native save dialog.
+//
+// The preview modal could open a file with its owning app but had no way to keep
+// it: a produced report lived in the workspace and the only route out was to go
+// and find it in Finder. Returns "ok", "cancelled", or the failure.
+func (a *App) ExportWorkspaceFile(path string) string {
+	ws := a.workspaceDir()
+	if ws == "" {
+		return "workspace not configured"
+	}
+	src := filepath.Join(ws, filepath.FromSlash(path))
+	if _, err := os.Stat(src); err != nil {
+		return fmt.Sprintf("no such file: %s", filepath.Base(path))
+	}
+	dst, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+		Title:           "Save file",
+		DefaultFilename: filepath.Base(path),
+	})
+	if err != nil {
+		return err.Error()
+	}
+	// An empty path is the user dismissing the dialog, which is not a failure.
+	if strings.TrimSpace(dst) == "" {
+		return "cancelled"
+	}
+	if err := copyFile(src, dst); err != nil {
+		return fmt.Sprintf("save failed: %v", err)
+	}
+	return "ok"
 }

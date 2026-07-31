@@ -27,15 +27,24 @@ type fileStamp struct {
 	mtime int64
 }
 
-// sessionFiles maps a session id to the workspace-relative paths it produced.
+// sessionFiles maps a session id to the workspace-relative paths it produced,
+// and remembers which paths arrived as attachments rather than being produced.
+//
+// Imported exists because "what the user handed in" was previously answered by
+// location — anything under uploads/ — and the agent writes its output next to
+// its input, so converting uploads/cv.pdf produced uploads/cv.docx and that file
+// was excluded from the conversation's deliverables. Attachments are copied in by
+// ImportFiles, so the exact set is known and does not have to be guessed from a
+// directory name.
 type sessionFiles struct {
-	mu    sync.Mutex
-	path  string
-	Files map[string][]string `json:"files"`
+	mu       sync.Mutex
+	path     string
+	Files    map[string][]string `json:"files"`
+	Imported map[string]bool     `json:"imported,omitempty"`
 }
 
 func newSessionFiles(path string) *sessionFiles {
-	sf := &sessionFiles{path: path, Files: map[string][]string{}}
+	sf := &sessionFiles{path: path, Files: map[string][]string{}, Imported: map[string]bool{}}
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return sf
@@ -44,7 +53,32 @@ func newSessionFiles(path string) *sessionFiles {
 	if sf.Files == nil {
 		sf.Files = map[string][]string{}
 	}
+	if sf.Imported == nil {
+		sf.Imported = map[string]bool{}
+	}
 	return sf
+}
+
+// noteImported records paths the app copied into the workspace for the user.
+func (sf *sessionFiles) noteImported(paths []string) {
+	if len(paths) == 0 {
+		return
+	}
+	sf.mu.Lock()
+	for _, p := range paths {
+		if p = strings.TrimSpace(filepath.ToSlash(p)); p != "" {
+			sf.Imported[p] = true
+		}
+	}
+	sf.mu.Unlock()
+	sf.save()
+}
+
+// isImported reports whether a workspace-relative path came from the user.
+func (sf *sessionFiles) isImported(path string) bool {
+	sf.mu.Lock()
+	defer sf.mu.Unlock()
+	return sf.Imported[filepath.ToSlash(path)]
 }
 
 func (sf *sessionFiles) save() {
@@ -98,8 +132,13 @@ func (sf *sessionFiles) forget(sessionID string) {
 	sf.save()
 }
 
-// snapshotWorkspace stamps every file under root, skipping attachments (which
-// the user supplied) and dotfiles.
+// snapshotWorkspace stamps every file under root, skipping dotfiles.
+//
+// It used to skip the uploads directory outright. That also hid anything the
+// agent wrote there, and the agent writes beside its input — so a converted
+// attachment never showed up as produced by the turn. Attachments are filtered
+// out by identity instead (see sessionFiles.isImported), which the caller
+// applies to the diff.
 func snapshotWorkspace(root string) map[string]fileStamp {
 	out := map[string]fileStamp{}
 	if strings.TrimSpace(root) == "" {
@@ -112,9 +151,6 @@ func snapshotWorkspace(root string) map[string]fileStamp {
 		name := d.Name()
 		if d.IsDir() {
 			if name != "." && strings.HasPrefix(name, ".") {
-				return fs.SkipDir
-			}
-			if rel, rerr := filepath.Rel(root, path); rerr == nil && rel == UploadsSubdir {
 				return fs.SkipDir
 			}
 			return nil

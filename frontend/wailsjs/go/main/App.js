@@ -42,12 +42,20 @@ export function DeleteChatSession(arg1) {
   return window['go']['main']['App']['DeleteChatSession'](arg1);
 }
 
+export function DeleteScheduledPrompt(arg1) {
+  return window['go']['main']['App']['DeleteScheduledPrompt'](arg1);
+}
+
 export function Deliverables(arg1) {
   return window['go']['main']['App']['Deliverables'](arg1);
 }
 
 export function EmitAvatarTest(arg1) {
   return window['go']['main']['App']['EmitAvatarTest'](arg1);
+}
+
+export function ExportWorkspaceFile(arg1) {
+  return window['go']['main']['App']['ExportWorkspaceFile'](arg1);
 }
 
 export function GetSettings() {
@@ -114,8 +122,20 @@ export function RemoveSkill(arg1) {
   return window['go']['main']['App']['RemoveSkill'](arg1);
 }
 
+export function RunScheduledPromptNow(arg1) {
+  return window['go']['main']['App']['RunScheduledPromptNow'](arg1);
+}
+
 export function SaveSettings(arg1) {
   return window['go']['main']['App']['SaveSettings'](arg1);
+}
+
+export function SchedulePrompt(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['SchedulePrompt'](arg1, arg2, arg3, arg4);
+}
+
+export function ScheduledPrompts() {
+  return window['go']['main']['App']['ScheduledPrompts']();
 }
 
 export function SearchMCPServers(arg1) {
@@ -128,6 +148,10 @@ export function SearchSkills(arg1) {
 
 export function SendChat(arg1, arg2, arg3) {
   return window['go']['main']['App']['SendChat'](arg1, arg2, arg3);
+}
+
+export function SetScheduledPromptEnabled(arg1, arg2) {
+  return window['go']['main']['App']['SetScheduledPromptEnabled'](arg1, arg2);
 }
 
 export function SetUIRules(arg1) {

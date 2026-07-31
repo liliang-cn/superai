@@ -49,6 +49,12 @@ type Service struct {
 	// single structured completion (reading an install page, say) can ask the
 	// model directly instead of going through a whole agent turn.
 	brain domain.Generator
+	// promptScheduler is injected by whoever owns the process lifetime (the app,
+	// or the background daemon), because a cron loop outlives a chat turn. Tools
+	// that create schedules — set_reminder — go through it. Guarded by schedMu
+	// because injection races tool calls already in flight.
+	schedMu         sync.Mutex
+	promptScheduler *agent.PromptScheduler
 	// dataDir is the agent's own data directory (<home>/data), where agent-go
 	// keeps its sqlite database.
 	dataDir string
@@ -267,7 +273,16 @@ func (s *Service) Stream(ctx context.Context, sessionID, message string, imagePa
 	before := snapshotWorkspace(root)
 	defer func() {
 		if s.files != nil {
-			s.files.record(sessionID, changedFiles(before, snapshotWorkspace(root)))
+			// An attachment imported during this turn also shows up as new, and it
+			// is the one thing here the agent did not produce.
+			changed := changedFiles(before, snapshotWorkspace(root))
+			kept := changed[:0]
+			for _, p := range changed {
+				if !s.files.isImported(p) {
+					kept = append(kept, p)
+				}
+			}
+			s.files.record(sessionID, kept)
 		}
 	}()
 
@@ -302,21 +317,44 @@ func (s *Service) Deliverables(ctx context.Context, sessionID string) ([]agent.D
 			owned[p] = true
 		}
 	}
-	// Attachments are copied into <workspace>/uploads, which the deliverables
-	// scan also sees. What the user handed in is not something the agent
-	// produced, so it does not belong in this list.
+	imported := func(string) bool { return false }
+	if s.files != nil {
+		imported = s.files.isImported
+	}
+	return keepDeliverables(all, owned, imported), nil
+}
+
+// keepDeliverables decides which artifacts belong to a conversation.
+//
+// What the user handed in is not something the agent produced, so it does not
+// belong in the list. Judged per file rather than by directory: the agent writes
+// its output beside its input, so excluding all of uploads/ also hid the
+// converted copy of an attachment — the one file the user then goes looking for.
+//
+// owned is nil for the "everything" caller, which has no conversation to compare
+// against; there, a path in uploads/ with no import record is still assumed to be
+// an attachment, since it predates the record being kept.
+func keepDeliverables(
+	all []agent.Deliverable,
+	owned map[string]bool,
+	isImported func(string) bool,
+) []agent.Deliverable {
 	out := make([]agent.Deliverable, 0, len(all))
 	for _, d := range all {
 		rel := filepath.ToSlash(d.Path)
-		if strings.HasPrefix(rel, UploadsSubdir+"/") {
+		if isImported(rel) {
 			continue
 		}
-		if owned != nil && !owned[rel] {
+		if owned != nil {
+			if !owned[rel] {
+				continue
+			}
+		} else if strings.HasPrefix(rel, UploadsSubdir+"/") {
 			continue
 		}
 		out = append(out, d)
 	}
-	return out, nil
+	return out
 }
 
 // ReadWorkspaceFile reads a workspace-relative file via the sandbox.
@@ -365,6 +403,53 @@ func (s *Service) OpenWorkspaceFileExternal(path string) error {
 		return err
 	}
 	return exec.Command("open", full).Start()
+}
+
+// UsePromptScheduler hands the service the scheduler its tools should create
+// schedules in. Passing nil makes scheduling tools report that the feature is
+// unavailable, which is honest — better than accepting a reminder nothing will
+// ever fire.
+func (s *Service) UsePromptScheduler(sch *agent.PromptScheduler) {
+	if s == nil {
+		return
+	}
+	s.schedMu.Lock()
+	s.promptScheduler = sch
+	s.schedMu.Unlock()
+}
+
+// reminderScheduler returns the injected scheduler, or explains its absence.
+func (s *Service) reminderScheduler() (*agent.PromptScheduler, error) {
+	if s == nil {
+		return nil, fmt.Errorf("no service")
+	}
+	s.schedMu.Lock()
+	sch := s.promptScheduler
+	s.schedMu.Unlock()
+	if sch == nil {
+		return nil, fmt.Errorf("定时功能未启动")
+	}
+	return sch, nil
+}
+
+// NoteImported records files the host copied into the workspace on the user's
+// behalf, so the deliverables list can tell them from what the agent produced
+// even when they share a directory.
+func (s *Service) NoteImported(paths []string) {
+	if s == nil || s.files == nil {
+		return
+	}
+	s.files.noteImported(paths)
+}
+
+// Agent exposes the underlying agent service, for capabilities this package
+// does not wrap — the prompt scheduler being the first, since its lifetime
+// belongs to the host rather than to a chat turn.
+func (s *Service) Agent() *agent.Service {
+	if s == nil {
+		return nil
+	}
+	return s.svc
 }
 
 // InstalledSkills returns the skills discovered/installed for this service.
@@ -578,21 +663,47 @@ func (s *Service) registerLifeTools() {
 			return okData(p), nil
 		}, write)
 
-	svc.AddToolWithMetadata("set_reminder", "设置提醒，可周期重复（到点 SuperAI 会主动提醒）。",
+	// A reminder is a scheduled prompt. Until the scheduler existed this tool
+	// only appended a row to a JSON file while telling the model "SuperAI will
+	// remind you when it is due" — a promise nothing kept.
+	svc.AddToolWithMetadata("set_reminder",
+		"设置提醒，到点会真的触发（后台常驻时即使 app 关着也会）。时间用 HH:MM（每天）或 RFC3339。",
 		obj(map[string]any{
-			"title": sp("提醒内容"), "remind_at": sp("一次性用 RFC3339；每日用 HH:MM"),
-			"recurrence": sp("重复规则：daily 或 none"),
+			"title":      sp("提醒内容；也可以是要先做的事，如「看看昨天的部署有没有问题」"),
+			"remind_at":  sp("每天用 HH:MM（如 08:00）；具体某天用 RFC3339"),
+			"recurrence": sp("daily 或 none；HH:MM 默认 daily"),
 		}, "title", "remind_at"),
 		func(ctx context.Context, a map[string]any) (any, error) {
-			db.mu.Lock()
-			rec := map[string]any{
-				"id": short(uuid.NewString()), "title": str(a, "title"),
-				"remind_at": str(a, "remind_at"), "recurrence": orDefault(str(a, "recurrence"), "none"),
+			title := strings.TrimSpace(str(a, "title"))
+			if title == "" {
+				return errResult("title is required"), nil
 			}
-			db.Reminders = append(db.Reminders, rec)
-			db.mu.Unlock()
-			db.save()
-			return okData(rec), nil
+			plan, err := ReminderToCron(str(a, "remind_at"), str(a, "recurrence"))
+			if err != nil {
+				return errResult(err.Error()), nil
+			}
+
+			sch, err := s.reminderScheduler()
+			if err != nil {
+				return errResult("提醒功能不可用：" + err.Error()), nil
+			}
+			task, err := sch.Schedule(ReminderPrompt(title), plan.Cron, "提醒："+title, "reminders")
+			if err != nil {
+				return errResult(err.Error()), nil
+			}
+
+			data := map[string]any{
+				"id": task.ID, "title": title, "schedule": plan.Cron, "when": plan.Note,
+			}
+			if task.NextRun != nil {
+				data["next_run"] = task.NextRun.Local().Format("2006-01-02 15:04")
+			}
+			if plan.OneShot {
+				// Said plainly rather than hidden: cron cannot express "once", so
+				// the user should know this will come back next year.
+				data["note"] = "cron 无法表达「只一次」，这条会每年同一天重复；不需要时删掉它。"
+			}
+			return okData(data), nil
 		}, write)
 
 	svc.AddToolWithMetadata("list_reminders", "列出全部提醒。", obj(map[string]any{}),

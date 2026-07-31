@@ -20,19 +20,46 @@ import {
   PromptInputSubmit,
 } from "@/components/ai-elements/prompt-input";
 import { Button } from "@/components/ui/button";
-import { CopyIcon, MessageSquareIcon, Trash2Icon, PaperclipIcon } from "lucide-react";
+import {
+  CopyIcon,
+  MessageSquareIcon,
+  Trash2Icon,
+  PaperclipIcon,
+} from "lucide-react";
 import { HistoryBar, HistoryList, useHistory } from "../components/HistoryBar";
 import TracePanel from "../components/TracePanel";
 import DeliverablesBar from "../components/DeliverablesBar";
+import ContextBlock from "../components/ContextBlock";
 import AgentProgress from "../components/AgentProgress";
 
-export default function ChatView({ status }: { status: AppStatus | null }) {
+export default function ChatView({
+  status,
+  openSession,
+  onSessionOpened,
+}: {
+  status: AppStatus | null;
+  /** A conversation to restore on arrival — a scheduled run's, for instance. */
+  openSession?: string;
+  onSessionOpened?: () => void;
+}) {
   const chat = useChat();
   const attach = useAttachments();
   const notReady = status !== null && !status.ready;
   const messages = chat.messages;
   const history = useHistory();
   const [filesKey, setFilesKey] = useState(0);
+
+  // Loading it here rather than in App keeps the transcript the only thing that
+  // owns a session id. Picking a run's conversation is the same act as picking
+  // one out of history.
+  useEffect(() => {
+    if (!openSession) return;
+    history.close();
+    chat.loadSession(openSession).catch(() => {});
+    onSessionOpened?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openSession]);
+
   useEffect(() => {
     // A finished turn may have written files and definitely changed history.
     chat.onDone(() => {
@@ -44,7 +71,10 @@ export default function ChatView({ status }: { status: AppStatus | null }) {
 
   // Asking again while an answer is still streaming is allowed: each ask gets
   // its own bubble, so there is nothing to wait for.
-  const onSubmit = (msg: { text: string }, e: React.FormEvent<HTMLFormElement>) => {
+  const onSubmit = (
+    msg: { text: string },
+    e: React.FormEvent<HTMLFormElement>,
+  ) => {
     const text = msg.text.trim();
     if (!text && attach.paths.length === 0) return;
     // Images go straight to the vision model as multimodal input; docs are read
@@ -58,10 +88,17 @@ export default function ChatView({ status }: { status: AppStatus | null }) {
   return (
     <div className="view">
       <div className="chat-layout">
-        <div className="chat-main" style={{ ["--wails-drop-target" as any]: "drop" }}>
+        <div
+          className="chat-main"
+          style={{ ["--wails-drop-target" as any]: "drop" }}
+        >
           {/* Starting a new conversation mid-answer is safe: the running ask
               finishes into its own conversation's history. */}
-          <HistoryBar history={history} onNew={chat.newSession} />
+          <HistoryBar
+            history={history}
+            onNew={chat.newSession}
+            sessionId={chat.sessionId}
+          />
 
           {history.sessions ? (
             <HistoryList
@@ -70,75 +107,88 @@ export default function ChatView({ status }: { status: AppStatus | null }) {
               onPick={(id) => chat.loadSession(id).catch(() => {})}
             />
           ) : (
-          <Conversation className="transcript">
-            {messages.length === 0 ? (
-              <ConversationEmptyState
-                icon={<MessageSquareIcon className="size-10" />}
-                title="Start a conversation"
-                description="Chat with SuperAI. It can use tools, search memory and the web, and stream its reasoning live."
-              >
-                {notReady && (
-                  <div className="empty-hint">
-                    ⚙️ Backend not ready — configure your LLM in Settings to begin.
-                  </div>
-                )}
-              </ConversationEmptyState>
-            ) : (
-              <ConversationContent
-                autoScrollKey={messages
-                  .map((m) => `${m.content}#${m.progress?.length ?? 0}`)
-                  .join("|")}
-              >
-                {messages.map((m) => (
-                  <div key={m.id}>
-                    <Message from={m.role}>
-                      <MessageContent variant="flat">
-                        {m.role === "assistant" ? (
-                          <>
-                            {m.progress && m.progress.length > 0 && (
-                              <AgentProgress
-                                steps={m.progress}
-                                running={!!m.streaming}
-                                startedAt={m.startedAt}
-                                finishedAt={m.finishedAt}
-                              />
-                            )}
-                            {m.content ? (
-                              <Response>{m.content}</Response>
-                            ) : m.streaming ? (
-                              // The progress block carries its own spinner, so
-                              // the caret is only needed before the first sign
-                              // of life.
-                              !m.progress?.length && <span className="msg-cursor" />
+            <Conversation className="transcript">
+              {messages.length === 0 ? (
+                <ConversationEmptyState
+                  icon={<MessageSquareIcon className="size-10" />}
+                  title="Start a conversation"
+                  description="Chat with SuperAI. It can use tools, search memory and the web, and stream its reasoning live."
+                >
+                  {notReady && (
+                    <div className="empty-hint">
+                      ⚙️ Backend not ready — configure your LLM in Settings to
+                      begin.
+                    </div>
+                  )}
+                </ConversationEmptyState>
+              ) : (
+                <ConversationContent
+                  autoScrollKey={messages
+                    .map((m) => `${m.content}#${m.progress?.length ?? 0}`)
+                    .join("|")}
+                >
+                  {messages.map((m) =>
+                    m.kind === "context" ? (
+                      <ContextBlock key={m.id} content={m.content} />
+                    ) : (
+                      <div key={m.id}>
+                        <Message from={m.role}>
+                          <MessageContent variant="flat">
+                            {m.role === "assistant" ? (
+                              <>
+                                {m.progress && m.progress.length > 0 && (
+                                  <AgentProgress
+                                    steps={m.progress}
+                                    running={!!m.streaming}
+                                    startedAt={m.startedAt}
+                                    finishedAt={m.finishedAt}
+                                  />
+                                )}
+                                {m.content ? (
+                                  <Response>{m.content}</Response>
+                                ) : m.streaming ? (
+                                  // The progress block carries its own spinner, so
+                                  // the caret is only needed before the first sign
+                                  // of life.
+                                  !m.progress?.length && (
+                                    <span className="msg-cursor" />
+                                  )
+                                ) : (
+                                  !m.error && !m.progress?.length && "…"
+                                )}
+                                {m.error && (
+                                  <div className="msg-error">⚠ {m.error}</div>
+                                )}
+                              </>
                             ) : (
-                              !m.error && !m.progress?.length && "…"
+                              <span style={{ whiteSpace: "pre-wrap" }}>
+                                {m.content}
+                              </span>
                             )}
-                            {m.error && <div className="msg-error">⚠ {m.error}</div>}
-                          </>
-                        ) : (
-                          <span style={{ whiteSpace: "pre-wrap" }}>{m.content}</span>
+                          </MessageContent>
+                        </Message>
+                        {m.role === "assistant" &&
+                          !m.streaming &&
+                          m.content && (
+                            <Actions className="mt-1 ml-1">
+                              <Action
+                                label="Copy"
+                                tooltip="Copy message"
+                                onClick={() => copyText(m.content)}
+                              >
+                                <CopyIcon className="size-3.5" />
+                              </Action>
+                            </Actions>
+                          )}
+                        {m.emotion && !m.streaming && (
+                          <div className="emotion-chip">🎭 {m.emotion}</div>
                         )}
-                      </MessageContent>
-                    </Message>
-                    {m.role === "assistant" && !m.streaming && m.content && (
-                      <Actions className="mt-1 ml-1">
-                        <Action
-                          label="Copy"
-                          tooltip="Copy message"
-                          onClick={() => copyText(m.content)}
-                        >
-                          <CopyIcon className="size-3.5" />
-                        </Action>
-                      </Actions>
-                    )}
-                    {m.emotion && !m.streaming && (
-                      <div className="emotion-chip">🎭 {m.emotion}</div>
-                    )}
-                  </div>
-                ))}
-              </ConversationContent>
-            )}
-          </Conversation>
+                      </div>
+                    ),
+                  )}
+                </ConversationContent>
+              )}
+            </Conversation>
           )}
 
           <DeliverablesBar sessionId={chat.sessionId} refreshKey={filesKey} />

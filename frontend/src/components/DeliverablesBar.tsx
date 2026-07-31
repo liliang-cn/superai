@@ -1,12 +1,19 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { ChevronDownIcon, ChevronUpIcon, RefreshCwIcon } from "lucide-react";
+import {
+  ChevronDownIcon,
+  ChevronUpIcon,
+  DownloadIcon,
+  RefreshCwIcon,
+} from "lucide-react";
 import {
   Deliverables,
+  ExportWorkspaceFile,
   OpenWorkspaceFileExternal,
   ReadWorkspaceFile,
   ReadWorkspaceFileDataURL,
 } from "../../wailsjs/go/main/App";
 import { agent } from "../../wailsjs/go/models";
+import { Response } from "@/components/ai-elements/response";
 
 function fmtSize(n: number): string {
   if (n < 1024) return `${n} B`;
@@ -32,6 +39,13 @@ const TEXT_RE =
   /\.(md|markdown|txt|json|ya?ml|toml|ini|csv|tsv|log|go|py|rb|rs|java|kt|c|h|cpp|cs|js|mjs|cjs|ts|tsx|jsx|css|scss|html?|xml|sh|bash|zsh|sql|env|gitignore)$/i;
 const IMAGE_RE = /\.(png|jpe?g|gif|webp|bmp|svg|avif)$/i;
 
+const MARKDOWN_RE = /\.(md|markdown)$/i;
+
+/** Markdown gets rendered; every other text format is shown as source. */
+function isMarkdown(path: string): boolean {
+  return MARKDOWN_RE.test(path);
+}
+
 /** What the modal can actually show for a given file. */
 function viewerKind(path: string): ViewerKind {
   if (/\.pdf$/i.test(path)) return "pdf";
@@ -56,11 +70,17 @@ export default function DeliverablesBar({
   refreshKey?: number;
 }) {
   const [items, setItems] = useState<agent.Deliverable[]>([]);
-  const [open, setOpen] = useState(() => localStorage.getItem(OPEN_KEY) !== "0");
-  const [viewer, setViewer] = useState<
-    { path: string; kind: ViewerKind; content: string; url: string } | null
-  >(null);
+  const [open, setOpen] = useState(
+    () => localStorage.getItem(OPEN_KEY) !== "0",
+  );
+  const [viewer, setViewer] = useState<{
+    path: string;
+    kind: ViewerKind;
+    content: string;
+    url: string;
+  } | null>(null);
   const [loading, setLoading] = useState(false);
+  const [note, setNote] = useState("");
 
   const refresh = useCallback(() => {
     Deliverables(sessionId)
@@ -76,17 +96,36 @@ export default function DeliverablesBar({
     localStorage.setItem(OPEN_KEY, open ? "1" : "0");
   }, [open]);
 
+  // Saving a copy where the user can keep it. The dialog is native, so the only
+  // thing to report here is a failure — "cancelled" is a choice, not a problem.
+  const download = async (path: string) => {
+    const res = await ExportWorkspaceFile(path).catch((e: any) =>
+      String(e?.message || e),
+    );
+    if (res !== "ok" && res !== "cancelled") setNote(res);
+  };
+
   const openFile = async (path: string) => {
     const kind = viewerKind(path);
     setViewer({ path, kind, content: "", url: "" });
     setLoading(true);
     try {
       if (kind === "text") {
-        setViewer({ path, kind, content: await ReadWorkspaceFile(path), url: "" });
+        setViewer({
+          path,
+          kind,
+          content: await ReadWorkspaceFile(path),
+          url: "",
+        });
       } else if (kind === "pdf" || kind === "image") {
         // Binary formats the webview renders natively: hand them over as a
         // data: URL rather than stringifying the bytes into the modal.
-        setViewer({ path, kind, content: "", url: await ReadWorkspaceFileDataURL(path) });
+        setViewer({
+          path,
+          kind,
+          content: "",
+          url: await ReadWorkspaceFileDataURL(path),
+        });
       } else {
         setViewer({ path, kind, content: "", url: "" });
       }
@@ -110,23 +149,46 @@ export default function DeliverablesBar({
       <div className="deliv-bar">
         <div className="trace-head">
           <button className="deliv-toggle" onClick={() => setOpen((v) => !v)}>
-            {open ? <ChevronDownIcon className="size-3.5" /> : <ChevronUpIcon className="size-3.5" />}
+            {open ? (
+              <ChevronDownIcon className="size-3.5" />
+            ) : (
+              <ChevronUpIcon className="size-3.5" />
+            )}
             <span>Files ({items.length})</span>
           </button>
-          <button className="btn ghost sm" onClick={refresh} title="Rescan the workspace">
+          {note !== "" && <span className="save-note err">{note}</span>}
+          <button
+            className="btn ghost sm"
+            onClick={refresh}
+            title="Rescan the workspace"
+          >
             <RefreshCwIcon className="size-3.5" /> Refresh
           </button>
         </div>
         {open && (
           <div className="deliv-grid">
             {items.map((d) => (
-              <button key={d.path} className="deliv-item" onClick={() => openFile(d.path)}>
-                <span className="deliv-icon">{iconFor(d.type, d.path)}</span>
-                <span className="deliv-meta">
-                  <div className="deliv-name">{d.path.split("/").pop() || d.path}</div>
-                  <div className="deliv-sub">{fmtSize(d.size)}</div>
-                </span>
-              </button>
+              <div key={d.path} className="deliv-item">
+                <button className="deliv-open" onClick={() => openFile(d.path)}>
+                  <span className="deliv-icon">{iconFor(d.type, d.path)}</span>
+                  <span className="deliv-meta">
+                    <div className="deliv-name">
+                      {d.path.split("/").pop() || d.path}
+                    </div>
+                    <div className="deliv-sub">{fmtSize(d.size)}</div>
+                  </span>
+                </button>
+                {/* Straight to disk, without opening the preview first — keeping
+                    the file is the common reason for looking at this list. */}
+                <button
+                  className="deliv-download"
+                  onClick={() => download(d.path)}
+                  title={`Download ${d.path.split("/").pop() || d.path}`}
+                  aria-label={`Download ${d.path.split("/").pop() || d.path}`}
+                >
+                  <DownloadIcon className="size-3.5" />
+                </button>
+              </div>
             ))}
           </div>
         )}
@@ -138,6 +200,13 @@ export default function DeliverablesBar({
             <div className="modal-head">
               <span className="modal-title">{viewer.path}</span>
               <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <button
+                  className="btn ghost sm"
+                  onClick={() => download(viewer.path)}
+                  title="Save a copy outside the workspace"
+                >
+                  <DownloadIcon className="size-3.5" /> Download
+                </button>
                 <button
                   className="btn ghost sm"
                   onClick={() => OpenWorkspaceFileExternal(viewer.path)}
@@ -153,7 +222,11 @@ export default function DeliverablesBar({
             <div className="modal-body">
               {loading ? (
                 <div className="loading-row">
-                  <span className="spinner" style={{ borderTopColor: "var(--accent)" }} /> Loading…
+                  <span
+                    className="spinner"
+                    style={{ borderTopColor: "var(--accent)" }}
+                  />{" "}
+                  Loading…
                 </div>
               ) : viewer.kind === "pdf" ? (
                 <embed
@@ -165,7 +238,11 @@ export default function DeliverablesBar({
                 <img
                   src={viewer.url}
                   alt={viewer.path}
-                  style={{ maxWidth: "100%", display: "block", margin: "0 auto" }}
+                  style={{
+                    maxWidth: "100%",
+                    display: "block",
+                    margin: "0 auto",
+                  }}
                 />
               ) : viewer.kind === "binary" ? (
                 <div className="trace-empty">
@@ -173,6 +250,11 @@ export default function DeliverablesBar({
                   <br />
                   Use “Open externally” to view it in the app that owns it.
                 </div>
+              ) : isMarkdown(viewer.path) ? (
+                // Markdown is the format the agent writes reports in, so it is
+                // shown as a report rather than as its source. Same pipeline as a
+                // chat answer, which means tables, headings and charts all work.
+                <Response>{viewer.content}</Response>
               ) : (
                 <pre>{viewer.content}</pre>
               )}

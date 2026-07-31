@@ -9,7 +9,10 @@ import SkillsView from "./views/SkillsView";
 import MCPView from "./views/MCPView";
 import DataView from "./views/DataView";
 import LifeView from "./views/LifeView";
+import SchedulesView from "./views/SchedulesView";
+import { ScheduleRunToasts } from "./components/ScheduleRuns";
 import { AppStatus, ViewKey, normalizeStatus } from "./lib/types";
+import { useScheduleRuns } from "./lib/useScheduleRuns";
 import { uiRules } from "./lib/aigui";
 import { GetStatus, SetUIRules } from "../wailsjs/go/main/App";
 
@@ -22,6 +25,12 @@ export default function App() {
   const [theme, setTheme] = useState<Theme>(
     () => (localStorage.getItem("superai-theme") as Theme) || "dark"
   );
+  // Scheduled runs are listened for here, not in the Schedules view: a timer
+  // fires while the user is somewhere else, which is the whole point of a timer.
+  const runs = useScheduleRuns();
+  // The conversation a run belongs to, handed to the chat view to open. Cleared
+  // as soon as it has been taken so asking for the same one twice works.
+  const [pendingSession, setPendingSession] = useState("");
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -38,6 +47,12 @@ export default function App() {
     () => setTheme((t) => (t === "dark" ? "light" : "dark")),
     []
   );
+
+  const openConversation = useCallback((session: string) => {
+    if (!session) return;
+    setPendingSession(session);
+    setView("chat");
+  }, []);
 
   const refreshStatus = useCallback(async () => {
     try {
@@ -57,21 +72,37 @@ export default function App() {
   }, [refreshStatus]);
 
   return (
-    <div className="app">
-      <Sidebar current={view} onNavigate={setView} />
-      <div className="main">
-        <StatusBar status={status} loading={loading} theme={theme} onToggleTheme={toggleTheme} />
-        <div className="content">
-          {view === "chat" && <ChatView status={status} />}
-          {view === "settings" && <SettingsView onSaved={refreshStatus} />}
-          {view === "avatar" && <AvatarView status={status} />}
-          {view === "memory" && <MemoryView />}
-          {view === "skills" && <SkillsView />}
-          {view === "mcp" && <MCPView />}
-          {view === "data" && <DataView />}
-          {view === "life" && <LifeView />}
+    <>
+      <div className="app">
+        <Sidebar current={view} onNavigate={setView} badges={{ schedules: runs.unseen }} />
+        <div className="main">
+          <StatusBar status={status} loading={loading} theme={theme} onToggleTheme={toggleTheme} />
+          <div className="content">
+            {view === "chat" && (
+              <ChatView
+                status={status}
+                openSession={pendingSession}
+                onSessionOpened={() => setPendingSession("")}
+              />
+            )}
+            {view === "schedules" && (
+              <SchedulesView status={status} log={runs} onOpenConversation={openConversation} />
+            )}
+            {view === "settings" && <SettingsView onSaved={refreshStatus} />}
+            {view === "avatar" && <AvatarView status={status} />}
+            {view === "memory" && <MemoryView />}
+            {view === "skills" && <SkillsView />}
+            {view === "mcp" && <MCPView />}
+            {view === "data" && <DataView />}
+            {view === "life" && <LifeView />}
+          </div>
         </div>
       </div>
-    </div>
+      {/* The Schedules view lists the same runs, so a toast there would only
+          repeat what is already on screen. */}
+      {view !== "schedules" && (
+        <ScheduleRunToasts log={runs} onOpenConversation={openConversation} />
+      )}
+    </>
   );
 }

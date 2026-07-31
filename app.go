@@ -29,6 +29,17 @@ type App struct {
 	// carries the manually pasted callback URL.
 	loginCh chan string
 
+	// scheduler drives prompts that run on a clock. It is rebuilt with the
+	// service, since a run is an agent turn against the current settings.
+	scheduler    *agent.PromptScheduler
+	schedulerErr string
+	// scheduleLock is held while this process owns firing schedules; nil means
+	// another process (the daemon) owns them and this one only manages.
+	scheduleLock *backend.ScheduleLock
+	// notifyOK records whether the user granted notification permission, asked
+	// for once at startup rather than when a timer fires and nobody is looking.
+	notifyOK bool
+
 	// emitFn overrides where frontend events go. Only tests set it: the Wails
 	// runtime calls log.Fatalf when EventsEmit is handed a context it did not
 	// create, which would take the whole test binary down.
@@ -62,6 +73,12 @@ func (a *App) startup(ctx context.Context) {
 
 	a.syncProxy()
 	a.rebuild()
+
+	// Permission is requested at startup, not when a timer fires: by then the
+	// user is typically not at the machine, which is the whole point of a
+	// schedule.
+	a.initNotifications()
+	a.startScheduler()
 }
 
 // syncProxy brings the embedded CLIProxyAPI in line with the current settings:
@@ -100,6 +117,10 @@ func (a *App) syncProxy() {
 
 // shutdown releases backend resources.
 func (a *App) shutdown(ctx context.Context) {
+	// Before the lock: stopping the cron loop must not race the service it runs
+	// its turns against.
+	a.stopScheduler()
+
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if a.svc != nil {
@@ -131,6 +152,12 @@ func (a *App) rebuild() {
 	}
 	a.buildErr = ""
 	a.svc = svc
+}
+
+// restartScheduler rebinds the timers to the current service. Callers must not
+// hold a.mu.
+func (a *App) restartScheduler() {
+	a.startScheduler()
 }
 
 // effective returns the settings the backend Service is actually built from:
@@ -168,6 +195,8 @@ func (a *App) SaveSettings(s backend.Settings) error {
 	a.mu.Unlock()
 	a.syncProxy()
 	a.rebuild()
+	// The scheduler runs turns against the service that was just replaced.
+	a.restartScheduler()
 	return nil
 }
 
@@ -400,14 +429,17 @@ func (a *App) GetStatus() map[string]any {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	st := map[string]any{
-		"ready":         a.svc != nil,
-		"error":         a.buildErr,
-		"skills":        []string{},
-		"memoryMode":    "",
-		"browser":       false,
-		"avatarPort":    0,
-		"cliproxy":      a.proxy != nil,
-		"cliproxyError": a.proxyErr,
+		"ready":          a.svc != nil,
+		"error":          a.buildErr,
+		"skills":         []string{},
+		"memoryMode":     "",
+		"browser":        false,
+		"avatarPort":     0,
+		"cliproxy":       a.proxy != nil,
+		"cliproxyError":  a.proxyErr,
+		"scheduler":      a.scheduler != nil,
+		"schedulerError": a.schedulerErr,
+		"notifications":  a.notifyOK,
 	}
 	if a.settings != nil {
 		st["avatarPort"] = a.settings.AvatarPort

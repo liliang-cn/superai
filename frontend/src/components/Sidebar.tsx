@@ -5,7 +5,10 @@ import { ViewKey } from "../lib/types";
 const NAV: { section: string; items: { key: ViewKey; label: string; icon: string }[] }[] = [
   {
     section: "Workspace",
-    items: [{ key: "chat", label: "Chat", icon: "💬" }],
+    items: [
+      { key: "chat", label: "Chat", icon: "💬" },
+      { key: "schedules", label: "Schedules", icon: "⏰" },
+    ],
   },
   {
     section: "Knowledge",
@@ -31,9 +34,12 @@ const OPEN_KEY = "superai-sidebar-open";
 export default function Sidebar({
   current,
   onNavigate,
+  badges,
 }: {
   current: ViewKey;
   onNavigate: (v: ViewKey) => void;
+  /** Counts of things that happened on their own, per view. */
+  badges?: Partial<Record<ViewKey, number>>;
 }) {
   const [open, setOpen] = useState(() => localStorage.getItem(OPEN_KEY) !== "0");
 
@@ -58,17 +64,25 @@ export default function Sidebar({
         {NAV.map((group) => (
           <div key={group.section}>
             {open && <div className="nav-section">{group.section}</div>}
-            {group.items.map((it) => (
-              <button
-                key={it.key}
-                className={`nav-item${current === it.key ? " active" : ""}`}
-                onClick={() => onNavigate(it.key)}
-                title={open ? undefined : it.label}
-              >
-                <span className="ic">{it.icon}</span>
-                {open && it.label}
-              </button>
-            ))}
+            {group.items.map((it) => {
+              const badge = badges?.[it.key] ?? 0;
+              return (
+                <button
+                  key={it.key}
+                  className={`nav-item${current === it.key ? " active" : ""}`}
+                  onClick={() => onNavigate(it.key)}
+                  title={open ? undefined : it.label}
+                >
+                  <span className="ic">{it.icon}</span>
+                  {open && it.label}
+                  {/* Collapsed there is no room for a count, but "something
+                      happened" still has to be visible. */}
+                  {badge > 0 && (
+                    <span className={`nav-badge${open ? "" : " dot"}`}>{open ? badge : ""}</span>
+                  )}
+                </button>
+              );
+            })}
           </div>
         ))}
       </nav>

@@ -34,8 +34,11 @@ function useElapsed(startedAt: number | undefined, running: boolean): number {
 
 function StepIcon({ kind }: { kind: ProgressStep["kind"] }) {
   if (kind === "tool") return <WrenchIcon className="mt-0.5 size-3 shrink-0" />;
-  if (kind === "state") return <ActivityIcon className="mt-0.5 size-3 shrink-0" />;
-  return <span className="mt-[7px] size-1 shrink-0 rounded-full bg-current opacity-60" />;
+  if (kind === "state")
+    return <ActivityIcon className="mt-0.5 size-3 shrink-0" />;
+  return (
+    <span className="mt-[7px] size-1 shrink-0 rounded-full bg-current opacity-60" />
+  );
 }
 
 /**
@@ -62,7 +65,9 @@ export default function AgentProgress({
   finishedAt?: number;
 }) {
   const live = useElapsed(startedAt, running);
-  const elapsed = running ? live : Math.max(0, (finishedAt || 0) - (startedAt || 0));
+  const elapsed = running
+    ? live
+    : Math.max(0, (finishedAt || 0) - (startedAt || 0));
   const duration = startedAt ? fmtDuration(elapsed) : "";
   const latest = steps[steps.length - 1];
 
@@ -82,7 +87,13 @@ export default function AgentProgress({
         <span className="min-w-0 flex-1 truncate" aria-live="polite">
           {running
             ? latest?.text || "Working…"
-            : `Worked for ${duration} · ${steps.length} step${steps.length === 1 ? "" : "s"}`}
+            : // A restored conversation has the steps but not the clock — the
+              // timings were never stored — so the duration is left out rather
+              // than printed as a gap.
+              [
+                duration ? `Worked for ${duration}` : "Worked",
+                `${steps.length} step${steps.length === 1 ? "" : "s"}`,
+              ].join(" · ")}
         </span>
         {running && duration && (
           <span className="shrink-0 tabular-nums opacity-70">{duration}</span>
@@ -94,7 +105,10 @@ export default function AgentProgress({
           <div key={s.id} className="flex items-start gap-1.5">
             <StepIcon kind={s.kind} />
             <span className={cn("min-w-0", s.kind === "thinking" && "italic")}>
-              {s.kind === "tool" ? (
+              {/* A live tool step carries the name separately, so it can be set
+                  in code type. A step recovered from history has only its line
+                  ("Called read_document") and is shown as written. */}
+              {s.kind === "tool" && s.tool ? (
                 <>
                   Calling <span className="font-mono">{s.tool}</span>
                 </>

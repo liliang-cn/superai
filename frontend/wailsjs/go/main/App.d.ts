@@ -24,9 +24,13 @@ export function ChatSessions():Promise<Array<backend.ChatSessionInfo>>;
 
 export function DeleteChatSession(arg1:string):Promise<string>;
 
+export function DeleteScheduledPrompt(arg1:string):Promise<string>;
+
 export function Deliverables(arg1:string):Promise<Array<agent.Deliverable>>;
 
 export function EmitAvatarTest(arg1:string):Promise<void>;
+
+export function ExportWorkspaceFile(arg1:string):Promise<string>;
 
 export function GetSettings():Promise<backend.Settings>;
 
@@ -60,13 +64,21 @@ export function RemoveMCPServer(arg1:string):Promise<string>;
 
 export function RemoveSkill(arg1:string):Promise<string>;
 
+export function RunScheduledPromptNow(arg1:string):Promise<string>;
+
 export function SaveSettings(arg1:backend.Settings):Promise<void>;
+
+export function SchedulePrompt(arg1:string,arg2:string,arg3:string,arg4:string):Promise<string>;
+
+export function ScheduledPrompts():Promise<Array<agent.ScheduledPrompt>>;
 
 export function SearchMCPServers(arg1:string):Promise<Record<string, any>>;
 
 export function SearchSkills(arg1:string):Promise<Array<backend.SkillCandidate>>;
 
 export function SendChat(arg1:string,arg2:string,arg3:Array<string>):Promise<string>;
+
+export function SetScheduledPromptEnabled(arg1:string,arg2:boolean):Promise<string>;
 
 export function SetUIRules(arg1:string):Promise<string>;
 

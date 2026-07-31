@@ -35,6 +35,22 @@ run: build
 package:
 	./scripts/package-macos.sh
 
+## daemon: build the background scheduler binary
+daemon:
+	go build -o build/bin/superai-daemon ./cmd/superai-daemon
+
+## install-daemon: install the launchd job that fires schedules while the app is closed
+install-daemon:
+	./scripts/install-daemon.sh
+
+## uninstall-daemon: remove the launchd job (schedules are kept)
+uninstall-daemon:
+	./scripts/install-daemon.sh --uninstall
+
+## daemon-status: is the scheduler running, and what is scheduled
+daemon-status:
+	./scripts/install-daemon.sh --status
+
 ## bindings: regenerate the Wails TypeScript bindings after changing App methods
 bindings:
 	wails generate module
@@ -65,4 +81,4 @@ deps:
 clean:
 	rm -rf build/bin frontend/dist
 
-.PHONY: help dev build run package bindings test smoke check fmt deps clean
+.PHONY: help dev build run package daemon install-daemon uninstall-daemon daemon-status bindings test smoke check fmt deps clean

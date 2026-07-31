@@ -16,6 +16,52 @@ export namespace agent {
 	        this.type = source["type"];
 	    }
 	}
+	export class ScheduledPrompt {
+	    id: string;
+	    prompt: string;
+	    schedule: string;
+	    note?: string;
+	    session?: string;
+	    enabled: boolean;
+	    // Go type: time
+	    next_run?: any;
+	    // Go type: time
+	    last_run?: any;
+	
+	    static createFrom(source: any = {}) {
+	        return new ScheduledPrompt(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.prompt = source["prompt"];
+	        this.schedule = source["schedule"];
+	        this.note = source["note"];
+	        this.session = source["session"];
+	        this.enabled = source["enabled"];
+	        this.next_run = this.convertValues(source["next_run"], null);
+	        this.last_run = this.convertValues(source["last_run"], null);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 
 }
 
@@ -83,6 +129,8 @@ export namespace backend {
 	    role: string;
 	    content: string;
 	    emotion?: string;
+	    kind?: string;
+	    steps?: string[];
 	
 	    static createFrom(source: any = {}) {
 	        return new ChatTurn(source);
@@ -93,6 +141,8 @@ export namespace backend {
 	        this.role = source["role"];
 	        this.content = source["content"];
 	        this.emotion = source["emotion"];
+	        this.kind = source["kind"];
+	        this.steps = source["steps"];
 	    }
 	}
 	export class LifeData {
