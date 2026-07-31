@@ -35,6 +35,10 @@ run: build
 package:
 	./scripts/package-macos.sh
 
+## cli: build the headless one-prompt binary -> build/bin/superai
+cli:
+	go build -o build/bin/superai ./cmd/superai
+
 ## daemon: build the background scheduler binary
 daemon:
 	go build -o build/bin/superai-daemon ./cmd/superai-daemon
@@ -81,4 +85,4 @@ deps:
 clean:
 	rm -rf build/bin frontend/dist
 
-.PHONY: help dev build run package daemon install-daemon uninstall-daemon daemon-status bindings test smoke check fmt deps clean
+.PHONY: help dev build run package cli daemon install-daemon uninstall-daemon daemon-status bindings test smoke check fmt deps clean
