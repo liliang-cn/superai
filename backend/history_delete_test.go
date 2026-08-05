@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/liliang-cn/agent-go/v2/pkg/store"
+	"github.com/liliang-cn/agent-go/v3/pkg/store"
 )
 
 // TestDeleteSession drives the real agent database, since the whole point of

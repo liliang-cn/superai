@@ -30,10 +30,9 @@ type Settings struct {
 	MaxRounds int  `json:"max_rounds"`
 	Headless  bool `json:"headless"`
 
-	// DisableBrowser skips attaching a browser. Launching Chrome costs about a
-	// second of every startup, so it is worth turning off when the agent will
-	// not be browsing. The SUPERAI_NO_BROWSER env var does the same, which is
-	// what the tests use.
+	// DisableBrowser is retained for settings-file compatibility. agent-go v3
+	// removed pkg/browser, so SuperAI no longer attaches a browser at all;
+	// wire an MCP browser server if browsing is needed.
 	DisableBrowser bool `json:"disable_browser"`
 
 	// DisablePTC turns off Programmatic Tool Calling (the model writes JS that
@@ -53,10 +52,10 @@ type Settings struct {
 	// too. Set this true for a model that rejects PTC's format.
 	DisablePTC bool `json:"disable_ptc"`
 
-	// PIIRedaction, when true, strips personal data (email/phone/中国身份证/
-	// 手机号/银行卡/…) from messages before they're sent to the LLM. Off by
-	// default — a personal assistant often needs to act on your real data; turn
-	// it on when you don't want PII leaving to a cloud provider.
+	// PIIRedaction is currently a no-op: agent-go v3 removed the built-in PII
+	// guardrail along with pkg/browser. The field is kept so existing settings
+	// files still parse; re-implement redaction here (or in a provider proxy)
+	// before advertising it again.
 	PIIRedaction bool `json:"pii_redaction"`
 
 	// Avatar driver server port (127.0.0.1:AvatarPort).

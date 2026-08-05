@@ -15,15 +15,14 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/liliang-cn/agent-go/v2/pkg/agent"
-	"github.com/liliang-cn/agent-go/v2/pkg/browser"
-	"github.com/liliang-cn/agent-go/v2/pkg/config"
-	"github.com/liliang-cn/agent-go/v2/pkg/cortexbridge"
-	"github.com/liliang-cn/agent-go/v2/pkg/cortexbridge/connectorbridge"
-	"github.com/liliang-cn/agent-go/v2/pkg/domain"
-	"github.com/liliang-cn/agent-go/v2/pkg/pool"
-	"github.com/liliang-cn/agent-go/v2/pkg/providers"
-	"github.com/liliang-cn/agent-go/v2/pkg/sandbox"
+	"github.com/liliang-cn/agent-go/v3/pkg/agent"
+	"github.com/liliang-cn/agent-go/v3/pkg/config"
+	"github.com/liliang-cn/agent-go/v3/pkg/cortexbridge"
+	"github.com/liliang-cn/agent-go/v3/pkg/cortexbridge/connectorbridge"
+	"github.com/liliang-cn/agent-go/v3/pkg/domain"
+	"github.com/liliang-cn/agent-go/v3/pkg/pool"
+	"github.com/liliang-cn/agent-go/v3/pkg/providers"
+	"github.com/liliang-cn/agent-go/v3/pkg/sandbox"
 	"github.com/liliang-cn/cortexdb/v2/pkg/connector"
 	"github.com/liliang-cn/cortexdb/v2/pkg/cortexdb"
 )
@@ -33,12 +32,11 @@ import (
 const UploadsSubdir = "uploads"
 
 // Service wraps a maximally-configured AgentGo agent.Service plus the desktop
-// app's supporting pieces (sandbox, browser, cortexdb handle, life-assistant
-// store, settings).
+// app's supporting pieces (sandbox, cortexdb handle, life-assistant store,
+// settings).
 type Service struct {
 	svc      *agent.Service
 	sb       sandbox.Sandbox
-	br       browser.Browser
 	cortex   *cortexdb.DB
 	settings *Settings
 	store    *lifeStore
@@ -116,18 +114,11 @@ func NewService(s *Settings) (*Service, error) {
 		return nil, fmt.Errorf("build sandbox: %w", err)
 	}
 
-	// --- Browser (optional; degrade gracefully if chromedp/Chrome is missing). ---
-	//
-	// Launching Chrome costs ~1s, every time. That is the single largest chunk of
-	// NewService, so it is skippable: a test that never browses should not pay
-	// for it, and neither should a launch where the user has no use for it.
-	var br browser.Browser
+	// Browser control left the framework in agent-go v3 (pkg/browser is gone).
+	// SuperAI keeps the settings fields so existing config files still parse;
+	// browsing is now expected to come from an MCP server instead.
 	if s.DisableBrowser || strings.TrimSpace(os.Getenv("SUPERAI_NO_BROWSER")) != "" {
 		log.Printf("superai: browser disabled by configuration")
-	} else if b, berr := browser.NewChromedp(browser.WithHeadless(s.Headless)); berr != nil {
-		log.Printf("superai: browser disabled (%v)", berr)
-	} else {
-		br = b
 	}
 
 	// --- Build the agent service. ---
@@ -136,15 +127,9 @@ func NewService(s *Settings) (*Service, error) {
 		WithConfig(cfg).
 		WithLLM(brain).
 		WithSandbox(sb).
-		WithVision(true).
-		WithDeliverables(true).
 		WithAutonomy(agent.AutonomyProfile{MaxRounds: s.MaxRounds, Scratchpad: true}).
 		WithSkills().
-		WithFileTools(). // read_document: Word/Excel/PPT/PDF/images (sandbox-aware)
-		WithOCR()        // ocr_image: local OCR via ollama glm-ocr (localhost:11434), stays offline
-	if s.PIIRedaction {
-		b = b.WithPIIRedaction() // strip PII before it reaches the LLM (cloud-safe)
-	}
+		WithOptions(agent.Options{Deliverables: true})
 	// PTC is off in the builder by default, so it takes an explicit call to turn
 	// on — a lone WithPTC(false) in the disabled branch (what this used to be)
 	// left it off in both cases, making the setting a no-op.
@@ -152,9 +137,6 @@ func NewService(s *Settings) (*Service, error) {
 		b = b.WithPTC(false) // direct tool-calling for models that reject PTC's format
 	} else {
 		b = b.WithPTC() // model writes JS that drives tools in one round
-	}
-	if br != nil {
-		b = b.WithBrowser(br)
 	}
 	memMode := "file"
 	if embedder != nil {
@@ -176,14 +158,11 @@ func NewService(s *Settings) (*Service, error) {
 	svc, err := b.Build()
 	if err != nil {
 		_ = sb.Close()
-		if br != nil {
-			_ = br.Close()
-		}
 		return nil, fmt.Errorf("build SuperAI: %w", err)
 	}
 
 	out := &Service{
-		svc: svc, sb: sb, br: br, settings: s, MemoryMode: memMode, dataDir: cfg.DataDir(),
+		svc: svc, sb: sb, settings: s, MemoryMode: memMode, dataDir: cfg.DataDir(),
 		brain: brain,
 	}
 
@@ -229,9 +208,6 @@ func (s *Service) Close() error {
 	if s.svc != nil {
 		_ = s.svc.Close()
 	}
-	if s.br != nil {
-		_ = s.br.Close()
-	}
 	if s.sb != nil {
 		_ = s.sb.Close()
 	}
@@ -250,7 +226,7 @@ func (s *Service) Stream(ctx context.Context, sessionID, message string, imagePa
 	}
 	// Route dropped images straight to the vision model as multimodal input
 	// (workspace-relative paths -> absolute, so the provider can read them).
-	if s.svc.VisionEnabled() && len(imagePaths) > 0 {
+	if len(imagePaths) > 0 {
 		root := ""
 		if s.sb != nil {
 			root = s.sb.Workspace()
@@ -455,8 +431,9 @@ func (s *Service) Agent() *agent.Service {
 // InstalledSkills returns the skills discovered/installed for this service.
 func (s *Service) InstalledSkills() []string { return s.svc.InstalledSkills() }
 
-// HasBrowser reports whether a browser was successfully attached.
-func (s *Service) HasBrowser() bool { return s.br != nil }
+// HasBrowser reports whether browsing is available. Always false since
+// agent-go v3 dropped pkg/browser; wire an MCP browser server instead.
+func (s *Service) HasBrowser() bool { return false }
 
 // ----------------------------------------------------------------------------
 // Persona

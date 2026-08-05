@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/liliang-cn/agent-go/v2/pkg/agent"
+	"github.com/liliang-cn/agent-go/v3/pkg/agent"
 )
 
 // resumeExcerpt has the shape of a CV contact block — an e-mail plus a mobile

@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/liliang-cn/agent-go/v2/pkg/cortexbridge"
-	"github.com/liliang-cn/agent-go/v2/pkg/mcp"
-	"github.com/liliang-cn/agent-go/v2/pkg/skills"
+	"github.com/liliang-cn/agent-go/v3/pkg/cortexbridge"
+	"github.com/liliang-cn/agent-go/v3/pkg/mcp"
+	"github.com/liliang-cn/agent-go/v3/pkg/skills"
 	"github.com/liliang-cn/cortexdb/v2/pkg/importflow"
 )
 

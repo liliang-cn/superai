@@ -12,7 +12,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/liliang-cn/agent-go/v2/pkg/agent"
+	"github.com/liliang-cn/agent-go/v3/pkg/agent"
 )
 
 // registerInstallTools exposes chat-callable tools that let the user install

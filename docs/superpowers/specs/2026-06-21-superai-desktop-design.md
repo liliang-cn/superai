@@ -17,7 +17,7 @@ protocol so any external 2D/3D renderer (Live2D / VRM / Unity / web) can be
 driven by it.
 
 Standalone repo at `~/Things/projects/ai/superai-desktop`, depending on the
-published `github.com/liliang-cn/agent-go/v2` (currently v2.89.0) and
+published `github.com/liliang-cn/agent-go/v3` (currently v2.89.0) and
 `cortexdb/v2` (v2.24.1). No Go workspace entanglement — it pins released
 versions.
 
