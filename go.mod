@@ -5,8 +5,8 @@ go 1.26.0
 require (
 	github.com/JohannesKaufmann/html-to-markdown/v2 v2.5.0
 	github.com/google/uuid v1.6.0
-	github.com/liliang-cn/agent-go/v2 v2.107.0
-	github.com/liliang-cn/cortexdb/v2 v2.45.0
+	github.com/liliang-cn/agent-go/v2 v2.108.1
+	github.com/liliang-cn/cortexdb/v2 v2.63.2
 	github.com/router-for-me/CLIProxyAPI/v6 v6.10.9
 	github.com/sirupsen/logrus v1.9.3
 	github.com/wailsapp/wails/v2 v2.12.0
