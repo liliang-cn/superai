@@ -271,7 +271,9 @@ func (s *Service) Stream(ctx context.Context, sessionID, message string, imagePa
 		if emit != nil {
 			emit(ev)
 		}
-		if ev.Type == agent.EventTypeComplete {
+		// A blocked run is an outcome, not an error: its explanation arrives as
+		// EventTypeBlocked and is the answer the user should see.
+		if ev.Type == agent.EventTypeComplete || ev.Type == agent.EventTypeBlocked {
 			final = ev.Content
 		}
 	}
