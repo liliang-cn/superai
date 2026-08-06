@@ -5,7 +5,7 @@ go 1.26.0
 require (
 	github.com/JohannesKaufmann/html-to-markdown/v2 v2.5.0
 	github.com/google/uuid v1.6.0
-	github.com/liliang-cn/agent-go/v3 v3.0.0
+	github.com/liliang-cn/agent-go/v3 v3.0.0-alpha.1
 	github.com/liliang-cn/cortexdb/v2 v2.63.2
 	github.com/router-for-me/CLIProxyAPI/v6 v6.10.9
 	github.com/sirupsen/logrus v1.9.3
@@ -135,8 +135,6 @@ require (
 	github.com/qdrant/go-client v1.15.2 // indirect
 	github.com/refraction-networking/utls v1.8.2 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
-	github.com/richardlehane/mscfb v1.0.7 // indirect
-	github.com/richardlehane/msoleps v1.0.6 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/robfig/cron/v3 v3.0.1 // indirect
 	github.com/samber/lo v1.49.1 // indirect
@@ -150,7 +148,6 @@ require (
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/tidwall/sjson v1.2.5 // indirect
-	github.com/tiendc/go-deepcopy v1.7.2 // indirect
 	github.com/tiktoken-go/tokenizer v0.7.0 // indirect
 	github.com/tkrajina/go-reflector v0.5.8 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
@@ -159,9 +156,6 @@ require (
 	github.com/valyala/fasttemplate v1.2.2 // indirect
 	github.com/wailsapp/go-webview2 v1.0.22 // indirect
 	github.com/wailsapp/mimetype v1.4.1 // indirect
-	github.com/xuri/efp v0.0.1 // indirect
-	github.com/xuri/excelize/v2 v2.11.0 // indirect
-	github.com/xuri/nfp v0.0.2-0.20250530014748-2ddeb826f9a9 // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
 	go.etcd.io/bbolt v1.4.0 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
@@ -171,7 +165,6 @@ require (
 	golang.org/x/arch v0.8.0 // indirect
 	golang.org/x/crypto v0.53.0 // indirect
 	golang.org/x/exp v0.0.0-20250819193227-8b4c13bb791b // indirect
-	golang.org/x/image v0.44.0 // indirect
 	golang.org/x/net v0.56.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect
