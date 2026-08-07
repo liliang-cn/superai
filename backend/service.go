@@ -130,14 +130,9 @@ func NewService(s *Settings) (*Service, error) {
 		WithAutonomy(agent.AutonomyProfile{MaxRounds: s.MaxRounds, Scratchpad: true}).
 		WithSkills().
 		WithOptions(agent.Options{Deliverables: true})
-	// PTC is off in the builder by default, so it takes an explicit call to turn
-	// on — a lone WithPTC(false) in the disabled branch (what this used to be)
-	// left it off in both cases, making the setting a no-op.
-	if s.DisablePTC {
-		b = b.WithPTC(false) // direct tool-calling for models that reject PTC's format
-	} else {
-		b = b.WithPTC() // model writes JS that drives tools in one round
-	}
+	// agent-go v3 removed PTC entirely — tools are always called directly, so
+	// the DisablePTC setting no longer selects anything. It stays in Settings
+	// only so existing settings files keep parsing.
 	memMode := "file"
 	if embedder != nil {
 		b = b.WithEmbedder(embedder).WithGraphMemory()
