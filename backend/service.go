@@ -53,6 +53,11 @@ type Service struct {
 	// because injection races tool calls already in flight.
 	schedMu         sync.Mutex
 	promptScheduler *agent.PromptScheduler
+	// ownedScheduler is a manage-only scheduler this service opened for itself
+	// because nobody injected one (the single-shot CLI, most obviously). It
+	// writes schedules to the shared store without firing any, and this service
+	// closes it. Never the same object as promptScheduler.
+	ownedScheduler *agent.PromptScheduler
 	// dataDir is the agent's own data directory (<home>/data), where agent-go
 	// keeps its sqlite database.
 	dataDir string
@@ -97,6 +102,10 @@ func NewService(s *Settings) (*Service, error) {
 
 	// --- Config / home layout. ---
 	cfg := &config.Config{Home: DataDir()}
+	// The whole catalogue goes straight into the schema, superleo-style: no
+	// discovery layer, no search tool. Burning rounds on tool search cost more
+	// benchmark tasks than a large schema ever did.
+	cfg.Tooling.DisableToolSearch = true
 	if embedder != nil {
 		cfg.Memory.StoreType = config.MemoryStoreTypeGraphFlow
 	}
@@ -141,8 +150,10 @@ func NewService(s *Settings) (*Service, error) {
 		b = b.WithMemory(agent.WithMemoryStoreType("file"))
 	}
 
-	// MCP: built-in servers (websearch) plus any user-defined servers from
-	// ~/.superai-desktop/mcpServers.json. Drop that file in to add MCP servers.
+	// MCP: any user-defined servers from ~/.superai-desktop/mcpServers.json.
+	// Drop that file in to add MCP servers. Web search does NOT come from here —
+	// it is the built-in web_search tool registered below, so a fresh install
+	// with no MCP config can still look something up.
 	mcpOpts := []agent.MCPOption{}
 	mcpCfgPath := filepath.Join(cfg.DataDir(), "mcpServers.json")
 	if _, statErr := os.Stat(mcpCfgPath); statErr == nil {
@@ -164,6 +175,15 @@ func NewService(s *Settings) (*Service, error) {
 	// --- Built-in framework tools. ---
 	agent.RegisterDateTimeTool(svc)
 	agent.RegisterFetchURLTool(svc)
+	// Looking things up is not an optional extra. Without it the agent has no
+	// answer to any question about now — the weather, a price, what happened
+	// today — and correctly reports itself blocked, which is a worse outcome
+	// than a grounded guess. On a fresh install with no MCP servers configured
+	// this was the only route to the open web, and it was not wired.
+	searchBase, searchKey, searchModel := s.WebSearch()
+	agent.RegisterWebSearchTool(svc, agent.WebSearchConfig{
+		BaseURL: searchBase, APIKey: searchKey, Model: searchModel,
+	})
 
 	// --- Life-assistant store + tools (ported from examples/superai). ---
 	out.files = newSessionFiles(filepath.Join(cfg.DataDir(), "session-files.json"))
@@ -199,6 +219,15 @@ func (s *Service) Close() error {
 	}
 	if s.store != nil {
 		s.store.save()
+	}
+	// Only the scheduler this service opened for itself; an injected one belongs
+	// to whoever injected it.
+	s.schedMu.Lock()
+	owned := s.ownedScheduler
+	s.ownedScheduler = nil
+	s.schedMu.Unlock()
+	if owned != nil {
+		_ = owned.Stop()
 	}
 	if s.svc != nil {
 		_ = s.svc.Close()
@@ -379,9 +408,7 @@ func (s *Service) OpenWorkspaceFileExternal(path string) error {
 }
 
 // UsePromptScheduler hands the service the scheduler its tools should create
-// schedules in. Passing nil makes scheduling tools report that the feature is
-// unavailable, which is honest — better than accepting a reminder nothing will
-// ever fire.
+// schedules in — the one whose process owns the cron loop.
 func (s *Service) UsePromptScheduler(sch *agent.PromptScheduler) {
 	if s == nil {
 		return
@@ -391,17 +418,44 @@ func (s *Service) UsePromptScheduler(sch *agent.PromptScheduler) {
 	s.schedMu.Unlock()
 }
 
-// reminderScheduler returns the injected scheduler, or explains its absence.
+// reminderScheduler returns something that can write a schedule.
+//
+// A reminder is data. Firing it is a cron loop's job, and the two are separate
+// concerns that happen to share a database: agent-go keeps schedules in the
+// same store as the sessions, so any process pointed at this home can create
+// one and whichever process owns execution picks it up.
+//
+// This used to refuse outright when nobody had injected a running scheduler,
+// which made "set a reminder" fail in the single-shot CLI — no window, no
+// daemon, no cron loop, and therefore, absurdly, no way to write a row. A
+// benchmark task was lost to it. Now the fallback opens the same store in
+// manage-only mode: the reminder is stored, nothing is fired here, and the app
+// or daemon rings it when the time comes.
 func (s *Service) reminderScheduler() (*agent.PromptScheduler, error) {
 	if s == nil {
 		return nil, fmt.Errorf("no service")
 	}
 	s.schedMu.Lock()
-	sch := s.promptScheduler
-	s.schedMu.Unlock()
-	if sch == nil {
+	defer s.schedMu.Unlock()
+	if s.promptScheduler != nil {
+		return s.promptScheduler, nil
+	}
+	if s.ownedScheduler != nil {
+		return s.ownedScheduler, nil
+	}
+	if s.svc == nil {
 		return nil, fmt.Errorf("定时功能未启动")
 	}
+	sch, err := s.svc.NewPromptScheduler(agent.WithPromptSessionID("scheduled"))
+	if err != nil {
+		return nil, err
+	}
+	// Manage-only: this process must not fire schedules. If it did, a CLI run
+	// and the desktop app would both ring the same reminder.
+	if err := sch.StartManageOnly(); err != nil {
+		return nil, err
+	}
+	s.ownedScheduler = sch
 	return sch, nil
 }
 
@@ -444,7 +498,7 @@ func buildPersona(now time.Time) string {
 职责：
 - 从用户的话里识别意图，主动调用工具记录：约定/会面→add_schedule；提到人→upsert_person；工作/踩坑→add_record(work,挂 project)；生活/心情→add_record(diary)；笔记→add_record(note)；打卡/习惯→add_record(habit)；要提醒→set_reminder。
 - 只要用户在陈述发生的事或要求记录/提醒，必须先调用对应工具存下来再回复。
-- 需要阅读/审阅某个具体网址的真实页面内容时，用 fetch_url 抓取该网页正文。
+- 需要查最新/实时/记忆里没有的信息（天气、行情、新闻、事实核对…）时，用 web_search 搜；需要阅读/审阅某个具体网址的真实页面内容时，用 fetch_url 抓取该网页正文。
 - 你有沙箱、浏览器、视觉、可交付物与技能可用，复杂任务可以自主多步完成。
 - 【能力不够时自己去装】任务需要你现在没有的能力时，不要直接说做不到：
   · 缺工具（连数据库、访问某个服务、操作某类文件…）→ search_mcp_servers 搜，把结果里的 command/args 原样交给 add_mcp_server 装上再继续。
@@ -672,6 +726,15 @@ func (s *Service) registerLifeTools() {
 			if task.NextRun != nil {
 				data["next_run"] = task.NextRun.Local().Format("2006-01-02 15:04")
 			}
+			// Keep a row too, or list_reminders answers "none" for a reminder
+			// the user just watched get created.
+			db.mu.Lock()
+			db.Reminders = append(db.Reminders, map[string]any{
+				"id": task.ID, "title": title, "schedule": plan.Cron, "when": plan.Note,
+				"created_at": time.Now().Format(time.RFC3339),
+			})
+			db.mu.Unlock()
+			db.save()
 			if plan.OneShot {
 				// Said plainly rather than hidden: cron cannot express "once", so
 				// the user should know this will come back next year.

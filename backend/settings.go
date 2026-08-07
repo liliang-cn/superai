@@ -23,6 +23,15 @@ type Settings struct {
 	EmbedKey     string `json:"embed_key"`
 	EmbedModel   string `json:"embed_model"`
 
+	// Web search. The built-in web_search tool asks a search-capable,
+	// OpenAI-compatible chat endpoint for a grounded answer. Left empty, these
+	// fall back to the brain's own endpoint — a gateway that serves a
+	// search-grounded model answers the same request, and an agent that cannot
+	// look anything up is stuck on any question about now.
+	SearchBaseURL string `json:"search_base_url"`
+	SearchKey     string `json:"search_key"`
+	SearchModel   string `json:"search_model"`
+
 	// Agent workspace (sandbox root).
 	WorkspaceDir string `json:"workspace_dir"`
 
@@ -116,6 +125,9 @@ func defaults() *Settings {
 		EmbedBaseURL:    envOr("EMBED_BASE", ""),
 		EmbedKey:        envOr("EMBED_KEY", ""),
 		EmbedModel:      envOr("EMBED_MODEL", ""),
+		SearchBaseURL:   envOr("SEARCH_BASE", ""),
+		SearchKey:       envOr("SEARCH_KEY", ""),
+		SearchModel:     envOr("SEARCH_MODEL", ""),
 		WorkspaceDir:    filepath.Join(DataDir(), "workspace"),
 		MaxRounds:       defaultMaxRds,
 		Headless:        true,
@@ -184,6 +196,21 @@ func (s *Settings) Save() error {
 		return err
 	}
 	return os.WriteFile(settingsPath(), raw, 0o644)
+}
+
+// WebSearch returns the endpoint the built-in web_search tool should use,
+// defaulting to the brain's own endpoint field by field. Returning the brain is
+// deliberate: it is the one endpoint SuperAI is guaranteed to have credentials
+// for, and a search-grounded model behind it answers a grounded request. A
+// dedicated search endpoint is configured by filling the Search* fields (or
+// SEARCH_BASE / SEARCH_KEY / SEARCH_MODEL).
+func (s *Settings) WebSearch() (baseURL, key, model string) {
+	if s == nil {
+		return "", "", ""
+	}
+	return firstNonEmpty(s.SearchBaseURL, s.LLMBaseURL),
+		firstNonEmpty(s.SearchKey, s.LLMKey),
+		firstNonEmpty(s.SearchModel, s.LLMModel)
 }
 
 // UseEmbeddings reports whether an embedder should be built (graph memory) or
