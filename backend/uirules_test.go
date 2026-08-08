@@ -42,11 +42,32 @@ func TestUIRulesRoundTrip(t *testing.T) {
 		t.Error("different rules must report a change")
 	}
 
-	persona := buildPersona(time.Now()) + uiRulesSection()
+	persona := buildPersona(time.Now(), true) + uiRulesSection()
 	if !strings.Contains(persona, "```chart") {
 		t.Error("persona must carry the rendering rules")
 	}
 	if !strings.Contains(persona, "你是 SuperAI") {
 		t.Error("persona must keep its original instructions")
+	}
+}
+
+// The persona and the schema have to agree. Telling the model to call
+// search_mcp_servers when no such tool is registered is an invitation to spend
+// a round finding that out.
+func TestPersonaOmitsSelfInstallWhenThoseToolsAreWithheld(t *testing.T) {
+	with := buildPersona(time.Now(), true)
+	without := buildPersona(time.Now(), false)
+
+	for _, tool := range []string{"search_mcp_servers", "add_mcp_server", "search_skills", "install_skill"} {
+		if !strings.Contains(with, tool) {
+			t.Errorf("expected %s in the self-install persona", tool)
+		}
+		if strings.Contains(without, tool) {
+			t.Errorf("persona still names %s after the tools were withheld", tool)
+		}
+	}
+	// The rest of the persona survives.
+	if !strings.Contains(without, "resolve_datetime") || !strings.Contains(without, "add_schedule") {
+		t.Error("withholding the install tools stripped unrelated instructions")
 	}
 }

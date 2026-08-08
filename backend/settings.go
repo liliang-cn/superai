@@ -32,6 +32,15 @@ type Settings struct {
 	SearchKey     string `json:"search_key"`
 	SearchModel   string `json:"search_model"`
 
+	// DisableSelfInstall withholds the self-extension toolset —
+	// search_mcp_servers, add_mcp_server, search_skills, install_skill and the
+	// URL installer. Those tools let the agent go and acquire a capability it
+	// lacks, which is right for a desktop conversation and wrong for a
+	// one-shot invocation: a run that answers one question should not be
+	// installing software, and the tools cost a schema slot and a tempting
+	// detour on every task that will never use them. cmd/superai sets it.
+	DisableSelfInstall bool `json:"disable_self_install"`
+
 	// Agent workspace (sandbox root).
 	WorkspaceDir string `json:"workspace_dir"`
 

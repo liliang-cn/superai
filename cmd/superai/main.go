@@ -84,6 +84,13 @@ func main() {
 	if err != nil {
 		log.Printf("settings: %v (continuing with defaults)", err)
 	}
+	// One prompt, one answer. A run this short has no business installing an
+	// MCP server or a skill, and carrying those tools costs a schema slot and a
+	// tempting detour on every task — the efficiency audit counted 37
+	// search_mcp_servers calls across 150 tasks, none of which needed to
+	// acquire anything. The desktop app, where the user is present to approve
+	// an install and to benefit from it later, keeps them.
+	settings.DisableSelfInstall = true
 
 	// The agent prints setup notices to stdout. In plain mode stdout is the
 	// answer and nothing else, so the build happens with stdout pointed at

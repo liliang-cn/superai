@@ -132,7 +132,7 @@ func NewService(s *Settings) (*Service, error) {
 
 	// --- Build the agent service. ---
 	b := agent.New("SuperAI").
-		WithPrompt(buildPersona(time.Now()) + uiRulesSection()).
+		WithPrompt(buildPersona(time.Now(), !s.DisableSelfInstall) + uiRulesSection()).
 		WithConfig(cfg).
 		WithLLM(brain).
 		WithSandbox(sb).
@@ -190,8 +190,13 @@ func NewService(s *Settings) (*Service, error) {
 	out.store = newLifeStore(filepath.Join(cfg.DataDir(), "superai-store.json"))
 	out.store.load()
 	out.registerLifeTools()
-	out.registerInstallTools()    // chat-driven install of skills + MCP servers
-	out.registerURLInstallTools() // "here's a URL, work out how to install it"
+	// Self-extension: chat-driven install of skills and MCP servers, plus
+	// "here's a URL, work out how to install it". Withheld for one-shot runs —
+	// see Settings.DisableSelfInstall.
+	if !s.DisableSelfInstall {
+		out.registerInstallTools()
+		out.registerURLInstallTools()
+	}
 
 	// --- CortexDB data-import + graphrag query + connector tools (best-effort). ---
 	if db, derr := cortexdb.Open(cortexdb.DefaultConfig(filepath.Join(cfg.DataDir(), "cortex.db"))); derr != nil {
@@ -490,7 +495,22 @@ func (s *Service) HasBrowser() bool { return false }
 // Persona
 // ----------------------------------------------------------------------------
 
-func buildPersona(now time.Time) string {
+// selfInstallSection is the "go and acquire what you lack" instruction. It is
+// only included when those tools are actually registered — a prompt that tells
+// the model to call search_mcp_servers when the schema has no such tool is an
+// invitation to waste a round discovering that.
+const selfInstallSection = `
+- 【能力不够时自己去装】任务需要你现在没有的能力时，不要直接说做不到：
+  · 缺工具（连数据库、访问某个服务、操作某类文件…）→ search_mcp_servers 搜，把结果里的 command/args 原样交给 add_mcp_server 装上再继续。
+  · 缺专门知识或固定流程（某语言的最佳实践、某种文档的写法…）→ search_skills 搜，用 install_skill 的 source_path 装上再继续。
+  · 搜到的 server 若有 required_env（API key 之类），先向用户要，别拿空值去装。
+  · 装完直接接着做原来的任务，不用等用户再说一次。同一个能力只装一次，装之前先看已有的工具够不够。`
+
+func buildPersona(now time.Time, selfInstall bool) string {
+	installHint := ""
+	if selfInstall {
+		installHint = selfInstallSection
+	}
 	return fmt.Sprintf(`你是 SuperAI，一个有温度的随身 AI 生活/工作助手桌面应用。
 当前系统时间：%s %s（%s），时区 %s。
 凡涉及相对时间（今天/明天/后天/大后天/这周五/下周一/下下周一/下个月3号/今晚N点…），都【必须先调用 resolve_datetime 工具】换算成绝对时间，再用返回的 rfc3339 去建日程/设提醒。绝不要自己心算日期。
@@ -499,16 +519,11 @@ func buildPersona(now time.Time) string {
 - 从用户的话里识别意图，主动调用工具记录：约定/会面→add_schedule；提到人→upsert_person；工作/踩坑→add_record(work,挂 project)；生活/心情→add_record(diary)；笔记→add_record(note)；打卡/习惯→add_record(habit)；要提醒→set_reminder。
 - 只要用户在陈述发生的事或要求记录/提醒，必须先调用对应工具存下来再回复。
 - 需要查最新/实时/记忆里没有的信息（天气、行情、新闻、事实核对…）时，用 web_search 搜；需要阅读/审阅某个具体网址的真实页面内容时，用 fetch_url 抓取该网页正文。
-- 你有沙箱、浏览器、视觉、可交付物与技能可用，复杂任务可以自主多步完成。
-- 【能力不够时自己去装】任务需要你现在没有的能力时，不要直接说做不到：
-  · 缺工具（连数据库、访问某个服务、操作某类文件…）→ search_mcp_servers 搜，把结果里的 command/args 原样交给 add_mcp_server 装上再继续。
-  · 缺专门知识或固定流程（某语言的最佳实践、某种文档的写法…）→ search_skills 搜，用 install_skill 的 source_path 装上再继续。
-  · 搜到的 server 若有 required_env（API key 之类），先向用户要，别拿空值去装。
-  · 装完直接接着做原来的任务，不用等用户再说一次。同一个能力只装一次，装之前先看已有的工具够不够。
+- 你有沙箱、浏览器、视觉、可交付物与技能可用，复杂任务可以自主多步完成。%s
 - 回答用中文，简短、自然、有人情味。每条回复最后单独一行输出情绪标签，格式严格为：情绪: <中性|开心|思考|惊讶|关心|抱歉>。
 
 严禁输出英文、日文或韩文，一律用中文回复。`,
-		now.Format("2006-01-02"), now.Format("15:04:05"), weekdayCN(now), now.Format("-07:00"))
+		now.Format("2006-01-02"), now.Format("15:04:05"), weekdayCN(now), now.Format("-07:00"), installHint)
 }
 
 // uiRulesSection appends the transcript's rendering rules to the persona, so
