@@ -127,5 +127,12 @@ export function visibleAnswer(raw: string): string {
   let out = raw.replace(/<code>[\s\S]*?<\/code>/g, "\n");
   const open = out.lastIndexOf("<code>");
   if (open >= 0) out = out.slice(0, open);
+  // The trailing "情绪: 中性" tag is protocol too — the backend splits it off
+  // the completed answer and routes it to the avatar. A streamed bubble never
+  // saw that split, so the tag used to flash at the end of every answer; on a
+  // stopped one it stayed there for good, because there is no final text to
+  // replace it with. Only a short last line counts, so an answer that discusses
+  // 情绪 in prose is left alone.
+  out = out.replace(/\n?[ \t]*情绪[:：][^\n]{0,20}[ \t]*$/, "");
   return out.trim();
 }
