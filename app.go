@@ -280,6 +280,13 @@ func (a *App) SetUIRules(rules string) string {
 	}
 	if changed {
 		a.rebuild()
+		// rebuild() closes the old agent.Service, and a closed Service owns a
+		// closed store. The scheduler holds the Service it was started with, so
+		// leaving it bound to the old one means every scheduled run from here on
+		// writes its history nowhere — silently, until agent-go v3.5.x started
+		// refusing to run on a closed Service. SaveSettings has always paired the
+		// two; this path was the one that forgot.
+		a.restartScheduler()
 	}
 	return "ok"
 }
