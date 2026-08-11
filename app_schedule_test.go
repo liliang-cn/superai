@@ -22,6 +22,14 @@ import (
 // carry.
 
 func scheduleTestApp(t *testing.T) (*App, func() []captured) {
+	return scheduleTestAppWith(t, nil)
+}
+
+// scheduleTestAppWith is scheduleTestApp with a hook that runs before the fake
+// provider answers a completion. A hook that waits on r.Context() turns the
+// provider into a turn that never comes back on its own — which is the only
+// thing worth cancelling.
+func scheduleTestAppWith(t *testing.T, beforeReply func(*http.Request)) (*App, func() []captured) {
 	t.Helper()
 	home := t.TempDir()
 	t.Setenv("SUPERAI_DESKTOP_HOME", home)
@@ -32,6 +40,9 @@ func scheduleTestApp(t *testing.T) (*App, func() []captured) {
 		if strings.Contains(r.URL.Path, "/models") {
 			_, _ = io.WriteString(w, `{"object":"list","data":[{"id":"test-model"}]}`)
 			return
+		}
+		if beforeReply != nil {
+			beforeReply(r)
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{
@@ -84,6 +95,23 @@ func scheduleTestApp(t *testing.T) (*App, func() []captured) {
 	}
 }
 
+// awaitScheduleRun waits for the "schedule:run" report of a finished run.
+func awaitScheduleRun(t *testing.T, seen func() []captured) *captured {
+	t.Helper()
+	deadline := time.Now().Add(20 * time.Second)
+	for time.Now().Before(deadline) {
+		for _, e := range seen() {
+			if e.name == "schedule:run" {
+				e := e
+				return &e
+			}
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatal("a finished run must be reported, or the user learns nothing happened")
+	return nil
+}
+
 func TestSchedulePromptFiresAndReports(t *testing.T) {
 	app, seen := scheduleTestApp(t)
 
@@ -108,20 +136,13 @@ func TestSchedulePromptFiresAndReports(t *testing.T) {
 	}
 
 	// Firing it now is how a user checks the schedule does what they meant.
+	// The binding starts the run and returns; the report arrives when the turn
+	// is over, which is exactly why the call no longer blocks on it.
 	if msg := app.RunScheduledPromptNow(got.ID); msg != "ok" {
 		t.Fatalf("RunScheduledPromptNow: %s", msg)
 	}
 
-	var run *captured
-	for _, e := range seen() {
-		if e.name == "schedule:run" {
-			e := e
-			run = &e
-		}
-	}
-	if run == nil {
-		t.Fatal("a finished run must be reported, or the user learns nothing happened")
-	}
+	run := awaitScheduleRun(t, seen)
 	if got := run.str("error"); got != "" {
 		t.Errorf("run reported an error: %s", got)
 	}
@@ -139,6 +160,73 @@ func TestSchedulePromptFiresAndReports(t *testing.T) {
 	// The turn is in that conversation, so opening it shows what happened.
 	if turns := app.ChatHistory("stocks"); len(turns) == 0 {
 		t.Error("the run should be readable in its conversation afterwards")
+	}
+}
+
+// Stopping a run in flight. The point of the whole thing: "Run now" starts a
+// turn that may take a quarter of an hour, and the user who realises it was a
+// mistake must be able to end it — and must not then be told they broke
+// something.
+func TestCancelScheduledRunStopsTheTurnAndIsNotAnError(t *testing.T) {
+	started := make(chan struct{})
+	var once sync.Once
+	app, seen := scheduleTestAppWith(t, func(r *http.Request) {
+		once.Do(func() { close(started) })
+		<-r.Context().Done()
+	})
+
+	if msg := app.SchedulePrompt("分析一大堆东西", "0 8 * * *", "长任务", "slow"); msg != "ok" {
+		t.Fatalf("SchedulePrompt: %s", msg)
+	}
+	id := app.ScheduledPrompts()[0].ID
+
+	if msg := app.RunScheduledPromptNow(id); msg != "ok" {
+		t.Fatalf("RunScheduledPromptNow: %s", msg)
+	}
+	select {
+	case <-started:
+	case <-time.After(20 * time.Second):
+		t.Fatal("the run never reached the provider")
+	}
+
+	// The listing is what the UI draws the Stop button from.
+	if !app.ScheduledPrompts()[0].Running {
+		t.Fatal("a run in flight must be reported as running, or the UI has no button to show")
+	}
+
+	if msg := app.CancelScheduledRun(id); msg != "ok" {
+		t.Fatalf("CancelScheduledRun: %s", msg)
+	}
+
+	run := awaitScheduleRun(t, seen)
+	if got := run.str("error"); got != "" {
+		t.Errorf("a stopped run reported an error: %q — cancel is an outcome, not a failure", got)
+	}
+	if cancelled, _ := run.payload["cancelled"].(bool); !cancelled {
+		t.Error("the run report does not say it was cancelled")
+	}
+
+	// The run is over and the schedule survives it, runnable again.
+	deadline := time.Now().Add(10 * time.Second)
+	for app.ScheduledPrompts()[0].Running && time.Now().Before(deadline) {
+		time.Sleep(20 * time.Millisecond)
+	}
+	after := app.ScheduledPrompts()
+	if len(after) != 1 {
+		t.Fatalf("the schedule should still exist, got %d", len(after))
+	}
+	if after[0].Running {
+		t.Error("the run is still reported as running after it was stopped")
+	}
+	if !after[0].Enabled {
+		t.Error("cancelling a run must not disable the schedule")
+	}
+
+	// A stop that lands after the run is over is late, not wrong.
+	if msg := app.CancelScheduledRun(id); msg == "ok" {
+		t.Error("cancelling nothing should say so rather than claim success")
+	} else if strings.Contains(strings.ToLower(msg), "error") {
+		t.Errorf("a late stop reads as an error: %q", msg)
 	}
 }
 
@@ -192,6 +280,7 @@ func TestScheduleBindingsWithoutSchedulerDoNotPanic(t *testing.T) {
 		app.SetScheduledPromptEnabled("id", true),
 		app.DeleteScheduledPrompt("id"),
 		app.RunScheduledPromptNow("id"),
+		app.CancelScheduledRun("id"),
 	} {
 		if msg == "ok" {
 			t.Error("a binding should report that the scheduler is not running, not claim success")

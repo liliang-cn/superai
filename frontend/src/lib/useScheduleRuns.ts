@@ -6,8 +6,10 @@ export interface ScheduleRun {
   prompt: string;
   session: string;
   answer: string;
-  /** "" on success. */
+  /** "" on success. Also "" when cancelled — a stop is not a failure. */
   error: string;
+  /** The run was stopped before it finished, by the user or by shutdown. */
+  cancelled: boolean;
   startedAt: string;
   durationMs: number;
 }
@@ -72,6 +74,7 @@ export function useScheduleRuns(): ScheduleRunLog {
         session: String(payload.session ?? ""),
         answer: String(payload.answer ?? ""),
         error: String(payload.error ?? ""),
+        cancelled: Boolean(payload.cancelled),
         startedAt: String(payload.startedAt ?? ""),
         durationMs: Number(payload.durationMs ?? 0),
         receivedAt: Date.now(),

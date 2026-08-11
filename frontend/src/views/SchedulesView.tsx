@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { SquareIcon } from "lucide-react";
 import {
+  CancelScheduledRun,
   DeleteScheduledPrompt,
   RunScheduledPromptNow,
   SchedulePrompt,
@@ -46,21 +48,32 @@ export default function SchedulesView({
   const [confirmDelete, setConfirmDelete] = useState("");
   const [fresh, setFresh] = useState("");
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (quiet = false) => {
+    if (!quiet) setLoading(true);
     try {
       const res = await ScheduledPrompts();
       setList(Array.isArray(res) ? res : []);
     } catch (e: any) {
-      setNote({ kind: "err", text: String(e?.message || e) });
+      if (!quiet) setNote({ kind: "err", text: String(e?.message || e) });
     } finally {
-      setLoading(false);
+      if (!quiet) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  // "Run now" returns as soon as the run has started, so the row's state comes
+  // from the backend's own `running` flag rather than from the click. Poll only
+  // while something is in flight: a schedule list at rest changes once an hour,
+  // and a spinner that never stops is worse than no spinner at all.
+  const anyRunning = list.some((s) => s.running);
+  useEffect(() => {
+    if (!anyRunning) return;
+    const t = window.setInterval(() => load(true), 1500);
+    return () => window.clearInterval(t);
+  }, [anyRunning, load]);
 
   // Being on this page is what "I have read the runs" means, so the sidebar
   // badge and any toasts clear on arrival and stay clear while it is open.
@@ -125,14 +138,23 @@ export default function SchedulesView({
     }
   };
 
-  const act = async (id: string, label: string, call: () => Promise<string>) => {
+  // opts.refusalIsFine covers Stop: a stop that lands after the run has already
+  // finished is late, not wrong, and the backend says so in words. Painting
+  // that reply red would teach the user that the button is broken.
+  const act = async (
+    id: string,
+    label: string,
+    call: () => Promise<string>,
+    opts: { refusalIsFine?: boolean } = {},
+  ) => {
     setBusy(id);
     setNote(null);
     setFresh("");
     setConfirmDelete("");
     try {
       const res = await call();
-      setNote(res === "ok" ? { kind: "ok", text: `${label} done.` } : { kind: "err", text: res });
+      if (res === "ok") setNote({ kind: "ok", text: `${label} done.` });
+      else setNote({ kind: opts.refusalIsFine ? "ok" : "err", text: res });
     } catch (e: any) {
       setNote({ kind: "err", text: String(e?.message || e) });
     } finally {
@@ -165,7 +187,9 @@ export default function SchedulesView({
           >
             {composing ? "Close" : "+ New schedule"}
           </button>
-          <button className="btn ghost sm" onClick={load} disabled={loading}>
+          {/* Wrapped rather than passed directly: onClick would hand load()
+              the click event as its `quiet` argument. */}
+          <button className="btn ghost sm" onClick={() => load()} disabled={loading}>
             {loading ? (
               <>
                 <span className="spinner" style={{ borderTopColor: "var(--text-1)" }} /> Loading…
@@ -286,7 +310,12 @@ export default function SchedulesView({
               const last = parseTime(s.last_run);
               const words = describeCron(s.schedule);
               const title = (s.note || "").trim() || firstLine(s.prompt, 70);
-              const running = busy === s.id;
+              // Two different things, kept apart on purpose: `acting` is a
+              // binding call in flight (milliseconds), `running` is the agent
+              // turn itself (minutes). Conflating them is what made "Run now"
+              // look finished the moment the click returned.
+              const acting = busy === s.id;
+              const running = !!s.running;
               return (
                 <div
                   className={`record-card${s.enabled ? "" : " paused"}${
@@ -298,28 +327,54 @@ export default function SchedulesView({
                     <span className={`status-dot ${s.enabled ? "ok" : "unknown"}`} />
                     <span className="sched-name">{title}</span>
                     {!s.enabled && <span className="chip">paused</span>}
+                    {running && (
+                      <span className="chip">
+                        <span className="spinner" style={{ borderTopColor: "var(--text-1)" }} />{" "}
+                        running
+                      </span>
+                    )}
                     <span className="sched-actions">
                       {/* Run now is the only way to find out whether a schedule
-                          does what was meant without waiting for the hour, and
-                          the call does not return until the turn is over. */}
+                          does what was meant without waiting for the hour. It
+                          starts the run and returns; while the run is in flight
+                          the same button stops it, the way the composer's send
+                          button becomes stop mid-answer. */}
+                      {running ? (
+                        <button
+                          className="btn ghost sm"
+                          disabled={acting}
+                          title="Stop this run"
+                          onClick={() =>
+                            act(s.id, "Stop", () => CancelScheduledRun(s.id), {
+                              refusalIsFine: true,
+                            })
+                          }
+                        >
+                          <SquareIcon className="size-3 fill-current" /> Stop
+                        </button>
+                      ) : (
+                        <button
+                          className="btn ghost sm"
+                          disabled={acting}
+                          title="Run this prompt immediately"
+                          onClick={() => act(s.id, "Run", () => RunScheduledPromptNow(s.id))}
+                        >
+                          {acting ? (
+                            <>
+                              <span
+                                className="spinner"
+                                style={{ borderTopColor: "var(--text-1)" }}
+                              />{" "}
+                              Starting…
+                            </>
+                          ) : (
+                            "Run now"
+                          )}
+                        </button>
+                      )}
                       <button
                         className="btn ghost sm"
-                        disabled={running}
-                        title="Run this prompt immediately"
-                        onClick={() => act(s.id, "Run", () => RunScheduledPromptNow(s.id))}
-                      >
-                        {running ? (
-                          <>
-                            <span className="spinner" style={{ borderTopColor: "var(--text-1)" }} />{" "}
-                            Running…
-                          </>
-                        ) : (
-                          "Run now"
-                        )}
-                      </button>
-                      <button
-                        className="btn ghost sm"
-                        disabled={running}
+                        disabled={acting}
                         onClick={() =>
                           act(s.id, s.enabled ? "Pause" : "Resume", () =>
                             SetScheduledPromptEnabled(s.id, !s.enabled),
@@ -330,7 +385,7 @@ export default function SchedulesView({
                       </button>
                       <button
                         className="btn ghost sm"
-                        disabled={running}
+                        disabled={acting}
                         onClick={() => {
                           if (confirmDelete !== s.id) {
                             setConfirmDelete(s.id);

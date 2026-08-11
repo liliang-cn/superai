@@ -21,7 +21,25 @@ import {
  */
 
 function runLabel(run: ScheduleRun): string {
+  if (run.cancelled) return "Scheduled run stopped";
   return run.error !== "" ? "Scheduled run failed" : "Scheduled run finished";
+}
+
+/**
+ * The dot beside a run. A stop is deliberately neutral rather than red: the
+ * user asked for it, and marking their own decision as a fault is the thing
+ * this whole feature exists to avoid.
+ */
+function runDot(run: ScheduleRun): string {
+  if (run.cancelled) return "unknown";
+  return run.error !== "" ? "bad" : "ok";
+}
+
+/** What a run has to show for itself once it is over. */
+function runBody(run: ScheduleRun): string {
+  if (run.error !== "") return run.error;
+  if (run.answer !== "") return run.answer;
+  return run.cancelled ? "Stopped before it finished." : "";
 }
 
 /** The meta line every surface shows: when it started and how long it took. */
@@ -143,9 +161,7 @@ export function ScheduleRunToasts({
               className={`run-toast${run.error !== "" ? " failed" : ""}`}
             >
               <div className="rt-head">
-                <span
-                  className={`status-dot ${run.error !== "" ? "bad" : "ok"}`}
-                />
+                <span className={`status-dot ${runDot(run)}`} />
                 <span>{runLabel(run)}</span>
                 <button
                   className="panel-toggle inline"
@@ -161,7 +177,7 @@ export function ScheduleRunToasts({
               <div
                 className={`rt-body${run.error !== "" ? " run-failed" : ""}`}
               >
-                {run.error !== "" ? run.error : run.answer}
+                {runBody(run)}
               </div>
               <div className="rt-actions">
                 {run.session !== "" && (
@@ -225,9 +241,7 @@ export function ScheduleRunList({
               className="rc-title"
               style={{ display: "flex", alignItems: "center", gap: 8 }}
             >
-              <span
-                className={`status-dot ${run.error !== "" ? "bad" : "ok"}`}
-              />
+              <span className={`status-dot ${runDot(run)}`} />
               <span className="rt-prompt">{firstLine(run.prompt, 80)}</span>
               <span className="sched-actions">
                 {run.session !== "" && (
@@ -250,7 +264,7 @@ export function ScheduleRunList({
               <span
                 className={`rt-body${run.error !== "" ? " run-failed" : ""}`}
               >
-                {run.error !== "" ? run.error : run.answer || "No answer."}
+                {runBody(run) || "No answer."}
               </span>
             </div>
           </div>

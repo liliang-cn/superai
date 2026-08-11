@@ -109,8 +109,8 @@ export function useChat(): UseChatResult {
   const attached = useRef(new Set<string>()); // asks belonging to the transcript on screen
   const running = useRef(new Set<string>()); // asks that have not finished
   // Stopped asks. A cancelled turn keeps emitting for a moment — the agent loop
-  // reports "Execution cancelled" as an ordinary workflow_error on its way out —
-  // and that must not repaint a deliberate stop as a failure.
+  // winds down with a tombstone and a workflow_cancelled on its way out — and
+  // none of that must repaint a deliberate stop as a failure.
   const stopped = useRef(new Set<string>());
   // Stops asked for before SendChat returned the id they need. Replayed at the
   // bind, so a stop pressed in the first instant is not silently lost.
@@ -253,6 +253,15 @@ export function useChat(): UseChatResult {
           finishAsk(askId, { error: ev.content || "workflow error" });
           break;
         }
+        case "workflow_cancelled": {
+          // The run stopped before it finished — the stop button, or the
+          // turn's own deadline. An outcome, not a failure: keep whatever was
+          // streamed and settle the ask as cancelled. Normally the stop path
+          // has already done this and dispatch drops the event; this is the
+          // case where nobody on this side asked for it.
+          finishAsk(askId, { cancelled: true });
+          break;
+        }
         case "workflow_blocked": {
           finishAsk(askId, { final: ev.content || undefined });
           break;
@@ -267,9 +276,9 @@ export function useChat(): UseChatResult {
   const dispatch = useCallback(
     (askId: string, item: Queued) => {
       // A stopped ask is over. The backend is still winding the turn down and
-      // its parting events — the "Execution cancelled" workflow_error, a
-      // tombstone, a last partial, and finally chat:cancelled itself — would
-      // otherwise turn a deliberate stop into a failure.
+      // its parting events — a tombstone, a last partial, workflow_cancelled,
+      // and finally chat:cancelled itself — would otherwise reopen an ask the
+      // user has already finished with.
       if (stopped.current.has(askId)) return;
       switch (item.kind) {
         case "event":

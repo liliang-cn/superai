@@ -22,6 +22,8 @@ export function CancelAllChats():Promise<string>;
 
 export function CancelChat(arg1:string):Promise<string>;
 
+export function CancelScheduledRun(arg1:string):Promise<string>;
+
 export function ChatHistory(arg1:string):Promise<Array<backend.ChatTurn>>;
 
 export function ChatSessions():Promise<Array<backend.ChatSessionInfo>>;

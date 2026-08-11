@@ -38,6 +38,10 @@ export function CancelChat(arg1) {
   return window['go']['main']['App']['CancelChat'](arg1);
 }
 
+export function CancelScheduledRun(arg1) {
+  return window['go']['main']['App']['CancelScheduledRun'](arg1);
+}
+
 export function ChatHistory(arg1) {
   return window['go']['main']['App']['ChatHistory'](arg1);
 }

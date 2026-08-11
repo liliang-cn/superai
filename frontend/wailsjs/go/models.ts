@@ -27,6 +27,7 @@ export namespace agent {
 	    next_run?: any;
 	    // Go type: time
 	    last_run?: any;
+	    running: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new ScheduledPrompt(source);
@@ -42,6 +43,7 @@ export namespace agent {
 	        this.enabled = source["enabled"];
 	        this.next_run = this.convertValues(source["next_run"], null);
 	        this.last_run = this.convertValues(source["last_run"], null);
+	        this.running = source["running"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

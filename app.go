@@ -532,7 +532,13 @@ func (a *App) SendChat(sessionID, message string, imagePaths []string) string {
 		// A stopped turn is not a failed one. Reported as its own event so the
 		// transcript can say "you stopped this" and keep whatever was already
 		// streamed, instead of painting a red error over a half-written answer.
-		if a.runCancelled(requestID) || errors.Is(err, context.Canceled) {
+		//
+		// ctx.Err() is in the test as well as the stop flag: the ten-minute
+		// deadline above ends the turn the same way the button does, and the
+		// agent loop reports both as an ordinary workflow_cancelled event with
+		// a nil error — so without it, a timed-out turn would settle as a
+		// successful answer with nothing in it.
+		if a.runCancelled(requestID) || errors.Is(err, context.Canceled) || ctx.Err() != nil {
 			driver.Emit(backend.AvatarEvent{Type: "state", State: backend.AvatarStateIdle})
 			partial, _ := backend.SplitEmotion(final)
 			a.emit("chat:cancelled", map[string]any{"requestId": requestID, "final": partial})

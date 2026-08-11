@@ -113,7 +113,13 @@ func (a *App) stopScheduler() {
 // so it does no work beyond emitting.
 func (a *App) onScheduledRun(run agent.PromptRun) {
 	summary := strings.TrimSpace(run.Answer)
-	if run.Err != nil {
+	switch {
+	case run.Cancelled:
+		// A stop is the user's own doing, so it is reported as an outcome and
+		// not as a fault — the same rule the chat transcript follows. Err is
+		// nil for a cancelled run, so nothing below would have caught it.
+		summary = "已取消"
+	case run.Err != nil:
 		summary = "运行失败：" + run.Err.Error()
 	}
 
@@ -122,10 +128,17 @@ func (a *App) onScheduledRun(run agent.PromptRun) {
 		"session":    run.SessionID,
 		"answer":     run.Answer,
 		"error":      errText(run.Err),
+		"cancelled":  run.Cancelled,
 		"startedAt":  run.StartedAt.Format("2006-01-02 15:04:05"),
 		"durationMs": run.Duration.Milliseconds(),
 	})
 
+	// No banner for a stop: the user was at the machine — they pressed the
+	// button — so a system notification telling them what they just did is
+	// noise.
+	if run.Cancelled {
+		return
+	}
 	a.notify(scheduleNotifyTitle, firstLine(run.Prompt), summary)
 }
 
@@ -235,8 +248,18 @@ func (a *App) DeleteScheduledPrompt(id string) string {
 	return "ok"
 }
 
-// RunScheduledPromptNow executes a schedule immediately, which is how you find
+// RunScheduledPromptNow starts a schedule immediately, which is how you find
 // out whether it does what you meant without waiting for the hour.
+//
+// It returns as soon as the run has started, not when it has finished. A
+// scheduled prompt is allowed fifteen minutes, and this used to block the Wails
+// call for all of them: the window froze, so the run could not be watched and —
+// worse — could not be stopped, because the button that would stop it was on
+// the other side of the frozen bridge.
+//
+// The outcome arrives the way a timer-fired run's does: the "schedule:run"
+// event, and the run's own conversation. ScheduledPrompts reports Running in
+// the meantime.
 func (a *App) RunScheduledPromptNow(id string) string {
 	a.mu.Lock()
 	sch := a.scheduler
@@ -244,8 +267,33 @@ func (a *App) RunScheduledPromptNow(id string) string {
 	if sch == nil {
 		return "scheduler not running"
 	}
-	if _, err := sch.RunNow(id); err != nil {
+	if _, err := sch.RunNowAsync(id); err != nil {
 		return err.Error()
+	}
+	return "ok"
+}
+
+// CancelScheduledRun stops the run of a schedule that is currently in flight.
+//
+// The schedule itself is untouched — its timer stands and it can be run again.
+// That is the difference between this and SetScheduledPromptEnabled(id, false).
+//
+// A stop that lands after the run has finished is not an error, so it says so
+// in words rather than failing: the caller needs to tell "stopped it" from
+// "there was nothing left to stop".
+func (a *App) CancelScheduledRun(id string) string {
+	a.mu.Lock()
+	sch := a.scheduler
+	a.mu.Unlock()
+	if sch == nil {
+		return "scheduler not running"
+	}
+	stopped, err := sch.CancelRun(id)
+	if err != nil {
+		return err.Error()
+	}
+	if stopped == 0 {
+		return "that run is not in flight — it has already finished"
 	}
 	return "ok"
 }
