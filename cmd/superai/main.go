@@ -49,6 +49,24 @@ type result struct {
 	Error      string   `json:"error,omitempty"`
 }
 
+// outcome decides whether a run succeeded and what to say about it.
+//
+// A run with no answer is a failed run, whether or not anything reported an
+// error: a provider outage (all credentials cooling down, say) comes back as a
+// clean run with empty text, and `ok: true, answer: ""` tells a caller the
+// opposite of what happened. The exit code already treats that as failure, so
+// the JSON has to agree with it.
+func outcome(answer string, runErr error) (ok bool, errMsg string) {
+	switch {
+	case runErr != nil:
+		return false, runErr.Error()
+	case strings.TrimSpace(answer) == "":
+		return false, "the agent produced no answer"
+	default:
+		return true, ""
+	}
+}
+
 func main() {
 	var (
 		asJSON  = flag.Bool("json", false, "print one JSON object (answer, tools, timing) instead of the answer")
@@ -133,16 +151,15 @@ func main() {
 	})
 
 	body, emotion := backend.SplitEmotion(strings.TrimSpace(answer))
+	ok, errMsg := outcome(body, runErr)
 	res := result{
-		OK:         runErr == nil,
+		OK:         ok,
 		Answer:     strings.TrimSpace(body),
 		Emotion:    emotion,
 		Tools:      tools,
 		DurationMS: time.Since(started).Milliseconds(),
 		SessionID:  sessionID,
-	}
-	if runErr != nil {
-		res.Error = runErr.Error()
+		Error:      errMsg,
 	}
 	if res.Tools == nil {
 		res.Tools = []string{}

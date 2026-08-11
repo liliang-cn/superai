@@ -2,10 +2,13 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"strings"
 	"testing"
 )
+
+var errTest = errors.New("provider unreachable")
 
 func TestReadPrompt(t *testing.T) {
 	cases := []struct {
@@ -125,5 +128,23 @@ func TestWithStdoutOnStderrKeepsStdoutClean(t *testing.T) {
 	}
 	if !strings.Contains(string(captured[:n]), "No embedding provider") {
 		t.Error("the notice should have been forwarded, not swallowed")
+	}
+}
+
+// A provider outage returns a clean run with no text. Reporting ok:true for it
+// told the benchmark harness the opposite of what happened — it happened for
+// real when the gateway put the model into a 47-minute cooldown.
+func TestOutcomeTreatsAnEmptyAnswerAsFailure(t *testing.T) {
+	if ok, msg := outcome("木星", nil); !ok || msg != "" {
+		t.Errorf("a real answer should succeed: ok=%v msg=%q", ok, msg)
+	}
+	if ok, msg := outcome("", nil); ok || msg == "" {
+		t.Errorf("an empty answer must fail with a reason: ok=%v msg=%q", ok, msg)
+	}
+	if ok, msg := outcome("   \n ", nil); ok || msg == "" {
+		t.Errorf("a blank answer must fail with a reason: ok=%v msg=%q", ok, msg)
+	}
+	if ok, msg := outcome("part of an answer", errTest); ok || msg != errTest.Error() {
+		t.Errorf("a run error must win and be reported verbatim: ok=%v msg=%q", ok, msg)
 	}
 }
