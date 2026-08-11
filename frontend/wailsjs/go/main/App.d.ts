@@ -18,6 +18,10 @@ export function CLIProxyStatus():Promise<Record<string, any>>;
 
 export function CLIProxySubmitPrompt(arg1:string):Promise<string>;
 
+export function CancelAllChats():Promise<string>;
+
+export function CancelChat(arg1:string):Promise<string>;
+
 export function ChatHistory(arg1:string):Promise<Array<backend.ChatTurn>>;
 
 export function ChatSessions():Promise<Array<backend.ChatSessionInfo>>;

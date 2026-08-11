@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -28,6 +30,14 @@ type App struct {
 	// loginCh is non-nil while a provider login is waiting for the user; it
 	// carries the manually pasted callback URL.
 	loginCh chan string
+
+	// runs holds the chat turns currently in flight, keyed by the request id
+	// every one of their events is tagged with. It has its own lock rather than
+	// sharing a.mu: a.mu is held across a rebuild (which constructs a whole
+	// Service), and "stop" must not queue behind that — the moment it is worth
+	// pressing is exactly the moment the app is busy.
+	runMu sync.Mutex
+	runs  map[string]*chatRun
 
 	// scheduler drives prompts that run on a clock. It is rebuilt with the
 	// service, since a run is an agent turn against the current settings.
@@ -453,8 +463,10 @@ func (a *App) GetStatus() map[string]any {
 }
 
 // SendChat streams a chat turn. Streaming output is delivered via Wails events
-// ("chat:event", "chat:done", "chat:error"); avatar lifecycle/emotion events
-// are pushed through the avatar driver.
+// ("chat:event", "chat:done", "chat:error", "chat:cancelled"); avatar
+// lifecycle/emotion events are pushed through the avatar driver.
+//
+// Exactly one of chat:done / chat:error / chat:cancelled ends a turn.
 //
 // The return value is the request id every one of those events is tagged with
 // under "requestId" — one conversation may have several asks in flight, and
@@ -483,9 +495,15 @@ func (a *App) SendChat(sessionID, message string, imagePaths []string) string {
 		return requestID
 	}
 
+	// Registered here rather than inside the goroutine: SendChat returns the id
+	// to the frontend, and a stop pressed before the goroutine got scheduled
+	// would otherwise be told the run does not exist.
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	a.trackRun(requestID, cancel)
+
 	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 		defer cancel()
+		defer a.untrackRun(requestID)
 
 		driver.Emit(backend.AvatarEvent{Type: "state", State: backend.AvatarStateThinking})
 
@@ -511,6 +529,16 @@ func (a *App) SendChat(sessionID, message string, imagePaths []string) string {
 			}
 		})
 
+		// A stopped turn is not a failed one. Reported as its own event so the
+		// transcript can say "you stopped this" and keep whatever was already
+		// streamed, instead of painting a red error over a half-written answer.
+		if a.runCancelled(requestID) || errors.Is(err, context.Canceled) {
+			driver.Emit(backend.AvatarEvent{Type: "state", State: backend.AvatarStateIdle})
+			partial, _ := backend.SplitEmotion(final)
+			a.emit("chat:cancelled", map[string]any{"requestId": requestID, "final": partial})
+			return
+		}
+
 		if err != nil {
 			driver.Emit(backend.AvatarEvent{Type: "state", State: backend.AvatarStateIdle})
 			a.emit("chat:error", map[string]any{"requestId": requestID, "error": err.Error()})
@@ -529,6 +557,88 @@ func (a *App) SendChat(sessionID, message string, imagePaths []string) string {
 	}()
 
 	return requestID
+}
+
+// chatRun is one streaming turn, as far as stopping it is concerned.
+//
+// cancelled is remembered rather than inferred from the error, because there is
+// nothing reliable to infer it from: a cancelled turn does not fail. The agent
+// loop notices its context is gone, emits "Execution cancelled" as an ordinary
+// event and closes the stream, so Service.Stream returns a nil error exactly as
+// it does for a turn that finished. Only the side that pulled the plug knows.
+type chatRun struct {
+	cancel    context.CancelFunc
+	cancelled bool
+}
+
+// trackRun registers an in-flight turn so CancelChat can find it.
+func (a *App) trackRun(requestID string, cancel context.CancelFunc) {
+	a.runMu.Lock()
+	defer a.runMu.Unlock()
+	if a.runs == nil {
+		a.runs = make(map[string]*chatRun)
+	}
+	a.runs[requestID] = &chatRun{cancel: cancel}
+}
+
+// untrackRun forgets a finished turn. Every goroutine that calls trackRun must
+// defer this, or the map grows for the lifetime of the process and a request id
+// that is long over still answers "ok" to a stop.
+func (a *App) untrackRun(requestID string) {
+	a.runMu.Lock()
+	defer a.runMu.Unlock()
+	delete(a.runs, requestID)
+}
+
+// runCancelled reports whether this turn was stopped by the user. It must be
+// read before untrackRun — after that the answer is always false.
+func (a *App) runCancelled(requestID string) bool {
+	a.runMu.Lock()
+	defer a.runMu.Unlock()
+	r := a.runs[requestID]
+	return r != nil && r.cancelled
+}
+
+// CancelChat stops one streaming turn. The id is the one SendChat returned.
+//
+// The reply is "ok" when a turn was actually stopped, and a sentence explaining
+// why not otherwise — a stop that lands after the answer did is not an error,
+// and the caller needs to be able to tell the two apart.
+func (a *App) CancelChat(requestID string) string {
+	a.runMu.Lock()
+	r := a.runs[requestID]
+	if r != nil {
+		r.cancelled = true
+	}
+	a.runMu.Unlock()
+
+	if r == nil {
+		return "that request is not running — it has already finished, or the id is unknown"
+	}
+	// Outside the lock: cancel runs the context's own callbacks, and nothing is
+	// gained by holding up a second stop while they do.
+	r.cancel()
+	return "ok"
+}
+
+// CancelAllChats stops every streaming turn — the "stop everything" the user
+// wants when several asks are in flight and all of them are going nowhere.
+func (a *App) CancelAllChats() string {
+	a.runMu.Lock()
+	pending := make([]context.CancelFunc, 0, len(a.runs))
+	for _, r := range a.runs {
+		r.cancelled = true
+		pending = append(pending, r.cancel)
+	}
+	a.runMu.Unlock()
+
+	if len(pending) == 0 {
+		return "nothing is running"
+	}
+	for _, cancel := range pending {
+		cancel()
+	}
+	return fmt.Sprintf("ok: stopped %d", len(pending))
 }
 
 // Deliverables returns the files a conversation produced. An empty session id

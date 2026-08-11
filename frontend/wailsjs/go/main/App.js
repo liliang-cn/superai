@@ -30,6 +30,14 @@ export function CLIProxySubmitPrompt(arg1) {
   return window['go']['main']['App']['CLIProxySubmitPrompt'](arg1);
 }
 
+export function CancelAllChats() {
+  return window['go']['main']['App']['CancelAllChats']();
+}
+
+export function CancelChat(arg1) {
+  return window['go']['main']['App']['CancelChat'](arg1);
+}
+
 export function ChatHistory(arg1) {
   return window['go']['main']['App']['ChatHistory'](arg1);
 }
