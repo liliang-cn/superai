@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EventsOn } from "../../wailsjs/runtime";
-import { ChatHistory, SendChat } from "../../wailsjs/go/main/App";
+import { CancelChat, ChatHistory, SendChat } from "../../wailsjs/go/main/App";
 import {
   AskSummary,
+  ChatCancelled,
   ChatDone,
   ChatError,
   ChatEvent,
@@ -28,7 +29,8 @@ function makeId(): string {
 type Queued =
   | { kind: "event"; payload: ChatEvent }
   | { kind: "done"; payload: ChatDone }
-  | { kind: "error"; payload: ChatError };
+  | { kind: "error"; payload: ChatError }
+  | { kind: "cancelled"; payload: ChatCancelled };
 
 /**
  * Progress text is written for a human but arrives with the model's markdown
@@ -51,7 +53,13 @@ function summarizeAsks(messages: ChatMessage[]): AskSummary[] {
     out.push({
       id: m.id,
       prompt: prev && prev.role === "user" ? prev.content : "",
-      status: m.streaming ? "streaming" : m.error ? "error" : "done",
+      status: m.streaming
+        ? "streaming"
+        : m.cancelled
+          ? "cancelled"
+          : m.error
+            ? "error"
+            : "done",
     });
   });
   return out;
@@ -67,6 +75,12 @@ interface UseChatResult {
   sending: boolean;
   lastEmotion: string;
   send: (text: string, imagePaths?: string[]) => Promise<void>;
+  /**
+   * Stop a running ask, or every running ask when called with no id. The turn
+   * is cancelled on the backend; whatever it already streamed stays in the
+   * bubble, and the composer never stops accepting the next question.
+   */
+  cancel: (askId?: string) => Promise<void>;
   onDone: (cb: () => void) => void;
   reset: () => void;
   clear: () => void;
@@ -89,10 +103,18 @@ export function useChat(): UseChatResult {
   // lives in a single "current" slot, so a second question asked while the
   // first is still answering gets its own bubble, trace and progress.
   const bound = useRef(new Map<string, string>()); // requestId -> ask id
+  const request = useRef(new Map<string, string>()); // ask id -> requestId, the handle a stop needs
   const queue = useRef(new Map<string, Queued[]>()); // requestId -> events seen before the bind
   const unbound = useRef(0); // sends whose SendChat call has not returned an id yet
   const attached = useRef(new Set<string>()); // asks belonging to the transcript on screen
   const running = useRef(new Set<string>()); // asks that have not finished
+  // Stopped asks. A cancelled turn keeps emitting for a moment — the agent loop
+  // reports "Execution cancelled" as an ordinary workflow_error on its way out —
+  // and that must not repaint a deliberate stop as a failure.
+  const stopped = useRef(new Set<string>());
+  // Stops asked for before SendChat returned the id they need. Replayed at the
+  // bind, so a stop pressed in the first instant is not silently lost.
+  const wantStop = useRef(new Set<string>());
   // Raw stream per ask. The bubble shows visibleAnswer() of this rather than the
   // deltas themselves, and stripping needs the whole text: a <code> block is cut
   // across deltas wherever the provider happens to flush.
@@ -123,15 +145,24 @@ export function useChat(): UseChatResult {
   const finishAsk = useCallback(
     (
       askId: string,
-      opts: { final?: string; emotion?: string; error?: string },
+      opts: {
+        final?: string;
+        emotion?: string;
+        error?: string;
+        cancelled?: boolean;
+      },
     ) => {
       running.current.delete(askId);
       streamed.current.delete(askId);
+      wantStop.current.delete(askId);
+      if (opts.cancelled) stopped.current.add(askId);
       patchMessage(askId, (m) => ({
         ...m,
         content: opts.final && opts.final.length ? opts.final : m.content,
         emotion: opts.emotion || m.emotion,
         error: opts.error || m.error,
+        cancelled: opts.cancelled || m.cancelled,
+        stopping: false,
         streaming: false,
         finishedAt: Date.now(),
       }));
@@ -235,6 +266,11 @@ export function useChat(): UseChatResult {
 
   const dispatch = useCallback(
     (askId: string, item: Queued) => {
+      // A stopped ask is over. The backend is still winding the turn down and
+      // its parting events — the "Execution cancelled" workflow_error, a
+      // tombstone, a last partial, and finally chat:cancelled itself — would
+      // otherwise turn a deliberate stop into a failure.
+      if (stopped.current.has(askId)) return;
       switch (item.kind) {
         case "event":
           applyEvent(askId, item.payload);
@@ -248,6 +284,12 @@ export function useChat(): UseChatResult {
           break;
         case "error":
           finishAsk(askId, { error: item.payload?.error || "unknown error" });
+          break;
+        case "cancelled":
+          finishAsk(askId, {
+            final: item.payload?.final || undefined,
+            cancelled: true,
+          });
           break;
       }
     },
@@ -298,10 +340,14 @@ export function useChat(): UseChatResult {
     const offErr = EventsOn("chat:error", (payload: ChatError) => {
       route(payload?.requestId || "", { kind: "error", payload });
     });
+    const offCancel = EventsOn("chat:cancelled", (payload: ChatCancelled) => {
+      route(payload?.requestId || "", { kind: "cancelled", payload });
+    });
     return () => {
       offEvent();
       offDone();
       offErr();
+      offCancel();
     };
   }, [route]);
 
@@ -317,12 +363,57 @@ export function useChat(): UseChatResult {
       queue.current.delete(requestId);
       if (attached.current.has(askId)) {
         bound.current.set(requestId, askId);
+        request.current.set(askId, requestId);
         held?.forEach((item) => dispatch(askId, item));
       }
       // Anything still held once every send knows its id is unclaimable.
       if (unbound.current === 0) queue.current.clear();
     },
     [dispatch],
+  );
+
+  /**
+   * Stop the turn behind a request id and settle the ask as cancelled once the
+   * backend confirms it. A refusal ("already finished") is left alone: the real
+   * terminal event is on its way and it, not this, decides how the ask ended.
+   */
+  const stopRequest = useCallback(
+    async (askId: string, requestId: string) => {
+      const clear = () =>
+        patchMessage(askId, (m) => (m.stopping ? { ...m, stopping: false } : m));
+      patchMessage(askId, (m) => (m.stopping ? m : { ...m, stopping: true }));
+      try {
+        const res = await CancelChat(requestId);
+        if (res === "ok" && running.current.has(askId)) {
+          finishAsk(askId, { cancelled: true });
+          return;
+        }
+      } catch {
+        /* the ask is ending one way or another; its own event will say how */
+      }
+      clear();
+    },
+    [finishAsk, patchMessage],
+  );
+
+  const cancel = useCallback(
+    async (askId?: string) => {
+      const targets = askId ? [askId] : Array.from(running.current);
+      await Promise.all(
+        targets.map((id) => {
+          if (!running.current.has(id)) return Promise.resolve();
+          const requestId = request.current.get(id);
+          if (requestId) return stopRequest(id, requestId);
+          // SendChat has not answered with an id yet. Remember the stop and
+          // let the bind carry it through, rather than dropping it and leaving
+          // a turn running that the user has already told us to abandon.
+          wantStop.current.add(id);
+          patchMessage(id, (m) => (m.stopping ? m : { ...m, stopping: true }));
+          return Promise.resolve();
+        }),
+      );
+    },
+    [patchMessage, stopRequest],
   );
 
   const send = useCallback(
@@ -355,6 +446,9 @@ export function useChat(): UseChatResult {
         const requestId = await SendChat(sessionId, trimmed, imagePaths);
         if (requestId) {
           bindAsk(askId, requestId);
+          // A stop pressed before the id came back is honoured now that it can
+          // name the run it meant.
+          if (wantStop.current.delete(askId)) void stopRequest(askId, requestId);
           return;
         }
         // Nothing was started. The backend also emits a tagged error, but it is
@@ -374,7 +468,7 @@ export function useChat(): UseChatResult {
         }
       }
     },
-    [sessionId, bindAsk, finishAsk],
+    [sessionId, bindAsk, finishAsk, stopRequest],
   );
 
   const onDone = useCallback((cb: () => void) => {
@@ -382,14 +476,18 @@ export function useChat(): UseChatResult {
   }, []);
 
   /**
-   * Let go of every ask on screen. The backend cannot be cancelled, so an ask
-   * in flight keeps running and its answer still lands in that conversation's
-   * history — it simply stops writing into a transcript it is no longer part of.
+   * Let go of every ask on screen without stopping it. Leaving a conversation
+   * is not the same act as pressing stop: the turn keeps running and its answer
+   * still lands in that conversation's history — it simply stops writing into a
+   * transcript it is no longer part of. Use cancel() to actually end one.
    */
   const detachAll = useCallback(() => {
     attached.current.clear();
     running.current.clear();
     bound.current.clear();
+    request.current.clear();
+    stopped.current.clear();
+    wantStop.current.clear();
     queue.current.clear();
   }, []);
 
@@ -439,7 +537,11 @@ export function useChat(): UseChatResult {
   // after their message is appended.
   const askSignature = messages
     .map((m) =>
-      m.startedAt ? `${m.id}:${m.streaming ? "s" : m.error ? "e" : "d"}` : "",
+      m.startedAt
+        ? `${m.id}:${
+            m.streaming ? "s" : m.cancelled ? "c" : m.error ? "e" : "d"
+          }`
+        : "",
     )
     .join("|");
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -453,6 +555,7 @@ export function useChat(): UseChatResult {
     sending,
     lastEmotion,
     send,
+    cancel,
     onDone,
     reset,
     clear: reset,

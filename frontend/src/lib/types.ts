@@ -35,6 +35,17 @@ export interface ChatError {
   error: string;
 }
 
+/**
+ * The user stopped this ask. Its own terminal event rather than an error,
+ * because a stop is an outcome the user chose — the partial answer stays and
+ * nothing about it is a fault. `final` is normally empty and is only set in the
+ * race where the turn completed as the stop landed.
+ */
+export interface ChatCancelled {
+  requestId: string;
+  final: string;
+}
+
 export interface AppStatus {
   ready: boolean;
   error: string;
@@ -76,6 +87,10 @@ export interface ChatMessage {
   progress?: ProgressStep[];
   /** This ask failed. Kept per message so one bad ask cannot blank a sibling. */
   error?: string;
+  /** The user stopped this ask. Distinct from `error`: nothing went wrong. */
+  cancelled?: boolean;
+  /** A stop has been asked for and the backend has not confirmed it yet. */
+  stopping?: boolean;
   /**
    * Wall clock of the ask, used for the "worked for 21s" summary. Only bubbles
    * this client streamed have them, which also distinguishes a live ask from a
@@ -101,7 +116,7 @@ export interface AskSummary {
   id: string;
   /** The question that started it, for labelling its tool activity. */
   prompt: string;
-  status: "streaming" | "done" | "error";
+  status: "streaming" | "done" | "error" | "cancelled";
 }
 
 export function normalizeStatus(raw: Record<string, any> | null): AppStatus {

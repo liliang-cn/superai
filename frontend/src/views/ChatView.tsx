@@ -25,6 +25,7 @@ import {
   MessageSquareIcon,
   Trash2Icon,
   PaperclipIcon,
+  SquareIcon,
 } from "lucide-react";
 import { HistoryBar, HistoryList, useHistory } from "../components/HistoryBar";
 import TracePanel from "../components/TracePanel";
@@ -48,6 +49,9 @@ export default function ChatView({
   const messages = chat.messages;
   const history = useHistory();
   const [filesKey, setFilesKey] = useState(0);
+  // The composer is controlled so the send button can know whether there is
+  // anything to send — which is what decides between "send" and "stop" below.
+  const [draft, setDraft] = useState("");
 
   // Loading it here rather than in App keeps the transcript the only thing that
   // owns a session id. Picking a run's conversation is the same act as picking
@@ -71,10 +75,7 @@ export default function ChatView({
 
   // Asking again while an answer is still streaming is allowed: each ask gets
   // its own bubble, so there is nothing to wait for.
-  const onSubmit = (
-    msg: { text: string },
-    e: React.FormEvent<HTMLFormElement>,
-  ) => {
+  const onSubmit = (msg: { text: string }) => {
     const text = msg.text.trim();
     if (!text && attach.paths.length === 0) return;
     // Images go straight to the vision model as multimodal input; docs are read
@@ -82,7 +83,7 @@ export default function ChatView({
     const { payload, images } = attach.build(text);
     attach.clear();
     chat.send(payload, images);
-    e.currentTarget.reset();
+    setDraft("");
   };
 
   return (
@@ -156,7 +157,18 @@ export default function ChatView({
                                 ) : (
                                   !m.error && !m.progress?.length && "…"
                                 )}
-                                {m.error && (
+                                {/* A stop is the user's own doing, so it is
+                                    reported as an outcome and not as a fault —
+                                    and whatever was already streamed stays. */}
+                                {m.cancelled && (
+                                  <div className="msg-stopped">
+                                    ■ Stopped — you cancelled this answer.
+                                  </div>
+                                )}
+                                {m.stopping && !m.cancelled && (
+                                  <div className="msg-stopped">Stopping…</div>
+                                )}
+                                {m.error && !m.cancelled && (
                                   <div className="msg-error">⚠ {m.error}</div>
                                 )}
                               </>
@@ -197,6 +209,8 @@ export default function ChatView({
             <AttachmentChips paths={attach.paths} onRemove={attach.remove} />
             <PromptInput onSubmit={onSubmit}>
               <PromptInputTextarea
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
                 placeholder={
                   notReady
                     ? "Configure LLM in Settings first…"
@@ -230,9 +244,26 @@ export default function ChatView({
                     Clear
                   </Button>
                 </PromptInputTools>
-                {/* Stays enabled while streaming — the button is how a second
-                    question gets asked. */}
-                <PromptInputSubmit status="ready" />
+                {/* While an answer is streaming and nothing has been typed, the
+                    send button is a stop button — the same place ChatGPT and
+                    Claude put it. Type anything and it turns back into send, so
+                    asking a second question mid-answer (which this transcript
+                    supports) is never taken away; ⏎ sends either way. */}
+                {chat.sending && draft.trim() === "" ? (
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="secondary"
+                    className="rounded-lg"
+                    title="Stop generating"
+                    aria-label="Stop generating"
+                    onClick={() => chat.cancel()}
+                  >
+                    <SquareIcon className="size-3.5 fill-current" />
+                  </Button>
+                ) : (
+                  <PromptInputSubmit status="ready" />
+                )}
               </PromptInputToolbar>
             </PromptInput>
           </div>
