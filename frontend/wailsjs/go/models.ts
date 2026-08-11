@@ -170,6 +170,10 @@ export namespace backend {
 	    embed_base_url: string;
 	    embed_key: string;
 	    embed_model: string;
+	    search_base_url: string;
+	    search_key: string;
+	    search_model: string;
+	    disable_self_install: boolean;
 	    workspace_dir: string;
 	    max_rounds: number;
 	    headless: boolean;
@@ -179,6 +183,10 @@ export namespace backend {
 	    avatar_port: number;
 	    cliproxy_enabled: boolean;
 	    cliproxy_port: number;
+	    memory_backend: string;
+	    shared_memory_endpoint: string;
+	    shared_memory_token: string;
+	    shared_memory_namespace: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Settings(source);
@@ -192,6 +200,10 @@ export namespace backend {
 	        this.embed_base_url = source["embed_base_url"];
 	        this.embed_key = source["embed_key"];
 	        this.embed_model = source["embed_model"];
+	        this.search_base_url = source["search_base_url"];
+	        this.search_key = source["search_key"];
+	        this.search_model = source["search_model"];
+	        this.disable_self_install = source["disable_self_install"];
 	        this.workspace_dir = source["workspace_dir"];
 	        this.max_rounds = source["max_rounds"];
 	        this.headless = source["headless"];
@@ -201,6 +213,10 @@ export namespace backend {
 	        this.avatar_port = source["avatar_port"];
 	        this.cliproxy_enabled = source["cliproxy_enabled"];
 	        this.cliproxy_port = source["cliproxy_port"];
+	        this.memory_backend = source["memory_backend"];
+	        this.shared_memory_endpoint = source["shared_memory_endpoint"];
+	        this.shared_memory_token = source["shared_memory_token"];
+	        this.shared_memory_namespace = source["shared_memory_namespace"];
 	    }
 	}
 	export class SkillCandidate {

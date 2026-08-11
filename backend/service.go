@@ -23,6 +23,7 @@ import (
 	"github.com/liliang-cn/agent-go/v3/pkg/pool"
 	"github.com/liliang-cn/agent-go/v3/pkg/providers"
 	"github.com/liliang-cn/agent-go/v3/pkg/sandbox"
+	"github.com/liliang-cn/agent-go/v3/pkg/store"
 	"github.com/liliang-cn/cortexdb/v2/pkg/connector"
 	"github.com/liliang-cn/cortexdb/v2/pkg/cortexdb"
 )
@@ -63,6 +64,10 @@ type Service struct {
 	dataDir string
 
 	MemoryMode string
+
+	// SuppressedMCPServers names the MCP servers that were left unmounted
+	// because they route to the same store the memory backend already owns.
+	SuppressedMCPServers []string
 }
 
 // NewService builds the full SuperAI agent service from the provided settings.
@@ -106,7 +111,23 @@ func NewService(s *Settings) (*Service, error) {
 	// discovery layer, no search tool. Burning rounds on tool search cost more
 	// benchmark tasks than a large schema ever did.
 	cfg.Tooling.DisableToolSearch = true
-	if embedder != nil {
+	// Memory backend: local by default, or the shared CortexDB brain when the
+	// user picked it and an endpoint is known. The shared backend is a remote
+	// store, so the local embedder plays no part in it — the server owns the
+	// embedding model.
+	useShared := s.UseSharedMemory()
+	switch {
+	case useShared:
+		cfg.Memory.StoreType = store.CortexRemoteStoreType
+		cfg.Memory.DSN = s.SharedMemoryEndpointResolved()
+		cfg.Memory.Options = map[string]string{
+			"namespace": s.SharedMemoryNamespace,
+			"scope":     "global",
+		}
+		if tok := s.SharedMemoryTokenResolved(); tok != "" {
+			cfg.Memory.Options["token"] = tok
+		}
+	case embedder != nil:
 		cfg.Memory.StoreType = config.MemoryStoreTypeGraphFlow
 	}
 	cfg.ApplyHomeLayout()
@@ -143,10 +164,22 @@ func NewService(s *Settings) (*Service, error) {
 	// the DisablePTC setting no longer selects anything. It stays in Settings
 	// only so existing settings files keep parsing.
 	memMode := "file"
-	if embedder != nil {
+	switch {
+	case useShared:
+		// The shared brain. Note there is no WithEmbedder here even when one is
+		// configured: the remote server does its own embedding, and a local
+		// vector would mean nothing to it.
+		memOpts := []agent.MemoryOption{
+			agent.WithMemoryStoreType(store.CortexRemoteStoreType),
+			agent.WithMemoryDSN(cfg.Memory.DSN),
+			agent.WithMemoryOptions(cfg.Memory.Options),
+		}
+		b = b.WithMemory(memOpts...)
+		memMode = "shared:" + cfg.Memory.DSN
+	case embedder != nil:
 		b = b.WithEmbedder(embedder).WithGraphMemory()
 		memMode = "graphflow"
-	} else {
+	default:
 		b = b.WithMemory(agent.WithMemoryStoreType("file"))
 	}
 
@@ -155,9 +188,27 @@ func NewService(s *Settings) (*Service, error) {
 	// it is the built-in web_search tool registered below, so a fresh install
 	// with no MCP config can still look something up.
 	mcpOpts := []agent.MCPOption{}
+	var droppedMCP []string
 	mcpCfgPath := filepath.Join(cfg.DataDir(), "mcpServers.json")
 	if _, statErr := os.Stat(mcpCfgPath); statErr == nil {
-		mcpOpts = append(mcpOpts, agent.WithMCPConfigPaths(mcpCfgPath))
+		// One capability, one route: if the memory backend now owns an
+		// endpoint, an MCP server pointed at that same endpoint is a second
+		// name for the same store, and gets left out of the tool surface.
+		owned := ""
+		if useShared {
+			owned = cfg.Memory.DSN
+		}
+		effectivePath, dropped, ferr := resolveMCPConfigPath(
+			mcpCfgPath, filepath.Join(cfg.DataDir(), "mcpServers.effective.json"), owned)
+		if ferr != nil {
+			log.Printf("superai: mcp config filter: %v", ferr)
+		}
+		droppedMCP = dropped
+		if len(dropped) > 0 {
+			log.Printf("superai: memory backend owns %s; not mounting MCP server(s) %v that route to the same store",
+				owned, dropped)
+		}
+		mcpOpts = append(mcpOpts, agent.WithMCPConfigPaths(effectivePath))
 	}
 	b = b.WithMCP(mcpOpts...)
 
@@ -169,7 +220,7 @@ func NewService(s *Settings) (*Service, error) {
 
 	out := &Service{
 		svc: svc, sb: sb, settings: s, MemoryMode: memMode, dataDir: cfg.DataDir(),
-		brain: brain,
+		brain: brain, SuppressedMCPServers: droppedMCP,
 	}
 
 	// --- Built-in framework tools. ---

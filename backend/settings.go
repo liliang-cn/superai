@@ -88,6 +88,62 @@ type Settings struct {
 
 	// CLIProxyPort is the local port the embedded proxy binds (loopback only).
 	CLIProxyPort int `json:"cliproxy_port"`
+
+	// MemoryBackend selects where durable memory lives:
+	//
+	//	"local"  (default) — this machine's own store under <data>/data.
+	//	"shared"           — a remote CortexDB (the "shared brain") that other
+	//	                     agents also read and write, over gRPC.
+	//
+	// This is a one-of-two choice on purpose. A capability should have exactly
+	// one route: when the shared brain is the memory backend, any MCP server
+	// pointed at the same endpoint is dropped from the tool surface, because
+	// two names for one store is how a model ends up calling both and
+	// reporting "not found".
+	MemoryBackend string `json:"memory_backend"`
+
+	// SharedMemoryEndpoint is host:port of the shared CortexDB gRPC server.
+	// Used only when MemoryBackend is "shared"; falls back to $CORTEXDB_REMOTE.
+	SharedMemoryEndpoint string `json:"shared_memory_endpoint"`
+
+	// SharedMemoryToken is the shared brain's bearer token. Leave it empty to
+	// read $CORTEXDB_GRPC_TOKEN instead, which keeps the secret out of
+	// settings.json.
+	SharedMemoryToken string `json:"shared_memory_token"`
+
+	// SharedMemoryNamespace scopes reads and writes inside the shared brain.
+	// Defaults to "default", which is the namespace the other clients use.
+	SharedMemoryNamespace string `json:"shared_memory_namespace"`
+}
+
+// Memory backend choices for Settings.MemoryBackend.
+const (
+	MemoryBackendLocal  = "local"
+	MemoryBackendShared = "shared"
+)
+
+// UseSharedMemory reports whether the shared brain is the configured backend
+// and reachable (an endpoint is known).
+func (s *Settings) UseSharedMemory() bool {
+	return s.MemoryBackend == MemoryBackendShared && s.SharedMemoryEndpointResolved() != ""
+}
+
+// SharedMemoryEndpointResolved returns the configured endpoint, falling back to
+// $CORTEXDB_REMOTE.
+func (s *Settings) SharedMemoryEndpointResolved() string {
+	if v := strings.TrimSpace(s.SharedMemoryEndpoint); v != "" {
+		return v
+	}
+	return strings.TrimSpace(os.Getenv("CORTEXDB_REMOTE"))
+}
+
+// SharedMemoryTokenResolved returns the configured token, falling back to
+// $CORTEXDB_GRPC_TOKEN. Never log the result.
+func (s *Settings) SharedMemoryTokenResolved() string {
+	if v := strings.TrimSpace(s.SharedMemoryToken); v != "" {
+		return v
+	}
+	return strings.TrimSpace(os.Getenv("CORTEXDB_GRPC_TOKEN"))
 }
 
 const (
@@ -143,6 +199,11 @@ func defaults() *Settings {
 		AvatarPort:      defaultAvatarP,
 		CLIProxyEnabled: true,
 		CLIProxyPort:    DefaultCLIProxyPort,
+		// Local memory is the default: a fresh install must not depend on a
+		// server somewhere else on the network.
+		MemoryBackend:         MemoryBackendLocal,
+		SharedMemoryEndpoint:  envOr("CORTEXDB_REMOTE", ""),
+		SharedMemoryNamespace: "default",
 	}
 	return s
 }
@@ -191,6 +252,17 @@ func (s *Settings) backfill(def *Settings) {
 	}
 	if s.CLIProxyPort <= 0 {
 		s.CLIProxyPort = def.CLIProxyPort
+	}
+	// An older settings file has no memory_backend; it was on local memory, so
+	// that is what it stays on.
+	if s.MemoryBackend != MemoryBackendShared {
+		s.MemoryBackend = MemoryBackendLocal
+	}
+	if strings.TrimSpace(s.SharedMemoryEndpoint) == "" {
+		s.SharedMemoryEndpoint = def.SharedMemoryEndpoint
+	}
+	if strings.TrimSpace(s.SharedMemoryNamespace) == "" {
+		s.SharedMemoryNamespace = def.SharedMemoryNamespace
 	}
 }
 

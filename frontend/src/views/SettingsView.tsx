@@ -345,6 +345,57 @@ export default function SettingsView({ onSaved }: { onSaved: () => void }) {
           </div>
 
           <div className="card">
+            <div className="card-title">Memory</div>
+            <div className="card-desc">
+              Where durable memory lives. Pick one — a capability should have exactly one route.
+            </div>
+            <div className="field">
+              <label>Backend</label>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
+                {(["local", "shared"] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    className={`btn sm${s.memory_backend === mode ? "" : " ghost"}`}
+                    onClick={() => set("memory_backend", mode)}
+                  >
+                    {mode === "local" ? "Local (this machine)" : "Shared brain (remote CortexDB)"}
+                  </button>
+                ))}
+              </div>
+              <span className="hint">
+                {s.memory_backend === "shared"
+                  ? "memory_* tools read and write the shared CortexDB. Any MCP server pointed at the same address is left unmounted, so the model does not see two names for one store."
+                  : "memory_* tools use this machine's own store. MCP servers are mounted as configured."}
+              </span>
+            </div>
+            {s.memory_backend === "shared" && (
+              <>
+                <TextField
+                  label="Shared CortexDB Endpoint"
+                  value={s.shared_memory_endpoint}
+                  onChange={(v) => set("shared_memory_endpoint", v)}
+                  placeholder="192.168.1.10:47821"
+                  hint="host:port of the cortexdb gRPC server. Empty falls back to $CORTEXDB_REMOTE."
+                />
+                <PasswordField
+                  label="Shared CortexDB Token"
+                  value={s.shared_memory_token}
+                  onChange={(v) => set("shared_memory_token", v)}
+                />
+                <span className="hint">Leave the token empty to read $CORTEXDB_GRPC_TOKEN instead, keeping it out of settings.json.</span>
+                <TextField
+                  label="Namespace"
+                  value={s.shared_memory_namespace}
+                  onChange={(v) => set("shared_memory_namespace", v)}
+                  placeholder="default"
+                  hint="Scopes reads and writes inside the shared brain."
+                />
+              </>
+            )}
+          </div>
+
+          <div className="card">
             <div className="card-title">Runtime</div>
             <div className="card-desc">Workspace, agent loop limits, and avatar bridge.</div>
             <TextField label="Workspace Directory" value={s.workspace_dir} onChange={(v) => set("workspace_dir", v)} placeholder="~/.superai/workspace" hint="Where the agent reads and writes deliverable files." />
