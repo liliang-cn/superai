@@ -50,9 +50,10 @@ type App struct {
 	// for once at startup rather than when a timer fires and nobody is looking.
 	notifyOK bool
 
-	// emitFn overrides where frontend events go. Only tests set it: the Wails
-	// runtime calls log.Fatalf when EventsEmit is handed a context it did not
-	// create, which would take the whole test binary down.
+	// emitFn overrides where frontend events go. Tests set it, and serve mode
+	// points it at the SSE hub: the Wails runtime calls log.Fatalf when
+	// EventsEmit is handed a context it did not create, so any path without a
+	// real window must divert events before they reach it.
 	emitFn func(name string, payload map[string]any)
 
 	buildErr string
@@ -69,7 +70,18 @@ func NewApp() *App {
 // GetStatus so the Settings page can fix the config and rebuild.
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	a.boot()
+}
 
+// startupHeadless boots the same backend with no Wails context: events go
+// wherever emitFn points, and everything that needs a native window — dialogs,
+// the notification permission prompt — stays off behind the existing nil-ctx
+// guards. Serve mode must set emitFn before calling this.
+func (a *App) startupHeadless() {
+	a.boot()
+}
+
+func (a *App) boot() {
 	s, _ := backend.LoadSettings() // returns defaults even on error
 	a.settings = s
 

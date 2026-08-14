@@ -3,6 +3,7 @@ package main
 import (
 	"embed"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/wailsapp/wails/v2"
@@ -31,6 +32,13 @@ func noCache(next http.Handler) http.Handler {
 }
 
 func main() {
+	// The same binary, minus the window: `superai-desktop serve` runs the app
+	// behind a local HTTP server instead of a WKWebView (see server.go).
+	if len(os.Args) > 1 && os.Args[1] == "serve" {
+		serveMain(os.Args[2:])
+		return
+	}
+
 	// Create an instance of the app structure
 	app := NewApp()
 

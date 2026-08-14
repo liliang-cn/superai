@@ -39,6 +39,15 @@ package:
 cli:
 	go build -o build/bin/superai ./cmd/superai
 
+## web: build the windowless web-server binary -> build/bin/superai-web (run: superai-web serve)
+web:
+	cd frontend && npm run build
+	go build -o build/bin/superai-web .
+
+## serve: build and run the web server on 127.0.0.1:43117
+serve: web
+	./build/bin/superai-web serve
+
 ## daemon: build the background scheduler binary
 daemon:
 	go build -o build/bin/superai-daemon ./cmd/superai-daemon
