@@ -347,15 +347,28 @@ func (s *Service) Stream(ctx context.Context, sessionID, message string, imagePa
 		return "", err
 	}
 	var final string
+	var lastErr string
+	sawTerminal := false
 	for ev := range ch {
 		if emit != nil {
 			emit(ev)
 		}
+		switch ev.Type {
 		// A blocked run is an outcome, not an error: its explanation arrives as
 		// EventTypeBlocked and is the answer the user should see.
-		if ev.Type == agent.EventTypeComplete || ev.Type == agent.EventTypeBlocked {
+		case agent.EventTypeComplete, agent.EventTypeBlocked:
 			final = ev.Content
+			sawTerminal = true
+		case agent.EventTypeError:
+			lastErr = ev.Content
 		}
+	}
+	// A run that ended on an error event and never reached a terminal state
+	// used to come back as ("", nil) — the caller saw "no answer" with the
+	// reason silently dropped (a gateway 502 looked identical to a model that
+	// said nothing). The error event is the explanation; return it as one.
+	if !sawTerminal && lastErr != "" {
+		return "", fmt.Errorf("%s", lastErr)
 	}
 	return final, nil
 }
