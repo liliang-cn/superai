@@ -79,6 +79,12 @@ func NewService(s *Settings) (*Service, error) {
 		return nil, fmt.Errorf("no model selected: pick one under Settings → Accounts")
 	}
 
+	// The builtin websearch MCP reads SEARXNG_BASE_URL at construction; the
+	// setting is the explicit way to point this process at an instance.
+	if u := strings.TrimSpace(s.SearXNGURL); u != "" {
+		_ = os.Setenv("SEARXNG_BASE_URL", u)
+	}
+
 	// --- Brain (LLM): OpenAI-compatible pool. ---
 	brain, err := pool.NewPool(pool.PoolConfig{
 		Enabled:  true,

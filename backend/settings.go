@@ -32,6 +32,12 @@ type Settings struct {
 	SearchKey     string `json:"search_key"`
 	SearchModel   string `json:"search_model"`
 
+	// SearXNGURL points the builtin websearch MCP at a self-hosted SearXNG
+	// instance (its JSON API must be enabled). Configured, that instance is
+	// tried before the scraping engines — a stable aggregator beats parsing
+	// search sites' HTML. Empty, the scrapers behave as before.
+	SearXNGURL string `json:"searxng_url"`
+
 	// DisableSelfInstall withholds the self-extension toolset —
 	// search_mcp_servers, add_mcp_server, search_skills, install_skill and the
 	// URL installer. Those tools let the agent go and acquire a capability it
