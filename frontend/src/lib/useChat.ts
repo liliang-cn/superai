@@ -127,6 +127,25 @@ export function useChat(): UseChatResult {
     [],
   );
 
+  /**
+   * A notify_user call becomes its own assistant bubble, placed just before
+   * the ask that sent it so the transcript reads in delivery order: interim
+   * messages first, the (still-streaming) final answer last.
+   */
+  const insertInterim = useCallback((askId: string, text: string) => {
+    setMessages((prev) => {
+      const msg: ChatMessage = {
+        id: makeId(),
+        role: "assistant",
+        kind: "interim",
+        content: text,
+      };
+      const idx = prev.findIndex((m) => m.id === askId);
+      if (idx === -1) return [...prev, msg];
+      return [...prev.slice(0, idx), msg, ...prev.slice(idx)];
+    });
+  }, []);
+
   const pushProgress = useCallback(
     (askId: string, step: Omit<ProgressStep, "id">) => {
       patchMessage(askId, (m) => {
@@ -217,6 +236,14 @@ export function useChat(): UseChatResult {
               status: "running",
             },
           ]);
+          // A notify_user call IS the message: surface it as its own bubble
+          // instead of a "Calling notify_user" progress line.
+          if (!inner && tool === "notify_user") {
+            const text =
+              typeof ev.args?.message === "string" ? ev.args.message.trim() : "";
+            if (text) insertInterim(askId, text);
+            break;
+          }
           // Inner calls are the ones the model's own code makes; there can be
           // dozens of them and the trace panel already shows them nested, so
           // only top-level tools become a progress line.
@@ -270,7 +297,7 @@ export function useChat(): UseChatResult {
           break;
       }
     },
-    [finishAsk, patchMessage, pushProgress],
+    [finishAsk, insertInterim, patchMessage, pushProgress],
   );
 
   const dispatch = useCallback(
@@ -516,7 +543,12 @@ export function useChat(): UseChatResult {
           id: makeId(),
           role: t.role as ChatMessage["role"],
           content: t.content,
-          kind: t.kind === "context" ? ("context" as const) : undefined,
+          kind:
+            t.kind === "context"
+              ? ("context" as const)
+              : t.kind === "interim"
+                ? ("interim" as const)
+                : undefined,
           emotion: t.emotion || undefined,
           // The working, recovered from the scripts the transcript hid, so a
           // reopened conversation still shows what the agent did and not just

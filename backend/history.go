@@ -48,6 +48,10 @@ const maxTitle = 60
 // TurnKindContext marks the memory the agent was handed before answering.
 const TurnKindContext = "context"
 
+// TurnKindInterim marks a standalone message the agent sent mid-turn via the
+// notify_user tool — a real bubble, delivered before that ask's final answer.
+const TurnKindInterim = "interim"
+
 // memoryContextHeader opens the block the agent injects as a user message when
 // long-term memory turns something up.
 const memoryContextHeader = "--- Relevant Context From Memory ---"
@@ -169,8 +173,20 @@ func visibleTurns(messages []domain.Message) []ChatTurn {
 		}
 		// An assistant turn that only carried tool calls has no text to show —
 		// but it is the record of the agent working, so it becomes progress.
+		// Except notify_user: its argument IS a message the user already saw
+		// live, so it is restored as an interim bubble, not a step line.
 		if len(messages[i].ToolCalls) > 0 && strings.TrimSpace(messages[i].Content) == "" {
-			pending = append(pending, toolCallSteps(messages[i].ToolCalls)...)
+			rest := make([]domain.ToolCall, 0, len(messages[i].ToolCalls))
+			for _, c := range messages[i].ToolCalls {
+				if c.Function.Name == "notify_user" {
+					if msg, _ := c.Function.Arguments["message"].(string); strings.TrimSpace(msg) != "" {
+						turns = append(turns, ChatTurn{Role: "assistant", Kind: TurnKindInterim, Content: strings.TrimSpace(msg)})
+					}
+					continue
+				}
+				rest = append(rest, c)
+			}
+			pending = append(pending, toolCallSteps(rest)...)
 			continue
 		}
 		content := strings.TrimSpace(messages[i].Content)

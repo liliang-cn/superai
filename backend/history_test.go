@@ -453,3 +453,41 @@ func TestVisibleTurnsKeepsRecalledMemoryAsAFoldedBlock(t *testing.T) {
 		t.Errorf("title = %q, want the question", got)
 	}
 }
+
+// An interim message sent via notify_user was a real bubble in the live
+// conversation; a reopened one must restore it as such — not demote it to a
+// "Called notify_user" progress line.
+func TestVisibleTurnsRestoresInterimMessages(t *testing.T) {
+	turns := visibleTurns([]domain.Message{
+		{Role: "user", Content: "调研三个方案并给结论"},
+		{Role: "assistant", ToolCalls: []domain.ToolCall{
+			{Function: domain.FunctionCall{
+				Name:      "notify_user",
+				Arguments: map[string]interface{}{"message": "方案 A 已排除：许可证不兼容。"},
+			}},
+			{Function: domain.FunctionCall{
+				Name:      "web_search",
+				Arguments: map[string]interface{}{"query": "方案 B"},
+			}},
+		}},
+		{Role: "tool", Content: "…search results…"},
+		{Role: "assistant", Content: "结论：选方案 B。"},
+	})
+
+	if len(turns) != 3 {
+		t.Fatalf("got %d turns, want question + interim + answer: %+v", len(turns), turns)
+	}
+	interim := turns[1]
+	if interim.Kind != TurnKindInterim || interim.Role != "assistant" {
+		t.Errorf("interim turn mismarked: %+v", interim)
+	}
+	if interim.Content != "方案 A 已排除：许可证不兼容。" {
+		t.Errorf("interim content = %q", interim.Content)
+	}
+	// The sibling tool call still becomes a step on the final answer, and the
+	// notify_user call must not double as one.
+	final := turns[2]
+	if len(final.Steps) != 1 || final.Steps[0] != "Called web_search" {
+		t.Errorf("final steps = %v, want [Called web_search]", final.Steps)
+	}
+}

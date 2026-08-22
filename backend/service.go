@@ -247,6 +247,7 @@ func NewService(s *Settings) (*Service, error) {
 	out.store = newLifeStore(filepath.Join(cfg.DataDir(), "superai-store.json"))
 	out.store.load()
 	out.registerLifeTools()
+	out.registerNotifyTool()
 	// Self-extension: chat-driven install of skills and MCP servers, plus
 	// "here's a URL, work out how to install it". Withheld for one-shot runs —
 	// see Settings.DisableSelfInstall.

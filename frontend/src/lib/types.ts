@@ -79,8 +79,12 @@ export interface ChatMessage {
    * "context" is what the agent was given to read before answering — recalled
    * memory, injected as a user message. Shown folded rather than as a bubble:
    * nobody typed it, but it is the reason the answer says what it says.
+   *
+   * "interim" is a standalone message the agent chose to send mid-turn via the
+   * notify_user tool — a real bubble of its own, delivered before the final
+   * answer of the ask that produced it.
    */
-  kind?: "context";
+  kind?: "context" | "interim";
   emotion?: string;
   streaming?: boolean;
   /** Progress lines captured while this ask was running. */
