@@ -175,6 +175,7 @@ export namespace backend {
 	    search_base_url: string;
 	    search_key: string;
 	    search_model: string;
+	    searxng_url: string;
 	    disable_self_install: boolean;
 	    workspace_dir: string;
 	    max_rounds: number;
@@ -205,6 +206,7 @@ export namespace backend {
 	        this.search_base_url = source["search_base_url"];
 	        this.search_key = source["search_key"];
 	        this.search_model = source["search_model"];
+	        this.searxng_url = source["searxng_url"];
 	        this.disable_self_install = source["disable_self_install"];
 	        this.workspace_dir = source["workspace_dir"];
 	        this.max_rounds = source["max_rounds"];
