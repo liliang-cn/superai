@@ -54,6 +54,9 @@ type Service struct {
 	// because injection races tool calls already in flight.
 	schedMu         sync.Mutex
 	promptScheduler *agent.PromptScheduler
+	// claims stops two schedule-writing tools from both answering one request.
+	// See schedule_once.go.
+	claims *scheduleClaims
 	// ownedScheduler is a manage-only scheduler this service opened for itself
 	// because nobody injected one (the single-shot CLI, most obviously). It
 	// writes schedules to the shared store without firing any, and this service
@@ -226,6 +229,7 @@ func NewService(s *Settings) (*Service, error) {
 
 	out := &Service{
 		svc: svc, sb: sb, settings: s, MemoryMode: memMode, dataDir: cfg.DataDir(),
+		claims: newScheduleClaims(),
 		brain: brain, SuppressedMCPServers: droppedMCP,
 	}
 
@@ -587,7 +591,8 @@ func buildPersona(now time.Time, selfInstall bool) string {
 凡涉及相对时间（今天/明天/后天/大后天/这周五/下周一/下下周一/下个月3号/今晚N点…），都【必须先调用 resolve_datetime 工具】换算成绝对时间，再用返回的 rfc3339 去建日程/设提醒。绝不要自己心算日期。
 
 职责：
-- 从用户的话里识别意图，主动调用工具记录：约定/会面→add_schedule；提到人→upsert_person；工作/踩坑→add_record(work,挂 project)；生活/心情→add_record(diary)；笔记→add_record(note)；打卡/习惯→add_record(habit)；要提醒→set_reminder。
+- 从用户的话里识别意图，主动调用工具记录：约定/会面→add_schedule；提到人→upsert_person；工作/踩坑→add_record(work,挂 project)；生活/心情→add_record(diary)；笔记→add_record(note)；打卡/习惯→add_record(habit)。
+- Scheduling: call exactly ONE tool. Every day at HH:MM, or one specific moment → set_reminder. Any other cadence — a weekday, every Monday, every few hours, a day of the month → schedule_prompt, which takes a cron and can say what the other cannot. Calling both leaves two schedules for one request, and one of them is always wrong.
 - 只要用户在陈述发生的事或要求记录/提醒，必须先调用对应工具存下来再回复。
 - 需要查最新/实时/记忆里没有的信息（天气、行情、新闻、事实核对…）时，用 web_search 搜；需要阅读/审阅某个具体网址的真实页面内容时，用 fetch_url 抓取该网页正文。
 - 你有沙箱、浏览器、视觉、可交付物与技能可用，复杂任务可以自主多步完成。%s
@@ -797,14 +802,21 @@ func (s *Service) registerLifeTools() {
 				return errResult(err.Error()), nil
 			}
 
+			// One request, one schedule — see schedule_once.go.
+			if held := s.claims.claim(title, plan.Cron); held != nil {
+				return errResult(duplicateScheduleMessage(held)), nil
+			}
 			sch, err := s.reminderScheduler()
 			if err != nil {
+				s.claims.release(title)
 				return errResult("提醒功能不可用：" + err.Error()), nil
 			}
 			task, err := sch.Schedule(ReminderPrompt(title), plan.Cron, "提醒："+title, "reminders")
 			if err != nil {
+				s.claims.release(title)
 				return errResult(err.Error()), nil
 			}
+			s.claims.record(title, task.ID, plan.Cron)
 
 			data := map[string]any{
 				"id": task.ID, "title": title, "schedule": plan.Cron, "when": plan.Note,
@@ -834,27 +846,33 @@ func (s *Service) registerLifeTools() {
 	// "每月一号" have no shape in that tool, and a model asked for them either
 	// picks the nearest daily time or gives up. This one takes the cron directly.
 	svc.AddToolWithMetadata("schedule_prompt",
-		"按任意周期安排一段提示词定时运行（工作日、每几小时、每月某天…）。只表达得了每天某点或某个具体时刻时，用 set_reminder。",
+		"Run a prompt on any cadence: weekdays, every few hours, a day of the month. Use set_reminder instead only when the timing is every day at HH:MM, or one specific moment. Never call both for one request.",
 		obj(map[string]any{
-			"prompt": sp("到点要执行的指令，照你会打进聊天框的样子写"),
-			"cron":   sp("五段 cron。每天八点 `0 8 * * *`；工作日九点 `0 9 * * 1-5`；每四小时 `0 */4 * * *`；每月一号九点 `0 9 1 * *`"),
-			"name":   sp("可选。列表里显示的名字，不给就用 prompt"),
-			"conversation": sp("可选。运行结果追加到这个会话，留空则共用一个叫 scheduled 的"),
+			"prompt": sp("The instruction to run when it fires, written as you would type it into chat"),
+			"cron":   sp("Five-field cron. Daily at 08:00 `0 8 * * *`; weekdays at 09:00 `0 9 * * 1-5`; every four hours `0 */4 * * *`; the 1st at 09:00 `0 9 1 * *`"),
+			"name":   sp("Optional label for the list; defaults to the prompt"),
+			"conversation": sp("Optional conversation the runs append to; blank shares one called scheduled"),
 		}, "prompt", "cron"),
 		func(ctx context.Context, a map[string]any) (any, error) {
 			prompt := strings.TrimSpace(str(a, "prompt"))
 			if prompt == "" {
 				return errResult("prompt is required"), nil
 			}
+			if held := s.claims.claim(prompt, strings.TrimSpace(str(a, "cron"))); held != nil {
+				return errResult(duplicateScheduleMessage(held)), nil
+			}
 			sch, err := s.reminderScheduler()
 			if err != nil {
+				s.claims.release(prompt)
 				return errResult("定时功能不可用：" + err.Error()), nil
 			}
 			task, err := sch.Schedule(prompt, strings.TrimSpace(str(a, "cron")),
 				strings.TrimSpace(str(a, "name")), strings.TrimSpace(str(a, "conversation")))
 			if err != nil {
+				s.claims.release(prompt)
 				return errResult(err.Error()), nil
 			}
+			s.claims.record(prompt, task.ID, task.Schedule)
 			data := map[string]any{"id": task.ID, "prompt": prompt, "schedule": task.Schedule}
 			// The next run is the only part a person can check against what they
 			// meant. A cron they cannot read is not a confirmation.
