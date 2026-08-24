@@ -22,6 +22,7 @@ import {
 import { Button } from "@/components/ui/button";
 import {
   CopyIcon,
+  RefreshCwIcon,
   MessageSquareIcon,
   Trash2Icon,
   PaperclipIcon,
@@ -75,6 +76,25 @@ export default function ChatView({
 
   // Asking again while an answer is still streaming is allowed: each ask gets
   // its own bubble, so there is nothing to wait for.
+  /**
+   * Ask again for the answer at `index`, by re-sending the question that
+   * produced it.
+   *
+   * The previous answer stays. Replacing it in place would be the tidier
+   * screen and the worse record: a model asked twice gives two different
+   * answers, and which one a person acted on is not recoverable from a
+   * transcript that kept only the last.
+   */
+  const regenerate = (index: number) => {
+    for (let i = index - 1; i >= 0; i--) {
+      const prev = messages[i];
+      if (prev.role === "user" && prev.kind !== "context" && prev.content) {
+        chat.send(prev.content);
+        return;
+      }
+    }
+  };
+
   const onSubmit = (msg: { text: string }) => {
     const text = msg.text.trim();
     if (!text && attach.paths.length === 0) return;
@@ -128,7 +148,7 @@ export default function ChatView({
                     .map((m) => `${m.content}#${m.progress?.length ?? 0}`)
                     .join("|")}
                 >
-                  {messages.map((m) =>
+                  {messages.map((m, mi) =>
                     m.kind === "context" ? (
                       <ContextBlock key={m.id} content={m.content} />
                     ) : (
@@ -195,6 +215,14 @@ export default function ChatView({
                                     onClick={() => copyText(m.content)}
                                   >
                                     <CopyIcon className="size-3.5" />
+                                  </Action>
+                                  <Action
+                                    label="Regenerate"
+                                    tooltip="Ask again"
+                                    disabled={chat.sending}
+                                    onClick={() => regenerate(mi)}
+                                  >
+                                    <RefreshCwIcon className="size-3.5" />
                                   </Action>
                                 </Actions>
                               )}

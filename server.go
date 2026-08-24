@@ -211,6 +211,9 @@ func newAPIMux(app *App, hub *eventHub) (*http.ServeMux, error) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/rpc/", func(w http.ResponseWriter, r *http.Request) { rpcCall(app, w, r) })
 	mux.HandleFunc("/api/events", hub.serveSSE)
+	// SuperAI as an MCP server — see mcp.go for why it lives in this process
+	// and why it adds no gate of its own.
+	mux.Handle(mcpPath, newMCPHandler(app, mcpServerVersion))
 	spa, err := spaHandler()
 	if err != nil {
 		return nil, err
