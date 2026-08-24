@@ -4,16 +4,15 @@ import {
   CancelScheduledRun,
   DeleteScheduledPrompt,
   RunScheduledPromptNow,
-  SchedulePrompt,
+  ScheduleFromText,
   ScheduledPrompts,
   SetScheduledPromptEnabled,
 } from "../../wailsjs/go/main/App";
 import { agent } from "../../wailsjs/go/models";
 import { AppStatus } from "../lib/types";
-import { DEFAULT_WHEN, When, describeCron, previewCron, whenToCron } from "../lib/cron";
+import { describeCron } from "../lib/cron";
 import { firstLine, formatStamp, fromNow, parseTime } from "../lib/format";
 import { ScheduleRunLog } from "../lib/useScheduleRuns";
-import WhenPicker from "../components/WhenPicker";
 import { ScheduleRunList } from "../components/ScheduleRuns";
 
 type Note = { kind: "ok" | "err"; text: string } | null;
@@ -40,9 +39,9 @@ export default function SchedulesView({
   const [note, setNote] = useState<Note>(null);
   const [composing, setComposing] = useState(false);
   const [prompt, setPrompt] = useState("");
-  const [name, setName] = useState("");
-  const [session, setSession] = useState("");
-  const [when, setWhen] = useState<When>(DEFAULT_WHEN);
+  // What the agent said about what it arranged. Shown verbatim: it is the only
+  // account of how a sentence was understood.
+  const [reply, setReply] = useState("");
   const [saving, setSaving] = useState(false);
   const [busy, setBusy] = useState("");
   const [confirmDelete, setConfirmDelete] = useState("");
@@ -92,45 +91,48 @@ export default function SchedulesView({
     load();
   }, [newestRun, load]);
 
-  const cron = whenToCron(when);
-  // An expression this parser calls invalid is one the backend also refuses, so
-  // saying so here saves a round trip that would answer with a robfig error
-  // message ("end of range (70) above maximum (59)") instead of the field's own.
-  // Only "invalid" blocks: "unknown" means we declined to judge, not that it is
-  // wrong, and the backend understands more dialects than this does.
-  const cronWhy = cron === "" ? null : previewCron(cron, 1);
-  const cronBad = cronWhy?.kind === "invalid" ? cronWhy.why : "";
-  const canCreate = prompt.trim() !== "" && cron !== "" && cronBad === "" && !saving;
+  const canCreate = prompt.trim() !== "" && !saving;
 
+  /**
+   * Hand the sentence to the agent and let it arrange the schedule.
+   *
+   * Nothing here parses time. "每天早八点" and "工作日下午三点" are the same kind
+   * of thing to a model and were six different controls to a form, and the
+   * agent already owns the tools that write a schedule.
+   */
   const create = async () => {
     setSaving(true);
     setNote(null);
+    setReply("");
     const known = new Set(list.map((s) => s.id));
     try {
-      const res = await SchedulePrompt(prompt.trim(), cron, name.trim(), session.trim());
-      if (res !== "ok") {
-        setNote({ kind: "err", text: res });
+      const res: any = await ScheduleFromText(prompt.trim());
+      if (res && res.answer) setReply(String(res.answer));
+      if (res && res.ok === false) {
+        setNote({ kind: "err", text: String(res.error || "could not arrange that") });
         return;
       }
       const next = await ScheduledPrompts();
       const rows = Array.isArray(next) ? next : [];
       setList(rows);
-      // Confirming with the backend's own next_run rather than the local preview:
-      // the preview is a guess about the expression, this is the answer.
+      // The new row is the confirmation, not the reply: a model that says it
+      // scheduled something and a scheduler that has it are different claims.
       const created = rows.find((s) => !known.has(s.id));
-      const at = created ? parseTime(created.next_run) : null;
       setFresh(created?.id || "");
-      setNote({
-        kind: "ok",
-        text: at
-          ? `Scheduled. First run ${formatStamp(at)} — ${fromNow(at)}.`
-          : "Scheduled.",
-      });
-      setComposing(false);
-      setPrompt("");
-      setName("");
-      setSession("");
-      setWhen(DEFAULT_WHEN);
+      if (created) {
+        const at = parseTime(created.next_run);
+        setNote({
+          kind: "ok",
+          text: at ? `Scheduled. First run ${formatStamp(at)} — ${fromNow(at)}.` : "Scheduled.",
+        });
+        setPrompt("");
+        setComposing(false);
+      } else {
+        setNote({
+          kind: "err",
+          text: "Nothing new is on the schedule — read the reply above and try saying the time more plainly.",
+        });
+      }
     } catch (e: any) {
       setNote({ kind: "err", text: String(e?.message || e) });
     } finally {
@@ -206,68 +208,41 @@ export default function SchedulesView({
           <div className="card" style={{ marginBottom: 14 }}>
             <div className="card-title">New schedule</div>
             <div className="card-desc">
-              Say what SuperAI should do and when. It runs on its own and the answer lands in a
-              conversation you can open afterwards.
+              Say what SuperAI should do and when, in one sentence. It works out the timing itself
+              and the answers land in a conversation you can open afterwards.
             </div>
             <div className="field">
-              <label>What should SuperAI do?</label>
               <textarea
                 className="input"
                 rows={3}
                 autoFocus
                 value={prompt}
-                placeholder="Work out my stock returns and message me"
+                placeholder="每天早八点看看昨天的部署有没有问题，有问题就告诉我"
                 onChange={(e) => setPrompt(e.target.value)}
+                onKeyDown={(e) => {
+                  if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && canCreate) create();
+                }}
               />
               <span className="hint">
-                Write it as an instruction, exactly as you would type it into chat.
+                一句话说清楚做什么、什么时候做。⌘/Ctrl + Enter 提交。
               </span>
             </div>
 
-            <WhenPicker when={when} onChange={setWhen} />
-
-            <div className="row2">
-              <div className="field">
-                <label>Name</label>
-                <input
-                  className="input"
-                  value={name}
-                  autoComplete="off"
-                  placeholder="Morning stock report"
-                  onChange={(e) => setName(e.target.value)}
-                />
-                <span className="hint">Optional. Shown in this list; defaults to the prompt.</span>
-              </div>
-              <div className="field">
-                <label>Conversation</label>
-                <input
-                  className="input"
-                  value={session}
-                  autoComplete="off"
-                  placeholder="scheduled"
-                  onChange={(e) => setSession(e.target.value)}
-                />
-                <span className="hint">
-                  Optional. Runs append to this conversation; blank shares one called “scheduled”.
-                </span>
-              </div>
-            </div>
+            {reply && <div className="card-desc" style={{ whiteSpace: "pre-wrap" }}>{reply}</div>}
 
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <button className="btn" onClick={create} disabled={!canCreate}>
                 {saving ? (
                   <>
-                    <span className="spinner" /> Scheduling…
+                    <span className="spinner" /> Arranging…
                   </>
                 ) : (
-                  "Create schedule"
+                  "Schedule it"
                 )}
               </button>
-              {prompt.trim() === "" ? (
-                <span className="save-note">Describe what it should do first.</span>
-              ) : cronBad !== "" ? (
-                <span className="save-note err">{cronBad}</span>
-              ) : null}
+              {prompt.trim() === "" && (
+                <span className="save-note">Say what should happen, and when.</span>
+              )}
             </div>
           </div>
         )}

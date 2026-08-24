@@ -829,6 +829,41 @@ func (s *Service) registerLifeTools() {
 			return okData(data), nil
 		}, write)
 
+	// set_reminder covers "every day at HH:MM" and one specific moment, which is
+	// most of what a person asks for and not all of it. "工作日下午三点"、"每四小时"、
+	// "每月一号" have no shape in that tool, and a model asked for them either
+	// picks the nearest daily time or gives up. This one takes the cron directly.
+	svc.AddToolWithMetadata("schedule_prompt",
+		"按任意周期安排一段提示词定时运行（工作日、每几小时、每月某天…）。只表达得了每天某点或某个具体时刻时，用 set_reminder。",
+		obj(map[string]any{
+			"prompt": sp("到点要执行的指令，照你会打进聊天框的样子写"),
+			"cron":   sp("五段 cron。每天八点 `0 8 * * *`；工作日九点 `0 9 * * 1-5`；每四小时 `0 */4 * * *`；每月一号九点 `0 9 1 * *`"),
+			"name":   sp("可选。列表里显示的名字，不给就用 prompt"),
+			"conversation": sp("可选。运行结果追加到这个会话，留空则共用一个叫 scheduled 的"),
+		}, "prompt", "cron"),
+		func(ctx context.Context, a map[string]any) (any, error) {
+			prompt := strings.TrimSpace(str(a, "prompt"))
+			if prompt == "" {
+				return errResult("prompt is required"), nil
+			}
+			sch, err := s.reminderScheduler()
+			if err != nil {
+				return errResult("定时功能不可用：" + err.Error()), nil
+			}
+			task, err := sch.Schedule(prompt, strings.TrimSpace(str(a, "cron")),
+				strings.TrimSpace(str(a, "name")), strings.TrimSpace(str(a, "conversation")))
+			if err != nil {
+				return errResult(err.Error()), nil
+			}
+			data := map[string]any{"id": task.ID, "prompt": prompt, "schedule": task.Schedule}
+			// The next run is the only part a person can check against what they
+			// meant. A cron they cannot read is not a confirmation.
+			if task.NextRun != nil {
+				data["next_run"] = task.NextRun.Local().Format("2006-01-02 15:04 MST")
+			}
+			return okData(data), nil
+		}, write)
+
 	svc.AddToolWithMetadata("list_reminders", "列出全部提醒。", obj(map[string]any{}),
 		func(ctx context.Context, a map[string]any) (any, error) {
 			db.mu.Lock()

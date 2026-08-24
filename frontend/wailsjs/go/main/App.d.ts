@@ -74,6 +74,8 @@ export function RunScheduledPromptNow(arg1:string):Promise<string>;
 
 export function SaveSettings(arg1:backend.Settings):Promise<void>;
 
+export function ScheduleFromText(arg1:string):Promise<Record<string, any>>;
+
 export function SchedulePrompt(arg1:string,arg2:string,arg3:string,arg4:string):Promise<string>;
 
 export function ScheduledPrompts():Promise<Array<agent.ScheduledPrompt>>;

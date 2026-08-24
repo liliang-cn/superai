@@ -142,6 +142,10 @@ export function SaveSettings(arg1) {
   return window['go']['main']['App']['SaveSettings'](arg1);
 }
 
+export function ScheduleFromText(arg1) {
+  return window['go']['main']['App']['ScheduleFromText'](arg1);
+}
+
 export function SchedulePrompt(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['SchedulePrompt'](arg1, arg2, arg3, arg4);
 }
