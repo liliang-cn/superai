@@ -240,8 +240,14 @@ func serveMain(argv []string) {
 	if err != nil {
 		log.Fatalf("assets: %v", err)
 	}
+	// Serve mode is the desktop app with the window replaced by a socket, and
+	// the socket has no idea who is on the other end. See auth.go.
+	creds, err := loadOrCreateCredentials()
+	if err != nil {
+		log.Fatalf("auth: %v", err)
+	}
 	addr := net.JoinHostPort("127.0.0.1", fmt.Sprint(*port))
-	srv := &http.Server{Addr: addr, Handler: mux}
+	srv := &http.Server{Addr: addr, Handler: requireAuth(creds, mux)}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
