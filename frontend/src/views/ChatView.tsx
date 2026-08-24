@@ -179,22 +179,30 @@ export default function ChatView({
                             )}
                           </MessageContent>
                         </Message>
+                        {/* One row under the reply: the copy action and the
+                            mood chip are both about the message that just
+                            finished, and stacking them made two half-empty
+                            lines out of one. */}
                         {m.role === "assistant" &&
                           !m.streaming &&
-                          m.content && (
-                            <Actions className="mt-1 ml-1">
-                              <Action
-                                label="Copy"
-                                tooltip="Copy message"
-                                onClick={() => copyText(m.content)}
-                              >
-                                <CopyIcon className="size-3.5" />
-                              </Action>
-                            </Actions>
+                          (m.content || m.emotion) && (
+                            <div className="msg-footer">
+                              {m.content && (
+                                <Actions>
+                                  <Action
+                                    label="Copy"
+                                    tooltip="Copy message"
+                                    onClick={() => copyText(m.content)}
+                                  >
+                                    <CopyIcon className="size-3.5" />
+                                  </Action>
+                                </Actions>
+                              )}
+                              {m.emotion && (
+                                <div className="emotion-chip">🎭 {m.emotion}</div>
+                              )}
+                            </div>
                           )}
-                        {m.emotion && !m.streaming && (
-                          <div className="emotion-chip">🎭 {m.emotion}</div>
-                        )}
                       </div>
                     ),
                   )}

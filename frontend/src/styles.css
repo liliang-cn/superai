@@ -475,6 +475,15 @@ input, textarea, select { font-family: inherit; }
   color: var(--text-2);
 }
 
+/* The strip under a finished assistant message: copy action and mood chip on
+   one row. The chip keeps its own margin-top when it appears alone elsewhere
+   (Transcript), so it is cleared here rather than removed there. */
+.msg-footer {
+  display: flex; align-items: center; gap: 8px;
+  margin: 4px 0 0 4px;
+}
+.msg-footer .emotion-chip { margin-top: 0; }
+
 .empty-state { margin: auto; text-align: center; color: var(--text-2); max-width: 420px; }
 .empty-state .big { font-size: 38px; margin-bottom: 12px; }
 .empty-state h3 { color: var(--text-0); font-size: 18px; margin-bottom: 6px; }
