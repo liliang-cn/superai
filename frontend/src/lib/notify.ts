@@ -40,6 +40,33 @@ export async function requestNotifyPermission(): Promise<NotificationPermission 
   }
 }
 
+/**
+ * Post a banner right now, whatever the page is doing.
+ *
+ * The only caller is the "try it" button. Everything automatic goes through
+ * notifyRun, which stays quiet while the page is visible — but a test fired
+ * from a click is always fired at a visible page, so testing through that path
+ * would show nothing and read as broken.
+ *
+ * Returns what happened, because a test that fails silently is worse than no
+ * test: macOS Focus, a Do Not Disturb schedule, or a browser in full screen
+ * will swallow the banner after the API has happily returned.
+ */
+export function notifyNow(title: string, body: string): "posted" | "denied" | "unsupported" | "failed" {
+  if (!notifySupported()) return "unsupported";
+  if (Notification.permission !== "granted") return "denied";
+  try {
+    const banner = new Notification(title, { body, tag: "superai-test", icon: "/favicon.ico" });
+    banner.onclick = () => {
+      window.focus();
+      banner.close();
+    };
+    return "posted";
+  } catch {
+    return "failed";
+  }
+}
+
 export interface RunNotice {
   /** Dedupe key: the same run must not stack two banners. */
   key: string;

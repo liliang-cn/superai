@@ -14,7 +14,7 @@ import { describeCron } from "../lib/cron";
 import { firstLine, formatStamp, fromNow, parseTime } from "../lib/format";
 import { ScheduleRunLog } from "../lib/useScheduleRuns";
 import { ScheduleRunList } from "../components/ScheduleRuns";
-import { notifyPermission, requestNotifyPermission } from "../lib/notify";
+import { notifyNow, notifyPermission, requestNotifyPermission } from "../lib/notify";
 
 type Note = { kind: "ok" | "err"; text: string } | null;
 
@@ -196,9 +196,37 @@ export default function SchedulesView({
         <button
           className="btn ghost sm"
           title="Show a system notification when a scheduled run finishes while this tab is in the background"
-          onClick={async () => setBanners(await requestNotifyPermission())}
+          onClick={async () => {
+            const granted = await requestNotifyPermission();
+            setBanners(granted);
+            // One banner the moment it is allowed. Being told "notifications
+            // are on" is not the same as having seen one arrive, and the
+            // difference is where Focus modes and full-screen apps hide.
+            if (granted === "granted") {
+              notifyNow("SuperAI", "通知已开启 —— 定时任务跑完时会这样提醒你。");
+            }
+          }}
         >
           🔔 Enable notifications
+        </button>
+      )}
+      {banners === "granted" && (
+        <button
+          className="btn ghost sm"
+          title="Post a test notification now"
+          onClick={() => {
+            const result = notifyNow("SuperAI", "这是一条测试通知。定时任务跑完时就是这个样子。");
+            setNote(
+              result === "posted"
+                ? {
+                    kind: "ok",
+                    text: "已发出一条测试通知。没看见的话，多半是系统的「专注模式」把它收进了通知中心。",
+                  }
+                : { kind: "err", text: `通知没能发出（${result}）。` },
+            );
+          }}
+        >
+          🔔 试一下
         </button>
       )}
       <button
