@@ -207,8 +207,11 @@ func spaHandler() (http.Handler, error) {
 	}), nil
 }
 
-func newAPIMux(app *App, hub *eventHub) (*http.ServeMux, error) {
+func newAPIMux(app *App, hub *eventHub, creds *credentials) (*http.ServeMux, error) {
 	mux := http.NewServeMux()
+	// Sign-in lives on the mux rather than in the middleware so it is a route
+	// like any other; requireAuth lets exactly these three through. See auth.go.
+	authRoutes(mux, creds)
 	mux.HandleFunc("/api/rpc/", func(w http.ResponseWriter, r *http.Request) { rpcCall(app, w, r) })
 	mux.HandleFunc("/api/events", hub.serveSSE)
 	// SuperAI as an MCP server — see mcp.go for why it lives in this process
@@ -236,15 +239,15 @@ func serveMain(argv []string) {
 	app.startupHeadless()
 	defer app.shutdown(context.Background())
 
-	mux, err := newAPIMux(app, hub)
-	if err != nil {
-		log.Fatalf("assets: %v", err)
-	}
 	// Serve mode is the desktop app with the window replaced by a socket, and
 	// the socket has no idea who is on the other end. See auth.go.
 	creds, err := loadOrCreateCredentials()
 	if err != nil {
 		log.Fatalf("auth: %v", err)
+	}
+	mux, err := newAPIMux(app, hub, creds)
+	if err != nil {
+		log.Fatalf("assets: %v", err)
 	}
 	addr := net.JoinHostPort("127.0.0.1", fmt.Sprint(*port))
 	srv := &http.Server{Addr: addr, Handler: requireAuth(creds, mux)}

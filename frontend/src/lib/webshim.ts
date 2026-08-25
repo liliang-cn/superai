@@ -25,6 +25,13 @@ function installWebShim() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(args),
     });
+    // The session expired (or was signed out in another tab). Every call from
+    // here on would fail the same way, so reload: the shell asks /api/session,
+    // gets a no, and draws the password box instead of a screen of errors.
+    if (resp.status === 401) {
+      window.location.reload();
+      throw new Error("signed out");
+    }
     const text = await resp.text();
     if (!resp.ok) {
       throw new Error(text.trim() || `${name}: HTTP ${resp.status}`);
@@ -125,6 +132,9 @@ function installWebShim() {
   const w = window as unknown as Record<string, unknown>;
   w.go = { main: { App: appProxy } };
   w.runtime = runtimeShim;
+  // Served over HTTP, which is the only mode with a door on it. The desktop
+  // window never sets this, and so never asks for a password.
+  w.superaiServed = true;
 }
 
 if (!(window as unknown as Record<string, unknown>).go) {
