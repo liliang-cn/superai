@@ -1,9 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { LogOutIcon, PanelLeftCloseIcon, PanelLeftOpenIcon } from "lucide-react";
+import { PanelLeftCloseIcon, PanelLeftOpenIcon } from "lucide-react";
 import { ViewKey } from "../lib/types";
-
-// Only the served build has a session to end; the desktop window has no door.
-const served = Boolean((window as unknown as Record<string, unknown>).superaiServed);
 
 const NAV: { section: string; items: { key: ViewKey; label: string; icon: string }[] }[] = [
   {
@@ -99,21 +96,6 @@ export default function Sidebar({
         >
           {open ? <PanelLeftCloseIcon className="size-4" /> : <PanelLeftOpenIcon className="size-4" />}
         </button>
-        {served && (
-          <button
-            type="button"
-            className="panel-toggle sign-out"
-            // Reload rather than route: the cookie is gone, so the shell asks
-            // /api/session on the way back up and lands on the password box.
-            onClick={() => {
-              void fetch("/api/logout", { method: "POST" }).finally(() => window.location.reload());
-            }}
-            title="Sign out"
-            aria-label="Sign out"
-          >
-            <LogOutIcon className="size-4" />
-          </button>
-        )}
       </div>
     </aside>
   );

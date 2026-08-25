@@ -1,5 +1,9 @@
 import React from "react";
+import { LogOutIcon } from "lucide-react";
 import { AppStatus } from "../lib/types";
+
+// Only the served build has a session to end; the desktop window has no door.
+const served = Boolean((window as unknown as Record<string, unknown>).superaiServed);
 
 export default function StatusBar({
   status,
@@ -51,6 +55,20 @@ export default function StatusBar({
         >
           {theme === "dark" ? "☀️" : "🌙"}
         </button>
+        {served && (
+          <button
+            className="theme-toggle sign-out"
+            // Reload rather than route: the cookie is gone, so the shell asks
+            // /api/session on the way back up and lands on the password box.
+            onClick={() => {
+              void fetch("/api/logout", { method: "POST" }).finally(() => window.location.reload());
+            }}
+            title="Sign out"
+            aria-label="Sign out"
+          >
+            <LogOutIcon className="size-4" />
+          </button>
+        )}
       </div>
     </div>
   );
