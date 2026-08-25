@@ -29,10 +29,19 @@ export default function SchedulesView({
   status,
   log,
   onOpenConversation,
+  embedded = false,
+  onCount,
 }: {
   status: AppStatus | null;
   log: ScheduleRunLog;
   onOpenConversation: (session: string) => void;
+  /** Rendered as a tab inside Records: drop the page chrome, keep the actions.
+   *  The tab and the page around it already say what this is. */
+  embedded?: boolean;
+  /** Report the list length so the tab that holds this can count it. Only the
+   *  scheduler knows the real number; Life() reports its own view of the same
+   *  thing and the two would drift. */
+  onCount?: (n: number) => void;
 }) {
   const [list, setList] = useState<agent.ScheduledPrompt[]>([]);
   const [loading, setLoading] = useState(true);
@@ -90,6 +99,10 @@ export default function SchedulesView({
     refreshedFor.current = newestRun;
     load();
   }, [newestRun, load]);
+
+  useEffect(() => {
+    onCount?.(list.length);
+  }, [list.length, onCount]);
 
   const canCreate = prompt.trim() !== "" && !saving;
 
@@ -169,41 +182,33 @@ export default function SchedulesView({
   // reporting it cannot produce a false alarm here.
   const schedulerDown = status !== null && status.ready && !status.scheduler;
 
-  return (
-    <div className="view">
-      <div className="view-header with-action">
-        <div>
-          <div className="view-title">Schedules{list.length > 0 ? ` (${list.length})` : ""}</div>
-          <div className="view-desc">
-            Prompts SuperAI runs on a clock, without being asked — “every morning at eight, work out
-            my stock returns and message me”.
-          </div>
-        </div>
-        <div className="vh-actions">
-          <button
-            className="btn ghost sm"
-            onClick={() => {
-              setFresh("");
-              setComposing((v) => !v);
-            }}
-          >
-            {composing ? "Close" : "+ New schedule"}
-          </button>
-          {/* Wrapped rather than passed directly: onClick would hand load()
-              the click event as its `quiet` argument. */}
-          <button className="btn ghost sm" onClick={() => load()} disabled={loading}>
-            {loading ? (
-              <>
-                <span className="spinner" style={{ borderTopColor: "var(--text-1)" }} /> Loading…
-              </>
-            ) : (
-              "↻ Refresh"
-            )}
-          </button>
-        </div>
-      </div>
+  const actions = (
+    <div className="vh-actions">
+      <button
+        className="btn ghost sm"
+        onClick={() => {
+          setFresh("");
+          setComposing((v) => !v);
+        }}
+      >
+        {composing ? "Close" : "+ New schedule"}
+      </button>
+      {/* Wrapped rather than passed directly: onClick would hand load()
+          the click event as its `quiet` argument. */}
+      <button className="btn ghost sm" onClick={() => load()} disabled={loading}>
+        {loading ? (
+          <>
+            <span className="spinner" style={{ borderTopColor: "var(--text-1)" }} /> Loading…
+          </>
+        ) : (
+          "↻ Refresh"
+        )}
+      </button>
+    </div>
+  );
 
-      <div className="panel-scroll">
+  const body = (
+    <>
         {composing && (
           <div className="card" style={{ marginBottom: 14 }}>
             <div className="card-title">New schedule</div>
@@ -421,8 +426,32 @@ export default function SchedulesView({
           </div>
         )}
 
-        <ScheduleRunList log={log} onOpenConversation={onOpenConversation} />
+      <ScheduleRunList log={log} onOpenConversation={onOpenConversation} />
+    </>
+  );
+
+  if (embedded) {
+    return (
+      <>
+        <div className="tab-actions">{actions}</div>
+        {body}
+      </>
+    );
+  }
+
+  return (
+    <div className="view">
+      <div className="view-header with-action">
+        <div>
+          <div className="view-title">Schedules{list.length > 0 ? ` (${list.length})` : ""}</div>
+          <div className="view-desc">
+            Prompts SuperAI runs on a clock, without being asked — “every morning at eight, work out
+            my stock returns and message me”.
+          </div>
+        </div>
+        {actions}
       </div>
+      <div className="panel-scroll">{body}</div>
     </div>
   );
 }

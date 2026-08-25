@@ -963,3 +963,6 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
    and the two must not read as one pair of buttons. */
 .status-pills .sign-out { margin-left: 6px; }
 .status-pills .sign-out:hover { color: var(--red); border-color: var(--red); }
+/* A tab that owns actions (Records → Schedules hosts the real schedules view)
+   puts them at the top right of the panel, where the page-level actions sit. */
+.tab-actions { display: flex; justify-content: flex-end; margin-bottom: 12px; }

@@ -1,6 +1,5 @@
 export type ViewKey =
   | "chat"
-  | "schedules"
   | "settings"
   | "avatar"
   | "memory"

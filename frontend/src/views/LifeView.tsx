@@ -1,6 +1,9 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Life } from "../../wailsjs/go/main/App";
 import { backend } from "../../wailsjs/go/models";
+import { AppStatus } from "../lib/types";
+import { ScheduleRunLog } from "../lib/useScheduleRuns";
+import SchedulesView from "./SchedulesView";
 
 type TabKey = "schedules" | "records" | "persons" | "reminders";
 
@@ -91,11 +94,23 @@ function InlineEmpty({ icon, hint }: { icon: string; hint: string }) {
   );
 }
 
-export default function LifeView() {
+export default function LifeView({
+  status,
+  log,
+  onOpenConversation,
+}: {
+  status: AppStatus | null;
+  log: ScheduleRunLog;
+  onOpenConversation: (session: string) => void;
+}) {
   const [data, setData] = useState<backend.LifeData | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string>("");
   const [tab, setTab] = useState<TabKey>("schedules");
+  // The scheduler's own count, reported by the view that owns it. Life() has a
+  // schedules field too, but it is a second answer to the same question and the
+  // two drift.
+  const [scheduleCount, setScheduleCount] = useState(0);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -121,7 +136,7 @@ export default function LifeView() {
   const personEntries = Object.entries(persons);
 
   const count: Record<TabKey, number> = {
-    schedules: schedules.length,
+    schedules: scheduleCount,
     records: records.length,
     persons: personEntries.length,
     reminders: reminders.length,
@@ -145,11 +160,16 @@ export default function LifeView() {
           <div className="view-title">Records</div>
           <div className="view-desc">Schedules, notes, people and reminders SuperAI keeps for you. Edits happen via Chat.</div>
         </div>
-        <div className="vh-actions">
-          <button className="btn ghost sm" onClick={load} disabled={loading}>
-            {loading ? <><span className="spinner" style={{ borderTopColor: "var(--text-1)" }} /> Loading…</> : "↻ Refresh"}
-          </button>
-        </div>
+        {/* The Schedules tab reloads itself from the scheduler and has its own
+            button. Showing this one too would stack two Refreshes that refresh
+            different things. */}
+        {tab !== "schedules" && (
+          <div className="vh-actions">
+            <button className="btn ghost sm" onClick={load} disabled={loading}>
+              {loading ? <><span className="spinner" style={{ borderTopColor: "var(--text-1)" }} /> Loading…</> : "↻ Refresh"}
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="tabs">
@@ -170,7 +190,15 @@ export default function LifeView() {
         )}
         {!err && data && (
           <>
-            {tab === "schedules" && renderArrayTab(schedules, "schedules", "📅")}
+            {tab === "schedules" && (
+              <SchedulesView
+                embedded
+                status={status}
+                log={log}
+                onOpenConversation={onOpenConversation}
+                onCount={setScheduleCount}
+              />
+            )}
             {tab === "records" && renderArrayTab(records, "records", "📝")}
             {tab === "reminders" && renderArrayTab(reminders, "reminders", "⏰")}
             {tab === "persons" &&

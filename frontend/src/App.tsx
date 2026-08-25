@@ -9,7 +9,6 @@ import SkillsView from "./views/SkillsView";
 import MCPView from "./views/MCPView";
 import DataView from "./views/DataView";
 import LifeView from "./views/LifeView";
-import SchedulesView from "./views/SchedulesView";
 import { ScheduleRunToasts } from "./components/ScheduleRuns";
 import { AppStatus, ViewKey, normalizeStatus } from "./lib/types";
 import { useScheduleRuns } from "./lib/useScheduleRuns";
@@ -74,7 +73,7 @@ export default function App() {
   return (
     <>
       <div className="app">
-        <Sidebar current={view} onNavigate={setView} badges={{ schedules: runs.unseen }} />
+        <Sidebar current={view} onNavigate={setView} badges={{ life: runs.unseen }} />
         <div className="main">
           <StatusBar status={status} loading={loading} theme={theme} onToggleTheme={toggleTheme} />
           <div className="content">
@@ -85,22 +84,21 @@ export default function App() {
                 onSessionOpened={() => setPendingSession("")}
               />
             )}
-            {view === "schedules" && (
-              <SchedulesView status={status} log={runs} onOpenConversation={openConversation} />
-            )}
             {view === "settings" && <SettingsView onSaved={refreshStatus} />}
             {view === "avatar" && <AvatarView status={status} />}
             {view === "memory" && <MemoryView />}
             {view === "skills" && <SkillsView />}
             {view === "mcp" && <MCPView />}
             {view === "data" && <DataView />}
-            {view === "life" && <LifeView />}
+            {view === "life" && (
+              <LifeView status={status} log={runs} onOpenConversation={openConversation} />
+            )}
           </div>
         </div>
       </div>
-      {/* The Schedules view lists the same runs, so a toast there would only
-          repeat what is already on screen. */}
-      {view !== "schedules" && (
+      {/* Records lists the same runs, so a toast there would only repeat what
+          is already on screen. */}
+      {view !== "life" && (
         <ScheduleRunToasts log={runs} onOpenConversation={openConversation} />
       )}
     </>
