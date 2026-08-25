@@ -67,13 +67,18 @@ func (s *Service) Life() LifeData {
 		return LifeData{Persons: map[string]map[string]any{}}
 	}
 	s.store.mu.Lock()
-	defer s.store.mu.Unlock()
-	return LifeData{
+	data := LifeData{
 		Schedules: append([]map[string]any(nil), s.store.Schedules...),
 		Records:   append([]map[string]any(nil), s.store.Records...),
 		Persons:   s.store.Persons,
 		Reminders: append([]map[string]any(nil), s.store.Reminders...),
 	}
+	s.store.mu.Unlock()
+	// Outside the lock: reconciling asks the scheduler, and holding the store
+	// while calling into it is how two locks become one deadlock. See
+	// reminder_once.go for why the reminder rows need reconciling at all.
+	data.Reminders = s.reconcileReminders(data.Reminders)
+	return data
 }
 
 // MemoryRecall queries long-term memory and returns the formatted recall context

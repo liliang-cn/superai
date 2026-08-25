@@ -819,7 +819,7 @@ func (s *Service) registerLifeTools() {
 			if held := s.claims.claim(title, plan.Cron); held != nil {
 				return errResult(duplicateScheduleMessage(held)), nil
 			}
-			task, err := sch.Schedule(ReminderPrompt(title), plan.Cron, "提醒："+title, "reminders")
+			task, err := sch.Schedule(ReminderPrompt(title), plan.Cron, reminderNote(title, plan.OneShot), "reminders")
 			if err != nil {
 				s.claims.release(title)
 				return errResult(err.Error()), nil
@@ -842,9 +842,11 @@ func (s *Service) registerLifeTools() {
 			db.mu.Unlock()
 			db.save()
 			if plan.OneShot {
-				// Said plainly rather than hidden: cron cannot express "once", so
-				// the user should know this will come back next year.
-				data["note"] = "cron 无法表达「只一次」，这条会每年同一天重复；不需要时删掉它。"
+				// cron cannot say "once", so this is stored as the same day every
+				// year and removed as soon as it has fired — see reminder_once.go.
+				// Said plainly because a reminder that deletes itself is a
+				// surprise if you go looking for it afterwards.
+				data["note"] = "这条只响一次，响过就会自动删除。"
 			}
 			return okData(data), nil
 		}, write)
@@ -860,6 +862,10 @@ func (s *Service) registerLifeTools() {
 			"cron":         sp("Five-field cron. Daily at 08:00 `0 8 * * *`; weekdays at 09:00 `0 9 * * 1-5`; every four hours `0 */4 * * *`; the 1st at 09:00 `0 9 1 * *`"),
 			"name":         sp("Optional label for the list; defaults to the prompt"),
 			"conversation": sp("Optional conversation the runs append to; blank shares one called scheduled"),
+			"once": map[string]any{
+				"type":        "boolean",
+				"description": "True when the user named one specific moment rather than a repeating cadence. cron cannot say \"once\", so a single moment has to be stored as that day every year; with this set the schedule is deleted as soon as it has fired, instead of coming back a year later.",
+			},
 		}, "prompt", "cron"),
 		func(ctx context.Context, a map[string]any) (any, error) {
 			prompt := strings.TrimSpace(str(a, "prompt"))
@@ -878,14 +884,22 @@ func (s *Service) registerLifeTools() {
 			if held := s.claims.claim(prompt, strings.TrimSpace(str(a, "cron"))); held != nil {
 				return errResult(duplicateScheduleMessage(held)), nil
 			}
+			once, _ := a["once"].(bool)
+			label := strings.TrimSpace(str(a, "name"))
+			if label == "" {
+				label = prompt
+			}
 			task, err := sch.Schedule(prompt, strings.TrimSpace(str(a, "cron")),
-				strings.TrimSpace(str(a, "name")), strings.TrimSpace(str(a, "conversation")))
+				markOneShot(label, once), strings.TrimSpace(str(a, "conversation")))
 			if err != nil {
 				s.claims.release(prompt)
 				return errResult(err.Error()), nil
 			}
 			s.claims.record(prompt, task.ID, task.Schedule)
 			data := map[string]any{"id": task.ID, "prompt": prompt, "schedule": task.Schedule}
+			if once {
+				data["note"] = "这条只响一次，响过就会自动删除。"
+			}
 			// The next run is the only part a person can check against what they
 			// meant. A cron they cannot read is not a confirmation.
 			if task.NextRun != nil {
@@ -897,8 +911,9 @@ func (s *Service) registerLifeTools() {
 	svc.AddToolWithMetadata("list_reminders", "列出全部提醒。", obj(map[string]any{}),
 		func(ctx context.Context, a map[string]any) (any, error) {
 			db.mu.Lock()
-			defer db.mu.Unlock()
-			return okData(db.Reminders), nil
+			rows := append([]map[string]any(nil), db.Reminders...)
+			db.mu.Unlock()
+			return okData(s.reconcileReminders(rows)), nil
 		}, read)
 }
 

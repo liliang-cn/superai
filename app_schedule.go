@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/google/uuid"
@@ -132,6 +133,24 @@ func (a *App) onScheduledRun(run agent.PromptRun) {
 		"startedAt":  run.StartedAt.Format("2006-01-02 15:04:05"),
 		"durationMs": run.Duration.Milliseconds(),
 	})
+
+	// A reminder for one moment is done once it has fired. Deleted off the
+	// scheduler's goroutine so the list is not modified while it is being
+	// walked, and after the emit so the report of the run never waits on it.
+	// A cancelled run has not fired, so it keeps its schedule.
+	if !run.Cancelled {
+		a.mu.Lock()
+		svc := a.svc
+		a.mu.Unlock()
+		if svc != nil {
+			prompt := run.Prompt
+			go func() {
+				if n := svc.DropFinishedOneShots(prompt); n > 0 {
+					log.Printf("superai: removed %d one-shot reminder(s) after firing", n)
+				}
+			}()
+		}
+	}
 
 	// No banner for a stop: the user was at the machine — they pressed the
 	// button — so a system notification telling them what they just did is
