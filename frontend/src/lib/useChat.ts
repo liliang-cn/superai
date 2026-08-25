@@ -199,6 +199,19 @@ export function useChat(): UseChatResult {
     [patchMessage],
   );
 
+/**
+ * One line for a rejected draft, out of the lint's own words.
+ *
+ * The lint's reason is written TO THE MODEL — "you never called it", "call it
+ * now and report what it returned". Showing that to a person reads as an
+ * accusation aimed at them. What is worth seeing is that a draft was refused
+ * and by which rule; the rest is between the runtime and the model.
+ */
+function lintRetryLine(content: string | undefined): string {
+  const name = /output lint ([a-z_]+)/i.exec(content ?? "")?.[1];
+  return name ? `Draft answer rejected by ${name} — retrying` : "Draft answer rejected — retrying";
+}
+
   const applyEvent = useCallback(
     (askId: string, ev: ChatEvent) => {
       switch (ev.type) {
@@ -277,6 +290,18 @@ export function useChat(): UseChatResult {
           break;
         }
         case "workflow_error": {
+          // Not every workflow_error ends the run. agent-go emits a rejected
+          // draft answer with debugType "lint_retry" — the output lint refused
+          // what the model was about to say, the model is being re-prompted,
+          // and the run carries on and usually succeeds. Treating it as fatal
+          // stapled a red error box under a correct answer: the model claimed
+          // it had created a schedule without calling the tool, the lint made
+          // it actually call the tool, and the user was shown the machinery
+          // arguing with itself as if their request had failed.
+          if (ev.debugType === "lint_retry") {
+            pushProgress(askId, { kind: "state", text: lintRetryLine(ev.content) });
+            break;
+          }
           finishAsk(askId, { error: ev.content || "workflow error" });
           break;
         }
