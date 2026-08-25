@@ -24,6 +24,8 @@ import (
 	"sync"
 	"time"
 	"unicode"
+
+	"github.com/liliang-cn/agent-go/v3/pkg/agent"
 )
 
 // scheduleClaimWindow is how long one subject stays claimed.
@@ -132,6 +134,44 @@ func sharesRun(a, b string, n int) bool {
 	return false
 }
 
+// alreadyScheduled reports a live schedule that is the same job as subject.
+//
+// The claim above only spans ninety seconds of one process's memory, which
+// turned out to be most of a guard and not all of one. It cannot see the same
+// request asked again eight minutes later, and it cannot see anything at all
+// across a restart — a deploy in the afternoon wiped it, and the evening's
+// "remind me about the Tuesday meeting" wrote a third row beside the two from
+// lunchtime. What is actually scheduled is the durable answer, so it is what
+// gets asked.
+//
+// Cron is not compared. The failure this exists for produces two rows with
+// *different* cadences for one job — set_reminder can only say "every day" and
+// writes `0 15 * * *` where the user said "every Tuesday" — so requiring the
+// crons to match would let through exactly the case that keeps happening. Two
+// schedules for one subject is the thing being refused, whatever their timing.
+func alreadyScheduled(existing []agent.ScheduledPrompt, subject string) *scheduleClaim {
+	key := scheduleSubjectKey(subject)
+	if key == "" {
+		return nil
+	}
+	for _, s := range existing {
+		// Both are checked because the two tools label a schedule differently:
+		// set_reminder writes a "提醒：…" note over a rewritten prompt, while
+		// schedule_prompt stores what the user said. Either can be the half
+		// that matches.
+		for _, candidate := range []string{s.Note, s.Prompt} {
+			other := scheduleSubjectKey(candidate)
+			if other == "" {
+				continue
+			}
+			if key == other || containsSubject(key, other) || containsSubject(other, key) {
+				return &scheduleClaim{id: s.ID, cron: s.Schedule}
+			}
+		}
+	}
+	return nil
+}
+
 // record attaches the created schedule to a claim already taken.
 func (c *scheduleClaims) record(subject, id, cron string) {
 	key := scheduleSubjectKey(subject)
@@ -204,6 +244,6 @@ func duplicateScheduleMessage(held *scheduleClaim) string {
 		return "Another tool just scheduled this. Do not schedule it again — report the one that exists."
 	}
 	return fmt.Sprintf(
-		"This is already scheduled: id %s, cron %s. Do not schedule it twice — one of two rows for one request is always the wrong one. Tell the user about this one.",
-		held.id, held.cron)
+		"This is already scheduled: id %s, cron %s. Do not schedule it twice — one of two rows for one request is always the wrong one. Tell the user about the one that exists, including its timing so they can see whether it is what they meant. If they want it to run at a different time, delete %s first and then schedule it once.",
+		held.id, held.cron, held.id)
 }

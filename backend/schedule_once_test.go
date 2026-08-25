@@ -1,6 +1,10 @@
 package backend
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/liliang-cn/agent-go/v3/pkg/agent"
+)
 
 // The failure this guard exists for, in the words it actually happened in: one
 // sentence, two tools, two schedules, and the weaker one had silently dropped
@@ -99,5 +103,55 @@ func TestSameMinuteDifferentJobsAreNotMerged(t *testing.T) {
 
 	if held := c.claim("给妈妈打电话", "30 9 * * *"); held != nil {
 		t.Errorf("unrelated job at the same minute was refused: %+v", held)
+	}
+}
+
+// The three rows that were live on 2026-08-25, for one Tuesday meeting.
+//
+// The claim was in memory and ninety seconds wide, so it stopped nothing here:
+// the asks were minutes apart and a deploy restarted the process between them.
+// set_reminder wrote a DAILY schedule for a weekly meeting — wrong six days out
+// of seven — beside two correct weekly ones.
+func TestTheThreeRowsForOneTuesdayMeeting(t *testing.T) {
+	live := []agent.ScheduledPrompt{{
+		ID:       "502b956d",
+		Schedule: "0 15 * * 2",
+		Note:     "Rene Slack 每周例会",
+		Prompt:   "提醒我：现在是奥地利时间 09:00（北京时间 15:00），该和 Rene 在 Slack 上开每周例会了。",
+	}}
+
+	// The wording the second ask produced. A different label, the same job.
+	if held := alreadyScheduled(live, "提醒我：现在是奥地利时间 09:00（北京时间 15:00），该和 Rene 在 Slack 上开每周例会了。"); held == nil {
+		t.Error("a second identical request was allowed to write a third row")
+	} else if held.id != "502b956d" {
+		t.Errorf("refusal named %q, not the schedule that exists", held.id)
+	}
+
+	// set_reminder's version: the same subject under a "提醒：" label, and the
+	// daily cron it fell back to. Cron must not be part of the test, or this —
+	// the wrongest of the three — is the one that gets through.
+	if held := alreadyScheduled(live, "现在是奥地利时间 09:00（北京时间 15:00），该和 Rene 在 Slack 上开每周例会了。"); held == nil {
+		t.Error("the daily fallback was allowed alongside the weekly schedule")
+	}
+}
+
+// A durable check that refused everything would be worse than none: the model
+// would stop being able to schedule anything after the first thing.
+func TestUnrelatedJobsStillSchedule(t *testing.T) {
+	live := []agent.ScheduledPrompt{
+		{ID: "a", Schedule: "0 15 * * 2", Note: "Rene Slack 每周例会", Prompt: "提醒我和 Rene 开会"},
+		{ID: "b", Schedule: "0 3 * * *", Note: "每天备份数据库", Prompt: "每天备份数据库"},
+	}
+	for _, subject := range []string{"给妈妈打电话", "看看昨天的部署有没有问题", "每周备份数据库到异地"} {
+		if held := alreadyScheduled(live, subject); held != nil {
+			t.Errorf("%q was refused because of %+v", subject, held)
+		}
+	}
+}
+
+// Nothing scheduled, nothing to collide with.
+func TestAnEmptyScheduleListBlocksNothing(t *testing.T) {
+	if held := alreadyScheduled(nil, "提醒我交周报"); held != nil {
+		t.Errorf("refused against an empty list: %+v", held)
 	}
 }

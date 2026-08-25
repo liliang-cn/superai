@@ -230,7 +230,7 @@ func NewService(s *Settings) (*Service, error) {
 	out := &Service{
 		svc: svc, sb: sb, settings: s, MemoryMode: memMode, dataDir: cfg.DataDir(),
 		claims: newScheduleClaims(),
-		brain: brain, SuppressedMCPServers: droppedMCP,
+		brain:  brain, SuppressedMCPServers: droppedMCP,
 	}
 
 	// --- Built-in framework tools. ---
@@ -802,14 +802,22 @@ func (s *Service) registerLifeTools() {
 				return errResult(err.Error()), nil
 			}
 
-			// One request, one schedule — see schedule_once.go.
-			if held := s.claims.claim(title, plan.Cron); held != nil {
-				return errResult(duplicateScheduleMessage(held)), nil
-			}
 			sch, err := s.reminderScheduler()
 			if err != nil {
-				s.claims.release(title)
 				return errResult("提醒功能不可用：" + err.Error()), nil
+			}
+			// One request, one schedule — see schedule_once.go. What is already
+			// scheduled is asked first: the in-memory claim below cannot see a
+			// repeat from an hour ago or anything at all from before a restart.
+			// A listing that fails is not a reason to refuse a reminder, so the
+			// claim still stands behind it.
+			if existing, lerr := sch.List(); lerr == nil {
+				if held := alreadyScheduled(existing, title); held != nil {
+					return errResult(duplicateScheduleMessage(held)), nil
+				}
+			}
+			if held := s.claims.claim(title, plan.Cron); held != nil {
+				return errResult(duplicateScheduleMessage(held)), nil
 			}
 			task, err := sch.Schedule(ReminderPrompt(title), plan.Cron, "提醒："+title, "reminders")
 			if err != nil {
@@ -848,9 +856,9 @@ func (s *Service) registerLifeTools() {
 	svc.AddToolWithMetadata("schedule_prompt",
 		"Run a prompt on any cadence: weekdays, every few hours, a day of the month. Use set_reminder instead only when the timing is every day at HH:MM, or one specific moment. Never call both for one request.",
 		obj(map[string]any{
-			"prompt": sp("The instruction to run when it fires, written as you would type it into chat"),
-			"cron":   sp("Five-field cron. Daily at 08:00 `0 8 * * *`; weekdays at 09:00 `0 9 * * 1-5`; every four hours `0 */4 * * *`; the 1st at 09:00 `0 9 1 * *`"),
-			"name":   sp("Optional label for the list; defaults to the prompt"),
+			"prompt":       sp("The instruction to run when it fires, written as you would type it into chat"),
+			"cron":         sp("Five-field cron. Daily at 08:00 `0 8 * * *`; weekdays at 09:00 `0 9 * * 1-5`; every four hours `0 */4 * * *`; the 1st at 09:00 `0 9 1 * *`"),
+			"name":         sp("Optional label for the list; defaults to the prompt"),
 			"conversation": sp("Optional conversation the runs append to; blank shares one called scheduled"),
 		}, "prompt", "cron"),
 		func(ctx context.Context, a map[string]any) (any, error) {
@@ -858,13 +866,17 @@ func (s *Service) registerLifeTools() {
 			if prompt == "" {
 				return errResult("prompt is required"), nil
 			}
-			if held := s.claims.claim(prompt, strings.TrimSpace(str(a, "cron"))); held != nil {
-				return errResult(duplicateScheduleMessage(held)), nil
-			}
 			sch, err := s.reminderScheduler()
 			if err != nil {
-				s.claims.release(prompt)
 				return errResult("定时功能不可用：" + err.Error()), nil
+			}
+			if existing, lerr := sch.List(); lerr == nil {
+				if held := alreadyScheduled(existing, prompt); held != nil {
+					return errResult(duplicateScheduleMessage(held)), nil
+				}
+			}
+			if held := s.claims.claim(prompt, strings.TrimSpace(str(a, "cron"))); held != nil {
+				return errResult(duplicateScheduleMessage(held)), nil
 			}
 			task, err := sch.Schedule(prompt, strings.TrimSpace(str(a, "cron")),
 				strings.TrimSpace(str(a, "name")), strings.TrimSpace(str(a, "conversation")))
