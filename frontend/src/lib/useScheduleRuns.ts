@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EventsOn } from "../../wailsjs/runtime";
+import { notifyRun } from "./notify";
+import { firstLine } from "./format";
 
 /** One finished scheduled run, as the backend reports it. */
 export interface ScheduleRun {
@@ -58,8 +60,12 @@ let counter = 0;
  * no schedule id, and a run whose schedule was deleted mid-flight still happened
  * and still needs reporting.
  */
-export function useScheduleRuns(): ScheduleRunLog {
+export function useScheduleRuns(onOpenConversation?: (session: string) => void): ScheduleRunLog {
   const [runs, setRuns] = useState<ScheduleRunEntry[]>([]);
+  // Held in a ref so the listener is registered once. Re-registering on every
+  // render of the caller would drop events in the gap.
+  const open = useRef(onOpenConversation);
+  open.current = onOpenConversation;
 
   useEffect(() => {
     // The Wails runtime only exists inside the desktop webview; guard so the SPA
@@ -82,6 +88,18 @@ export function useScheduleRuns(): ScheduleRunLog {
         dismissed: false,
       };
       setRuns((prev) => [entry, ...prev].slice(0, KEEP));
+      // A banner as well as the toast, for the case the toast cannot cover:
+      // the tab is behind something. notifyRun stays quiet when the page is
+      // visible, so this never doubles up on what is already on screen.
+      notifyRun(
+        {
+          key: entry.key,
+          title: entry.error !== "" ? "定时任务失败" : "SuperAI",
+          body: firstLine(entry.answer || entry.error || entry.prompt, 140),
+          session: entry.session,
+        },
+        (session) => open.current?.(session),
+      );
     });
     return () => off();
   }, []);

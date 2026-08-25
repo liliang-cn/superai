@@ -24,12 +24,20 @@ export default function App() {
   const [theme, setTheme] = useState<Theme>(
     () => (localStorage.getItem("superai-theme") as Theme) || "dark"
   );
-  // Scheduled runs are listened for here, not in the Schedules view: a timer
-  // fires while the user is somewhere else, which is the whole point of a timer.
-  const runs = useScheduleRuns();
   // The conversation a run belongs to, handed to the chat view to open. Cleared
   // as soon as it has been taken so asking for the same one twice works.
   const [pendingSession, setPendingSession] = useState("");
+
+  const openConversation = useCallback((session: string) => {
+    if (!session) return;
+    setPendingSession(session);
+    setView("chat");
+  }, []);
+
+  // Scheduled runs are listened for here, not in the Schedules view: a timer
+  // fires while the user is somewhere else, which is the whole point of a timer.
+  // The opener goes with it so a clicked notification lands in the right place.
+  const runs = useScheduleRuns(openConversation);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -46,12 +54,6 @@ export default function App() {
     () => setTheme((t) => (t === "dark" ? "light" : "dark")),
     []
   );
-
-  const openConversation = useCallback((session: string) => {
-    if (!session) return;
-    setPendingSession(session);
-    setView("chat");
-  }, []);
 
   const refreshStatus = useCallback(async () => {
     try {

@@ -14,6 +14,7 @@ import { describeCron } from "../lib/cron";
 import { firstLine, formatStamp, fromNow, parseTime } from "../lib/format";
 import { ScheduleRunLog } from "../lib/useScheduleRuns";
 import { ScheduleRunList } from "../components/ScheduleRuns";
+import { notifyPermission, requestNotifyPermission } from "../lib/notify";
 
 type Note = { kind: "ok" | "err"; text: string } | null;
 
@@ -55,6 +56,10 @@ export default function SchedulesView({
   const [busy, setBusy] = useState("");
   const [confirmDelete, setConfirmDelete] = useState("");
   const [fresh, setFresh] = useState("");
+  // Whether this browser will draw a banner when a run finishes while the page
+  // is in the background. Read once: it only changes when the button below is
+  // pressed, or in browser settings, which reloads anyway.
+  const [banners, setBanners] = useState(notifyPermission);
 
   const load = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true);
@@ -184,6 +189,18 @@ export default function SchedulesView({
 
   const actions = (
     <div className="vh-actions">
+      {/* Asked for from a click, never on load: an unprompted permission
+          dialog is what teaches people to press "block", and a blocked
+          notification cannot be asked for again from script. */}
+      {banners === "default" && (
+        <button
+          className="btn ghost sm"
+          title="Show a system notification when a scheduled run finishes while this tab is in the background"
+          onClick={async () => setBanners(await requestNotifyPermission())}
+        >
+          🔔 Enable notifications
+        </button>
+      )}
       <button
         className="btn ghost sm"
         onClick={() => {
@@ -249,6 +266,13 @@ export default function SchedulesView({
                 <span className="save-note">Say what should happen, and when.</span>
               )}
             </div>
+          </div>
+        )}
+
+        {banners === "denied" && (
+          <div className="save-note" style={{ display: "block", marginBottom: 12 }}>
+            通知被浏览器挡住了。定时任务照常运行，但页面在后台时不会弹提示 —— 要开的话，
+            在地址栏左边的站点设置里把「通知」改成允许。
           </div>
         )}
 
