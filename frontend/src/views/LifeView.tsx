@@ -6,14 +6,14 @@ type TabKey = "schedules" | "records" | "persons" | "reminders";
 
 const TABS: { key: TabKey; label: string; icon: string }[] = [
   { key: "schedules", label: "Schedules", icon: "📅" },
-  { key: "records", label: "Records", icon: "📝" },
-  { key: "persons", label: "Persons", icon: "👤" },
+  { key: "records", label: "Notes", icon: "📝" },
+  { key: "persons", label: "People", icon: "👤" },
   { key: "reminders", label: "Reminders", icon: "⏰" },
 ];
 
 const EMPTY_HINT: Record<TabKey, string> = {
   schedules: "No schedules yet — ask SuperAI in Chat to add one.",
-  records: "No records yet — ask SuperAI in Chat to keep notes for you.",
+  records: "No notes yet — ask SuperAI in Chat to keep notes for you.",
   persons: "No people yet — mention someone in Chat and SuperAI will remember them.",
   reminders: "No reminders yet — ask SuperAI in Chat to remind you of something.",
 };
@@ -142,8 +142,8 @@ export default function LifeView() {
     <div className="view">
       <div className="view-header with-action">
         <div>
-          <div className="view-title">Life</div>
-          <div className="view-desc">Schedules, records, people and reminders SuperAI keeps for you. Edits happen via Chat.</div>
+          <div className="view-title">Records</div>
+          <div className="view-desc">Schedules, notes, people and reminders SuperAI keeps for you. Edits happen via Chat.</div>
         </div>
         <div className="vh-actions">
           <button className="btn ghost sm" onClick={load} disabled={loading}>
