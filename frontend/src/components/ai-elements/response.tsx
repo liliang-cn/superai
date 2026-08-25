@@ -2,7 +2,14 @@ import { cn } from "@/lib/utils";
 import { memo } from "react";
 import type { ComponentProps } from "react";
 import { AIRenderer } from "@ai-gui/react";
-import { APP_LOCALE, nodeRenderers, plugins, registry, useThemeName } from "@/lib/aigui";
+import {
+  APP_LOCALE,
+  normalizeOneLineBlocks,
+  nodeRenderers,
+  plugins,
+  registry,
+  useThemeName,
+} from "@/lib/aigui";
 
 type ResponseProps = ComponentProps<"div"> & {
   children: string;
@@ -17,6 +24,9 @@ type ResponseProps = ComponentProps<"div"> & {
  * AIRenderer is controlled by `text`: handing it the full string on every
  * update lets it push just the delta, which is exactly the shape useChat keeps
  * a streaming message in.
+ *
+ * The text is repaired on the way in — see normalizeOneLineBlocks. Every place
+ * assistant output is shown goes through here, so the repair happens once.
  */
 export const Response = memo(
   ({ className, children, ...props }: ResponseProps) => {
@@ -31,7 +41,7 @@ export const Response = memo(
       >
         <AIRenderer
           className="md"
-          text={children}
+          text={normalizeOneLineBlocks(children)}
           registry={registry}
           plugins={plugins}
           nodeRenderers={nodeRenderers}
