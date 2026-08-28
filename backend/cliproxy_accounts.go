@@ -1,12 +1,17 @@
 package backend
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 )
 
 // CLIProxyAccount is one signed-in provider credential. Tokens are deliberately
@@ -83,34 +88,77 @@ func (p *CLIProxy) Accounts() ([]CLIProxyAccount, error) {
 // other field untouched. The proxy's watcher reloads the file, so the account's
 // models leave or rejoin the catalog without a restart.
 func (p *CLIProxy) SetAccountDisabled(file string, disabled bool) error {
-	path, err := p.authFilePath(file)
-	if err != nil {
+	// Name-checked first, so a caller that tries to escape the auth dir is
+	// refused here rather than by the proxy — same answer, and it still holds
+	// when the proxy is not reachable.
+	if _, err := p.authFilePath(file); err != nil {
 		return err
 	}
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		return err
-	}
-	var doc map[string]any
-	if err := json.Unmarshal(raw, &doc); err != nil {
-		return fmt.Errorf("parse %s: %w", file, err)
-	}
-	doc["disabled"] = disabled
-
-	updated, err := json.MarshalIndent(doc, "", "  ")
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(path, updated, 0o600)
+	return p.mgmtRequest(http.MethodPatch, "/v0/management/auth-files/status", nil,
+		map[string]any{"name": file, "disabled": disabled})
 }
 
 // RemoveAccount deletes a credential — signing that provider account out.
 func (p *CLIProxy) RemoveAccount(file string) error {
-	path, err := p.authFilePath(file)
+	if _, err := p.authFilePath(file); err != nil {
+		return err
+	}
+	return p.mgmtRequest(http.MethodDelete, "/v0/management/auth-files",
+		url.Values{"name": []string{file}}, nil)
+}
+
+// mgmtRequest calls the proxy's management API on this loopback instance.
+//
+// Every credential change goes through here rather than through the auth
+// directory. The proxy owns those files while it is running — it reloads them,
+// refreshes tokens into them, and writes its in-memory record back over
+// anything it did not do itself — so a direct edit is a race the editor
+// usually loses, silently.
+func (p *CLIProxy) mgmtRequest(method, path string, query url.Values, body any) error {
+	if p == nil {
+		return fmt.Errorf("cliproxy not running")
+	}
+	var payload io.Reader
+	if body != nil {
+		encoded, err := json.Marshal(body)
+		if err != nil {
+			return err
+		}
+		payload = bytes.NewReader(encoded)
+	}
+
+	endpoint := fmt.Sprintf("http://127.0.0.1:%d%s", p.port, path)
+	if len(query) > 0 {
+		endpoint += "?" + query.Encode()
+	}
+	req, err := http.NewRequest(method, endpoint, payload)
 	if err != nil {
 		return err
 	}
-	return os.Remove(path)
+	req.Header.Set("Authorization", "Bearer "+p.mgmtKey)
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+
+	resp, err := (&http.Client{Timeout: 15 * time.Second}).Do(req)
+	if err != nil {
+		return fmt.Errorf("cliproxy management %s %s: %w", method, path, err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 8<<10))
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		// The body carries the proxy's own reason ("auth file not found", "invalid
+		// management key"); passing it through is the difference between a
+		// number and something a person can act on.
+		var reported struct {
+			Error string `json:"error"`
+		}
+		if json.Unmarshal(raw, &reported) == nil && reported.Error != "" {
+			return fmt.Errorf("cliproxy management %s %s: %s", method, path, reported.Error)
+		}
+		return fmt.Errorf("cliproxy management %s %s: %s", method, path, resp.Status)
+	}
+	return nil
 }
 
 // authFilePath resolves a UI-supplied file name inside the auth dir, refusing

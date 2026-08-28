@@ -17,6 +17,7 @@ import (
 
 	"github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy"
 	cpaconfig "github.com/router-for-me/CLIProxyAPI/v6/sdk/config"
+	"golang.org/x/crypto/bcrypt"
 
 	// Registers every built-in request/response translator. Without this the
 	// proxy forwards payloads to the provider untranslated — an OpenAI
@@ -38,6 +39,10 @@ type CLIProxy struct {
 	cfgPath string
 	port    int
 	key     string
+	// mgmtKey is the plaintext management secret. The config holds only its
+	// bcrypt hash, so this is the only copy that can be presented as a
+	// credential — see mgmtRequest.
+	mgmtKey string
 
 	svc    *cliproxy.Service
 	cancel context.CancelFunc
@@ -112,6 +117,33 @@ func StartCLIProxy(port int) (*CLIProxy, error) {
 		logrus.SetLevel(logrus.WarnLevel)
 	}
 
+	// Turn on the proxy's own management API, on this loopback instance only.
+	//
+	// It is how account changes stop fighting the proxy. Editing the auth JSON
+	// on disk looks like it works and is then quietly undone: the proxy holds
+	// those credentials in memory, and its own persistence writes the record it
+	// already had back over the edit. Disabling an account reverted about one
+	// time in five, and the same write is what a reader catches mid-truncate.
+	// Routed through the management API instead, the proxy is the single writer
+	// and applies the change to the record and the file together.
+	//
+	// The secret is generated per process and never written to the config: the
+	// file gets the bcrypt hash the middleware compares against, and the
+	// plaintext stays in memory. Nothing outside this process can present it,
+	// and nothing is left behind for the next one to find.
+	mgmtKey, kerr := randomKey()
+	if kerr != nil {
+		return nil, kerr
+	}
+	hashed, herr := bcrypt.GenerateFromPassword([]byte(mgmtKey), bcrypt.DefaultCost)
+	if herr != nil {
+		return nil, fmt.Errorf("hash management key: %w", herr)
+	}
+	cfg.RemoteManagement.SecretKey = string(hashed)
+	// Loopback only. AllowRemote stays off, so the middleware refuses any
+	// caller that is not 127.0.0.1 whatever it presents.
+	cfg.RemoteManagement.AllowRemote = false
+
 	svc, err := cliproxy.NewBuilder().
 		WithConfig(cfg).
 		WithConfigPath(cfgPath).
@@ -125,6 +157,7 @@ func StartCLIProxy(port int) (*CLIProxy, error) {
 		cfgPath: cfgPath,
 		port:    port,
 		key:     cfg.APIKeys[0],
+		mgmtKey: mgmtKey,
 		svc:     svc,
 		done:    make(chan struct{}),
 	}
