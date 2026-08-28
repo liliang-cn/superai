@@ -143,6 +143,13 @@ func NewService(s *Settings) (*Service, error) {
 	if err := os.MkdirAll(cfg.DataDir(), 0o755); err != nil {
 		return nil, fmt.Errorf("mkdir data dir: %w", err)
 	}
+	// Must run before the agent is built: that is when agent-go reads the
+	// embedding pool out of agentgo.db, and settings.json is not one of its
+	// sources. Never fatal — embeddings are an enhancement, and refusing to
+	// start over one would be worse than starting without it.
+	if err := syncEmbeddingProvider(cfg, s); err != nil {
+		log.Printf("superai: embedding settings not applied to the pool: %v", err)
+	}
 	if err := os.MkdirAll(s.WorkspaceDir, 0o755); err != nil {
 		log.Printf("superai: mkdir workspace: %v", err)
 	}

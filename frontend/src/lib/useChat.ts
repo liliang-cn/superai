@@ -13,6 +13,31 @@ import {
 } from "./types";
 import { visibleAnswer } from "./format";
 
+/**
+ * Where the id of the conversation on screen is kept across reloads.
+ *
+ * The server keeps running a turn whether or not a tab is watching it, but a
+ * reload used to open an empty new session, so a long task looked lost and the
+ * only way back was to recognise your own question in the history list.
+ */
+const LAST_SESSION_KEY = "superai.lastSession";
+
+function rememberSession(id: string): void {
+  try {
+    window.localStorage.setItem(LAST_SESSION_KEY, id);
+  } catch {
+    /* private windows and blocked storage are not a reason to fail a chat */
+  }
+}
+
+function recallSession(): string {
+  try {
+    return window.localStorage.getItem(LAST_SESSION_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+
 let sessionCounter = 0;
 function makeId(): string {
   try {
@@ -503,6 +528,8 @@ function lintRetryLine(content: string | undefined): string {
       // sibling that is still running.
       setTrace((prev) => prev.filter((t) => running.current.has(t.askId)));
       setMessages((prev) => [...prev, userMsg, assistantMsg]);
+      // A session becomes worth restoring once it has been asked something.
+      rememberSession(sessionId);
       try {
         const requestId = await SendChat(sessionId, trimmed, imagePaths);
         if (requestId) {
@@ -588,12 +615,31 @@ function lintRetryLine(content: string | undefined): string {
       );
       setTrace([]);
       setSessionId(id);
+      rememberSession(id);
     },
     [detachAll],
   );
 
+  // Restore the conversation that was on screen before the reload. Only the
+  // transcript comes back: a turn still running on the server keeps running and
+  // lands in history when it finishes, which beats showing an empty page and
+  // implying the work was lost.
+  const restored = useRef(false);
+  useEffect(() => {
+    if (restored.current) return;
+    restored.current = true;
+    const previous = recallSession();
+    if (!previous || previous === sessionId) return;
+    void loadSession(previous).catch(() => {
+      /* a session the server no longer has just leaves the new empty one */
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const newSession = useCallback(() => {
-    setSessionId(makeId());
+    const id = makeId();
+    setSessionId(id);
+    rememberSession(id);
     reset();
   }, [reset]);
 
