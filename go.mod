@@ -5,8 +5,8 @@ go 1.26.0
 require (
 	github.com/JohannesKaufmann/html-to-markdown/v2 v2.5.0
 	github.com/google/uuid v1.6.0
-	github.com/liliang-cn/agent-go/v3 v3.8.2
-	github.com/liliang-cn/cortexdb/v2 v2.72.2
+	github.com/liliang-cn/agent-go/v3 v3.10.0
+	github.com/liliang-cn/cortexdb/v2 v2.82.2
 	github.com/modelcontextprotocol/go-sdk v1.6.1
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/router-for-me/CLIProxyAPI/v6 v6.10.9
