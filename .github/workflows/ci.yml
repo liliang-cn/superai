@@ -28,6 +28,20 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # main.go embeds all:frontend/dist, and dist is gitignored — so on a
+      # fresh checkout the Go code does not compile until the bundle exists.
+      # Not a CI quirk: it is the same coupling a new contributor hits, and the
+      # reason this job is not purely Go.
+      - name: build the bundle Go embeds
+        working-directory: frontend
+        run: npm ci && npm run build
+
       # Formatting is a gate rather than a suggestion. It is only worth having
       # as one because the repo is clean: a check with a permanent exception in
       # it teaches people to ignore the check.
@@ -116,5 +130,10 @@ jobs:
       - name: wails
         run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.15.0
 
+      # -tags webkit2_41 because wails defaults to pkg-config'ing
+      # webkit2gtk-4.0, which Ubuntu no longer ships; 4.1 is what is installed
+      # above. Without the tag the link fails with "Package 'webkit2gtk-4.0'
+      # ... not found", which reads like a missing dependency rather than a
+      # version the build was not told about.
       - name: wails build
-        run: wails build -platform linux/amd64 -skipbindings
+        run: wails build -platform linux/amd64 -skipbindings -tags webkit2_41
