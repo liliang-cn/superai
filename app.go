@@ -50,6 +50,13 @@ type App struct {
 	// for once at startup rather than when a timer fires and nobody is looking.
 	notifyOK bool
 
+	// approvals holds the tool calls currently parked in front of the user.
+	// Its own lock, like runs above and for the same reason: an answer must
+	// not queue behind a rebuild, and the agent goroutine waiting on one of
+	// these is holding up a turn.
+	approvalMu sync.Mutex
+	approvals  map[string]*pendingApproval
+
 	// emitFn overrides where frontend events go. Tests set it, and serve mode
 	// points it at the SSE hub: the Wails runtime calls log.Fatalf when
 	// EventsEmit is handed a context it did not create, so any path without a
@@ -174,6 +181,12 @@ func (a *App) rebuild() {
 	}
 	a.buildErr = ""
 	a.svc = svc
+	// The service is built with its approval gate already installed but with
+	// nobody to ask; this is where the app volunteers. Done on every rebuild
+	// because SaveSettings constructs a whole new Service, and a gate that
+	// lost its approver would start denying every shell command with "no way
+	// to ask" while the window is sitting right there.
+	svc.ToolGate().SetApprover(a.askToolApproval)
 }
 
 // restartScheduler rebinds the timers to the current service. Callers must not

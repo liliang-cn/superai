@@ -60,6 +60,8 @@ export function MemorySkills():Promise<Array<string>>;
 
 export function OpenWorkspaceFileExternal(arg1:string):Promise<string>;
 
+export function PendingToolApprovals():Promise<Array<Record<string, any>>>;
+
 export function PickFiles():Promise<Array<string>>;
 
 export function ReadWorkspaceFile(arg1:string):Promise<string>;
@@ -69,6 +71,8 @@ export function ReadWorkspaceFileDataURL(arg1:string):Promise<string>;
 export function RemoveMCPServer(arg1:string):Promise<string>;
 
 export function RemoveSkill(arg1:string):Promise<string>;
+
+export function ResolveToolApproval(arg1:string,arg2:boolean):Promise<string>;
 
 export function RunScheduledPromptNow(arg1:string):Promise<string>;
 
@@ -91,3 +95,5 @@ export function SetScheduledPromptEnabled(arg1:string,arg2:boolean):Promise<stri
 export function SetUIRules(arg1:string):Promise<string>;
 
 export function Skills():Promise<Array<backend.SkillInfo>>;
+
+export function ToolApprovalInfo(arg1:number):Promise<Record<string, any>>;

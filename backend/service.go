@@ -65,6 +65,11 @@ type Service struct {
 	// dataDir is the agent's own data directory (<home>/data), where agent-go
 	// keeps its sqlite database.
 	dataDir string
+	// gate authorizes tool calls. It is installed on the agent at build time
+	// and stays reachable afterwards so whoever owns a UI can hand it an
+	// approver — the service is built before the window knows about it, and a
+	// gate with no approver denies rather than allows.
+	gate *ToolGate
 
 	MemoryMode string
 
@@ -167,6 +172,14 @@ func NewService(s *Settings) (*Service, error) {
 		log.Printf("superai: browser disabled by configuration")
 	}
 
+	// --- Tool approval gate. ---
+	// Built before the agent because the handler is installed as part of the
+	// build: agent-go only consults SetPermissionHandler's handler, and a
+	// service that gets one later has already run whatever it ran in between.
+	// Default ON — see Settings.DisableToolApproval for why the setting is
+	// phrased as a disable.
+	gate := NewToolGate(!s.DisableToolApproval, AuditLogPath())
+
 	// --- Build the agent service. ---
 	b := agent.New("SuperAI").
 		WithPrompt(buildPersona(time.Now(), !s.DisableSelfInstall) + uiRulesSection()).
@@ -175,7 +188,15 @@ func NewService(s *Settings) (*Service, error) {
 		WithSandbox(sb).
 		WithAutonomy(agent.AutonomyProfile{MaxRounds: s.MaxRounds, Scratchpad: true}).
 		WithSkills().
-		WithOptions(agent.Options{Deliverables: true})
+		WithOptions(agent.Options{
+			Deliverables: true,
+			// Both, always. agent-go treats a nil policy next to a non-nil
+			// handler as "gate everything", which would put a prompt in front
+			// of every memory write; and a nil handler makes authorizeTool a
+			// no-op, which is the bug this closes.
+			PermissionHandler: gate.Handler(),
+			PermissionPolicy:  gate.Policy(),
+		})
 	// agent-go v3 removed PTC entirely — tools are always called directly, so
 	// the DisablePTC setting no longer selects anything. It stays in Settings
 	// only so existing settings files keep parsing.
@@ -238,6 +259,7 @@ func NewService(s *Settings) (*Service, error) {
 		svc: svc, sb: sb, settings: s, MemoryMode: memMode, dataDir: cfg.DataDir(),
 		claims: newScheduleClaims(),
 		brain:  brain, SuppressedMCPServers: droppedMCP,
+		gate: gate,
 	}
 
 	// --- Built-in framework tools. ---
@@ -284,6 +306,16 @@ func NewService(s *Settings) (*Service, error) {
 	}
 
 	return out, nil
+}
+
+// ToolGate is the approval gate this service's agent runs behind. Whoever has
+// a user in front of them installs an approver on it; nobody else has to, and
+// the gate denies gated calls when nobody does.
+func (s *Service) ToolGate() *ToolGate {
+	if s == nil {
+		return nil
+	}
+	return s.gate
 }
 
 // Close releases the agent service, browser, sandbox, and cortexdb handle.
