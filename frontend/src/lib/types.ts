@@ -3,6 +3,7 @@ export type ViewKey =
   | "settings"
   | "avatar"
   | "memory"
+  | "graph"
   | "skills"
   | "mcp"
   | "data"
