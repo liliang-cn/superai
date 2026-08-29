@@ -353,6 +353,11 @@ func gatedPath(p string) bool {
 	switch {
 	case p == "/api/login", p == "/api/logout", p == "/api/session":
 		return false
+	// The handoff is how a browser holding nothing gets a session; gating it on
+	// already having one would make it useless. It carries its own credential
+	// (see companion.go) and hands out nothing without one.
+	case p == handoffPath:
+		return false
 	case strings.HasPrefix(p, "/api/"), p == mcpPath, strings.HasPrefix(p, mcpPath+"/"):
 		return true
 	}
