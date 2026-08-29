@@ -223,6 +223,9 @@ func newAPIMux(app *App, hub *eventHub, creds *credentials, handoff *handoffStor
 	handoffRoute(mux, creds, handoff)
 	mux.HandleFunc("/api/rpc/", func(w http.ResponseWriter, r *http.Request) { rpcCall(app, w, r) })
 	mux.HandleFunc("/api/events", hub.serveSSE)
+	// Uploading a file to import. It writes to this machine, so it is gated
+	// like everything else under /api — see gatedPath.
+	mux.HandleFunc(uploadPath, app.handleUpload)
 	// The live graph view, proxied. It binds loopback on this host and has no
 	// authentication of its own — see backend/graphproxy.go — so it is mounted
 	// here, behind requireAuth, and nowhere else.

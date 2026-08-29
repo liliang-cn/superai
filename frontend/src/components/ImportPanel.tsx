@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import { ImportCSV } from "../../wailsjs/go/main/App";
 
 /**
@@ -15,7 +15,14 @@ import { ImportCSV } from "../../wailsjs/go/main/App";
  */
 export default function ImportPanel() {
   const [open, setOpen] = useState(false);
+  // The server-side path of the file to import. Filled by uploading, never
+  // typed: a path is only meaningful on the machine SuperAI runs on, and over
+  // the network the obvious thing to type — a path on your own laptop — is the
+  // one thing that cannot work.
   const [path, setPath] = useState("");
+  const [picked, setPicked] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement | null>(null);
   const [hint, setHint] = useState("");
   const [running, setRunning] = useState(false);
   const [report, setReport] = useState("");
@@ -37,6 +44,28 @@ export default function ImportPanel() {
       setRunning(false);
     }
   }, [path, hint, running]);
+
+  const upload = useCallback(async (f: File) => {
+    setUploading(true);
+    setReport("");
+    setDone(false);
+    try {
+      const form = new FormData();
+      form.append("file", f);
+      const res = await fetch("/api/upload", { method: "POST", body: form });
+      if (!res.ok) throw new Error((await res.text()).trim() || `upload failed (${res.status})`);
+      const out = await res.json();
+      setPath(out.path);
+      setPicked(`${out.name} · ${Math.max(1, Math.round(out.bytes / 1024))} KB`);
+    } catch (e: any) {
+      setReport("error: " + String(e?.message || e));
+      setDone(true);
+      setPath("");
+      setPicked("");
+    } finally {
+      setUploading(false);
+    }
+  }, []);
 
   const isError = report.startsWith("error:") || report === "backend not ready";
   let pretty = report;
@@ -74,12 +103,27 @@ export default function ImportPanel() {
       </div>
       <div className="search-row">
         <input
-          className="input"
-          value={path}
-          onChange={(e) => setPath(e.target.value)}
-          placeholder="/Users/me/contacts.csv — absolute path on the machine running SuperAI"
-          autoComplete="off"
+          ref={fileRef}
+          type="file"
+          accept=".csv,.tsv,.txt,.sql,.dump"
+          style={{ display: "none" }}
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) void upload(f);
+            // Cleared so choosing the same file twice still fires a change.
+            e.target.value = "";
+          }}
         />
+        <button className="btn ghost" onClick={() => fileRef.current?.click()} disabled={uploading}>
+          {uploading ? (
+            <>
+              <span className="spinner" /> Uploading…
+            </>
+          ) : (
+            "Choose a file…"
+          )}
+        </button>
+        <span className="import-picked">{picked || "No file chosen"}</span>
       </div>
       <div className="search-row" style={{ marginTop: 8 }}>
         <input

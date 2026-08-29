@@ -1072,3 +1072,4 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
   background: var(--bg-0); border: 1px solid var(--border); border-radius: var(--radius-sm);
   padding: 10px 12px; max-height: 26vh; overflow: auto; margin: 0;
 }
+.import-picked { font-size: 12px; color: var(--text-2); font-family: var(--font-mono); }
