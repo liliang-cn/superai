@@ -8,9 +8,10 @@ import {
   CLIProxyStatus,
   CLIProxySubmitPrompt,
   GetSettings,
+  OpenInBrowser,
   SaveSettings,
 } from "../../wailsjs/go/main/App";
-import { EventsOff, EventsOn } from "../../wailsjs/runtime/runtime";
+import { BrowserOpenURL, EventsOff, EventsOn } from "../../wailsjs/runtime/runtime";
 import { backend } from "../../wailsjs/go/models";
 
 type ProxyStatus = {
@@ -73,6 +74,63 @@ function TextField({
       <label>{label}</label>
       <input className="input" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} autoComplete="off" />
       {hint && <span className="hint">{hint}</span>}
+    </div>
+  );
+}
+
+// Only the desktop window has anywhere to go. Served, this is the tab you are
+// already reading it in, so the card is not rendered at all.
+const served = Boolean((window as unknown as Record<string, unknown>).superaiServed);
+
+function OpenInBrowserCard() {
+  const [origin, setOrigin] = useState("");
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const open = async () => {
+    setBusy(true);
+    setErr("");
+    try {
+      // Each click asks for its own link. The server behind it is started once
+      // and reused, but the sign-in token in the URL is spent by the page load
+      // that redeems it, so a second tab needs a second one.
+      const url = await OpenInBrowser();
+      setOrigin(new URL(url).origin);
+      BrowserOpenURL(url);
+    } catch (e: any) {
+      setErr(String(e?.message || e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="card">
+      <div className="card-title">Open in Browser</div>
+      <div className="card-desc">
+        Serve this running app on localhost and open it in your default browser. Not a copy —
+        the same conversations, the same agent, the same runs in flight, seen from a second
+        window. The link signs that browser in once and then expires; the server stops when
+        SuperAI quits.
+      </div>
+      {origin && (
+        <div className="url-box" style={{ marginBottom: 14 }}>
+          <span className="url-label">LOCAL</span>
+          <span style={{ flex: 1 }}>{origin}</span>
+        </div>
+      )}
+      <div className="field">
+        <button className="btn" onClick={open} disabled={busy} style={{ alignSelf: "flex-start" }}>
+          {busy ? (
+            <><span className="spinner" /> Starting…</>
+          ) : origin ? (
+            "Open another tab ↗"
+          ) : (
+            "Open in Browser ↗"
+          )}
+        </button>
+        {err && <span className="save-note err">⚠ {err}</span>}
+      </div>
     </div>
   );
 }
@@ -466,6 +524,8 @@ export default function SettingsView({ onSaved }: { onSaved: () => void }) {
               </div>
             </div>
           </div>
+
+          {!served && <OpenInBrowserCard />}
 
           <div className="settings-actions">
             <button className="btn" onClick={save} disabled={saving}>

@@ -110,6 +110,10 @@ export function MemorySkills() {
   return window['go']['main']['App']['MemorySkills']();
 }
 
+export function OpenInBrowser() {
+  return window['go']['main']['App']['OpenInBrowser']();
+}
+
 export function OpenWorkspaceFileExternal(arg1) {
   return window['go']['main']['App']['OpenWorkspaceFileExternal'](arg1);
 }

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -50,11 +51,22 @@ type App struct {
 	// for once at startup rather than when a timer fires and nobody is looking.
 	notifyOK bool
 
-	// emitFn overrides where frontend events go. Tests set it, and serve mode
-	// points it at the SSE hub: the Wails runtime calls log.Fatalf when
-	// EventsEmit is handed a context it did not create, so any path without a
-	// real window must divert events before they reach it.
+	// emitFn is an extra sink for frontend events. Tests set it, and serve mode
+	// points it at the SSE hub, where it is the only sink there is: the Wails
+	// runtime calls log.Fatalf when EventsEmit is handed a context it did not
+	// create, so any path without a real window needs somewhere else to send
+	// events. It does not stand in for the window — emit fans out to every
+	// surface that is attached, and in the desktop app that includes both.
 	emitFn func(name string, payload map[string]any)
+
+	// companion is the HTTP server behind "Open in Browser": this same app,
+	// reachable from a real browser tab, started on demand. Guarded by a.mu.
+	companion *companionServer
+	// companionHub is that server's SSE fan-out, held separately and atomically
+	// rather than reached through a.companion. emit reads it on every event,
+	// from whatever goroutine a chat turn happens to be on, and a.mu is held
+	// across a whole service rebuild — an event must never queue behind that.
+	companionHub atomic.Pointer[eventHub]
 
 	buildErr string
 	proxyErr string
@@ -142,6 +154,10 @@ func (a *App) shutdown(ctx context.Context) {
 	// Before the lock: stopping the cron loop must not race the service it runs
 	// its turns against.
 	a.stopScheduler()
+	// Also before the lock, and for the same reason: stopCompanion takes a.mu
+	// to unhook the server, and an open browser tab must not outlive the app it
+	// is a window onto.
+	a.stopCompanion()
 
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -431,18 +447,36 @@ func (a *App) CLIProxySubmitPrompt(value string) string {
 	}
 }
 
-// emit delivers one payload to the frontend. Before startup there is no window
-// and nothing can be listening, so the event is dropped rather than emitted
+// windowEmit is the Wails leg of emit, held in a variable only so a test can
+// stand in for a window it has no way to create: the real runtime calls
+// log.Fatalf if it is handed a context it did not make, so the fan-out below
+// cannot otherwise be checked at all.
+var windowEmit = func(ctx context.Context, name string, payload map[string]any) {
+	runtime.EventsEmit(ctx, name, payload)
+}
+
+// emit delivers one payload to every surface currently attached to this app.
+//
+// Every surface, not the first one found. This used to return after emitFn, on
+// the assumption that a process has either a window or a socket. "Open in
+// Browser" breaks that assumption: the desktop app keeps its window and gains a
+// companion server, and the same chat has to stream into both at once. An
+// early return there is silent — nothing errors, the window simply stops
+// updating the moment a browser tab exists.
+//
+// Each leg carries its own guard for the case where it is not attached. Before
+// startup there is no window, so the Wails call is skipped rather than made
 // against a nil context (which the Wails runtime treats as fatal).
 func (a *App) emit(name string, payload map[string]any) {
 	if a.emitFn != nil {
 		a.emitFn(name, payload)
-		return
 	}
-	if a.ctx == nil {
-		return
+	if hub := a.companionHub.Load(); hub != nil {
+		hub.broadcast(name, payload)
 	}
-	runtime.EventsEmit(a.ctx, name, payload)
+	if a.ctx != nil {
+		windowEmit(a.ctx, name, payload)
+	}
 }
 
 func (a *App) emitLogin(status, provider, message string) {

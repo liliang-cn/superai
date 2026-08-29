@@ -46,6 +46,10 @@ import (
 var rpcDenied = map[string]string{
 	"PickFiles":           "needs a native file dialog; not available in the browser",
 	"ExportWorkspaceFile": "needs a native save dialog; use ReadWorkspaceFileDataURL and download instead",
+	// Whoever is calling this over HTTP is already in a browser, so the button
+	// has nothing to offer them — and opening listeners is not something a
+	// remote caller should be able to ask for on the strength of one session.
+	"OpenInBrowser": "you are already in a browser",
 }
 
 // eventHub fans one emitted event out to every connected SSE client. A slow
@@ -207,11 +211,15 @@ func spaHandler() (http.Handler, error) {
 	}), nil
 }
 
-func newAPIMux(app *App, hub *eventHub, creds *credentials) (*http.ServeMux, error) {
+func newAPIMux(app *App, hub *eventHub, creds *credentials, handoff *handoffStore) (*http.ServeMux, error) {
 	mux := http.NewServeMux()
 	// Sign-in lives on the mux rather than in the middleware so it is a route
-	// like any other; requireAuth lets exactly these three through. See auth.go.
+	// like any other; requireAuth lets exactly these four through. See auth.go.
 	authRoutes(mux, creds)
+	// The desktop app's "Open in Browser" hands the tab it opens a one-shot
+	// token here, so nobody is asked for a password they never chose. nil in
+	// serve mode: nothing there mints tokens, so every arrival is turned away.
+	handoffRoute(mux, creds, handoff)
 	mux.HandleFunc("/api/rpc/", func(w http.ResponseWriter, r *http.Request) { rpcCall(app, w, r) })
 	mux.HandleFunc("/api/events", hub.serveSSE)
 	// SuperAI as an MCP server — see mcp.go for why it lives in this process
@@ -245,7 +253,7 @@ func serveMain(argv []string) {
 	if err != nil {
 		log.Fatalf("auth: %v", err)
 	}
-	mux, err := newAPIMux(app, hub, creds)
+	mux, err := newAPIMux(app, hub, creds, nil)
 	if err != nil {
 		log.Fatalf("assets: %v", err)
 	}

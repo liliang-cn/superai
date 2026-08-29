@@ -58,6 +58,8 @@ export function MemoryRecall(arg1:string):Promise<string>;
 
 export function MemorySkills():Promise<Array<string>>;
 
+export function OpenInBrowser():Promise<string>;
+
 export function OpenWorkspaceFileExternal(arg1:string):Promise<string>;
 
 export function PickFiles():Promise<Array<string>>;
