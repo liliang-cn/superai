@@ -3,6 +3,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ChatMessage } from "../lib/types";
 import { copyText } from "../lib/format";
+import { isExternallyOpenable, openExternal } from "../lib/openExternal";
 
 function CodeBlock({ className, text }: { className?: string; text: string }) {
   const [copied, setCopied] = useState(false);
@@ -40,6 +41,27 @@ const mdComponents = {
   // CodeBlock provides its own <pre>; unwrap react-markdown's outer <pre>.
   pre({ children }: any) {
     return <>{children}</>;
+  },
+  // A link the model wrote must leave the app rather than navigate it. Left as
+  // a real anchor so it still looks like one and the URL shows on hover; the
+  // click is what changes.
+  a({ href, children, ...props }: any) {
+    if (!isExternallyOpenable(href)) {
+      return <span {...props}>{children}</span>;
+    }
+    return (
+      <a
+        href={href}
+        title={href}
+        onClick={(e) => {
+          e.preventDefault();
+          openExternal(href);
+        }}
+        {...props}
+      >
+        {children}
+      </a>
+    );
   },
 };
 
