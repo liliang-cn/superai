@@ -15,7 +15,6 @@ const NAV: { section: string; items: { key: ViewKey; label: string; icon: string
       { key: "knowledge", label: "Knowledge", icon: "🧠" },
       { key: "skills", label: "Skills", icon: "🧩" },
       { key: "mcp", label: "MCP", icon: "🔌" },
-      { key: "data", label: "Data", icon: "🗄️" },
       { key: "records", label: "Records", icon: "🗂️" },
     ],
   },

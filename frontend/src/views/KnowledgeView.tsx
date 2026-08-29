@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ClipboardSetText } from "../../wailsjs/runtime";
 import { GraphView as startGraphView, MemoryRecall } from "../../wailsjs/go/main/App";
 import { openExternal } from "../lib/openExternal";
+import ImportPanel from "../components/ImportPanel";
 
 /**
  * One page for what SuperAI knows.
@@ -249,6 +250,8 @@ export default function KnowledgeView() {
             </button>
           )}
         </div>
+
+        <ImportPanel />
 
         {recallErr && <div className="report-error">⚠ {recallErr}</div>}
         {!recallErr && searched && (

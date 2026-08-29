@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/liliang-cn/agent-go/v3/pkg/cortexbridge"
 	"github.com/liliang-cn/agent-go/v3/pkg/mcp"
@@ -91,10 +93,35 @@ func (s *Service) MemoryRecall(ctx context.Context, query string) (string, error
 	return formatted, err
 }
 
-// ImportCSV imports a CSV file into the CortexDB RAG + knowledge graph via
-// importflow (LLM-inferred mapping). hint is an optional domain hint. Returns a
-// short JSON report. Used by the Data panel.
-func (s *Service) ImportCSV(ctx context.Context, path, hint string) (string, error) {
+// ImportableExtensions are the file types importflow has a parser for. Exported
+// so the UI can say so up front rather than letting someone pick a file and
+// find out on submit.
+var ImportableExtensions = []string{".csv", ".tsv", ".txt", ".sql", ".dump"}
+
+// importableExt reports whether this importer can read a file with this
+// extension. Case-insensitive: a .CSV off a Windows machine is a CSV.
+func importableExt(ext string) bool {
+	ext = strings.ToLower(ext)
+	for _, e := range ImportableExtensions {
+		if e == ext {
+			return true
+		}
+	}
+	return false
+}
+
+// ImportFile imports a data file into the CortexDB RAG store and knowledge
+// graph through importflow, which infers the column-to-field mapping with the
+// LLM. hint is an optional description of the dataset, which is what the mapper
+// leans on when a column name is ambiguous on its own ("id", "name", "date").
+// Returns a JSON report.
+//
+// The format is chosen by extension rather than by asking: the caller has a
+// file, and which parser reads it is not a decision they should have to make.
+// An unrecognised extension is refused by name — silently treating a .json as
+// CSV would produce one column of garbage and an import that looks like it
+// worked.
+func (s *Service) ImportFile(ctx context.Context, path, hint string) (string, error) {
 	if s == nil || s.cortex == nil {
 		return "", fmt.Errorf("data import unavailable: CortexDB not configured")
 	}
@@ -103,10 +130,29 @@ func (s *Service) ImportCSV(ctx context.Context, path, hint string) (string, err
 		return "", fmt.Errorf("open %s: %w", path, err)
 	}
 	defer f.Close()
-	src, err := importflow.NewCSVSource(f, importflow.CSVOptions{})
-	if err != nil {
-		return "", fmt.Errorf("read csv: %w", err)
+
+	ext := strings.ToLower(filepath.Ext(path))
+	if !importableExt(ext) {
+		return "", fmt.Errorf("%q is not a format this can read — use %s",
+			ext, strings.Join(ImportableExtensions, ", "))
 	}
+	var src importflow.Source
+	switch ext {
+	case ".csv", ".tsv", ".txt":
+		src, err = importflow.NewCSVSource(f, importflow.CSVOptions{})
+		if err != nil {
+			return "", fmt.Errorf("read csv: %w", err)
+		}
+	case ".sql", ".dump":
+		// Dialect auto: the parser reads MySQL and PostgreSQL dumps and works
+		// out which from the file, which is one fewer thing to get wrong than
+		// asking someone to say.
+		src, err = importflow.NewSQLDumpSource(f, importflow.DumpOptions{Dialect: importflow.DialectAuto})
+		if err != nil {
+			return "", fmt.Errorf("read sql dump: %w", err)
+		}
+	}
+
 	im := cortexbridge.NewImporter(s.cortex, s.svc.LLM)
 	report, err := im.AutoImport(ctx, src, importflow.Goal{BuildRAG: true, BuildKG: true, Hint: hint})
 	if err != nil {
@@ -114,4 +160,10 @@ func (s *Service) ImportCSV(ctx context.Context, path, hint string) (string, err
 	}
 	b, _ := json.MarshalIndent(report, "", "  ")
 	return string(b), nil
+}
+
+// ImportCSV is the old name. Kept because it is a bound method the frontend
+// bindings still carry, and forwarding costs a line.
+func (s *Service) ImportCSV(ctx context.Context, path, hint string) (string, error) {
+	return s.ImportFile(ctx, path, hint)
 }

@@ -1057,3 +1057,18 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
    the whole page and leave the graph — which the same search just highlighted —
    with nowhere to be seen. */
 .knowledge-recall { flex: none; max-height: 30vh; overflow: auto; }
+
+/* Import, folded into the Knowledge page. Collapsed by default: importing is
+   rare and looking at the graph is not, so the form must not permanently
+   occupy the space the graph came for. */
+.import-toggle { align-self: flex-start; flex: none; }
+.import-panel {
+  flex: none; padding: 12px 14px; border: 1px solid var(--border);
+  border-radius: var(--radius); background: var(--bg-1);
+}
+.import-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+.import-report {
+  font-family: var(--font-mono); font-size: 11.5px; line-height: 1.5;
+  background: var(--bg-0); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 10px 12px; max-height: 26vh; overflow: auto; margin: 0;
+}

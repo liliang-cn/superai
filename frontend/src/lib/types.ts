@@ -4,7 +4,6 @@ export type ViewKey =
   | "knowledge"
   | "skills"
   | "mcp"
-  | "data"
   | "records";
 
 /**

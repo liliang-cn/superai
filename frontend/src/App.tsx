@@ -6,7 +6,6 @@ import SettingsView from "./views/SettingsView";
 import KnowledgeView from "./views/KnowledgeView";
 import SkillsView from "./views/SkillsView";
 import MCPView from "./views/MCPView";
-import DataView from "./views/DataView";
 import RecordsView from "./views/RecordsView";
 import { ScheduleRunToasts } from "./components/ScheduleRuns";
 import ToolApprovals from "./components/ToolApprovals";
@@ -105,7 +104,6 @@ export default function App() {
             {view === "knowledge" && <KnowledgeView />}
             {view === "skills" && <SkillsView />}
             {view === "mcp" && <MCPView />}
-            {view === "data" && <DataView />}
             {view === "records" && (
               <RecordsView status={status} log={runs} onOpenConversation={openConversation} />
             )}
