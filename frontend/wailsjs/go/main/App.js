@@ -194,6 +194,14 @@ export function Skills() {
   return window['go']['main']['App']['Skills']();
 }
 
+export function StartYoloMode(arg1) {
+  return window['go']['main']['App']['StartYoloMode'](arg1);
+}
+
+export function StopYoloMode() {
+  return window['go']['main']['App']['StopYoloMode']();
+}
+
 export function ToolApprovalInfo(arg1) {
   return window['go']['main']['App']['ToolApprovalInfo'](arg1);
 }

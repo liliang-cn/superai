@@ -145,6 +145,16 @@ func (a *App) ToolApprovalInfo(limit int) map[string]any {
 		return info
 	}
 	gate := svc.ToolGate()
+	if gate != nil {
+		// Included so a page that loads mid-window sees the banner. Events
+		// alone would leave a reloaded tab believing prompts are still coming.
+		yoloOn, yoloUntil := gate.YoloStatus()
+		info["yolo"] = yoloOn
+		if yoloOn {
+			info["yoloUntil"] = yoloUntil.Format(time.RFC3339)
+		}
+		info["yoloMaxMins"] = int(backend.MaxYoloWindow / time.Minute)
+	}
 	if gate == nil {
 		return info
 	}
@@ -157,4 +167,64 @@ func (a *App) ToolApprovalInfo(limit int) map[string]any {
 		info["entries"] = entries
 	}
 	return info
+}
+
+// StartYoloMode approves every gated call for a while, and reports when it
+// ends. minutes of zero takes the default; anything longer than the cap is
+// clamped to it.
+//
+// Bound so the approval modal can offer it at the moment it is wanted: the
+// prompt a user is about to click through for the twentieth time is exactly
+// where "stop asking for a bit" belongs, and burying it in Settings is how
+// people end up turning the gate off permanently instead.
+func (a *App) StartYoloMode(minutes int) map[string]any {
+	a.mu.Lock()
+	svc := a.svc
+	a.mu.Unlock()
+	if svc == nil || svc.ToolGate() == nil {
+		return map[string]any{"error": "the approval gate is not running"}
+	}
+	granted := svc.ToolGate().StartYolo(time.Duration(minutes) * time.Minute)
+	on, until := svc.ToolGate().YoloStatus()
+
+	// Announced rather than left to be noticed. Every surface that could be
+	// showing an approval card needs to know they are about to stop appearing,
+	// and a user who left the tab open needs to see the banner without asking.
+	a.emit("tool:yolo", map[string]any{
+		"active":      on,
+		"until":       until.Format(time.RFC3339),
+		"grantedMins": int(granted / time.Minute),
+	})
+
+	// Answer whatever is already on screen, or those cards sit there waiting
+	// for a click that YOLO has made meaningless.
+	a.approvalMu.Lock()
+	pending := make([]string, 0, len(a.approvals))
+	for id := range a.approvals {
+		pending = append(pending, id)
+	}
+	a.approvalMu.Unlock()
+	for _, id := range pending {
+		_ = a.ResolveToolApproval(id, true)
+	}
+
+	return map[string]any{
+		"active":      on,
+		"until":       until.Format(time.RFC3339),
+		"grantedMins": int(granted / time.Minute),
+		"maxMins":     int(backend.MaxYoloWindow / time.Minute),
+	}
+}
+
+// StopYoloMode ends it now.
+func (a *App) StopYoloMode() map[string]any {
+	a.mu.Lock()
+	svc := a.svc
+	a.mu.Unlock()
+	if svc == nil || svc.ToolGate() == nil {
+		return map[string]any{"error": "the approval gate is not running"}
+	}
+	svc.ToolGate().StopYolo()
+	a.emit("tool:yolo", map[string]any{"active": false})
+	return map[string]any{"active": false}
 }

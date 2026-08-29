@@ -12,6 +12,7 @@ import DataView from "./views/DataView";
 import LifeView from "./views/LifeView";
 import { ScheduleRunToasts } from "./components/ScheduleRuns";
 import ToolApprovals from "./components/ToolApprovals";
+import YoloBanner from "./components/YoloBanner";
 import { AppStatus, ViewKey, normalizeStatus } from "./lib/types";
 import { useScheduleRuns } from "./lib/useScheduleRuns";
 import { useToolApprovals } from "./lib/useToolApprovals";
@@ -113,6 +114,7 @@ export default function App() {
       {view !== "life" && (
         <ScheduleRunToasts log={runs} onOpenConversation={openConversation} />
       )}
+      <YoloBanner />
       <ToolApprovals
         pending={approvals.pending}
         note={approvals.note}

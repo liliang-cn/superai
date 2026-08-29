@@ -96,6 +96,11 @@ type ToolGate struct {
 	wait     time.Duration
 	audit    *approvalAudit
 
+	// yoloUntil is when YOLO mode stops approving everything. Zero means off.
+	// A deadline rather than a bool: see yolo.go for why it expires by
+	// comparing clocks instead of by a timer someone has to remember to fire.
+	yoloUntil time.Time
+
 	// Injected so tests can pin ids and timestamps.
 	newID func() string
 	now   func() time.Time
@@ -254,6 +259,13 @@ func (g *ToolGate) decide(ctx context.Context, req agent.PermissionRequest) (*ag
 			By:      DecidedByGateOff,
 			Reason:  "approval gate is switched off in Settings",
 		})
+	}
+
+	// Checked after the gate-off case and before the approver: with the gate
+	// off there is nothing to relax, and with YOLO on it does not matter
+	// whether a surface exists to ask — that is the point of it.
+	if dec := g.yoloDecision(); dec != nil {
+		return g.answer(ask, *dec)
 	}
 
 	if approver == nil {
