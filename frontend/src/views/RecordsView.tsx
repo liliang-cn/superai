@@ -5,18 +5,23 @@ import { AppStatus } from "../lib/types";
 import { ScheduleRunLog } from "../lib/useScheduleRuns";
 import SchedulesView from "./SchedulesView";
 
-type TabKey = "schedules" | "records" | "persons" | "reminders";
+// The tab keyed "records" is labelled Notes, and used to be keyed that way
+// too — inside a page that is itself called Records. Two different things with
+// one name, one nested in the other. The key follows the label now; the backend
+// field it reads is still `records`, which is where the name came from and the
+// one place it is not ambiguous.
+type TabKey = "schedules" | "notes" | "persons" | "reminders";
 
 const TABS: { key: TabKey; label: string; icon: string }[] = [
   { key: "schedules", label: "Schedules", icon: "📅" },
-  { key: "records", label: "Notes", icon: "📝" },
+  { key: "notes", label: "Notes", icon: "📝" },
   { key: "persons", label: "People", icon: "👤" },
   { key: "reminders", label: "Reminders", icon: "⏰" },
 ];
 
 const EMPTY_HINT: Record<TabKey, string> = {
   schedules: "No schedules yet — ask SuperAI in Chat to add one.",
-  records: "No notes yet — ask SuperAI in Chat to keep notes for you.",
+  notes: "No notes yet — ask SuperAI in Chat to keep notes for you.",
   persons: "No people yet — mention someone in Chat and SuperAI will remember them.",
   reminders: "No reminders yet — ask SuperAI in Chat to remind you of something.",
 };
@@ -94,7 +99,7 @@ function InlineEmpty({ icon, hint }: { icon: string; hint: string }) {
   );
 }
 
-export default function LifeView({
+export default function RecordsView({
   status,
   log,
   onOpenConversation,
@@ -137,7 +142,7 @@ export default function LifeView({
 
   const count: Record<TabKey, number> = {
     schedules: scheduleCount,
-    records: records.length,
+    notes: records.length,
     persons: personEntries.length,
     reminders: reminders.length,
   };
@@ -199,7 +204,7 @@ export default function LifeView({
                 onCount={setScheduleCount}
               />
             )}
-            {tab === "records" && renderArrayTab(records, "records", "📝")}
+            {tab === "notes" && renderArrayTab(records, "notes", "📝")}
             {tab === "reminders" && renderArrayTab(reminders, "reminders", "⏰")}
             {tab === "persons" &&
               (personEntries.length === 0 ? (

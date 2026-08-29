@@ -1,13 +1,11 @@
 export type ViewKey =
   | "chat"
   | "settings"
-  | "avatar"
-  | "memory"
-  | "graph"
+  | "knowledge"
   | "skills"
   | "mcp"
   | "data"
-  | "life";
+  | "records";
 
 /**
  * Every streaming payload is tagged with the id `SendChat` returned for that

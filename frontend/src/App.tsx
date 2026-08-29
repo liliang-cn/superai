@@ -3,13 +3,11 @@ import Sidebar from "./components/Sidebar";
 import StatusBar from "./components/StatusBar";
 import ChatView from "./views/ChatView";
 import SettingsView from "./views/SettingsView";
-import AvatarView from "./views/AvatarView";
-import MemoryView from "./views/MemoryView";
-import GraphView from "./views/GraphView";
+import KnowledgeView from "./views/KnowledgeView";
 import SkillsView from "./views/SkillsView";
 import MCPView from "./views/MCPView";
 import DataView from "./views/DataView";
-import LifeView from "./views/LifeView";
+import RecordsView from "./views/RecordsView";
 import { ScheduleRunToasts } from "./components/ScheduleRuns";
 import ToolApprovals from "./components/ToolApprovals";
 import YoloBanner from "./components/YoloBanner";
@@ -92,7 +90,7 @@ export default function App() {
   return (
     <>
       <div className="app">
-        <Sidebar current={view} onNavigate={setView} badges={{ life: runs.unseen }} />
+        <Sidebar current={view} onNavigate={setView} badges={{ records: runs.unseen }} />
         <div className="main">
           <StatusBar status={status} loading={loading} theme={theme} onToggleTheme={toggleTheme} />
           <div className="content">
@@ -103,22 +101,20 @@ export default function App() {
                 onSessionOpened={() => setPendingSession("")}
               />
             )}
-            {view === "settings" && <SettingsView onSaved={refreshStatus} />}
-            {view === "avatar" && <AvatarView status={status} />}
-            {view === "memory" && <MemoryView />}
-            {view === "graph" && <GraphView />}
+            {view === "settings" && <SettingsView onSaved={refreshStatus} status={status} />}
+            {view === "knowledge" && <KnowledgeView />}
             {view === "skills" && <SkillsView />}
             {view === "mcp" && <MCPView />}
             {view === "data" && <DataView />}
-            {view === "life" && (
-              <LifeView status={status} log={runs} onOpenConversation={openConversation} />
+            {view === "records" && (
+              <RecordsView status={status} log={runs} onOpenConversation={openConversation} />
             )}
           </div>
         </div>
       </div>
       {/* Records lists the same runs, so a toast there would only repeat what
           is already on screen. */}
-      {view !== "life" && (
+      {view !== "records" && (
         <ScheduleRunToasts log={runs} onOpenConversation={openConversation} />
       )}
       <YoloBanner />

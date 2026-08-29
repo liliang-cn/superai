@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from "react";
+import AvatarSection from "./AvatarSection";
+import { AppStatus } from "../lib/types";
 import {
   CLIProxyAccounts,
   CLIProxyLogin,
@@ -190,7 +192,14 @@ function OpenInBrowserCard() {
   );
 }
 
-export default function SettingsView({ onSaved }: { onSaved: () => void }) {
+export default function SettingsView({
+  onSaved,
+  status,
+}: {
+  onSaved: () => void;
+  // Only the avatar section needs it, for the port the bridge is listening on.
+  status: AppStatus | null;
+}) {
   const [s, setS] = useState<backend.Settings | null>(null);
   const [saving, setSaving] = useState(false);
   const [note, setNote] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
@@ -626,6 +635,11 @@ export default function SettingsView({ onSaved }: { onSaved: () => void }) {
               </div>
             </div>
           </div>
+
+          {/* Folded in from what used to be its own sidebar entry. It sits
+              after Runtime because that is where the avatar port it depends on
+              is set. */}
+          <AvatarSection status={status} />
 
           {!served && <OpenInBrowserCard />}
 

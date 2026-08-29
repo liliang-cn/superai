@@ -1,7 +1,21 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ClipboardSetText } from "../../wailsjs/runtime";
-import { GraphView as startGraphView } from "../../wailsjs/go/main/App";
+import { GraphView as startGraphView, MemoryRecall } from "../../wailsjs/go/main/App";
 import { openExternal } from "../lib/openExternal";
+
+/**
+ * One page for what SuperAI knows.
+ *
+ * Recall and the graph used to be two entries in the sidebar, and they read the
+ * same CortexDB — one asks it by name, the other shows the whole thing. Kept
+ * apart, using them together meant going back and forth: spot a node worth
+ * understanding and leave to search for it; find a memory and leave to see what
+ * it connects to. They are two views of one question, so they are one page.
+ *
+ * Searching also drives the graph. The 3D view already has a Find box; typing
+ * here reaches into it, so a recall lights up the nodes it is about instead of
+ * leaving the reader to spot them.
+ */
 
 /** What the backend says about the running view. See App.GraphView. */
 interface GraphStatus {
@@ -49,10 +63,18 @@ const SERVED = Boolean((window as unknown as Record<string, unknown>).superaiSer
 // authentication applies to the frame exactly as it does to everything else.
 const GRAPH_SRC = SERVED ? "/graph/" : null;
 
-export default function GraphView() {
+export default function KnowledgeView() {
   const [status, setStatus] = useState<GraphStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const frameRef = useRef<HTMLIFrameElement | null>(null);
+
+  // Recall, which used to be the Memory page.
+  const [query, setQuery] = useState("");
+  const [recall, setRecall] = useState("");
+  const [searched, setSearched] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const [recallErr, setRecallErr] = useState("");
   // Bumped to force the iframe to remount, which is the only way to reload a
   // cross-origin frame from outside it.
   const [nonce, setNonce] = useState(0);
@@ -82,6 +104,49 @@ export default function GraphView() {
     return () => clearInterval(t);
   }, [status, load]);
 
+  /**
+   * Light the query up on the graph.
+   *
+   * Sent as a message rather than by reaching into the frame's DOM: the frame
+   * is a different origin over HTTP (SuperAI proxies it), so touching its
+   * document would throw. The view ignores messages it does not understand, so
+   * an older CortexDB simply does not highlight — the recall still works.
+   */
+  const highlight = useCallback((q: string) => {
+    const w = frameRef.current?.contentWindow;
+    if (!w) return;
+    try {
+      w.postMessage({ type: "cortexdb:highlight", query: q }, "*");
+    } catch {
+      // A frame that will not take a message is not a reason to fail a search.
+    }
+  }, []);
+
+  const search = useCallback(async () => {
+    const q = query.trim();
+    if (!q || searching) return;
+    setSearching(true);
+    setRecallErr("");
+    highlight(q);
+    try {
+      setRecall((await MemoryRecall(q)) ?? "");
+      setSearched(true);
+    } catch (e: any) {
+      setRecallErr(String(e?.message || e));
+      setSearched(true);
+    } finally {
+      setSearching(false);
+    }
+  }, [query, searching, highlight]);
+
+  const clearSearch = useCallback(() => {
+    setQuery("");
+    setRecall("");
+    setSearched(false);
+    setRecallErr("");
+    highlight("");
+  }, [highlight]);
+
   const copy = (url: string) => {
     ClipboardSetText(url).then(() => {
       setCopied(true);
@@ -95,10 +160,10 @@ export default function GraphView() {
   const header = (
     <div className="view-header with-action">
       <div>
-        <div className="view-title">Knowledge Graph</div>
+        <div className="view-title">Knowledge</div>
         <div className="view-desc">
-          The live 3D view of the CortexDB brain SuperAI reads on every turn. Drag to rotate; it
-          redraws itself as the graph changes.
+          Everything SuperAI knows, as one graph it reads on every turn. Search to recall it in
+          words; the same search lights up the nodes it is about.
         </div>
       </div>
       {status?.url && (
@@ -154,6 +219,51 @@ export default function GraphView() {
   } else {
     body = (
       <div className="graph-stage">
+        <div className="knowledge-search">
+          <input
+            className="input"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                search();
+              }
+              if (e.key === "Escape") clearSearch();
+            }}
+            placeholder="Recall — e.g. what do I know about Alice?"
+            autoComplete="off"
+          />
+          <button className="btn" onClick={search} disabled={searching || query.trim() === ""}>
+            {searching ? (
+              <>
+                <span className="spinner" /> Searching…
+              </>
+            ) : (
+              "Recall"
+            )}
+          </button>
+          {(searched || query !== "") && (
+            <button className="btn ghost" onClick={clearSearch}>
+              Clear
+            </button>
+          )}
+        </div>
+
+        {recallErr && <div className="report-error">⚠ {recallErr}</div>}
+        {!recallErr && searched && (
+          <div className="knowledge-recall">
+            {recall.trim() === "" ? (
+              <div className="graph-note">
+                Nothing matched. Either the brain holds nothing about that, or recall is
+                unavailable because no embedding model is configured.
+              </div>
+            ) : (
+              <div className="prose-panel">{recall}</div>
+            )}
+          </div>
+        )}
+
         {status?.nodes === 0 && (
           <div className="graph-note">
             {brain} has no entities yet, so the scene is empty. It fills in on its own as SuperAI
@@ -162,6 +272,7 @@ export default function GraphView() {
         )}
         <iframe
           key={`${GRAPH_SRC ?? status?.url}#${nonce}`}
+          ref={frameRef}
           className="graph-frame"
           src={GRAPH_SRC ?? status?.url}
           title="CortexDB knowledge graph"

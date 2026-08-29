@@ -10,20 +10,18 @@ const NAV: { section: string; items: { key: ViewKey; label: string; icon: string
   {
     section: "Knowledge",
     items: [
-      { key: "memory", label: "Memory", icon: "🧠" },
       // Next to Memory on purpose: it is the same store, seen whole instead of
       // one recall at a time.
-      { key: "graph", label: "Graph", icon: "🕸️" },
+      { key: "knowledge", label: "Knowledge", icon: "🧠" },
       { key: "skills", label: "Skills", icon: "🧩" },
       { key: "mcp", label: "MCP", icon: "🔌" },
       { key: "data", label: "Data", icon: "🗄️" },
-      { key: "life", label: "Records", icon: "🗂️" },
+      { key: "records", label: "Records", icon: "🗂️" },
     ],
   },
   {
     section: "System",
     items: [
-      { key: "avatar", label: "Avatar", icon: "🎭" },
       { key: "settings", label: "Settings", icon: "⚙️" },
     ],
   },

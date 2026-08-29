@@ -1048,3 +1048,12 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
   background: none; border: none; color: inherit; cursor: pointer;
   text-decoration: underline; font-size: 12px; padding: 0;
 }
+
+/* The recall bar above the scene. It is one row and stays one row: the graph is
+   the subject of this page, and a search box that grows pushes it off screen. */
+.knowledge-search { display: flex; gap: 8px; align-items: center; flex: none; }
+.knowledge-search .input { flex: 1; }
+/* Recall output is capped rather than allowed to grow. A long answer would take
+   the whole page and leave the graph — which the same search just highlighted —
+   with nowhere to be seen. */
+.knowledge-recall { flex: none; max-height: 30vh; overflow: auto; }
