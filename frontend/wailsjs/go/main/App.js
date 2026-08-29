@@ -190,6 +190,10 @@ export function SetUIRules(arg1) {
   return window['go']['main']['App']['SetUIRules'](arg1);
 }
 
+export function SetWindowTheme(arg1) {
+  return window['go']['main']['App']['SetWindowTheme'](arg1);
+}
+
 export function Skills() {
   return window['go']['main']['App']['Skills']();
 }

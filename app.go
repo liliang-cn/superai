@@ -1002,3 +1002,29 @@ func (a *App) EmitAvatarTest(emotion string) {
 	driver.Emit(backend.AvatarEvent{Type: "speech", Text: "这是一条头像测试事件 (" + emotion + ")"})
 	driver.Emit(backend.AvatarEvent{Type: "state", State: backend.AvatarStateSpeaking})
 }
+
+// SetWindowTheme paints the window chrome to match the UI's theme.
+//
+// The web view is only the middle of the window. On macOS the title bar and the
+// area behind the page are drawn by the OS from the background colour Wails was
+// given at startup, so switching the page to light left a dark bar above it and
+// a dark edge around it — the app looked half-converted, which is worse than
+// picking one and staying there.
+//
+// Called from the frontend whenever the theme changes, because the frontend is
+// where that decision is made and remembered. A no-op without a window: serve
+// mode has no chrome to paint, and the browser tab draws its own.
+func (a *App) SetWindowTheme(dark bool) {
+	if a.ctx == nil {
+		return
+	}
+	// The same two colours the stylesheet uses for --bg-0, so the seam between
+	// the page and the chrome around it does not show.
+	if dark {
+		runtime.WindowSetBackgroundColour(a.ctx, 14, 17, 22, 255)
+		runtime.WindowSetDarkTheme(a.ctx)
+		return
+	}
+	runtime.WindowSetBackgroundColour(a.ctx, 250, 250, 251, 255)
+	runtime.WindowSetLightTheme(a.ctx)
+}

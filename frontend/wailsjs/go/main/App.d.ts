@@ -98,6 +98,8 @@ export function SetScheduledPromptEnabled(arg1:string,arg2:boolean):Promise<stri
 
 export function SetUIRules(arg1:string):Promise<string>;
 
+export function SetWindowTheme(arg1:boolean):Promise<void>;
+
 export function Skills():Promise<Array<backend.SkillInfo>>;
 
 export function StartYoloMode(arg1:number):Promise<Record<string, any>>;

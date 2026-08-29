@@ -17,7 +17,7 @@ import { AppStatus, ViewKey, normalizeStatus } from "./lib/types";
 import { useScheduleRuns } from "./lib/useScheduleRuns";
 import { useToolApprovals } from "./lib/useToolApprovals";
 import { uiRules } from "./lib/aigui";
-import { GetStatus, SetUIRules } from "../wailsjs/go/main/App";
+import { GetStatus, SetUIRules, SetWindowTheme } from "../wailsjs/go/main/App";
 
 type Theme = "dark" | "light";
 
@@ -52,6 +52,13 @@ export default function App() {
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     localStorage.setItem("superai-theme", theme);
+    // The window chrome is drawn by the OS, not by this stylesheet. Without
+    // this the title bar keeps whatever colour the app started with, and a
+    // light page sits under a dark bar looking half-converted. Runs on mount
+    // too, so a remembered theme is matched before the first paint rather than
+    // only after the next toggle. Harmless in a browser tab, which has no
+    // chrome of its own to paint.
+    void SetWindowTheme(theme === "dark").catch(() => {});
   }, [theme]);
 
   // Tell the agent which rich blocks this transcript can render. The rules come
