@@ -180,6 +180,12 @@ func NewService(s *Settings) (*Service, error) {
 	// phrased as a disable.
 	gate := NewToolGate(!s.DisableToolApproval, AuditLogPath())
 
+	// --- Plan persistence. ---
+	//
+	// Deliberately not the brain: a run's steps are what happened once, and a
+	// few thousand of them would bury the knowledge they sit next to.
+	planStore := NewGraphPlanStore(filepath.Join(cfg.DataDir(), "plans"))
+
 	// --- Build the agent service. ---
 	b := agent.New("SuperAI").
 		WithPrompt(buildPersona(time.Now(), !s.DisableSelfInstall) + uiRulesSection()).
@@ -188,6 +194,12 @@ func NewService(s *Settings) (*Service, error) {
 		WithSandbox(sb).
 		WithAutonomy(agent.AutonomyProfile{MaxRounds: s.MaxRounds, Scratchpad: true}).
 		WithSkills().
+		// A plan that outlives the process. Without it a long task that is
+		// interrupted comes back having forgotten what it was doing — which is
+		// the moment the plan is the only thing worth keeping. Each task gets
+		// its own graph under <data>/plans, which is also what serve_graph_3d
+		// renders, so a run can be watched filling in its own plan.
+		WithPlanStore(planStore).
 		WithOptions(agent.Options{
 			Deliverables: true,
 			// Both, always. agent-go treats a nil policy next to a non-nil

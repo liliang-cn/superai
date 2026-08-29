@@ -2,6 +2,7 @@ package backend
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -192,14 +193,18 @@ func TestEnsureServesTheLivePage(t *testing.T) {
 func TestEnsureRestartsWhenTheBrainChanges(t *testing.T) {
 	t.Setenv("SUPERAI_DESKTOP_HOME", t.TempDir())
 	t.Setenv("CORTEXDB_REMOTE", "")
-	g := &GraphViews{open: fakeSource("brain-one", 1)}
+	// Named after the backend it was opened for, so an answer says which view
+	// gave it. A fixed name cannot distinguish the old view from the new one
+	// when they share a port.
+	g := &GraphViews{open: func(s *Settings) (*liveview.Source, error) {
+		return fakeSource(s.MemoryBackend, 1)(s)
+	}}
 	defer func() { _ = g.Close() }()
 
 	first, err := g.Ensure(context.Background(), &Settings{MemoryBackend: MemoryBackendLocal})
 	if err != nil {
 		t.Fatalf("Ensure local: %v", err)
 	}
-	oldURL := first.URL()
 
 	second, err := g.Ensure(context.Background(), &Settings{
 		MemoryBackend:        MemoryBackendShared,
@@ -211,12 +216,35 @@ func TestEnsureRestartsWhenTheBrainChanges(t *testing.T) {
 	if first == second {
 		t.Fatal("switching the memory backend kept the old brain's view")
 	}
-	// The old listener has to be gone, not merely forgotten: a stale view of
-	// the previous brain still answering on its port is the failure this key
-	// exists to prevent.
-	if _, err := http.Get(oldURL); err == nil {
-		t.Fatalf("the previous view is still serving %s", oldURL)
+	// The old view has to be shut down, not merely forgotten: a stale view of
+	// the previous brain still answering is the failure this key exists to
+	// prevent.
+	//
+	// Checked by asking what is on that port and seeing which brain answers,
+	// not by expecting the port to go quiet. Both views ask for
+	// liveview.DefaultPort, so the second normally takes it straight back the
+	// moment the first lets go — a dead port is not what success looks like
+	// here, and asserting on one made this test fail about three runs in eight.
+	if got := graphSourceAt(first.URL()); got == "local" {
+		t.Fatalf("the previous brain's view is still answering on %s", first.URL())
 	}
+}
+
+// graphSourceAt reports which brain the view on this address is reading, or ""
+// if nothing answers.
+func graphSourceAt(url string) string {
+	resp, err := http.Get(url + "/api/graph")
+	if err != nil {
+		return ""
+	}
+	defer func() { _ = resp.Body.Close() }()
+	var payload struct {
+		Source string `json:"source"`
+	}
+	if json.NewDecoder(resp.Body).Decode(&payload) != nil {
+		return ""
+	}
+	return payload.Source
 }
 
 func TestEnsureReportsAFailedOpen(t *testing.T) {
