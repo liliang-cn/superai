@@ -32,12 +32,12 @@ func (s *Service) registerInstallTools() {
 	// may look for a capability on its own and only needs approval to install.
 	svc.AddTool(
 		"search_mcp_servers",
-		"搜索可安装的 MCP server(官方 registry)。当前任务需要你不具备的能力时先调用它,再把结果里的 command/args 原样交给 add_mcp_server 安装。返回的 required_env 是该 server 必须的环境变量,缺少时要先向用户索要。",
+		"Search the official registry for installable MCP servers. Call it first whenever the task needs a capability you do not have, then hand the command/args from the result to add_mcp_server verbatim to install it. The required_env in a result lists the environment variables that server needs; ask the user for any you are missing before installing.",
 		map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
-				"query": map[string]interface{}{"type": "string", "description": "能力关键词,如 filesystem / postgres / slack"},
-				"limit": map[string]interface{}{"type": "integer", "description": "最多返回几条,默认 10"},
+				"query": map[string]interface{}{"type": "string", "description": "Capability keyword, e.g. filesystem / postgres / slack"},
+				"limit": map[string]interface{}{"type": "integer", "description": "How many results at most; defaults to 10"},
 			},
 			"required": []string{"query"},
 		},
@@ -53,12 +53,12 @@ func (s *Service) registerInstallTools() {
 	// --- search_skills ---
 	svc.AddTool(
 		"search_skills",
-		"搜索本机可安装的 skill(SKILL.md 格式,含 ~/.claude/skills)。任务需要某方面专门知识/流程时先搜,再用 install_skill 的 source_path 装上。installed=true 表示已经装过。",
+		"Search this machine for installable skills (SKILL.md format, including ~/.claude/skills). Search first whenever the task needs specialist knowledge or a set procedure, then install with install_skill's source_path. installed=true means it is already installed.",
 		map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
-				"query": map[string]interface{}{"type": "string", "description": "关键词,如 go / 投资 / 前端;留空列出全部"},
-				"limit": map[string]interface{}{"type": "integer", "description": "最多返回几条,默认 20"},
+				"query": map[string]interface{}{"type": "string", "description": "Keyword, e.g. go / investing / frontend; leave blank to list everything"},
+				"limit": map[string]interface{}{"type": "integer", "description": "How many results at most; defaults to 20"},
 			},
 		},
 		func(_ context.Context, a map[string]interface{}) (interface{}, error) {
@@ -70,14 +70,14 @@ func (s *Service) registerInstallTools() {
 	// --- add_mcp_server ---
 	svc.AddToolWithMetadata(
 		"add_mcp_server",
-		"安装/添加一个 MCP server(用户在对话里说想加某个 MCP 工具时调用)。会立即启动(stdio)并写入 ~/.superai-desktop/mcpServers.json,重启后仍在。",
+		"Install/add an MCP server (call it when the user asks in conversation for some MCP tool). It starts immediately over stdio and is written to ~/.superai-desktop/mcpServers.json, so it survives a restart.",
 		map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
-				"name":    map[string]interface{}{"type": "string", "description": "server 名称,如 filesystem"},
-				"command": map[string]interface{}{"type": "string", "description": "启动命令,如 npx"},
-				"args":    map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "string"}, "description": "命令参数,如 ['-y','@modelcontextprotocol/server-filesystem','/path']"},
-				"env":     map[string]interface{}{"type": "object", "description": "环境变量(可选)"},
+				"name":    map[string]interface{}{"type": "string", "description": "Server name, e.g. filesystem"},
+				"command": map[string]interface{}{"type": "string", "description": "Command to launch it, e.g. npx"},
+				"args":    map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "string"}, "description": "Command arguments, e.g. ['-y','@modelcontextprotocol/server-filesystem','/path']"},
+				"env":     map[string]interface{}{"type": "object", "description": "Environment variables (optional)"},
 			},
 			"required": []string{"name", "command"},
 		},
@@ -89,7 +89,7 @@ func (s *Service) registerInstallTools() {
 			}
 			args := argStrSlice(a, "args")
 			env := argStrMap(a, "env")
-			started, note := true, "已启动并写入配置。"
+			started, note := true, "Started and written to the config."
 			if err := s.InstallMCPServer(ctx, name, command, args, env); err != nil {
 				started, note = false, err.Error()
 				if !strings.Contains(err.Error(), "did not start") {
@@ -112,14 +112,14 @@ func (s *Service) registerInstallTools() {
 	// --- install_skill ---
 	svc.AddToolWithMetadata(
 		"install_skill",
-		"安装一个 skill。三种来源:本机路径(source_path,配合 search_skills)、git 仓库(git_url)、或直接给 SKILL.md 内容(skill_md)。装到 ~/.superai-desktop/skills/<name> 并热重载;装好后在 Skills 面板可见。",
+		"Install a skill from one of three sources: a local path (source_path, paired with search_skills), a git repository (git_url), or SKILL.md content given directly (skill_md). It is installed into ~/.superai-desktop/skills/<name> and hot-reloaded; once installed it shows up in the Skills panel.",
 		map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
-				"name":        map[string]interface{}{"type": "string", "description": "skill 名称(目录名)"},
-				"git_url":     map[string]interface{}{"type": "string", "description": "git 仓库地址(可选,与 skill_md 二选一)"},
-				"skill_md":    map[string]interface{}{"type": "string", "description": "直接提供的 SKILL.md 内容(可选)"},
-				"source_path": map[string]interface{}{"type": "string", "description": "本机上的 skill 目录(可选),用 search_skills 返回的 path"},
+				"name":        map[string]interface{}{"type": "string", "description": "Skill name (the directory name)"},
+				"git_url":     map[string]interface{}{"type": "string", "description": "Git repository URL (optional; either this or skill_md)"},
+				"skill_md":    map[string]interface{}{"type": "string", "description": "SKILL.md content given directly (optional)"},
+				"source_path": map[string]interface{}{"type": "string", "description": "A skill directory on this machine (optional); use the path returned by search_skills"},
 			},
 			"required": []string{"name"},
 		},

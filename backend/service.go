@@ -563,7 +563,7 @@ func (s *Service) reminderScheduler() (*agent.PromptScheduler, error) {
 		return s.ownedScheduler, nil
 	}
 	if s.svc == nil {
-		return nil, fmt.Errorf("定时功能未启动")
+		return nil, fmt.Errorf("the scheduler is not running")
 	}
 	sch, err := s.svc.NewPromptScheduler(agent.WithPromptSessionID("scheduled"))
 	if err != nil {
@@ -614,31 +614,31 @@ func (s *Service) HasBrowser() bool { return false }
 // the model to call search_mcp_servers when the schema has no such tool is an
 // invitation to waste a round discovering that.
 const selfInstallSection = `
-- 【能力不够时自己去装】任务需要你现在没有的能力时，不要直接说做不到：
-  · 缺工具（连数据库、访问某个服务、操作某类文件…）→ search_mcp_servers 搜，把结果里的 command/args 原样交给 add_mcp_server 装上再继续。
-  · 缺专门知识或固定流程（某语言的最佳实践、某种文档的写法…）→ search_skills 搜，用 install_skill 的 source_path 装上再继续。
-  · 搜到的 server 若有 required_env（API key 之类），先向用户要，别拿空值去装。
-  · 装完直接接着做原来的任务，不用等用户再说一次。同一个能力只装一次，装之前先看已有的工具够不够。`
+- When you lack a capability, go and get it — a task that needs something you do not have yet is not a task you refuse:
+  · Missing a tool (reach a database, call a service, handle a kind of file…) → search_mcp_servers, hand the command/args from the result to add_mcp_server verbatim, install, carry on.
+  · Missing specialist knowledge or a set procedure (a language's best practice, how a kind of document is written…) → search_skills, install with install_skill's source_path, carry on.
+  · If the server you found lists required_env (an API key and the like), ask the user for it first; never install with empty values.
+  · Once installed, resume the original task without waiting to be asked again. Install a capability once, and check the tools you already have before installing anything.`
 
 func buildPersona(now time.Time, selfInstall bool) string {
 	installHint := ""
 	if selfInstall {
 		installHint = selfInstallSection
 	}
-	return fmt.Sprintf(`你是 SuperAI，一个有温度的随身 AI 生活/工作助手桌面应用。
-当前系统时间：%s %s（%s），时区 %s。
-凡涉及相对时间（今天/明天/后天/大后天/这周五/下周一/下下周一/下个月3号/今晚N点…），都【必须先调用 resolve_datetime 工具】换算成绝对时间，再用返回的 rfc3339 去建日程/设提醒。绝不要自己心算日期。
+	return fmt.Sprintf(`You are SuperAI, a warm everyday AI assistant for life and work, running as a desktop app.
+Current system time: %s %s (%s), timezone %s.
+For any relative time (today, tomorrow, the day after tomorrow, this Friday, next Monday, the Monday after next, the 3rd of next month, N o'clock tonight…) you MUST call resolve_datetime first to turn it into an absolute time, then use the rfc3339 it returns to create the schedule or reminder. Never work a date out in your head.
 
-职责：
-- 从用户的话里识别意图，主动调用工具记录：约定/会面→add_schedule；提到人→upsert_person；工作/踩坑→add_record(work,挂 project)；生活/心情→add_record(diary)；笔记→add_record(note)；打卡/习惯→add_record(habit)。
+Duties:
+- Read the intent behind what the user says and record it unprompted: a plan or meeting→add_schedule; a person mentioned→upsert_person; work or a problem hit→add_record(work, with project); life or mood→add_record(diary); a note→add_record(note); a check-in or habit→add_record(habit).
 - Scheduling: call exactly ONE tool. Every day at HH:MM, or one specific moment → set_reminder. Any other cadence — a weekday, every Monday, every few hours, a day of the month → schedule_prompt, which takes a cron and can say what the other cannot. Calling both leaves two schedules for one request, and one of them is always wrong.
-- 只要用户在陈述发生的事或要求记录/提醒，必须先调用对应工具存下来再回复。
-- 需要查最新/实时/记忆里没有的信息（天气、行情、新闻、事实核对…）时，用 web_search 搜；需要阅读/审阅某个具体网址的真实页面内容时，用 fetch_url 抓取该网页正文。
-- 你有沙箱、浏览器、视觉、可交付物与技能可用，复杂任务可以自主多步完成。%s
-- 回答用中文，简短、自然、有人情味。每条回复最后单独一行输出情绪标签，格式严格为：情绪: <中性|开心|思考|惊讶|关心|抱歉>。
+- Whenever the user states something that happened, or asks to be reminded or to have something recorded, store it with the matching tool before you reply.
+- When you need something current, live, or not in memory (weather, markets, news, fact-checking…), search with web_search; when you need to read or review the real content of a specific URL, fetch that page's text with fetch_url.
+- You have a sandbox, a browser, vision, deliverables and skills; take complex tasks through as many steps as they need on your own.%s
+- Answer in Chinese: short, natural, human. End every reply with the emotion tag alone on the last line, in exactly this format: 情绪: <中性|开心|思考|惊讶|关心|抱歉>.
 
-严禁输出英文、日文或韩文，一律用中文回复。`,
-		now.Format("2006-01-02"), now.Format("15:04:05"), weekdayCN(now), now.Format("-07:00"), installHint)
+Never answer in English, Japanese or Korean — always Chinese.`,
+		now.Format("2006-01-02"), now.Format("15:04:05"), now.Format("Monday"), now.Format("-07:00"), installHint)
 }
 
 // uiRulesSection appends the transcript's rendering rules to the persona, so
@@ -650,10 +650,6 @@ func uiRulesSection() string {
 		return ""
 	}
 	return "\n\n" + rules
-}
-
-func weekdayCN(t time.Time) string {
-	return "周" + []string{"日", "一", "二", "三", "四", "五", "六"}[int(t.Weekday())]
 }
 
 // ----------------------------------------------------------------------------
@@ -737,10 +733,10 @@ func (s *Service) registerLifeTools() {
 		return map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": desc}
 	}
 
-	svc.AddToolWithMetadata("add_schedule", "新建一条日程/约会。时间请用 RFC3339 绝对时间（先用 resolve_datetime 换算）。",
+	svc.AddToolWithMetadata("add_schedule", "Create a calendar entry or appointment. Give the time as an absolute RFC3339 timestamp (resolve it with resolve_datetime first).",
 		obj(map[string]any{
-			"title": sp("日程标题"), "start_at": sp("开始时间 RFC3339"),
-			"location": sp("地点"), "participants": arr("参与人姓名"),
+			"title": sp("Title of the entry"), "start_at": sp("Start time, RFC3339"),
+			"location": sp("Location"), "participants": arr("Names of the participants"),
 		}, "title", "start_at"),
 		func(ctx context.Context, a map[string]any) (any, error) {
 			db.mu.Lock()
@@ -754,17 +750,17 @@ func (s *Service) registerLifeTools() {
 			return okData(rec), nil
 		}, write)
 
-	svc.AddToolWithMetadata("list_schedules", "列出全部日程。", obj(map[string]any{}),
+	svc.AddToolWithMetadata("list_schedules", "List every calendar entry.", obj(map[string]any{}),
 		func(ctx context.Context, a map[string]any) (any, error) {
 			db.mu.Lock()
 			defer db.mu.Unlock()
 			return okData(db.Schedules), nil
 		}, read)
 
-	svc.AddToolWithMetadata("add_record", "记录一条内容：日记/工作/笔记/习惯。",
+	svc.AddToolWithMetadata("add_record", "Record one entry: diary, work, note or habit.",
 		obj(map[string]any{
-			"type": sp("类型：diary|work|note|habit"), "title": sp("简短标题"),
-			"body": sp("正文内容"), "tags": arr("标签"), "project": sp("所属项目（工作记录用）"),
+			"type": sp("Kind: diary|work|note|habit"), "title": sp("Short title"),
+			"body": sp("Body text"), "tags": arr("Tags"), "project": sp("Project it belongs to (for work records)"),
 		}, "type", "body"),
 		func(ctx context.Context, a map[string]any) (any, error) {
 			db.mu.Lock()
@@ -779,8 +775,8 @@ func (s *Service) registerLifeTools() {
 			return okData(rec), nil
 		}, write)
 
-	svc.AddToolWithMetadata("search_records", "按关键词检索记录，可选按 type 过滤。",
-		obj(map[string]any{"query": sp("关键词"), "type": sp("可选：diary|work|note|habit")}, "query"),
+	svc.AddToolWithMetadata("search_records", "Search records by keyword, optionally filtered by type.",
+		obj(map[string]any{"query": sp("Keyword"), "type": sp("Optional: diary|work|note|habit")}, "query"),
 		func(ctx context.Context, a map[string]any) (any, error) {
 			db.mu.Lock()
 			defer db.mu.Unlock()
@@ -798,9 +794,9 @@ func (s *Service) registerLifeTools() {
 			return okData(hits), nil
 		}, read)
 
-	svc.AddToolWithMetadata("upsert_person", "新建或更新一个人物档案（关系、偏好、最近动态）。",
+	svc.AddToolWithMetadata("upsert_person", "Create or update a person's profile (relationship, preferences, what they are up to).",
 		obj(map[string]any{
-			"name": sp("姓名"), "relation": sp("关系，如同事/朋友/室友"), "note": sp("偏好或最近动态"),
+			"name": sp("Name"), "relation": sp("Relationship, e.g. colleague/friend/flatmate"), "note": sp("Preferences or recent news"),
 		}, "name"),
 		func(ctx context.Context, a map[string]any) (any, error) {
 			db.mu.Lock()
@@ -825,11 +821,11 @@ func (s *Service) registerLifeTools() {
 	// only appended a row to a JSON file while telling the model "SuperAI will
 	// remind you when it is due" — a promise nothing kept.
 	svc.AddToolWithMetadata("set_reminder",
-		"设置提醒，到点会真的触发（后台常驻时即使 app 关着也会）。时间用 HH:MM（每天）或 RFC3339。",
+		"Set a reminder that really fires when it comes due (even with the app closed, as long as the background service is resident). Give the time as HH:MM (every day) or RFC3339.",
 		obj(map[string]any{
-			"title":      sp("提醒内容；也可以是要先做的事，如「看看昨天的部署有没有问题」"),
-			"remind_at":  sp("每天用 HH:MM（如 08:00）；具体某天用 RFC3339"),
-			"recurrence": sp("daily 或 none；HH:MM 默认 daily"),
+			"title":      sp("What to remind about; it may also be something to do first, e.g. \"check whether yesterday's deploy is healthy\""),
+			"remind_at":  sp("HH:MM for every day (e.g. 08:00); RFC3339 for one specific day"),
+			"recurrence": sp("daily or none; HH:MM defaults to daily"),
 		}, "title", "remind_at"),
 		func(ctx context.Context, a map[string]any) (any, error) {
 			title := strings.TrimSpace(str(a, "title"))
@@ -843,7 +839,7 @@ func (s *Service) registerLifeTools() {
 
 			sch, err := s.reminderScheduler()
 			if err != nil {
-				return errResult("提醒功能不可用：" + err.Error()), nil
+				return errResult("reminders are unavailable: " + err.Error()), nil
 			}
 			// One request, one schedule — see schedule_once.go. What is already
 			// scheduled is asked first: the in-memory claim below cannot see a
@@ -885,7 +881,7 @@ func (s *Service) registerLifeTools() {
 				// year and removed as soon as it has fired — see reminder_once.go.
 				// Said plainly because a reminder that deletes itself is a
 				// surprise if you go looking for it afterwards.
-				data["note"] = "这条只响一次，响过就会自动删除。"
+				data["note"] = "This fires once and is deleted automatically after it has fired."
 			}
 			return okData(data), nil
 		}, write)
@@ -913,7 +909,7 @@ func (s *Service) registerLifeTools() {
 			}
 			sch, err := s.reminderScheduler()
 			if err != nil {
-				return errResult("定时功能不可用：" + err.Error()), nil
+				return errResult("scheduling is unavailable: " + err.Error()), nil
 			}
 			if existing, lerr := sch.List(); lerr == nil {
 				if held := alreadyScheduled(existing, prompt); held != nil {
@@ -937,7 +933,7 @@ func (s *Service) registerLifeTools() {
 			s.claims.record(prompt, task.ID, task.Schedule)
 			data := map[string]any{"id": task.ID, "prompt": prompt, "schedule": task.Schedule}
 			if once {
-				data["note"] = "这条只响一次，响过就会自动删除。"
+				data["note"] = "This fires once and is deleted automatically after it has fired."
 			}
 			// The next run is the only part a person can check against what they
 			// meant. A cron they cannot read is not a confirmation.
@@ -947,7 +943,7 @@ func (s *Service) registerLifeTools() {
 			return okData(data), nil
 		}, write)
 
-	svc.AddToolWithMetadata("list_reminders", "列出全部提醒。", obj(map[string]any{}),
+	svc.AddToolWithMetadata("list_reminders", "List every reminder.", obj(map[string]any{}),
 		func(ctx context.Context, a map[string]any) (any, error) {
 			db.mu.Lock()
 			rows := append([]map[string]any(nil), db.Reminders...)

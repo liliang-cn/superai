@@ -88,7 +88,7 @@ func ReminderToCron(remindAt, recurrence string) (ReminderSchedule, error) {
 		return ReminderSchedule{Cron: remindAt, Note: remindAt}, nil
 	}
 
-	return ReminderSchedule{}, fmt.Errorf("看不懂的提醒时间 %q：用 HH:MM（每天）、RFC3339 时间戳，或 cron 表达式", remindAt)
+	return ReminderSchedule{}, fmt.Errorf("cannot make sense of the reminder time %q: use HH:MM (every day), an RFC3339 timestamp, or a cron expression", remindAt)
 }
 
 // ReminderPrompt is what the agent is asked to do when a reminder fires.
@@ -99,7 +99,8 @@ func ReminderToCron(remindAt, recurrence string) (ReminderSchedule, error) {
 // a mail, a notification.
 func ReminderPrompt(title string) string {
 	title = strings.TrimSpace(title)
-	return fmt.Sprintf("现在是提醒时间。提醒事项：%s\n\n"+
-		"请用一句话把这个提醒告诉用户。如果提醒内容本身要求你先做点什么"+
-		"（查一下、算一下、看一下），先做完再告诉用户结果。", title)
+	return fmt.Sprintf("This reminder is now due. Reminder: %s\n\n"+
+		"Tell the user about it in one sentence. If the reminder itself asks you to "+
+		"do something first (look something up, work something out, check something), "+
+		"do that first and tell them the result.", title)
 }

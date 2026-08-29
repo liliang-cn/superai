@@ -13,13 +13,13 @@ import (
 // nothing to transport — it only acknowledges.
 func (s *Service) registerNotifyTool() {
 	s.svc.AddToolWithMetadata("notify_user",
-		"在长任务中途给用户发一条独立的即时消息：阶段性结论、已确认的部分结果、重要发现或计划变更。用户会立刻看到它，不用等最终答案。最终答案仍需照常给出——不要用本工具代替最终答案，也不要重复已发过的内容。简短任务不需要它。",
+		"Send the user a standalone interim message partway through a long task: an intermediate conclusion, a confirmed partial result, an important finding, or a change of plan. They see it immediately, without waiting for the final answer. Still give the final answer as usual — do not use this tool in place of it, and do not repeat what you have already sent. Short tasks do not need it.",
 		map[string]any{
 			"type": "object",
 			"properties": map[string]any{
 				"message": map[string]any{
 					"type":        "string",
-					"description": "要发给用户的消息，支持 Markdown",
+					"description": "The message to send the user; Markdown is supported",
 				},
 			},
 			"required": []string{"message"},

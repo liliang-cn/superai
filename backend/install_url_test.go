@@ -235,17 +235,17 @@ func TestInstallLoopFetchGuards(t *testing.T) {
 func TestInstallLoopContextCarriesPagesAndAttempts(t *testing.T) {
 	loop := newInstallLoop()
 	loop.pages = append(loop.pages, readPage{url: "https://x/readme", text: "run npx -y thing"})
-	loop.note("试装 thing 失败: %v", "exec: npx not found")
+	loop.note("installing thing failed: %v", "exec: npx not found")
 
 	ctx := loop.context()
-	for _, want := range []string{"https://x/readme", "npx -y thing", "npx not found", "不要重复"} {
+	for _, want := range []string{"https://x/readme", "npx -y thing", "npx not found", "do not repeat"} {
 		if !strings.Contains(ctx, want) {
 			t.Errorf("loop context missing %q:\n%s", want, ctx)
 		}
 	}
 
 	trace := loop.trace()
-	if len(trace) != 2 || !strings.HasPrefix(trace[0], "读取 ") {
+	if len(trace) != 2 || !strings.HasPrefix(trace[0], "read ") {
 		t.Errorf("trace should list the page read then the attempt, got %v", trace)
 	}
 }
@@ -265,7 +265,7 @@ func TestInstallLoopTruncatesHugePages(t *testing.T) {
 	if got := len(loop.pages[0].text); got > pageBudget+64 {
 		t.Errorf("page kept at %d bytes, should be trimmed to about %d", got, pageBudget)
 	}
-	if !strings.Contains(loop.pages[0].text, "截断") {
+	if !strings.Contains(loop.pages[0].text, "truncated") {
 		t.Error("a trimmed page should say so, or the model will think it saw everything")
 	}
 }
@@ -275,12 +275,12 @@ func TestInstallSucceededReadsThePayloadNotTheEnvelope(t *testing.T) {
 	// the install failed, so judging by the envelope calls failure success.
 	writtenButBroken := okData(map[string]interface{}{
 		"installed": false,
-		"note":      "SKILL.md 格式可能不对",
+		"note":      "the SKILL.md is probably malformed",
 	})
 	if installSucceeded(writtenButBroken) {
 		t.Error("installed=false must not count as success just because ok=true")
 	}
-	if got := resultProblem(writtenButBroken); !strings.Contains(got, "格式") {
+	if got := resultProblem(writtenButBroken); !strings.Contains(got, "malformed") {
 		t.Errorf("resultProblem = %q, want the note", got)
 	}
 

@@ -46,7 +46,7 @@ func TestUIRulesRoundTrip(t *testing.T) {
 	if !strings.Contains(persona, "```chart") {
 		t.Error("persona must carry the rendering rules")
 	}
-	if !strings.Contains(persona, "你是 SuperAI") {
+	if !strings.Contains(persona, "You are SuperAI") {
 		t.Error("persona must keep its original instructions")
 	}
 }

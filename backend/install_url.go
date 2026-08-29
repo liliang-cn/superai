@@ -60,13 +60,13 @@ func (s *Service) registerURLInstallTools() {
 
 	svc.AddToolWithMetadata(
 		"install_mcp_from_url",
-		"给一个网址(README/文档/npm 页面/GitHub 仓库),自动读懂安装方式并装上这个 MCP server。会自己多轮探索:读页面→必要时追读相关页面→试装→装不上就根据报错换个方式重试→装好后验证工具数。用户说\"装一下这个 MCP: <url>\"时用它。如果需要 API key 等环境变量而用户没给,会返回 needs_env——此时向用户索要,拿到后带 env 再调一次。",
+		"Given a URL (README, docs, npm page, GitHub repo), work out how this MCP server is installed and install it. It explores over several rounds by itself: read the page, follow linked pages when needed, try installing, retry a different way when the error says why, then verify the tool count. Use it when the user says \"install this MCP: <url>\". If it needs environment variables such as an API key that the user has not given, it returns needs_env — ask the user for them and call again with env.",
 		map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
-				"url":  map[string]interface{}{"type": "string", "description": "MCP server 的文档/仓库网址"},
-				"name": map[string]interface{}{"type": "string", "description": "可选,指定安装后的 server 名称"},
-				"env":  map[string]interface{}{"type": "object", "description": "可选,环境变量(如 {\"GITHUB_TOKEN\":\"ghp_xxx\"})"},
+				"url":  map[string]interface{}{"type": "string", "description": "URL of the MCP server's docs or repository"},
+				"name": map[string]interface{}{"type": "string", "description": "Optional; the name to install the server under"},
+				"env":  map[string]interface{}{"type": "object", "description": "Optional; environment variables (e.g. {\"GITHUB_TOKEN\":\"ghp_xxx\"})"},
 			},
 			"required": []string{"url"},
 		},
@@ -78,12 +78,12 @@ func (s *Service) registerURLInstallTools() {
 
 	svc.AddToolWithMetadata(
 		"install_skill_from_url",
-		"给一个网址(git 仓库/raw SKILL.md/文档页),自动读懂并安装成一个 skill。会自己多轮探索:判断是仓库还是说明页→clone 或据页面写出 SKILL.md→验证装好。装到 ~/.superai-desktop/skills/<name> 并热重载。",
+		"Given a URL (git repository, raw SKILL.md, docs page), work out what it is and install it as a skill. It explores over several rounds by itself: decide whether it is a repository or a description page, clone it or write a SKILL.md from the page, then verify it loaded. Installed into ~/.superai-desktop/skills/<name> and hot-reloaded.",
 		map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
-				"url":  map[string]interface{}{"type": "string", "description": "skill 的仓库地址、raw SKILL.md 链接或说明页网址"},
-				"name": map[string]interface{}{"type": "string", "description": "可选,指定安装后的 skill 名称(目录名)"},
+				"url":  map[string]interface{}{"type": "string", "description": "The skill's repository URL, a raw SKILL.md link, or a description page"},
+				"name": map[string]interface{}{"type": "string", "description": "Optional; the name (directory name) to install the skill under"},
 			},
 			"required": []string{"url"},
 		},
@@ -120,13 +120,13 @@ func newInstallLoop() *installLoop {
 func (l *installLoop) fetch(ctx context.Context, rawURL string) error {
 	key := strings.TrimSpace(rawURL)
 	if key == "" {
-		return fmt.Errorf("没有给出要读的网址")
+		return fmt.Errorf("no URL to read was given")
 	}
 	if l.visited[key] {
-		return fmt.Errorf("这个网址已经读过了: %s", key)
+		return fmt.Errorf("this URL has already been read: %s", key)
 	}
 	if len(l.pages) >= maxPages {
-		return fmt.Errorf("已经读了 %d 个页面,不再继续读", maxPages)
+		return fmt.Errorf("%d pages have been read already; no more will be read", maxPages)
 	}
 	text, err := fetchReadable(ctx, key)
 	l.visited[key] = true
@@ -146,10 +146,10 @@ func (l *installLoop) note(format string, args ...interface{}) {
 func (l *installLoop) context() string {
 	var b strings.Builder
 	for _, p := range l.pages {
-		fmt.Fprintf(&b, "\n=== 页面: %s ===\n%s\n", p.url, p.text)
+		fmt.Fprintf(&b, "\n=== Page: %s ===\n%s\n", p.url, p.text)
 	}
 	if len(l.attempts) > 0 {
-		b.WriteString("\n=== 之前的尝试(不要重复同样的做法) ===\n")
+		b.WriteString("\n=== Earlier attempts (do not repeat the same approach) ===\n")
 		for i, a := range l.attempts {
 			fmt.Fprintf(&b, "%d. %s\n", i+1, a)
 		}
@@ -162,7 +162,7 @@ func (l *installLoop) context() string {
 func (l *installLoop) trace() []string {
 	out := make([]string, 0, len(l.pages)+len(l.attempts))
 	for _, p := range l.pages {
-		out = append(out, "读取 "+p.url)
+		out = append(out, "read "+p.url)
 	}
 	out = append(out, l.attempts...)
 	return out
@@ -183,23 +183,23 @@ type mcpAction struct {
 	Reason  string   `json:"reason"`
 }
 
-const mcpLoopPrompt = `你在安装一个 MCP server,目标网址: %s
+const mcpLoopPrompt = `You are installing an MCP server. Target URL: %s
 
-每一轮你只选一个动作:
-- fetch: 已有信息不足以确定启动方式时,给出下一个要读的网址(url)。比如 README 指向了文档页、或需要看 npm 包页面确认包名。
-- install: 已经能确定 stdio 启动方式时,给出 name / command / args / env_keys 并安装。
-- need_env: 启动方式已确定,但缺少必需的环境变量(env_keys),需要向用户索要。
-- give_up: 页面与 MCP server 无关,或只支持 http/sse 而无法 stdio 启动;在 reason 里说明。
+Each round, pick exactly one action:
+- fetch: what you have is not enough to determine how it starts — give the next URL to read (url). For example the README points at a docs page, or the npm package page is needed to confirm the package name.
+- install: you can determine the stdio launch — give name / command / args / env_keys and install it.
+- need_env: the launch is determined but required environment variables (env_keys) are missing and must be asked of the user.
+- give_up: the page has nothing to do with an MCP server, or it only supports http/sse and cannot start over stdio; say so in reason.
 
-规则:
-- command 只写可执行文件名(npx / uvx / node / python / docker 居多),参数放 args。
-- npx 记得带 "-y"。
-- env_keys 只列页面明确要求的,不要编造。
-- 路径类占位符(如 /path/to/dir)原样保留在 args 里。
-- 如果上一轮安装失败,读报错再决定:包名写错了就改 args,命令不存在就换等价方式(npx↔uvx),信息不够就 fetch 别的页面。
-- 不要重复已经失败过的完全相同的做法。
+Rules:
+- command is the executable name alone (usually npx / uvx / node / python / docker); the parameters go in args.
+- Remember "-y" with npx.
+- List only the env_keys the page explicitly requires; do not invent any.
+- Keep path placeholders (such as /path/to/dir) verbatim in args.
+- If the last install failed, read the error before deciding: a wrong package name means fixing args, a missing command means an equivalent one (npx<->uvx), too little information means fetching another page.
+- Never repeat an approach that has already failed exactly as it was.
 
-已知信息:%s`
+What is known so far:%s`
 
 // installMCPFromURL works out how to install an MCP server and does it,
 // verifying the result and retrying on failure.
@@ -217,13 +217,13 @@ func (s *Service) installMCPFromURL(ctx context.Context, rawURL, name string, en
 		var act mcpAction
 		prompt := fmt.Sprintf(mcpLoopPrompt, rawURL, loop.context())
 		if err := s.extractJSON(ctx, prompt, mcpActionSchema(), &act); err != nil {
-			return errResult("读取安装方式失败: " + err.Error()), nil
+			return errResult("could not read how to install it: " + err.Error()), nil
 		}
 
 		switch strings.ToLower(strings.TrimSpace(act.Action)) {
 		case "fetch":
 			if err := loop.fetch(ctx, act.URL); err != nil {
-				loop.note("想读 %s 但失败: %v", act.URL, err)
+				loop.note("tried to read %s but failed: %v", act.URL, err)
 			}
 			continue
 
@@ -231,27 +231,27 @@ func (s *Service) installMCPFromURL(ctx context.Context, rawURL, name string, en
 			missing := missingEnv(act.EnvKeys, env)
 			if len(missing) == 0 {
 				// Everything it asked for is already in hand; press on.
-				loop.note("说缺环境变量,但 %v 都已提供,继续安装", act.EnvKeys)
+				loop.note("claimed environment variables were missing, but %v were all supplied; installing anyway", act.EnvKeys)
 				continue
 			}
 			return okData(map[string]interface{}{
 				"installed": false, "needs_env": missing,
 				"server": firstNonEmpty(name, act.Name), "command": act.Command, "args": act.Args,
-				"note":  "这个 MCP server 需要上面的环境变量,请向用户索要后带 env 再调一次。",
+				"note":  "This MCP server needs the environment variables above; ask the user for them and call again with env.",
 				"trace": loop.trace(),
 			}), nil
 
 		case "install":
 			server := sanitizeName(firstNonEmpty(name, act.Name))
 			if server == "" || strings.TrimSpace(act.Command) == "" {
-				loop.note("给出的配置不完整(name=%q command=%q)", act.Name, act.Command)
+				loop.note("the configuration given was incomplete (name=%q command=%q)", act.Name, act.Command)
 				continue
 			}
 			if missing := missingEnv(act.EnvKeys, env); len(missing) > 0 {
 				return okData(map[string]interface{}{
 					"installed": false, "needs_env": missing,
 					"server": server, "command": act.Command, "args": act.Args,
-					"note":  "这个 MCP server 需要上面的环境变量,请向用户索要后带 env 再调一次。",
+					"note":  "This MCP server needs the environment variables above; ask the user for them and call again with env.",
 					"trace": loop.trace(),
 				}), nil
 			}
@@ -260,16 +260,16 @@ func (s *Service) installMCPFromURL(ctx context.Context, rawURL, name string, en
 			tools, running := s.mcpServerState(server)
 			switch {
 			case err != nil:
-				loop.note("试装 %s(%s %s)失败: %v", server, act.Command, strings.Join(act.Args, " "), err)
+				loop.note("installing %s (%s %s) failed: %v", server, act.Command, strings.Join(act.Args, " "), err)
 			case !running:
-				loop.note("装了 %s 但进程没起来", server)
+				loop.note("installed %s but the process did not start", server)
 			case tools == 0:
-				loop.note("%s 起来了但没有暴露任何工具,配置可能不对", server)
+				loop.note("%s started but exposed no tools; the configuration is probably wrong", server)
 			default:
 				return okData(map[string]interface{}{
 					"installed": true, "server": server, "command": act.Command, "args": act.Args,
 					"tools": tools, "rounds": round, "trace": loop.trace(),
-					"note": "已启动并写入配置,重启后仍在。",
+					"note": "Started and written to the config; it survives a restart.",
 				}), nil
 			}
 			// A failed attempt leaves nothing half-installed behind.
@@ -277,7 +277,7 @@ func (s *Service) installMCPFromURL(ctx context.Context, rawURL, name string, en
 			continue
 
 		default: // give_up and anything unrecognised
-			reason := firstNonEmpty(act.Reason, "无法从页面确定安装方式")
+			reason := firstNonEmpty(act.Reason, "could not determine from the page how to install it")
 			return okData(map[string]interface{}{
 				"installed": false, "reason": reason, "trace": loop.trace(),
 			}), nil
@@ -286,7 +286,7 @@ func (s *Service) installMCPFromURL(ctx context.Context, rawURL, name string, en
 
 	return okData(map[string]interface{}{
 		"installed": false,
-		"reason":    fmt.Sprintf("试了 %d 轮仍没装上", maxInstallRounds),
+		"reason":    fmt.Sprintf("still not installed after %d rounds", maxInstallRounds),
 		"trace":     loop.trace(),
 	}), nil
 }
@@ -318,26 +318,26 @@ type skillAction struct {
 	Reason  string `json:"reason"`
 }
 
-const skillLoopPrompt = `你在安装一个 skill(SKILL.md 格式的 AI 技能包),目标网址: %s
+const skillLoopPrompt = `You are installing a skill (an AI skill package in SKILL.md format). Target URL: %s
 
-每一轮你只选一个动作:
-- fetch: 信息不足时,给出下一个要读的网址(url)。
-- clone: 页面里有可以 git clone 的仓库地址时,填 git_url 和 name。
-- write: 页面描述了这个 skill 但没有仓库时,你根据页面内容写出完整的 SKILL.md 放进 skill_md,并给 name。
-- give_up: 页面和 skill 无关;在 reason 里说明。
+Each round, pick exactly one action:
+- fetch: what you have is not enough — give the next URL to read (url).
+- clone: the page carries a repository URL that can be git cloned — fill in git_url and name.
+- write: the page describes the skill but there is no repository — write the complete SKILL.md from the page into skill_md, and give a name.
+- give_up: the page has nothing to do with a skill; say so in reason.
 
-规则:
-- SKILL.md 必须以 YAML frontmatter 开头,含 name 和 description:
+Rules:
+- SKILL.md must open with YAML frontmatter carrying name and description:
   ---
   name: my-skill
   description: Use when ...
   ---
-  然后是正文。
-- name 用小写短横线命名。
-- 只根据页面内容写,不要编造功能。
-- 如果上一轮 clone 失败或仓库里没有 SKILL.md,换个做法:读别的页面,或改用 write 自己写。
+  and then the body.
+- Name it in lowercase with hyphens.
+- Write only from the page's content; do not invent capabilities.
+- If the last clone failed or the repository had no SKILL.md, change approach: read another page, or write it yourself instead.
 
-已知信息:%s`
+What is known so far:%s`
 
 // installSkillFromURL installs a skill, exploring until it has something that
 // actually loads.
@@ -354,7 +354,7 @@ func (s *Service) installSkillFromURL(ctx context.Context, rawURL, name string) 
 		if err != nil || installSucceeded(res) {
 			return res, err
 		}
-		loop.note("直接 clone %s 没成功(%s),继续从页面找线索", rawURL, resultProblem(res))
+		loop.note("cloning %s directly did not work (%s); still looking for clues on the page", rawURL, resultProblem(res))
 	}
 	if err := loop.fetch(ctx, rawURL); err != nil {
 		return errResult(err.Error()), nil
@@ -367,19 +367,19 @@ func (s *Service) installSkillFromURL(ctx context.Context, rawURL, name string) 
 		var act skillAction
 		prompt := fmt.Sprintf(skillLoopPrompt, rawURL, loop.context())
 		if err := s.extractJSON(ctx, prompt, skillActionSchema(), &act); err != nil {
-			return errResult("读取安装方式失败: " + err.Error()), nil
+			return errResult("could not read how to install it: " + err.Error()), nil
 		}
 
 		switch strings.ToLower(strings.TrimSpace(act.Action)) {
 		case "fetch":
 			if err := loop.fetch(ctx, act.URL); err != nil {
-				loop.note("想读 %s 但失败: %v", act.URL, err)
+				loop.note("tried to read %s but failed: %v", act.URL, err)
 			}
 			continue
 
 		case "clone":
 			if strings.TrimSpace(act.GitURL) == "" {
-				loop.note("选了 clone 但没给仓库地址")
+				loop.note("chose clone but gave no repository URL")
 				continue
 			}
 			res, err := s.installSkillFromGit(ctx, act.GitURL, firstNonEmpty(name, act.Name))
@@ -389,12 +389,12 @@ func (s *Service) installSkillFromURL(ctx context.Context, rawURL, name string) 
 			if installSucceeded(res) {
 				return res, nil
 			}
-			loop.note("clone %s 没装成: %s", act.GitURL, resultProblem(res))
+			loop.note("cloning %s did not install it: %s", act.GitURL, resultProblem(res))
 			continue
 
 		case "write":
 			if strings.TrimSpace(act.SkillMD) == "" {
-				loop.note("选了 write 但没给 SKILL.md 内容")
+				loop.note("chose write but gave no SKILL.md content")
 				continue
 			}
 			return s.writeSkill(ctx,
@@ -404,7 +404,7 @@ func (s *Service) installSkillFromURL(ctx context.Context, rawURL, name string) 
 		default:
 			return okData(map[string]interface{}{
 				"installed": false,
-				"reason":    firstNonEmpty(act.Reason, "无法判断安装方式"),
+				"reason":    firstNonEmpty(act.Reason, "could not tell how to install it"),
 				"trace":     loop.trace(),
 			}), nil
 		}
@@ -412,7 +412,7 @@ func (s *Service) installSkillFromURL(ctx context.Context, rawURL, name string) 
 
 	return okData(map[string]interface{}{
 		"installed": false,
-		"reason":    fmt.Sprintf("试了 %d 轮仍没装上", maxInstallRounds),
+		"reason":    fmt.Sprintf("still not installed after %d rounds", maxInstallRounds),
 		"trace":     loop.trace(),
 	}), nil
 }
@@ -422,7 +422,7 @@ func (s *Service) installSkillFromURL(ctx context.Context, rawURL, name string) 
 func (s *Service) installSkillFromGit(ctx context.Context, gitURL, name string) (interface{}, error) {
 	skill := sanitizeName(firstNonEmpty(name, skillNameFromURL(gitURL)))
 	if skill == "" {
-		return errResult("无法确定 skill 名称,请指定 name"), nil
+		return errResult("could not determine the skill name; give one as name"), nil
 	}
 	dst := filepath.Join(DataDir(), "skills", skill)
 	_ = os.RemoveAll(dst)
@@ -445,7 +445,7 @@ func (s *Service) installSkillFromGit(ctx context.Context, gitURL, name string) 
 	}
 	if _, err := os.Stat(filepath.Join(dst, "SKILL.md")); err != nil {
 		_ = os.RemoveAll(dst)
-		return errResult("仓库里没有 SKILL.md,不是一个 skill"), nil
+		return errResult("the repository has no SKILL.md, so it is not a skill"), nil
 	}
 	return s.finishSkillInstall(ctx, skill, dst, "git clone", nil)
 }
@@ -454,7 +454,7 @@ func (s *Service) installSkillFromGit(ctx context.Context, gitURL, name string) 
 func (s *Service) writeSkill(ctx context.Context, name, skillMD string, loop *installLoop) (interface{}, error) {
 	name = sanitizeName(name)
 	if name == "" {
-		return errResult("无法确定 skill 名称,请指定 name"), nil
+		return errResult("could not determine the skill name; give one as name"), nil
 	}
 	dst := filepath.Join(DataDir(), "skills", name)
 	if err := os.MkdirAll(dst, 0o755); err != nil {
@@ -481,7 +481,7 @@ func (s *Service) finishSkillInstall(ctx context.Context, name, path, how string
 	if !installed {
 		// Written but not loaded means the SKILL.md is malformed; do not leave a
 		// broken directory behind claiming success.
-		data["note"] = "文件写下了但没能加载,SKILL.md 格式可能不对(需要 name/description frontmatter)"
+		data["note"] = "The file was written but did not load; the SKILL.md is probably malformed (it needs name/description frontmatter)"
 	}
 	return okData(data), nil
 }
@@ -569,7 +569,7 @@ func fetchReadable(ctx context.Context, rawURL string) (string, error) {
 	}
 	text := asText(body, ctype)
 	if strings.TrimSpace(text) == "" {
-		return "", fmt.Errorf("页面没有可读内容: %s", rawURL)
+		return "", fmt.Errorf("the page has no readable content: %s", rawURL)
 	}
 	return text, nil
 }
@@ -584,11 +584,11 @@ func httpGet(ctx context.Context, u string) ([]byte, string, error) {
 	req.Header.Set("User-Agent", "SuperAI-Desktop/1.0")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, "", fmt.Errorf("抓取失败: %w", err)
+		return nil, "", fmt.Errorf("fetch failed: %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		return nil, "", fmt.Errorf("抓取 %s 返回 %d", u, resp.StatusCode)
+		return nil, "", fmt.Errorf("fetching %s returned %d", u, resp.StatusCode)
 	}
 	body, err := io.ReadAll(io.LimitReader(resp.Body, fetchLimit))
 	if err != nil {
@@ -666,14 +666,14 @@ func resultProblem(res interface{}) string {
 			return v
 		}
 	}
-	return "未装上"
+	return "not installed"
 }
 
 func truncate(s string, max int) string {
 	if len(s) <= max {
 		return s
 	}
-	return s[:max] + "\n…(截断)"
+	return s[:max] + "\n…(truncated)"
 }
 
 func firstNonEmpty(vals ...string) string {
