@@ -47,6 +47,18 @@ type Settings struct {
 	// detour on every task that will never use them. cmd/superai sets it.
 	DisableSelfInstall bool `json:"disable_self_install"`
 
+	// DisableToolApproval turns off the tool approval gate: shell commands,
+	// self-installs and deletions then run without asking (they are still
+	// written to the audit log).
+	//
+	// Phrased as a disable so the safe state is the zero value. A settings.json
+	// written before this field existed unmarshals to false, which means the
+	// gate is on — an upgrade cannot silently leave a machine ungated, and
+	// neither can a hand-edited file that forgot the key. The same reasoning
+	// the DisableSelfInstall / DisableBrowser fields use, applied to the one
+	// setting where getting the default backwards actually costs something.
+	DisableToolApproval bool `json:"disable_tool_approval"`
+
 	// Agent workspace (sandbox root).
 	WorkspaceDir string `json:"workspace_dir"`
 

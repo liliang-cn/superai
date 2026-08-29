@@ -13,6 +13,14 @@
 //
 // Install it with `make install-daemon`, which writes a launchd job that starts
 // it at login and restarts it if it dies.
+//
+// It attaches no approver to the tool gate, and that is the point rather than
+// an omission: there is no window here and nobody awake at eight in the
+// morning, so a shell command a scheduled prompt asks for is denied with a
+// reason the model can report, instead of running unwatched. A schedule that
+// genuinely needs to run commands unattended is a decision to make once, in
+// Settings, by turning the gate off — not one made silently every night. The
+// app's own cron loop, which does have a window, prompts as usual.
 package main
 
 import (

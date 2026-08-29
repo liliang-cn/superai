@@ -9,6 +9,7 @@ import {
   CLIProxySubmitPrompt,
   GetSettings,
   SaveSettings,
+  ToolApprovalInfo,
 } from "../../wailsjs/go/main/App";
 import { EventsOff, EventsOn } from "../../wailsjs/runtime/runtime";
 import { backend } from "../../wailsjs/go/models";
@@ -21,6 +22,60 @@ type ProxyStatus = {
   config: string;
   models: string[];
 };
+
+/** One line of the approval audit log, as the backend writes it. */
+type AuditEntry = {
+  at: string;
+  tool: string;
+  allowed: boolean;
+  decided_by: string;
+  reason?: string;
+  summary?: string;
+};
+
+type ApprovalInfo = {
+  enabled: boolean;
+  waitSeconds: number;
+  auditPath: string;
+  entries: AuditEntry[];
+};
+
+/**
+ * The tail of the audit log.
+ *
+ * On the Settings page rather than behind a menu because it is the evidence for
+ * the switch sitting above it: someone deciding whether to leave the gate on
+ * wants to see what it has actually been stopping. The full record is the file
+ * whose path is printed underneath — this is a window onto it, not the record.
+ */
+function AuditTail({ info }: { info: ApprovalInfo | null }) {
+  if (!info) return null;
+  return (
+    <div className="field">
+      <label>Recent tool decisions</label>
+      {info.entries.length === 0 ? (
+        <span className="hint">Nothing yet. Shell commands, installs and deletions land here.</span>
+      ) : (
+        <div className="audit-list">
+          {/* Newest first on screen; the file itself is append-order. */}
+          {[...info.entries].reverse().map((e, i) => (
+            <div key={`${e.at}-${i}`} className={`audit-row${e.allowed ? "" : " denied"}`}>
+              <span>{e.allowed ? "allow" : "deny "}</span>
+              <span>{e.tool}</span>
+              <span className="audit-cmd" title={e.summary || e.reason || ""}>
+                {e.summary || e.reason || ""}
+              </span>
+              <span>{e.decided_by}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      <span className="hint">
+        Full log: <code>{info.auditPath}</code> — one JSON object per line, readable without this app.
+      </span>
+    </div>
+  );
+}
 
 function PasswordField({
   label,
@@ -89,6 +144,13 @@ export default function SettingsView({ onSaved }: { onSaved: () => void }) {
 
   const [accounts, setAccounts] = useState<backend.CLIProxyAccount[]>([]);
   const [confirmOut, setConfirmOut] = useState("");
+  const [approval, setApproval] = useState<ApprovalInfo | null>(null);
+
+  const refreshApproval = () => {
+    ToolApprovalInfo(20)
+      .then((res) => setApproval(res as ApprovalInfo))
+      .catch(() => setApproval(null));
+  };
 
   const refreshProxy = () => {
     CLIProxyStatus()
@@ -105,6 +167,7 @@ export default function SettingsView({ onSaved }: { onSaved: () => void }) {
       .catch((e) => setNote({ kind: "err", text: String(e?.message || e) }));
     CLIProxyProviders().then(setProviders).catch(() => setProviders([]));
     refreshProxy();
+    refreshApproval();
 
     EventsOn("cliproxy:login", (ev: any) => {
       setLogin(ev);
@@ -129,6 +192,9 @@ export default function SettingsView({ onSaved }: { onSaved: () => void }) {
       await SaveSettings(s);
       setNote({ kind: "ok", text: "Saved. Backend rebuilt." });
       refreshProxy();
+      // The gate is rebuilt with the service, so what it reports is only true
+      // after the save has been through.
+      refreshApproval();
       onSaved();
     } catch (e: any) {
       setNote({ kind: "err", text: String(e?.message || e) });
@@ -334,6 +400,42 @@ export default function SettingsView({ onSaved }: { onSaved: () => void }) {
               />
               <span className="hint">Only change this if something else already uses it.</span>
             </div>
+          </div>
+
+          <div className="card">
+            <div className="card-title">Safety</div>
+            <div className="card-desc">
+              Shell commands run on this machine with your permissions — the agent workspace is
+              where they start, not a boundary they are held inside.
+            </div>
+            <div className="field">
+              <label>Ask before running commands</label>
+              <div
+                className="toggle"
+                onClick={() => set("disable_tool_approval", !s.disable_tool_approval)}
+                style={{ cursor: "pointer", marginTop: 2 }}
+              >
+                {/* The switch reads "on = asking", so it tracks the inverse of
+                    the stored disable flag. The setting is stored as a disable
+                    so that a settings file which has never heard of it — every
+                    file written before this existed — still comes up gated. */}
+                <div className={`switch${s.disable_tool_approval ? "" : " on"}`}><div className="knob" /></div>
+                <span style={{ fontSize: 13, color: "var(--text-1)" }}>
+                  {s.disable_tool_approval
+                    ? "Off — shell commands, installs and deletions run without asking"
+                    : `On — you are asked first; unanswered after ${
+                        approval?.waitSeconds ?? 120
+                      }s counts as no`}
+                </span>
+              </div>
+              {s.disable_tool_approval && (
+                <span className="hint">
+                  Decisions are still written to the audit log. Turn this off only for unattended
+                  runs you have decided to trust — a schedule that fires at 3am has nobody to ask.
+                </span>
+              )}
+            </div>
+            <AuditTail info={approval} />
           </div>
 
           <div className="card">

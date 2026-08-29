@@ -966,3 +966,42 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
 /* A tab that owns actions (Records → Schedules hosts the real schedules view)
    puts them at the top right of the panel, where the page-level actions sit. */
 .tab-actions { display: flex; justify-content: flex-end; margin-bottom: 12px; }
+
+/* ---------------- Tool approval ---------------- */
+/* The agent's turn is stopped until this is answered, so it takes the screen
+   rather than sitting in the corner with the run toasts. Above the ordinary
+   modal z-index because it can be raised while one is already open, and a
+   question nobody can see is a question that times out into a denial. */
+.approval-modal { max-width: 640px; }
+.approval-overlay { z-index: 110; }
+.approval-icon { display: inline-block; vertical-align: -3px; color: var(--red); margin-right: 6px; }
+.approval-desc { font-size: 12.5px; color: var(--text-2); line-height: 1.55; margin-bottom: 10px; }
+/* The command, whole. Wrapped rather than scrolled sideways: a command whose
+   dangerous half is off the right edge is a command nobody read. */
+.approval-cmd {
+  font-family: var(--font-mono); font-size: 12.5px; line-height: 1.55;
+  color: var(--text-0); background: var(--bg-0);
+  border: 1px solid var(--border-strong); border-radius: var(--radius);
+  padding: 10px 12px; margin-bottom: 10px;
+  white-space: pre-wrap; word-break: break-word; user-select: text;
+  max-height: 40vh; overflow: auto;
+}
+.approval-actions {
+  display: flex; justify-content: flex-end; gap: 8px;
+  padding: 12px 18px; border-top: 1px solid var(--border);
+}
+.approval-allow:hover { color: var(--red); border-color: var(--red); }
+.approval-more {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: 26px; z-index: 111;
+  font-size: 11.5px; color: var(--text-3);
+}
+/* The audit tail on the Settings page. Dense on purpose — it is a log, and the
+   thing being scanned for is a line that should not be there. */
+.audit-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.audit-row {
+  display: flex; align-items: baseline; gap: 8px;
+  font-family: var(--font-mono); font-size: 11.5px; color: var(--text-2);
+  user-select: text;
+}
+.audit-row .audit-cmd { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.audit-row.denied { color: var(--red); }

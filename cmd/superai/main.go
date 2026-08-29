@@ -121,6 +121,13 @@ func main() {
 	}
 	defer svc.Close()
 
+	// The approval gate denies whatever nobody answers, which is what an
+	// unattended run should get. A person at a terminal is not unattended, so
+	// give them the prompt instead of denying on their behalf. See approve.go.
+	if stdinIsTerminal() {
+		svc.ToolGate().SetApprover(terminalApprover(bufio.NewReader(os.Stdin)))
+	}
+
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 	ctx, cancel := context.WithTimeout(ctx, *timeout)

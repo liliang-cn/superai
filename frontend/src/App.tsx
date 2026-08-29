@@ -10,8 +10,10 @@ import MCPView from "./views/MCPView";
 import DataView from "./views/DataView";
 import LifeView from "./views/LifeView";
 import { ScheduleRunToasts } from "./components/ScheduleRuns";
+import ToolApprovals from "./components/ToolApprovals";
 import { AppStatus, ViewKey, normalizeStatus } from "./lib/types";
 import { useScheduleRuns } from "./lib/useScheduleRuns";
+import { useToolApprovals } from "./lib/useToolApprovals";
 import { uiRules } from "./lib/aigui";
 import { GetStatus, SetUIRules } from "../wailsjs/go/main/App";
 
@@ -38,6 +40,12 @@ export default function App() {
   // fires while the user is somewhere else, which is the whole point of a timer.
   // The opener goes with it so a clicked notification lands in the right place.
   const runs = useScheduleRuns(openConversation);
+
+  // Tool approvals live at the root for a stronger version of the same reason:
+  // the agent's turn is blocked until one is answered, and the prompt has to
+  // find the user wherever they are — including on the Settings page they went
+  // to in order to look at the audit log.
+  const approvals = useToolApprovals();
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -103,6 +111,12 @@ export default function App() {
       {view !== "life" && (
         <ScheduleRunToasts log={runs} onOpenConversation={openConversation} />
       )}
+      <ToolApprovals
+        pending={approvals.pending}
+        note={approvals.note}
+        onResolve={approvals.resolve}
+        onDismissNote={approvals.dismissNote}
+      />
     </>
   );
 }

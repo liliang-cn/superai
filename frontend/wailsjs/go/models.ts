@@ -177,6 +177,7 @@ export namespace backend {
 	    search_model: string;
 	    searxng_url: string;
 	    disable_self_install: boolean;
+	    disable_tool_approval: boolean;
 	    workspace_dir: string;
 	    max_rounds: number;
 	    headless: boolean;
@@ -208,6 +209,7 @@ export namespace backend {
 	        this.search_model = source["search_model"];
 	        this.searxng_url = source["searxng_url"];
 	        this.disable_self_install = source["disable_self_install"];
+	        this.disable_tool_approval = source["disable_tool_approval"];
 	        this.workspace_dir = source["workspace_dir"];
 	        this.max_rounds = source["max_rounds"];
 	        this.headless = source["headless"];

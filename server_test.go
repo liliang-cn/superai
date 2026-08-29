@@ -156,6 +156,100 @@ func TestSSEDeliversBroadcasts(t *testing.T) {
 	}
 }
 
+// The approval gate has to work in serve mode as well as in the window, and
+// nothing about it was written twice to make that true: the prompt rides the
+// same SSE stream as every other event, and the answer goes back through the
+// reflection bridge like any other bound method. This test is what keeps that
+// claim honest — if ResolveToolApproval ever stopped being an exported method
+// on App, or the payload stopped carrying the command, the desktop build would
+// keep working and the browser one would quietly start timing out.
+func TestApprovalRoundTripOverHTTPAndSSE(t *testing.T) {
+	app, _, srv := serveTestApp(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, srv.URL+"/api/events", nil)
+	stream, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stream.Body.Close()
+	r := bufio.NewReader(stream.Body)
+	if line, err := r.ReadString('\n'); err != nil || !strings.HasPrefix(line, ":") {
+		t.Fatalf("opening frame = %q, %v", line, err)
+	}
+
+	answered := make(chan backend.ApprovalDecision, 1)
+	go func() {
+		dec, _ := app.askToolApproval(context.Background(), backend.ApprovalRequest{
+			ID: "rpc-1", Tool: "bash", Command: "rm -rf /tmp/x",
+			AskedAt: time.Now(), ExpiresAt: time.Now().Add(time.Minute),
+		})
+		answered <- dec
+	}()
+
+	// The browser learns about the prompt the same way it learns about a
+	// streamed token.
+	envelope := make(chan map[string]any, 1)
+	go func() {
+		for {
+			line, err := r.ReadString('\n')
+			if err != nil {
+				return
+			}
+			if !strings.HasPrefix(line, "data: ") {
+				continue
+			}
+			var env struct {
+				Name    string         `json:"name"`
+				Payload map[string]any `json:"payload"`
+			}
+			if json.Unmarshal([]byte(strings.TrimPrefix(strings.TrimSpace(line), "data: ")), &env) != nil {
+				continue
+			}
+			if env.Name == "tool:approval" {
+				envelope <- env.Payload
+				return
+			}
+		}
+	}()
+
+	select {
+	case payload := <-envelope:
+		if payload["command"] != "rm -rf /tmp/x" {
+			t.Fatalf("SSE payload = %v, want the command the user has to judge", payload)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("the approval prompt never reached the browser surface")
+	}
+
+	resp, err := http.Post(srv.URL+"/api/rpc/ResolveToolApproval", "application/json",
+		strings.NewReader(`["rpc-1", true]`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("ResolveToolApproval over RPC: status = %d", resp.StatusCode)
+	}
+	var reply string
+	if err := json.NewDecoder(resp.Body).Decode(&reply); err != nil {
+		t.Fatal(err)
+	}
+	if reply != "ok" {
+		t.Fatalf("ResolveToolApproval = %q, want ok", reply)
+	}
+
+	select {
+	case dec := <-answered:
+		if !dec.Allowed {
+			t.Fatal("an approval sent over RPC did not reach the waiting tool call")
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("the waiting tool call never woke up")
+	}
+}
+
 func TestHubDropsSlowSubscriberWithoutBlocking(t *testing.T) {
 	hub := newEventHub()
 	ch, off := hub.subscribe()

@@ -114,6 +114,10 @@ export function OpenWorkspaceFileExternal(arg1) {
   return window['go']['main']['App']['OpenWorkspaceFileExternal'](arg1);
 }
 
+export function PendingToolApprovals() {
+  return window['go']['main']['App']['PendingToolApprovals']();
+}
+
 export function PickFiles() {
   return window['go']['main']['App']['PickFiles']();
 }
@@ -132,6 +136,10 @@ export function RemoveMCPServer(arg1) {
 
 export function RemoveSkill(arg1) {
   return window['go']['main']['App']['RemoveSkill'](arg1);
+}
+
+export function ResolveToolApproval(arg1, arg2) {
+  return window['go']['main']['App']['ResolveToolApproval'](arg1, arg2);
 }
 
 export function RunScheduledPromptNow(arg1) {
@@ -176,4 +184,8 @@ export function SetUIRules(arg1) {
 
 export function Skills() {
   return window['go']['main']['App']['Skills']();
+}
+
+export function ToolApprovalInfo(arg1) {
+  return window['go']['main']['App']['ToolApprovalInfo'](arg1);
 }
