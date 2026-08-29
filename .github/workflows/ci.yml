@@ -1,0 +1,120 @@
+name: CI
+
+# There was no CI here until now, and it showed: a flaky test that failed three
+# runs in eight sat on main unnoticed, a file with no tests at all shipped a
+# Chinese-input code path, and `wails build` was broken on every commit for long
+# enough that nobody remembered it working. All three were found by hand.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# A second push supersedes the first: this repo is pushed in bursts, and there
+# is no value in finishing a run for a commit that is already history.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  go:
+    name: Go
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # Formatting is a gate rather than a suggestion. It is only worth having
+      # as one because the repo is clean: a check with a permanent exception in
+      # it teaches people to ignore the check.
+      - name: gofmt
+        run: |
+          out=$(gofmt -l . | grep -v '^frontend/node_modules' || true)
+          if [ -n "$out" ]; then
+            echo "::error::these files are not gofmt'd:"
+            echo "$out"
+            gofmt -d $out
+            exit 1
+          fi
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go build
+        run: go build ./...
+
+      # Run more than once. Every test failure this repo has had was a flake
+      # that a single run reported as green — the point of running tests in CI
+      # is to catch what a developer running them once does not.
+      - name: go test
+        run: go test ./... -count=3 -timeout 15m
+
+      # Not a gate. Two races live inside the CLIProxyAPI dependency
+      # (TestEffectiveRoutesThroughProxy, TestCLIProxyAccounts) and are not
+      # ours to fix, so a failure here is reported and read rather than
+      # blocking. Remove the `|| true` once the dependency is fixed.
+      - name: go test -race (advisory)
+        continue-on-error: true
+        run: go test ./... -race -count=1 -timeout 20m
+
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: npm ci
+        working-directory: frontend
+        run: npm ci
+
+      # `npm run build` is `tsc && vite build`, so this is the type check as
+      # well as the bundle. The app ships the bundle, so a build that does not
+      # run here is a build nobody checked.
+      - name: build
+        working-directory: frontend
+        run: npm run build
+
+  desktop:
+    name: Desktop build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # Wails needs a webkit to link the GUI against. The serve path does not,
+      # which is why deploys cross-compile with CGO off — but the desktop app
+      # does, and it is the desktop build that was silently broken.
+      - name: webkit
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
+
+      # Pinned to the version the repo depends on. The break this job exists to
+      # catch was exactly a version skew: the CLI's own x/tools could not read
+      # the toolchain's export data, and it reported that as the project having
+      # no types.
+      - name: wails
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.15.0
+
+      - name: wails build
+        run: wails build -platform linux/amd64 -skipbindings

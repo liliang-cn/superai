@@ -51,9 +51,9 @@ var cronParser = cron.NewParser(
 )
 
 type scheduleCreateIn struct {
-	Prompt string `json:"prompt" jsonschema:"what SuperAI should do, written exactly as you would type it into chat"`
-	Cron   string `json:"cron" jsonschema:"five-field cron, e.g. '0 8 * * *' for every morning at 08:00, '0 9 * * 1-5' weekdays at 09:00, '0 */4 * * *' every four hours"`
-	Name   string `json:"name,omitempty" jsonschema:"optional label shown in the schedule list; defaults to the prompt"`
+	Prompt       string `json:"prompt" jsonschema:"what SuperAI should do, written exactly as you would type it into chat"`
+	Cron         string `json:"cron" jsonschema:"five-field cron, e.g. '0 8 * * *' for every morning at 08:00, '0 9 * * 1-5' weekdays at 09:00, '0 */4 * * *' every four hours"`
+	Name         string `json:"name,omitempty" jsonschema:"optional label shown in the schedule list; defaults to the prompt"`
 	Conversation string `json:"conversation,omitempty" jsonschema:"optional conversation the runs append to; blank shares one called 'scheduled'"`
 }
 
