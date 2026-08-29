@@ -56,6 +56,12 @@ type App struct {
 	// real window must divert events before they reach it.
 	emitFn func(name string, payload map[string]any)
 
+	// graphs holds the live 3D view of the knowledge graph. It has its own lock
+	// and is deliberately not started at boot: it is a loopback listener plus a
+	// poller reading the whole brain every couple of seconds, and most sessions
+	// never open that page. See GraphView.
+	graphs backend.GraphViews
+
 	buildErr string
 	proxyErr string
 }
@@ -142,6 +148,9 @@ func (a *App) shutdown(ctx context.Context) {
 	// Before the lock: stopping the cron loop must not race the service it runs
 	// its turns against.
 	a.stopScheduler()
+	// Also before the lock, and for the same reason: closing the view waits for
+	// its HTTP server to drain, and it takes its own lock, not a.mu.
+	_ = a.graphs.Close()
 
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -479,6 +488,39 @@ func (a *App) GetStatus() map[string]any {
 		st["browser"] = a.svc.HasBrowser()
 	}
 	return st
+}
+
+// GraphView starts the live 3D view of the knowledge graph and reports where it
+// is: a URL on this machine's loopback serving the brain SuperAI actually uses,
+// updating itself as the graph changes.
+//
+// Started here rather than at boot. The view is a listener and a poller that
+// reads the whole graph every couple of seconds, which is a fair price for a
+// page someone is looking at and a poor one for every session that never opens
+// it. Once started it stays up for the life of the process — reopening the page
+// returns the same URL instead of binding another port.
+//
+// A failure comes back inside the payload rather than as an error, because the
+// reason is what the page has to show: "the shared brain is not answering" and
+// "there is nothing in the local one yet" are opposite problems and the user
+// can only act on the difference.
+func (a *App) GraphView() map[string]any {
+	// The settings are read under a.mu and the view is started without it:
+	// starting one reads the whole brain first, and against a shared brain that
+	// is a network call. Holding the lock that a settings save also takes would
+	// mean a slow or unreachable server freezes the Settings page too.
+	a.mu.Lock()
+	s := a.settings
+	a.mu.Unlock()
+
+	ctx := a.ctx
+	if ctx == nil {
+		// Serve mode and tests have no Wails context. The view's lifetime is
+		// owned by a.graphs.Close either way, so the parent context only has to
+		// be a valid one.
+		ctx = context.Background()
+	}
+	return a.graphs.GraphStatus(ctx, s).Map()
 }
 
 // SendChat streams a chat turn. Streaming output is delivered via Wails events

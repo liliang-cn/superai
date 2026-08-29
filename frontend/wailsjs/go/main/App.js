@@ -78,6 +78,10 @@ export function GetStatus() {
   return window['go']['main']['App']['GetStatus']();
 }
 
+export function GraphView() {
+  return window['go']['main']['App']['GraphView']();
+}
+
 export function ImportCSV(arg1, arg2) {
   return window['go']['main']['App']['ImportCSV'](arg1, arg2);
 }

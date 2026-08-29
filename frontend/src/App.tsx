@@ -5,6 +5,7 @@ import ChatView from "./views/ChatView";
 import SettingsView from "./views/SettingsView";
 import AvatarView from "./views/AvatarView";
 import MemoryView from "./views/MemoryView";
+import GraphView from "./views/GraphView";
 import SkillsView from "./views/SkillsView";
 import MCPView from "./views/MCPView";
 import DataView from "./views/DataView";
@@ -89,6 +90,7 @@ export default function App() {
             {view === "settings" && <SettingsView onSaved={refreshStatus} />}
             {view === "avatar" && <AvatarView status={status} />}
             {view === "memory" && <MemoryView />}
+            {view === "graph" && <GraphView />}
             {view === "skills" && <SkillsView />}
             {view === "mcp" && <MCPView />}
             {view === "data" && <DataView />}
