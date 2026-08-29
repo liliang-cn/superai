@@ -27,24 +27,27 @@ function normalize(raw: Record<string, any> | null): GraphStatus {
 }
 
 /**
- * Whether the view's URL can possibly resolve from this browser.
+ * Where to point the frame.
  *
  * CortexDB binds the live view to 127.0.0.1 of the machine SuperAI runs on, and
  * there is deliberately no option to widen that — the page is the whole brain
- * with no authentication in front of it. Inside the desktop window that host is
- * always this machine. Served over HTTP it need not be: a browser on a laptop
- * pointed at `superai-desktop serve` on a home server would resolve 127.0.0.1
- * to the laptop, where nothing is listening, and the iframe would sit there
- * blank with no way to tell that apart from a slow load.
+ * with no authentication in front of it.
  *
- * So the frame is only offered where it can work. The remaining hole is an SSH
- * tunnel — location.hostname reads as localhost while the view's port is not
- * forwarded — which nothing in the page can detect; the "not drawing?" note
- * covers it in words.
+ * That address is only reachable from the browser when the browser is on that
+ * machine, which inside the desktop window it always is. Over HTTP it usually
+ * is not: a tab open at a domain would resolve 127.0.0.1 to the viewer's own
+ * laptop, where nothing is listening.
+ *
+ * This used to be handled by not drawing a frame at all and explaining the
+ * situation, which is honest and is not the feature working — and served over
+ * a domain is how SuperAI is actually used. So SuperAI proxies the view
+ * instead: it runs on that host, it can reach loopback, and it has the front
+ * door the view has none of. See backend/graphproxy.go.
  */
 const SERVED = Boolean((window as unknown as Record<string, unknown>).superaiServed);
-const LOOPBACK = new Set(["localhost", "127.0.0.1", "::1", "[::1]", ""]);
-const SAME_MACHINE = !SERVED || LOOPBACK.has(window.location.hostname);
+// Same origin as this page, so the session cookie rides along and the proxy's
+// authentication applies to the frame exactly as it does to everything else.
+const GRAPH_SRC = SERVED ? "/graph/" : null;
 
 export default function GraphView() {
   const [status, setStatus] = useState<GraphStatus | null>(null);
@@ -98,7 +101,7 @@ export default function GraphView() {
           redraws itself as the graph changes.
         </div>
       </div>
-      {status?.url && SAME_MACHINE && (
+      {status?.url && (
         <div className="vh-actions">
           <span className="graph-meta">
             {status.nodes} nodes · {status.edges} edges
@@ -148,34 +151,6 @@ export default function GraphView() {
         </div>
       </div>
     );
-  } else if (!SAME_MACHINE) {
-    // Honest rather than broken: an iframe here would point at the viewer's own
-    // loopback and show nothing, forever, with no error to read.
-    body = (
-      <div className="panel-scroll">
-        <div className="panel-grid">
-          <div className="card">
-            <div className="card-title">The view is on the SuperAI machine</div>
-            <div className="card-desc">
-              CortexDB serves the graph on the loopback interface of the host running SuperAI, and
-              never on a wider one — the page is the whole brain with nothing asking who you are.
-              This tab is talking to that host over HTTP, so it cannot reach the view directly.
-              Forward the port (<code>ssh -L</code>) or open the URL from a browser on that machine.
-            </div>
-            <div className="url-box">
-              <span className="url-label">VIEW</span>
-              <span style={{ flex: 1 }}>{status?.url}</span>
-              <button className="btn ghost sm" onClick={() => status?.url && copy(status.url)}>
-                {copied ? "Copied!" : "Copy"}
-              </button>
-            </div>
-            <div className="card-desc" style={{ marginTop: 12 }}>
-              Reading {status?.source} — {status?.nodes} nodes, {status?.edges} edges.
-            </div>
-          </div>
-        </div>
-      </div>
-    );
   } else {
     body = (
       <div className="graph-stage">
@@ -186,9 +161,9 @@ export default function GraphView() {
           </div>
         )}
         <iframe
-          key={`${status?.url}#${nonce}`}
+          key={`${GRAPH_SRC ?? status?.url}#${nonce}`}
           className="graph-frame"
-          src={status?.url}
+          src={GRAPH_SRC ?? status?.url}
           title="CortexDB knowledge graph"
         />
         <div className="graph-foot">

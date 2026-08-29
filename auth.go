@@ -360,6 +360,11 @@ func gatedPath(p string) bool {
 		return false
 	case strings.HasPrefix(p, "/api/"), p == mcpPath, strings.HasPrefix(p, mcpPath+"/"):
 		return true
+	// The proxied graph view. It is the whole brain with no gate of its own, so
+	// forgetting this line would publish everything CortexDB holds to anyone
+	// who can reach the port.
+	case p == backend.GraphProxyPrefix, strings.HasPrefix(p, backend.GraphProxyPrefix+"/"):
+		return true
 	}
 	return false
 }

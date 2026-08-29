@@ -26,6 +26,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/liliang-cn/superai-desktop/backend"
 	"io"
 	"io/fs"
 	"log"
@@ -222,6 +223,11 @@ func newAPIMux(app *App, hub *eventHub, creds *credentials, handoff *handoffStor
 	handoffRoute(mux, creds, handoff)
 	mux.HandleFunc("/api/rpc/", func(w http.ResponseWriter, r *http.Request) { rpcCall(app, w, r) })
 	mux.HandleFunc("/api/events", hub.serveSSE)
+	// The live graph view, proxied. It binds loopback on this host and has no
+	// authentication of its own — see backend/graphproxy.go — so it is mounted
+	// here, behind requireAuth, and nowhere else.
+	mux.Handle(backend.GraphProxyPrefix, app.graphProxy())
+	mux.Handle(backend.GraphProxyPrefix+"/", app.graphProxy())
 	// SuperAI as an MCP server — see mcp.go for why it lives in this process
 	// and why it adds no gate of its own.
 	mux.Handle(mcpPath, newMCPHandler(app, mcpServerVersion))

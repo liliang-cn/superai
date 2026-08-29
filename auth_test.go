@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/liliang-cn/superai-desktop/backend"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -217,5 +218,21 @@ func TestClientIPPrefersTheLastForwardedHop(t *testing.T) {
 	bare.RemoteAddr = "192.168.1.7:41234"
 	if got := clientIP(bare); got != "192.168.1.7" {
 		t.Errorf("clientIP = %q, want 192.168.1.7", got)
+	}
+}
+
+// The proxied graph view is the whole brain with no gate of its own. If it ever
+// stops being gated here, everything CortexDB holds is readable by anyone who
+// can reach the port.
+func TestTheGraphViewIsGated(t *testing.T) {
+	for _, p := range []string{
+		backend.GraphProxyPrefix,
+		backend.GraphProxyPrefix + "/",
+		backend.GraphProxyPrefix + "/api/graph",
+		backend.GraphProxyPrefix + "/api/stream",
+	} {
+		if !gatedPath(p) {
+			t.Errorf("%s is not behind authentication", p)
+		}
 	}
 }

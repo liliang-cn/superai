@@ -12,6 +12,7 @@ package main
 
 import (
 	"context"
+	"net/http"
 	"time"
 
 	"github.com/liliang-cn/superai-desktop/backend"
@@ -227,4 +228,20 @@ func (a *App) StopYoloMode() map[string]any {
 	svc.ToolGate().StopYolo()
 	a.emit("tool:yolo", map[string]any{"active": false})
 	return map[string]any{"active": false}
+}
+
+// graphProxy forwards to whatever live view this process is running.
+//
+// The address is resolved per request, not captured: the view starts on demand
+// and restarts on a new port whenever the memory backend changes.
+func (a *App) graphProxy() http.Handler {
+	return backend.NewGraphProxy(func() string {
+		a.mu.Lock()
+		graphs := &a.graphs
+		a.mu.Unlock()
+		if sv := graphs.Running(); sv != nil {
+			return sv.URL()
+		}
+		return ""
+	})
 }
