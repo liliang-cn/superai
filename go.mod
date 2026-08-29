@@ -11,7 +11,7 @@ require (
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/router-for-me/CLIProxyAPI/v6 v6.10.9
 	github.com/sirupsen/logrus v1.9.3
-	github.com/wailsapp/wails/v2 v2.12.0
+	github.com/wailsapp/wails/v2 v2.15.0
 	golang.org/x/crypto v0.53.0
 )
 
