@@ -181,3 +181,5 @@ require (
 	modernc.org/memory v1.11.0 // indirect
 	modernc.org/sqlite v1.38.2 // indirect
 )
+
+replace github.com/liliang-cn/agent-go/v3 => /Users/liliang/Things/AI/base/agent-go
