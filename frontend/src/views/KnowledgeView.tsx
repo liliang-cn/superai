@@ -3,6 +3,7 @@ import { ClipboardSetText } from "../../wailsjs/runtime";
 import { GraphView as startGraphView, MemoryRecall } from "../../wailsjs/go/main/App";
 import { openExternal } from "../lib/openExternal";
 import ImportPanel from "../components/ImportPanel";
+import { useImeGuard } from "@/lib/ime";
 
 /**
  * One page for what SuperAI knows.
@@ -65,6 +66,7 @@ const SERVED = Boolean((window as unknown as Record<string, unknown>).superaiSer
 const GRAPH_SRC = SERVED ? "/graph/" : null;
 
 export default function KnowledgeView() {
+  const ime = useImeGuard();
   const [status, setStatus] = useState<GraphStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
@@ -225,8 +227,12 @@ export default function KnowledgeView() {
             className="input"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            onCompositionStart={ime.handlers.onCompositionStart}
+            onCompositionEnd={ime.handlers.onCompositionEnd}
             onKeyDown={(e) => {
-              if (e.key === "Enter") {
+              // Enter mid-composition accepts a candidate. preventDefault here
+              // would swallow that keystroke and search for a half-typed query.
+              if (e.key === "Enter" && !ime.composing(e)) {
                 e.preventDefault();
                 search();
               }

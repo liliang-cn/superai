@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { InstallMCPServer, MCP, RemoveMCPServer, SearchMCPServers } from "../../wailsjs/go/main/App";
 import { mcp } from "../../wailsjs/go/models";
+import { useImeGuard } from "@/lib/ime";
 
 /** One installable server from the registry, as SearchMCPServers returns it. */
 interface Candidate {
@@ -20,6 +21,7 @@ function shortName(full: string): string {
 }
 
 export default function MCPView() {
+  const ime = useImeGuard();
   const [servers, setServers] = useState<mcp.ServerStatus[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string>("");
@@ -97,7 +99,9 @@ export default function MCPView() {
                 autoFocus
                 placeholder="What should it be able to do? e.g. postgres, slack, filesystem"
                 onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && search()}
+                onCompositionStart={ime.handlers.onCompositionStart}
+                onCompositionEnd={ime.handlers.onCompositionEnd}
+                onKeyDown={(e) => e.key === "Enter" && !ime.composing(e) && search()}
               />
               <button className="btn sm" onClick={search} disabled={searching}>
                 {searching ? "Searching…" : "Search"}

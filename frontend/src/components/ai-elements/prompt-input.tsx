@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { useImeGuard } from "@/lib/ime";
 import { Button } from "@/components/ui/button";
 import { Loader2Icon, SendIcon, SquareIcon } from "lucide-react";
 import type {
@@ -52,11 +53,17 @@ export type PromptInputTextareaProps = ComponentProps<"textarea">;
 export const PromptInputTextarea = ({
   className,
   onKeyDown,
+  onCompositionStart,
+  onCompositionEnd,
   placeholder = "Send a message…",
   ...props
 }: PromptInputTextareaProps) => {
+  // nativeEvent.isComposing alone is not enough in WKWebView, which is what
+  // Wails renders in: the Enter that accepts a candidate can arrive after
+  // compositionend, and a half-typed sentence gets sent. See lib/ime.ts.
+  const ime = useImeGuard();
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+    if (e.key === "Enter" && !e.shiftKey && !ime.composing(e)) {
       e.preventDefault();
       e.currentTarget.form?.requestSubmit();
     }
@@ -72,6 +79,14 @@ export const PromptInputTextarea = ({
       )}
       name="message"
       onKeyDown={handleKeyDown}
+      onCompositionStart={(e) => {
+        ime.handlers.onCompositionStart(e);
+        onCompositionStart?.(e);
+      }}
+      onCompositionEnd={(e) => {
+        ime.handlers.onCompositionEnd(e);
+        onCompositionEnd?.(e);
+      }}
       placeholder={placeholder}
       {...props}
     />

@@ -15,6 +15,7 @@ import { firstLine, formatStamp, fromNow, parseTime } from "../lib/format";
 import { ScheduleRunLog } from "../lib/useScheduleRuns";
 import { ScheduleRunList } from "../components/ScheduleRuns";
 import { notifyNow, notifyPermission, requestNotifyPermission } from "../lib/notify";
+import { useImeGuard } from "@/lib/ime";
 
 type Note = { kind: "ok" | "err"; text: string } | null;
 
@@ -44,6 +45,7 @@ export default function SchedulesView({
    *  thing and the two would drift. */
   onCount?: (n: number) => void;
 }) {
+  const ime = useImeGuard();
   const [list, setList] = useState<agent.ScheduledPrompt[]>([]);
   const [loading, setLoading] = useState(true);
   const [note, setNote] = useState<Note>(null);
@@ -269,7 +271,10 @@ export default function SchedulesView({
                 value={prompt}
                 placeholder="每天早八点看看昨天的部署有没有问题，有问题就告诉我"
                 onChange={(e) => setPrompt(e.target.value)}
+                onCompositionStart={ime.handlers.onCompositionStart}
+                onCompositionEnd={ime.handlers.onCompositionEnd}
                 onKeyDown={(e) => {
+                  if (ime.composing(e)) return;
                   if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && canCreate) create();
                 }}
               />
