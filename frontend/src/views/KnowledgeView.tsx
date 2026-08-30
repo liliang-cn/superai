@@ -115,11 +115,27 @@ export default function KnowledgeView() {
    * document would throw. The view ignores messages it does not understand, so
    * an older CortexDB simply does not highlight — the recall still works.
    */
+  // The graph's find is a substring match over node labels, and a recall query
+  // is a question — "AI Agent" is not the name of anything, so forwarding it
+  // verbatim lit up nothing while the graph sat full of agent-go, oss-agent and
+  // the rest. The panel promises "the same search lights up the nodes it is
+  // about"; sending the query's most distinctive word is what makes that true.
+  //
+  // Longest word, because that is the one carrying the meaning: "AI Agent" ->
+  // "Agent", "what do I know about superai" -> "superai". A query with no
+  // spaces (any CJK one, and most single terms) is already its own best term
+  // and goes through unchanged.
+  const highlightTerm = (q: string) => {
+    const words = q.split(/[\s,.;:!?()[\]{}"'`]+/).filter(Boolean);
+    if (words.length < 2) return q;
+    return words.reduce((best, w) => (w.length > best.length ? w : best), "");
+  };
+
   const highlight = useCallback((q: string) => {
     const w = frameRef.current?.contentWindow;
     if (!w) return;
     try {
-      w.postMessage({ type: "cortexdb:highlight", query: q }, "*");
+      w.postMessage({ type: "cortexdb:highlight", query: q ? highlightTerm(q) : "" }, "*");
     } catch {
       // A frame that will not take a message is not a reason to fail a search.
     }
