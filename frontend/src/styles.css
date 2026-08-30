@@ -610,6 +610,24 @@ input, textarea, select { font-family: inherit; }
 .btn.ghost:hover:not(:disabled) { background: var(--bg-hover); }
 .btn.sm { padding: 6px 12px; font-size: 12.5px; }
 
+/* An icon standing in for a control that used to hold a whole row. Square, so
+   a row of them reads as a toolbar rather than as buttons of assorted widths;
+   .on marks the one whose panel is currently open, because an icon that
+   toggles something has to say which way it is. */
+.btn.icon-only {
+  padding: 6px;
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.btn.ghost.icon-only.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
 /* ---------------- Settings ---------------- */
 .settings-scroll { flex: 1; overflow-y: auto; padding: 20px 24px 40px; }
 .settings-grid { max-width: 720px; display: flex; flex-direction: column; gap: 20px; }

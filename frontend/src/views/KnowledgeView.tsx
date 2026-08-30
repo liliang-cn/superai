@@ -3,6 +3,7 @@ import { ClipboardSetText } from "../../wailsjs/runtime";
 import { GraphView as startGraphView, MemoryRecall } from "../../wailsjs/go/main/App";
 import { openExternal } from "../lib/openExternal";
 import ImportPanel from "../components/ImportPanel";
+import { SearchIcon, UploadIcon } from "lucide-react";
 import { useImeGuard } from "@/lib/ime";
 
 /**
@@ -67,6 +68,14 @@ const GRAPH_SRC = SERVED ? "/graph/" : null;
 
 export default function KnowledgeView() {
   const ime = useImeGuard();
+  // Search and import are occasional; the graph is why the page exists. Both
+  // used to hold a full row apiece above it — a search bar with two buttons and
+  // an import link — so the thing people came to look at started below the
+  // fold. They are icons in the header now, and the search field appears when
+  // it is asked for.
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const searchRef = useRef<HTMLInputElement | null>(null);
   const [status, setStatus] = useState<GraphStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
@@ -181,8 +190,7 @@ export default function KnowledgeView() {
       <div>
         <div className="view-title">Knowledge</div>
         <div className="view-desc">
-          Everything SuperAI knows, as one graph it reads on every turn. Search to recall it in
-          words; the same search lights up the nodes it is about.
+          Everything SuperAI knows, as one graph it reads on every turn.
         </div>
       </div>
       {status?.url && (
@@ -190,6 +198,29 @@ export default function KnowledgeView() {
           <span className="graph-meta">
             {status.nodes} nodes · {status.edges} edges
           </span>
+          <button
+            className={`btn ghost sm icon-only${searchOpen ? " on" : ""}`}
+            title="Recall from memory"
+            aria-label="Recall from memory"
+            aria-pressed={searchOpen}
+            onClick={() => {
+              const next = !searchOpen;
+              setSearchOpen(next);
+              if (next) setTimeout(() => searchRef.current?.focus(), 0);
+              else clearSearch();
+            }}
+          >
+            <SearchIcon size={15} />
+          </button>
+          <button
+            className={`btn ghost sm icon-only${importOpen ? " on" : ""}`}
+            title="Import a file into this graph"
+            aria-label="Import a file into this graph"
+            aria-pressed={importOpen}
+            onClick={() => setImportOpen((v) => !v)}
+          >
+            <UploadIcon size={15} />
+          </button>
           <button className="btn ghost sm" onClick={() => setNonce((n) => n + 1)}>
             Reload
           </button>
@@ -238,8 +269,10 @@ export default function KnowledgeView() {
   } else {
     body = (
       <div className="graph-stage">
+        {searchOpen && (
         <div className="knowledge-search">
           <input
+            ref={searchRef}
             className="input"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -252,7 +285,13 @@ export default function KnowledgeView() {
                 e.preventDefault();
                 search();
               }
-              if (e.key === "Escape") clearSearch();
+              // Escape closes the field as well as clearing it: it was opened
+              // deliberately, and leaving an empty bar behind is clutter of the
+              // kind this replaced.
+              if (e.key === "Escape") {
+                clearSearch();
+                setSearchOpen(false);
+              }
             }}
             placeholder="Recall — e.g. what do I know about Alice?"
             autoComplete="off"
@@ -272,8 +311,9 @@ export default function KnowledgeView() {
             </button>
           )}
         </div>
+        )}
 
-        <ImportPanel />
+        <ImportPanel open={importOpen} onOpenChange={setImportOpen} />
 
         {recallErr && <div className="report-error">⚠ {recallErr}</div>}
         {!recallErr && searched && (

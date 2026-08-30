@@ -12,9 +12,24 @@ import { ImportCSV } from "../../wailsjs/go/main/App";
  * Kept behind a disclosure because importing is rare and looking is not: an
  * upload form permanently occupying the top of the page would push the thing
  * people came for down the screen.
+ *
+ * The disclosure can be driven from outside (props.open / props.onOpenChange)
+ * so the trigger can live in the page header as an icon rather than as a link
+ * occupying a row of its own. Uncontrolled, it keeps its own link trigger.
  */
-export default function ImportPanel() {
-  const [open, setOpen] = useState(false);
+export type ImportPanelProps = {
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+};
+
+export default function ImportPanel({ open: openProp, onOpenChange }: ImportPanelProps = {}) {
+  const [openState, setOpenState] = useState(false);
+  const controlled = openProp !== undefined;
+  const open = controlled ? openProp : openState;
+  const setOpen = (v: boolean) => {
+    if (!controlled) setOpenState(v);
+    onOpenChange?.(v);
+  };
   // The server-side path of the file to import. Filled by uploading, never
   // typed: a path is only meaningful on the machine SuperAI runs on, and over
   // the network the obvious thing to type — a path on your own laptop — is the
@@ -78,6 +93,8 @@ export default function ImportPanel() {
   }
 
   if (!open) {
+    // Controlled: the page is showing its own trigger, so show nothing here.
+    if (controlled) return null;
     return (
       <button className="link-btn import-toggle" onClick={() => setOpen(true)}>
         + Import a file into this graph
