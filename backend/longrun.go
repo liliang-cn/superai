@@ -50,10 +50,10 @@ type LongRunReport struct {
 	TaskID string `json:"task_id"`
 	// Done is true only when the task actually finished — not merely when the
 	// supervisor stopped asking.
-	Done     bool   `json:"done"`
-	Stop     string `json:"stop"`
-	Segments int    `json:"segments"`
-	Text     string `json:"text"`
+	Done     bool    `json:"done"`
+	Stop     string  `json:"stop"`
+	Segments int     `json:"segments"`
+	Text     string  `json:"text"`
 	CostUSD  float64 `json:"cost_usd"`
 	Duration string  `json:"duration"`
 }
