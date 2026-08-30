@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/liliang-cn/agent-go/v3/pkg/domain"
 	"os"
 	"path/filepath"
 	"strings"
@@ -89,7 +90,20 @@ func (s *Service) MemoryRecall(ctx context.Context, query string) (string, error
 	if s == nil || s.svc == nil || s.svc.Memory == nil {
 		return "", nil
 	}
-	formatted, _, err := s.svc.Memory.RetrieveAndInject(ctx, query, "memory-panel")
+	// Search the agent's own scope, not just the global one.
+	//
+	// RetrieveAndInject builds its scope chain from the session id alone, and
+	// "memory-panel" is not a session anything was ever written under — so the
+	// chain came out [session:memory-panel, global] and every memory scoped to
+	// the agent was filtered out before the panel saw it. Measured against the
+	// shared brain, the two best hits for "AI Agent" were both
+	// scope=agent/SuperAI: SuperAI could not find its own memories in its own
+	// knowledge panel, and what it showed instead was whatever global entry
+	// happened to rank next.
+	formatted, _, err := s.svc.Memory.RetrieveAndInjectWithContext(ctx, query, domain.MemoryQueryContext{
+		SessionID: "memory-panel",
+		AgentID:   s.svc.Info().Name,
+	})
 	return formatted, err
 }
 
