@@ -40,6 +40,8 @@ export function ExportWorkspaceFile(arg1:string):Promise<string>;
 
 export function GetSettings():Promise<backend.Settings>;
 
+export function Dashboard():Promise<Record<string, any>>;
+
 export function GetStatus():Promise<Record<string, any>>;
 
 export function GraphView():Promise<Record<string, any>>;

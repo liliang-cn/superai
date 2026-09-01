@@ -5,7 +5,10 @@ import { ViewKey } from "../lib/types";
 const NAV: { section: string; items: { key: ViewKey; label: string; icon: string }[] }[] = [
   {
     section: "Workspace",
-    items: [{ key: "chat", label: "Chat", icon: "💬" }],
+    items: [
+      { key: "chat", label: "Chat", icon: "💬" },
+      { key: "dashboard", label: "Dashboard", icon: "📊" },
+    ],
   },
   {
     section: "Knowledge",

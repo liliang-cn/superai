@@ -73,6 +73,10 @@ type Service struct {
 
 	MemoryMode string
 
+	// usage counts model-turn tokens across every entry point, for the
+	// dashboard. Fed by an observer registered at build time; see dashboard.go.
+	usage *usageTracker
+
 	// SuppressedMCPServers names the MCP servers that were left unmounted
 	// because they route to the same store the memory backend already owns.
 	SuppressedMCPServers []string
@@ -273,6 +277,10 @@ func NewService(s *Settings) (*Service, error) {
 		brain:  brain, SuppressedMCPServers: droppedMCP,
 		gate: gate,
 	}
+	// Token accounting for the dashboard: one observer sees every model turn,
+	// whichever entry point started the run.
+	out.usage = newUsageTracker(filepath.Join(cfg.DataDir(), "usage.json"))
+	svc.RegisterObserver(&usageObserver{u: out.usage})
 
 	// --- Built-in framework tools. ---
 	agent.RegisterDateTimeTool(svc)

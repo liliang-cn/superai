@@ -11,3 +11,4 @@ frontend/dist
 
 # scratch from driving the app under Playwright
 /.playwright-mcp/
+build/linux/

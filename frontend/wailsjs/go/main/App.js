@@ -6,6 +6,10 @@ export function CLIProxyAccounts() {
   return window['go']['main']['App']['CLIProxyAccounts']();
 }
 
+export function Dashboard() {
+  return window['go']['main']['App']['Dashboard']();
+}
+
 export function CLIProxyLogin(arg1, arg2) {
   return window['go']['main']['App']['CLIProxyLogin'](arg1, arg2);
 }

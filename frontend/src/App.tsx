@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import Sidebar from "./components/Sidebar";
 import StatusBar from "./components/StatusBar";
 import ChatView from "./views/ChatView";
+import DashboardView from "./views/DashboardView";
 import SettingsView from "./views/SettingsView";
 import KnowledgeView from "./views/KnowledgeView";
 import SkillsView from "./views/SkillsView";
@@ -100,6 +101,7 @@ export default function App() {
                 onSessionOpened={() => setPendingSession("")}
               />
             )}
+            {view === "dashboard" && <DashboardView />}
             {view === "settings" && <SettingsView onSaved={refreshStatus} status={status} />}
             {view === "knowledge" && <KnowledgeView />}
             {view === "skills" && <SkillsView />}

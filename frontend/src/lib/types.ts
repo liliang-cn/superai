@@ -1,5 +1,6 @@
 export type ViewKey =
   | "chat"
+  | "dashboard"
   | "settings"
   | "knowledge"
   | "skills"

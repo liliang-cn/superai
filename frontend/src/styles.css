@@ -1091,3 +1091,28 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
   padding: 10px 12px; max-height: 26vh; overflow: auto; margin: 0;
 }
 .import-picked { font-size: 12px; color: var(--text-2); font-family: var(--font-mono); }
+
+/* ---------------- Dashboard ---------------- */
+.dash { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 14px; padding: 16px 20px; overflow-y: auto; }
+.dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.dash-card { display: flex; flex-direction: column; min-width: 0; }
+.dash-kv { display: flex; flex-direction: column; gap: 8px; font-size: 12.5px; }
+.dash-kv > div { display: flex; justify-content: space-between; gap: 12px; min-width: 0; }
+.dash-k { color: var(--text-2); flex-shrink: 0; }
+.dash-v { font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dash-stats { display: flex; gap: 18px; flex-wrap: wrap; margin-bottom: 10px; }
+.dash-stat-n { font-size: 20px; font-weight: 700; font-family: var(--font-mono); }
+.dash-stat-l { font-size: 11px; color: var(--text-3); }
+.dash-bars { display: flex; align-items: flex-end; gap: 3px; height: 42px; margin-top: auto; }
+.dash-bar { flex: 1; min-width: 4px; background: var(--accent, var(--green)); opacity: 0.65; border-radius: 2px 2px 0 0; }
+.dash-list { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.dash-row { display: flex; align-items: center; gap: 8px; font-size: 12.5px; min-width: 0; }
+.dash-row-main { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.dash-row-side { margin-left: auto; flex-shrink: 0; color: var(--text-3); font-size: 11.5px; font-family: var(--font-mono); }
+.dash-task { min-width: 0; }
+.dash-brief {
+  font-size: 11.5px; color: var(--text-2); margin: 3px 0 0 17px;
+  overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+}
+.dash-graph { flex: 1; min-height: 320px; display: flex; flex-direction: column; }
+.dash-frame { flex: 1; width: 100%; min-height: 280px; border: 0; border-radius: var(--radius-sm); background: var(--bg-0); }

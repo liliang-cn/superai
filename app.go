@@ -536,6 +536,33 @@ func (a *App) GetStatus() map[string]any {
 	return st
 }
 
+// Dashboard is one call with everything the dashboard page shows: the
+// configured brain (never its key), runs in flight, token usage, and what
+// task memory holds. Polled by the frontend, so it must stay cheap.
+func (a *App) Dashboard() map[string]any {
+	a.mu.Lock()
+	svc := a.svc
+	s := a.settings
+	a.mu.Unlock()
+
+	out := map[string]any{"ready": svc != nil}
+	if s != nil {
+		out["llm"] = map[string]any{
+			"model":      s.LLMModel,
+			"baseURL":    s.LLMBaseURL,
+			"embedModel": s.EmbedModel,
+			"maxRounds":  s.MaxRounds,
+			"workspace":  s.WorkspaceDir,
+		}
+	}
+	if svc != nil {
+		for k, v := range svc.DashboardData() {
+			out[k] = v
+		}
+	}
+	return out
+}
+
 // GraphView starts the live 3D view of the knowledge graph and reports where it
 // is: a URL on this machine's loopback serving the brain SuperAI actually uses,
 // updating itself as the graph changes.
