@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Dashboard, GraphView as startGraphView } from "../../wailsjs/go/main/App";
-import { openExternal } from "../lib/openExternal";
 import { formatDuration, fromNow, parseTime } from "../lib/format";
 
 /**
@@ -97,6 +96,8 @@ export default function DashboardView() {
   const [data, setData] = useState<DashData | null>(null);
   const [graphURL, setGraphURL] = useState("");
   const [graphErr, setGraphErr] = useState("");
+  const [graphTried, setGraphTried] = useState(false);
+  const [nonce, setNonce] = useState(0);
   const [now, setNow] = useState(Date.now());
 
   const load = useCallback(async () => {
@@ -114,23 +115,41 @@ export default function DashboardView() {
     return () => clearInterval(t);
   }, [load]);
 
-  // The graph view starts on first visit of this page and stays up.
-  useEffect(() => {
-    (async () => {
-      try {
-        const st = (await startGraphView()) as Record<string, any>;
-        setGraphURL(String(st?.url ?? ""));
-        setGraphErr(String(st?.error ?? ""));
-      } catch (e: any) {
-        setGraphErr(String(e?.message || e));
-      }
-    })();
+  // The graph view starts on first visit of this page and stays up. Starting
+  // can fail (the shared brain may be off or unreachable at that moment), so
+  // the frame is only drawn once the backend says the view is actually
+  // running — an iframe pointed at the proxy earlier would have captured its
+  // "not running" answer and kept showing it forever. The nonce remounts the
+  // frame on every successful (re)start for the same reason.
+  const startGraph = useCallback(async () => {
+    try {
+      const st = (await startGraphView()) as Record<string, any>;
+      setGraphURL(String(st?.url ?? ""));
+      setGraphErr(String(st?.error ?? ""));
+      if (st?.url && !st?.error) setNonce((n) => n + 1);
+    } catch (e: any) {
+      setGraphErr(String(e?.message || e));
+    }
+    setGraphTried(true);
   }, []);
+
+  useEffect(() => {
+    startGraph();
+  }, [startGraph]);
+
+  // While the view is not up, keep asking — the usual cause is a shared brain
+  // that is momentarily unreachable, which heals on its own.
+  const graphOK = graphURL !== "" && graphErr === "";
+  useEffect(() => {
+    if (graphOK) return;
+    const t = setInterval(startGraph, 8000);
+    return () => clearInterval(t);
+  }, [graphOK, startGraph]);
 
   const runs = data?.activeRuns ?? [];
   const tasks = data?.tasks ?? [];
   const usage = data?.usage;
-  const frameSrc = GRAPH_SRC ?? graphURL;
+  const frameSrc = graphOK ? (GRAPH_SRC ? `${GRAPH_SRC}?v=${nonce}` : graphURL) : null;
 
   return (
     <div className="dash">
@@ -231,17 +250,17 @@ export default function DashboardView() {
       <div className="card dash-card dash-graph">
         <div className="card-title">🕸️ Memory graph</div>
         {frameSrc ? (
-          <iframe className="dash-frame" src={frameSrc} title="Memory graph" />
+          <iframe key={nonce} className="dash-frame" src={frameSrc} title="Memory graph" />
         ) : graphErr ? (
-          <div className="card-desc">{graphErr}</div>
-        ) : graphURL ? (
           <div className="card-desc">
-            <a href={graphURL} onClick={(e) => { e.preventDefault(); openExternal(graphURL); }}>
-              Open the graph view
-            </a>
+            ⚠ {graphErr}
+            <div style={{ marginTop: 8 }}>
+              <button className="btn sm" onClick={startGraph}>Retry</button>
+              <span style={{ marginLeft: 8 }}>retrying automatically…</span>
+            </div>
           </div>
         ) : (
-          <div className="card-desc">Starting the graph view…</div>
+          <div className="card-desc">{graphTried ? "Waiting for the graph view…" : "Starting the graph view…"}</div>
         )}
       </div>
     </div>
