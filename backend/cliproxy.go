@@ -144,6 +144,24 @@ func StartCLIProxy(port int) (*CLIProxy, error) {
 	// caller that is not 127.0.0.1 whatever it presents.
 	cfg.RemoteManagement.AllowRemote = false
 
+	// Ask for the port before the proxy does, so a port someone else already
+	// holds is reported as the configuration problem it is. The proxy's own
+	// failure surfaces as "listen tcp 127.0.0.1:43517: bind: address already
+	// in use" on the Accounts page, which names no cause and no cure — on a
+	// machine running anything else this is the single likeliest way starting
+	// the proxy fails, and it is one settings field away from fixed.
+	//
+	// Not auto-picked: the caller compares the running proxy's port against
+	// the configured one to decide whether to restart it, so a proxy quietly
+	// listening somewhere else would be torn down and rebuilt forever.
+	if l, lerr := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port)); lerr != nil {
+		return nil, fmt.Errorf(
+			"port %d is already in use by another program on this machine — "+
+				"pick a different Local Port under Settings → Accounts", port)
+	} else {
+		_ = l.Close()
+	}
+
 	svc, err := cliproxy.NewBuilder().
 		WithConfig(cfg).
 		WithConfigPath(cfgPath).

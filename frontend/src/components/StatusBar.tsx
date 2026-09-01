@@ -1,6 +1,7 @@
 import React from "react";
 import { LogOutIcon } from "lucide-react";
-import { AppStatus } from "../lib/types";
+import { Accent, AppStatus, Theme } from "../lib/types";
+import ThemePicker from "./ThemePicker";
 
 // Only the served build has a session to end; the desktop window has no door.
 const served = Boolean((window as unknown as Record<string, unknown>).superaiServed);
@@ -9,12 +10,16 @@ export default function StatusBar({
   status,
   loading,
   theme,
-  onToggleTheme,
+  onTheme,
+  accent,
+  onAccent,
 }: {
   status: AppStatus | null;
   loading: boolean;
-  theme: "dark" | "light";
-  onToggleTheme: () => void;
+  theme: Theme;
+  onTheme: (t: Theme) => void;
+  accent: Accent;
+  onAccent: (a: Accent) => void;
 }) {
   let dotClass = "unknown";
   let label = "Connecting…";
@@ -48,13 +53,7 @@ export default function StatusBar({
             {status.avatarPort > 0 && <span className="pill">avatar <b>:{status.avatarPort}</b></span>}
           </>
         )}
-        <button
-          className="theme-toggle"
-          onClick={onToggleTheme}
-          title={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
-        >
-          {theme === "dark" ? "☀️" : "🌙"}
-        </button>
+        <ThemePicker theme={theme} onTheme={onTheme} accent={accent} onAccent={onAccent} />
         {served && (
           <button
             className="theme-toggle sign-out"

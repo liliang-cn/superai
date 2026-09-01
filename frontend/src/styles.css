@@ -51,8 +51,8 @@
   --card-foreground: #161a22;
   --popover: #ffffff;
   --popover-foreground: #161a22;
-  --primary: #6d6cf0;
-  --primary-foreground: #ffffff;
+  --primary: var(--accent);
+  --primary-foreground: var(--on-accent);
   --secondary: #f4f6fa;
   --secondary-foreground: #161a22;
   --muted: #f4f6fa;
@@ -63,7 +63,7 @@
   --destructive-foreground: #ffffff;
   --border-color: #dde2ec;
   --input: #dde2ec;
-  --ring: #6d6cf0;
+  --ring: var(--accent);
   --radius: 0.625rem;
 }
 
@@ -76,8 +76,8 @@
   --card-foreground: #f1f3f8;
   --popover: #1c212c;
   --popover-foreground: #f1f3f8;
-  --primary: #6d6cf0;
-  --primary-foreground: #ffffff;
+  --primary: var(--accent);
+  --primary-foreground: var(--on-accent);
   --secondary: #1c212c;
   --secondary-foreground: #f1f3f8;
   --muted: #1c212c;
@@ -88,7 +88,7 @@
   --destructive-foreground: #ffffff;
   --border-color: #262c39;
   --input: #2a3140;
-  --ring: #6d6cf0;
+  --ring: var(--accent);
 }
 
 :root {
@@ -106,10 +106,17 @@
   --text-2: #8b93a7;
   --text-3: #5c6478;
 
-  --accent: #6d6cf0;
-  --accent-hover: #8281f5;
-  --accent-soft: rgba(109, 108, 240, 0.14);
-  --accent-border: rgba(109, 108, 240, 0.4);
+  /* Accent = the finish on the chassis. Copper by default; the picker swaps
+     it via [data-accent] below. Dark mode gets a bright finish with dark
+     ink on it, light mode a deep finish with white — so text on an accent
+     surface stays legible whichever finish is chosen. */
+  --accent: #d2793f;
+  --accent-hover: #e28d53;
+  --accent-alt: #d0663f;
+  --on-accent: #1a1206;
+  --accent-soft: rgba(210, 121, 63, 0.16);
+  --accent-border: rgba(210, 121, 63, 0.42);
+  --accent-glow: rgba(210, 121, 63, 0.35);
 
   --green: #3ecf8e;
   --red: #f0556b;
@@ -142,10 +149,13 @@
   --text-2: #69728a;
   --text-3: #99a1b3;
 
-  --accent: #5b5be6;
-  --accent-hover: #4a4ad8;
-  --accent-soft: rgba(91, 91, 230, 0.10);
-  --accent-border: rgba(91, 91, 230, 0.34);
+  --accent: #94510f;
+  --accent-hover: #7b420a;
+  --accent-alt: #a8481f;
+  --on-accent: #ffffff;
+  --accent-soft: rgba(148, 81, 15, 0.10);
+  --accent-border: rgba(148, 81, 15, 0.34);
+  --accent-glow: rgba(148, 81, 15, 0.30);
 
   --green: #1fae73;
   --red: #e23a52;
@@ -153,6 +163,123 @@
   --cyan: #1f9fc4;
 
   --shadow: 0 10px 34px rgba(30, 42, 76, 0.12);
+}
+
+
+/* ---------------------------------------------------------------------------
+   Accent finishes.
+
+   The chassis (slate neutrals, status colours, type) never changes; only the
+   accent does, the way a finish changes on an instrument that is otherwise
+   the same instrument. Set with data-accent on <html> — see ThemePicker.
+
+   Each finish declares its own ink (--on-accent) rather than assuming white:
+   a bright copper or rose reads as a smear under white text, and the whole
+   point of a light finish in dark mode is that it is light.
+
+   Status colours are deliberately not in this set. Green means ok and amber
+   means attention on every finish; an accent that borrowed either would make
+   a decorative choice change what a dot means.
+--------------------------------------------------------------------------- */
+
+[data-accent="copper"] {
+  --accent: #d2793f;
+  --accent-hover: #e28d53;
+  --accent-alt: #d0663f;
+  --on-accent: #1a1206;
+  --accent-soft: rgba(210, 121, 63, 0.16);
+  --accent-border: rgba(210, 121, 63, 0.42);
+  --accent-glow: rgba(210, 121, 63, 0.35);
+}
+
+[data-theme="light"][data-accent="copper"] {
+  --accent: #94510f;
+  --accent-hover: #7b420a;
+  --accent-alt: #a8481f;
+  --on-accent: #ffffff;
+  --accent-soft: rgba(148, 81, 15, 0.10);
+  --accent-border: rgba(148, 81, 15, 0.34);
+  --accent-glow: rgba(148, 81, 15, 0.30);
+}
+
+[data-accent="cobalt"] {
+  --accent: #5b93ff;
+  --accent-hover: #7dabff;
+  --accent-alt: #52c8e0;
+  --on-accent: #04101f;
+  --accent-soft: rgba(91, 147, 255, 0.16);
+  --accent-border: rgba(91, 147, 255, 0.42);
+  --accent-glow: rgba(91, 147, 255, 0.35);
+}
+
+[data-theme="light"][data-accent="cobalt"] {
+  --accent: #2059d6;
+  --accent-hover: #1847b4;
+  --accent-alt: #12809f;
+  --on-accent: #ffffff;
+  --accent-soft: rgba(32, 89, 214, 0.10);
+  --accent-border: rgba(32, 89, 214, 0.34);
+  --accent-glow: rgba(32, 89, 214, 0.30);
+}
+
+[data-accent="jade"] {
+  --accent: #2fbfa4;
+  --accent-hover: #4dd3b9;
+  --accent-alt: #3fa5c9;
+  --on-accent: #04140f;
+  --accent-soft: rgba(47, 191, 164, 0.16);
+  --accent-border: rgba(47, 191, 164, 0.42);
+  --accent-glow: rgba(47, 191, 164, 0.35);
+}
+
+[data-theme="light"][data-accent="jade"] {
+  --accent: #0f7d6b;
+  --accent-hover: #0a6355;
+  --accent-alt: #106b86;
+  --on-accent: #ffffff;
+  --accent-soft: rgba(15, 125, 107, 0.10);
+  --accent-border: rgba(15, 125, 107, 0.34);
+  --accent-glow: rgba(15, 125, 107, 0.30);
+}
+
+[data-accent="rose"] {
+  --accent: #f2739f;
+  --accent-hover: #f78fb3;
+  --accent-alt: #c86ce8;
+  --on-accent: #1e0710;
+  --accent-soft: rgba(242, 115, 159, 0.16);
+  --accent-border: rgba(242, 115, 159, 0.42);
+  --accent-glow: rgba(242, 115, 159, 0.35);
+}
+
+[data-theme="light"][data-accent="rose"] {
+  --accent: #c03569;
+  --accent-hover: #a32a58;
+  --accent-alt: #8b46c4;
+  --on-accent: #ffffff;
+  --accent-soft: rgba(192, 53, 105, 0.10);
+  --accent-border: rgba(192, 53, 105, 0.34);
+  --accent-glow: rgba(192, 53, 105, 0.30);
+}
+
+[data-accent="violet"] {
+  --accent: #8b8af5;
+  --accent-hover: #a3a2f8;
+  --accent-alt: #c05cf0;
+  --on-accent: #0b0a1f;
+  --accent-soft: rgba(139, 138, 245, 0.16);
+  --accent-border: rgba(139, 138, 245, 0.42);
+  --accent-glow: rgba(139, 138, 245, 0.35);
+}
+
+[data-theme="light"][data-accent="violet"] {
+  --accent: #5b5be6;
+  --accent-hover: #4a4ad8;
+  --accent-alt: #9a45d8;
+  --on-accent: #ffffff;
+  --accent-soft: rgba(91, 91, 230, 0.10);
+  --accent-border: rgba(91, 91, 230, 0.34);
+  --accent-glow: rgba(91, 91, 230, 0.30);
 }
 
 /* markdown rendering in assistant chat bubbles */
@@ -356,10 +483,10 @@ input, textarea, select { font-family: inherit; }
 .brand-logo {
   width: 32px; height: 32px;
   border-radius: 9px;
-  background: linear-gradient(135deg, var(--accent), #a45cf0);
+  background: linear-gradient(135deg, var(--accent), var(--accent-alt));
   display: grid; place-items: center;
-  font-weight: 800; font-size: 16px; color: white;
-  box-shadow: 0 4px 14px rgba(109, 108, 240, 0.4);
+  font-weight: 800; font-size: 16px; color: var(--on-accent);
+  box-shadow: 0 4px 14px var(--accent-glow);
 }
 .brand-name { font-weight: 700; font-size: 16px; letter-spacing: -0.2px; }
 .brand-sub { font-size: 11px; color: var(--text-3); margin-top: -2px; }
@@ -436,7 +563,7 @@ input, textarea, select { font-family: inherit; }
   display: grid; place-items: center; font-size: 13px; font-weight: 700;
 }
 .msg.user .msg-avatar { background: var(--bg-3); color: var(--text-1); }
-.msg.assistant .msg-avatar { background: linear-gradient(135deg, var(--accent), #a45cf0); color: white; }
+.msg.assistant .msg-avatar { background: linear-gradient(135deg, var(--accent), var(--accent-alt)); color: var(--on-accent); }
 .msg-body {
   background: var(--bg-2); border: 1px solid var(--border);
   border-radius: var(--radius); padding: 11px 14px;
@@ -529,7 +656,7 @@ input, textarea, select { font-family: inherit; }
   position: absolute; top: -3px; right: -4px;
   min-width: 15px; height: 15px; padding: 0 3px;
   display: grid; place-items: center;
-  border-radius: 8px; background: var(--accent); color: white;
+  border-radius: 8px; background: var(--accent); color: var(--on-accent);
   font-size: 9.5px; font-weight: 700; line-height: 1;
 }
 .trace-head {
@@ -600,7 +727,7 @@ input, textarea, select { font-family: inherit; }
 /* ---------------- Buttons ---------------- */
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 7px;
-  background: var(--accent); color: white; border: none;
+  background: var(--accent); color: var(--on-accent); border: none;
   padding: 9px 18px; border-radius: 8px; font-size: 13.5px; font-weight: 600;
   transition: background 0.12s, opacity 0.12s;
 }
@@ -625,7 +752,7 @@ input, textarea, select { font-family: inherit; }
 .btn.ghost.icon-only.on {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 /* ---------------- Settings ---------------- */
@@ -726,7 +853,7 @@ input, textarea, select { font-family: inherit; }
 .modal-body pre { font-family: var(--font-mono); font-size: 12.5px; color: var(--text-1); white-space: pre-wrap; word-break: break-word; user-select: text; }
 
 .spinner {
-  width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white;
+  width: 14px; height: 14px; border: 2px solid rgba(127,127,127,0.35); border-top-color: currentColor;
   border-radius: 50%; animation: spin 0.7s linear infinite; display: inline-block;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -884,7 +1011,7 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
   margin-left: auto; flex: none;
   min-width: 20px; text-align: center;
   font-size: 10.5px; font-weight: 700; line-height: 16px;
-  color: white; background: var(--accent); border-radius: 10px; padding: 0 5px;
+  color: var(--on-accent); background: var(--accent); border-radius: 10px; padding: 0 5px;
 }
 .nav-badge.dot { min-width: 8px; height: 8px; padding: 0; border-radius: 50%; margin-left: 2px; }
 
@@ -966,10 +1093,10 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
 .gate-card { width: 100%; max-width: 300px; display: flex; flex-direction: column; align-items: center; }
 .gate-logo {
   width: 46px; height: 46px; border-radius: 13px;
-  background: linear-gradient(135deg, var(--accent), #a45cf0);
+  background: linear-gradient(135deg, var(--accent), var(--accent-alt));
   display: grid; place-items: center;
-  font-weight: 800; font-size: 22px; color: white;
-  box-shadow: 0 6px 20px rgba(109, 108, 240, 0.4);
+  font-weight: 800; font-size: 22px; color: var(--on-accent);
+  box-shadow: 0 6px 20px var(--accent-glow);
 }
 .gate-name { margin-top: 14px; font-size: 21px; font-weight: 700; letter-spacing: -0.3px; }
 .gate-sub { margin-top: 4px; font-size: 12.5px; color: var(--text-3); }
@@ -1116,3 +1243,57 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
 }
 .dash-graph { flex: 1; min-height: 320px; display: flex; flex-direction: column; }
 .dash-frame { flex: 1; width: 100%; min-height: 280px; border: 0; border-radius: var(--radius-sm); background: var(--bg-0); }
+
+/* ---------------- Appearance picker ---------------- */
+.theme-picker { position: relative; display: inline-flex; }
+.theme-toggle.on { background: var(--bg-hover); border-color: var(--border-strong); }
+/* The button wears the finish it will change, so the control shows its own
+   state closed — which is also what makes an unlabelled glyph findable. */
+.tp-current {
+  width: 13px; height: 13px; border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25);
+}
+.tp-panel {
+  position: absolute; top: calc(100% + 8px); right: 0; z-index: 60;
+  min-width: 194px; padding: 12px;
+  display: flex; flex-direction: column; gap: 14px;
+  background: var(--bg-1); border: 1px solid var(--border-strong);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+}
+.tp-group { display: flex; flex-direction: column; gap: 7px; }
+.tp-label {
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.07em;
+  text-transform: uppercase; color: var(--text-3);
+}
+.tp-seg {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 3px;
+  padding: 3px; background: var(--bg-0);
+  border: 1px solid var(--border); border-radius: 8px;
+}
+.tp-seg-btn {
+  border: none; background: transparent; color: var(--text-2);
+  padding: 5px 0; border-radius: 6px; cursor: pointer;
+  font-size: 12.5px; font-weight: 600;
+}
+.tp-seg-btn:hover { color: var(--text-0); }
+.tp-seg-btn.on { background: var(--accent); color: var(--on-accent); }
+.tp-swatches { display: flex; gap: 8px; }
+.tp-swatch {
+  width: 22px; height: 22px; padding: 0; border-radius: 50%;
+  background: var(--sw); cursor: pointer;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  box-shadow: 0 0 0 0 var(--sw);
+  transition: box-shadow 0.14s, transform 0.14s;
+}
+.tp-swatch:hover { transform: translateY(-1px); }
+/* The ring is the selection, drawn in the finish itself rather than a neutral
+   outline: picking a colour should be answered in that colour. */
+.tp-swatch.on { box-shadow: 0 0 0 2px var(--bg-1), 0 0 0 4px var(--sw); }
+.tp-current-name { font-size: 11.5px; color: var(--text-2); }
+.theme-toggle:focus-visible,
+.tp-seg-btn:focus-visible,
+.tp-swatch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  .tp-swatch { transition: none; }
+  .tp-swatch:hover { transform: none; }
+}

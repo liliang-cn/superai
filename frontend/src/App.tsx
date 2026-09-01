@@ -11,13 +11,11 @@ import RecordsView from "./views/RecordsView";
 import { ScheduleRunToasts } from "./components/ScheduleRuns";
 import ToolApprovals from "./components/ToolApprovals";
 import YoloBanner from "./components/YoloBanner";
-import { AppStatus, ViewKey, normalizeStatus } from "./lib/types";
+import { Accent, AppStatus, Theme, ViewKey, normalizeStatus } from "./lib/types";
 import { useScheduleRuns } from "./lib/useScheduleRuns";
 import { useToolApprovals } from "./lib/useToolApprovals";
 import { uiRules } from "./lib/aigui";
 import { GetStatus, SetUIRules, SetWindowTheme } from "../wailsjs/go/main/App";
-
-type Theme = "dark" | "light";
 
 export default function App() {
   const [view, setView] = useState<ViewKey>("chat");
@@ -25,6 +23,12 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [theme, setTheme] = useState<Theme>(
     () => (localStorage.getItem("superai-theme") as Theme) || "dark"
+  );
+  // The accent finish. Remembered per browser rather than in settings.json:
+  // it changes nothing the agent does, and a preference the backend has to be
+  // rebuilt to apply is a preference nobody flips twice.
+  const [accent, setAccent] = useState<Accent>(
+    () => (localStorage.getItem("superai-accent") as Accent) || "copper"
   );
   // The conversation a run belongs to, handed to the chat view to open. Cleared
   // as soon as it has been taken so asking for the same one twice works.
@@ -59,17 +63,17 @@ export default function App() {
     void SetWindowTheme(theme === "dark").catch(() => {});
   }, [theme]);
 
+  useEffect(() => {
+    document.documentElement.dataset.accent = accent;
+    localStorage.setItem("superai-accent", accent);
+  }, [accent]);
+
   // Tell the agent which rich blocks this transcript can render. The rules come
   // from the same registry + plugins the renderer uses, so they cannot drift;
   // the backend only rebuilds when they actually changed.
   useEffect(() => {
     SetUIRules(uiRules()).catch(() => {});
   }, []);
-  const toggleTheme = useCallback(
-    () => setTheme((t) => (t === "dark" ? "light" : "dark")),
-    []
-  );
-
   const refreshStatus = useCallback(async () => {
     try {
       const raw = await GetStatus();
@@ -92,7 +96,14 @@ export default function App() {
       <div className="app">
         <Sidebar current={view} onNavigate={setView} badges={{ records: runs.unseen }} />
         <div className="main">
-          <StatusBar status={status} loading={loading} theme={theme} onToggleTheme={toggleTheme} />
+          <StatusBar
+            status={status}
+            loading={loading}
+            theme={theme}
+            onTheme={setTheme}
+            accent={accent}
+            onAccent={setAccent}
+          />
           <div className="content">
             {view === "chat" && (
               <ChatView
