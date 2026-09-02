@@ -11,6 +11,7 @@ import RecordsView from "./views/RecordsView";
 import { ScheduleRunToasts } from "./components/ScheduleRuns";
 import { Toaster } from "./components/Toaster";
 import { useBackendToasts } from "./lib/toasts";
+import { EventsOff, EventsOn } from "../wailsjs/runtime/runtime";
 import ToolApprovals from "./components/ToolApprovals";
 import YoloBanner from "./components/YoloBanner";
 import { Accent, AppStatus, Theme, ViewKey, normalizeStatus } from "./lib/types";
@@ -51,6 +52,17 @@ export default function App() {
   // fires while the user is somewhere else, which is the whole point of a timer.
   // The opener goes with it so a clicked notification lands in the right place.
   const runs = useScheduleRuns(openConversation);
+
+  // A click on a native banner. The desktop build carries the conversation on
+  // the notification itself and asks for it back here, because a banner that
+  // says a run finished and leaves you to find it is a dead end — a reminder
+  // that fired hours ago means scrolling a list to work out which one it meant.
+  useEffect(() => {
+    EventsOn("open:conversation", (payload: { session?: string }) => {
+      if (payload?.session) openConversation(payload.session);
+    });
+    return () => EventsOff("open:conversation");
+  }, [openConversation]);
 
   // Tool approvals live at the root for a stronger version of the same reason:
   // the agent's turn is blocked until one is answered, and the prompt has to

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { InstallSkill, RemoveSkill, SearchSkills, Skills } from "../../wailsjs/go/main/App";
 import { backend } from "../../wailsjs/go/models";
+import { toast } from "../lib/toasts";
 
 export default function SkillsView() {
   const [skills, setSkills] = useState<backend.SkillInfo[]>([]);
@@ -91,7 +92,8 @@ export default function SkillsView() {
                           setBusy(c.name);
                           const res = await InstallSkill(c.name, c.path);
                           setBusy("");
-                          setNote(res === "ok" ? `Installed ${c.name}.` : res);
+                          if (res === "ok") toast.success(`Installed ${c.name}.`);
+                            else toast.error(res);
                           load();
                           browse(query);
                         }}
@@ -150,7 +152,8 @@ export default function SkillsView() {
                         }
                         setConfirmRemove("");
                         RemoveSkill(id).then((res) => {
-                          setNote(res === "ok" ? `Removed ${id}.` : res);
+                          if (res === "ok") toast.success(`Removed ${id}.`);
+                          else toast.error(res);
                           load();
                           if (available) browse(query);
                         });

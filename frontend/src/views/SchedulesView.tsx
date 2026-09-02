@@ -16,6 +16,7 @@ import { ScheduleRunLog } from "../lib/useScheduleRuns";
 import { ScheduleRunList } from "../components/ScheduleRuns";
 import { notifyNow, notifyPermission, requestNotifyPermission } from "../lib/notify";
 import { useImeGuard } from "@/lib/ime";
+import { toast } from "../lib/toasts";
 
 type Note = { kind: "ok" | "err"; text: string } | null;
 
@@ -69,7 +70,7 @@ export default function SchedulesView({
       const res = await ScheduledPrompts();
       setList(Array.isArray(res) ? res : []);
     } catch (e: any) {
-      if (!quiet) setNote({ kind: "err", text: String(e?.message || e) });
+      if (!quiet) toast.error(String(e?.message || e));
     } finally {
       if (!quiet) setLoading(false);
     }
@@ -129,7 +130,7 @@ export default function SchedulesView({
       const res: any = await ScheduleFromText(prompt.trim());
       if (res && res.answer) setReply(String(res.answer));
       if (res && res.ok === false) {
-        setNote({ kind: "err", text: String(res.error || "could not arrange that") });
+        toast.error(String(res.error || "could not arrange that"));
         return;
       }
       const next = await ScheduledPrompts();
@@ -154,7 +155,7 @@ export default function SchedulesView({
         });
       }
     } catch (e: any) {
-      setNote({ kind: "err", text: String(e?.message || e) });
+      toast.error(String(e?.message || e));
     } finally {
       setSaving(false);
     }
@@ -175,10 +176,11 @@ export default function SchedulesView({
     setConfirmDelete("");
     try {
       const res = await call();
-      if (res === "ok") setNote({ kind: "ok", text: `${label} done.` });
-      else setNote({ kind: opts.refusalIsFine ? "ok" : "err", text: res });
+      if (res === "ok") toast.success(`${label} done.`);
+      else if (opts.refusalIsFine) toast.info(res);
+      else toast.error(res);
     } catch (e: any) {
-      setNote({ kind: "err", text: String(e?.message || e) });
+      toast.error(String(e?.message || e));
     } finally {
       setBusy("");
       load();

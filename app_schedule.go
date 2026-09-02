@@ -112,22 +112,12 @@ func (a *App) stopScheduler() {
 }
 
 // onScheduledRun reports a finished run. It runs on the scheduler's goroutine,
-// so it does no work beyond emitting.
+// so it does no work beyond publishing.
 func (a *App) onScheduledRun(run agent.PromptRun) {
-	summary := strings.TrimSpace(run.Answer)
-	switch {
-	case run.Cancelled:
-		// A stop is the user's own doing, so it is reported as an outcome and
-		// not as a fault — the same rule the chat transcript follows. Err is
-		// nil for a cancelled run, so nothing below would have caught it.
-		summary = "已取消"
-	case run.Err != nil:
-		summary = "运行失败：" + run.Err.Error()
-	}
-
-	// Out to whoever is not looking at the page. The emit below only reaches an
-	// open frontend, and in serve mode on a headless box there is never one —
-	// which is how a reminder that fired at 08:00 reached a log and nobody.
+	// One notice, drawn by every surface that is attached: the toast in an open
+	// window, the native banner on this desktop, and the webhook for whoever is
+	// nowhere near either. What the message says is decided once, in Go, rather
+	// than three times in three places that drift.
 	a.mu.Lock()
 	notifySvc := a.svc
 	a.mu.Unlock()
@@ -163,19 +153,30 @@ func (a *App) onScheduledRun(run agent.PromptRun) {
 		}
 	}
 
-	// No banner for a stop: the user was at the machine — they pressed the
-	// button — so a system notification telling them what they just did is
-	// noise.
-	if run.Cancelled {
+}
+
+// bannerSink draws a notice as a native system notification.
+//
+// Subscribed rather than called, because this is the surface that only exists
+// in the desktop build: serve mode has no window to hang a banner off, and the
+// publisher should not have to know which build it is in.
+//
+// It draws only what was marked Push, and for the same reason the webhook does.
+// A banner is an interruption, and the message that earns one is the message
+// worth reaching someone who is not looking — which is exactly what that flag
+// means. "Settings saved" would otherwise put a system notification on screen
+// for something the user is already watching happen.
+func (a *App) bannerSink(_ context.Context, n backend.Notice) {
+	if !n.Push {
 		return
 	}
-	a.notify(scheduleNotifyTitle, firstLine(run.Prompt), summary)
+	a.notify(scheduleNotifyTitle, firstLine(n.Source), n.Message, n.Session)
 }
 
 // notify sends a native notification, degrading to nothing when the platform or
 // the user has not granted permission — a failed banner must never take a
 // scheduled run down with it.
-func (a *App) notify(title, subtitle, body string) {
+func (a *App) notify(title, subtitle, body, session string) {
 	a.mu.Lock()
 	ctx := a.ctx
 	allowed := a.notifyOK
@@ -184,15 +185,47 @@ func (a *App) notify(title, subtitle, body string) {
 	if ctx == nil || !allowed {
 		return
 	}
-	if err := runtime.SendNotification(ctx, runtime.NotificationOptions{
+	opts := runtime.NotificationOptions{
 		ID:       "superai-" + uuid.NewString(),
 		Title:    title,
 		Subtitle: subtitle,
 		Body:     truncateRunes(body, 300),
-	}); err != nil {
+	}
+	if session != "" {
+		// Carried on the notification itself, not in a map this process keeps.
+		// A banner outlives the run that raised it — it sits in Notification
+		// Centre until it is dismissed, which may be tomorrow — and a lookup
+		// table would have to be either unbounded or wrong by then.
+		opts.Data = map[string]any{"session": session}
+	}
+	if err := runtime.SendNotification(ctx, opts); err != nil {
 		// Logged, not surfaced: the run itself succeeded.
 		fmt.Printf("superai: notification failed: %v\n", err)
 	}
+}
+
+// watchNotificationClicks opens the conversation a banner came from.
+//
+// Without this a banner is a dead end: it tells you a run finished and leaves
+// you to find it, which for a reminder that fired hours ago means scrolling a
+// list of conversations to work out which one it meant.
+func (a *App) watchNotificationClicks() {
+	if a.ctx == nil {
+		return
+	}
+	runtime.OnNotificationResponse(a.ctx, func(result runtime.NotificationResult) {
+		if result.Error != nil {
+			return
+		}
+		session, _ := result.Response.UserInfo["session"].(string)
+		if session == "" {
+			return
+		}
+		// The window is where the conversation is, and a click on a banner is a
+		// request to look at something.
+		runtime.WindowShow(a.ctx)
+		a.emit("open:conversation", map[string]any{"session": session})
+	})
 }
 
 // initNotifications asks for permission once at startup. macOS requires
@@ -215,6 +248,7 @@ func (a *App) initNotifications() {
 	a.mu.Lock()
 	a.notifyOK = true
 	a.mu.Unlock()
+	a.watchNotificationClicks()
 }
 
 // ---- bindings ----

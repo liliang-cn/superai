@@ -227,6 +227,10 @@ func (a *App) rebuild() {
 	// save constructs a whole new Service, and one that lost its emitter would
 	// go on posting webhooks while the open window heard nothing.
 	svc.Notices().SetEmitter(a.emit)
+	// The desktop's own banner is a third surface, and it subscribes like any
+	// other. Registered under a name so a rebuild replaces it rather than
+	// stacking a second one that would draw every notification twice.
+	svc.Notices().Subscribe("banner", a.bannerSink)
 }
 
 // restartScheduler rebinds the timers to the current service. Callers must not

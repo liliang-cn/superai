@@ -17,6 +17,7 @@ import {
 } from "../../wailsjs/go/main/App";
 import { BrowserOpenURL, EventsOff, EventsOn } from "../../wailsjs/runtime/runtime";
 import { backend } from "../../wailsjs/go/models";
+import { toast } from "../lib/toasts";
 
 type ProxyStatus = {
   running: boolean;
@@ -203,7 +204,6 @@ export default function SettingsView({
 }) {
   const [s, setS] = useState<backend.Settings | null>(null);
   const [saving, setSaving] = useState(false);
-  const [note, setNote] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const [proxy, setProxy] = useState<ProxyStatus | null>(null);
   const [providers, setProviders] = useState<backend.CLIProxyProvider[]>([]);
   const [projectID, setProjectID] = useState("");
@@ -256,7 +256,7 @@ export default function SettingsView({
   useEffect(() => {
     GetSettings()
       .then((res) => setS(res))
-      .catch((e) => setNote({ kind: "err", text: String(e?.message || e) }));
+      .catch((e) => toast.error(String(e?.message || e)));
     CLIProxyProviders().then(setProviders).catch(() => setProviders([]));
     refreshProxy();
     refreshApproval();
@@ -279,17 +279,16 @@ export default function SettingsView({
   const save = async () => {
     if (!s) return;
     setSaving(true);
-    setNote(null);
     try {
       await SaveSettings(s);
-      setNote({ kind: "ok", text: "Saved. Backend rebuilt." });
+      toast.success("Saved. Backend rebuilt.");
       refreshProxy();
       // The gate is rebuilt with the service, so what it reports is only true
       // after the save has been through.
       refreshApproval();
       onSaved();
     } catch (e: any) {
-      setNote({ kind: "err", text: String(e?.message || e) });
+      toast.error(String(e?.message || e));
     } finally {
       setSaving(false);
     }
@@ -703,7 +702,6 @@ export default function SettingsView({
             <button className="btn" onClick={save} disabled={saving}>
               {saving ? <><span className="spinner" /> Saving…</> : "Save settings"}
             </button>
-            {note && <span className={`save-note ${note.kind}`}>{note.kind === "ok" ? "✓" : "⚠"} {note.text}</span>}
           </div>
         </div>
       </div>

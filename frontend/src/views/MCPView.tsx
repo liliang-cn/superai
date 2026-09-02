@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { InstallMCPServer, MCP, RemoveMCPServer, SearchMCPServers } from "../../wailsjs/go/main/App";
 import { mcp } from "../../wailsjs/go/models";
 import { useImeGuard } from "@/lib/ime";
+import { toast } from "../lib/toasts";
 
 /** One installable server from the registry, as SearchMCPServers returns it. */
 interface Candidate {
@@ -129,7 +130,8 @@ export default function MCPView() {
                             setBusy(c.name);
                             const res = await InstallMCPServer(name, c.command || "", c.args || [], {});
                             setBusy("");
-                            setNote(res === "ok" ? `Installed ${name}.` : res);
+                            if (res === "ok") toast.success(`Installed ${name}.`);
+                            else toast.error(res);
                             load();
                           }}
                         >
@@ -207,7 +209,8 @@ export default function MCPView() {
                           }
                           setConfirmRemove("");
                           RemoveMCPServer(s.name).then((res) => {
-                            setNote(res === "ok" ? `Removed ${s.name}. It stops on the next launch.` : res);
+                            if (res === "ok") toast.success(`Removed ${s.name}. It stops on the next launch.`);
+                            else toast.error(res);
                             load();
                           });
                         }}

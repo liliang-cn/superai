@@ -288,5 +288,8 @@ func TestScheduleBindingsWithoutSchedulerDoNotPanic(t *testing.T) {
 	}
 
 	// Notifying with no Wails context must be a no-op rather than a crash.
-	app.notify("t", "s", "b")
+	app.notify("t", "s", "b", "session")
+	// And so must registering the click handler: initNotifications guards on
+	// the same context, but the guard is the thing under test.
+	app.watchNotificationClicks()
 }
