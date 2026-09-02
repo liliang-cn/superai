@@ -132,6 +132,27 @@ type Settings struct {
 	// SharedMemoryNamespace scopes reads and writes inside the shared brain.
 	// Defaults to "default", which is the namespace the other clients use.
 	SharedMemoryNamespace string `json:"shared_memory_namespace"`
+
+	// WebhookURL receives a JSON POST for every notification the agent
+	// produces: notify_user mid-task, and each scheduled run as it finishes.
+	//
+	// It exists because the other two surfaces both need someone already
+	// looking — notify_user rides the stream to an open page, and the desktop
+	// notification is macOS-only and absent in serve mode. On a headless box a
+	// reminder that fired at 08:00 reached a log and nobody. One POST is what
+	// Telegram, a WeCom bot, bark, ntfy and a home-made receiver all accept
+	// behind a short adapter, which is why this is a URL and not a list of
+	// per-service integrations.
+	//
+	// Empty disables it, which is the default.
+	WebhookURL string `json:"webhook_url"`
+
+	// WebhookSecret, when set, is sent as `Authorization: Bearer <secret>` so a
+	// receiver on the open internet can tell the agent's calls from anyone
+	// else's. A bearer token rather than a request signature: the receiver is
+	// usually a few lines of script, and a token it can compare is the check it
+	// will actually implement.
+	WebhookSecret string `json:"webhook_secret"`
 }
 
 // Memory backend choices for Settings.MemoryBackend.
@@ -230,8 +251,14 @@ func defaults() *Settings {
 // missing. Any zero-valued fields are backfilled with defaults so older files
 // keep working after upgrades.
 func LoadSettings() (*Settings, error) {
+	return loadSettingsFrom(settingsPath())
+}
+
+// loadSettingsFrom is LoadSettings against a named file, for callers that
+// look at a home other than the running app's.
+func loadSettingsFrom(path string) (*Settings, error) {
 	def := defaults()
-	raw, err := os.ReadFile(settingsPath())
+	raw, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return def, nil

@@ -233,8 +233,8 @@ github.com/ledongthuc/pdf v0.0.0-20220302134840-0c2507a12d80 h1:6Yzfa6GP0rIo/kUL
 github.com/ledongthuc/pdf v0.0.0-20220302134840-0c2507a12d80/go.mod h1:imJHygn/1yfhB7XSJJKlFZKl/J+dCPAknuiaGOshXAs=
 github.com/leodido/go-urn v1.4.0 h1:WT9HwE9SGECu3lg4d/dIA+jxlljEa1/ffXKmRjqdmIQ=
 github.com/leodido/go-urn v1.4.0/go.mod h1:bvxc+MVxLKB4z00jd1z+Dvzr47oO32F/QSNjSBOlFxI=
-github.com/liliang-cn/agent-go/v3 v3.17.0 h1:CS1LP1IzLE3J6dcmGNugoyTRY2HyX+Rujz5HoBD0mJw=
-github.com/liliang-cn/agent-go/v3 v3.17.0/go.mod h1:79Q8WhRkiz6Zk+202SpzUzrpPsOQB1OG2zQxCwzxkpE=
+github.com/liliang-cn/agent-go/v3 v3.17.1 h1:H0zOvKEE21Prr2/3k5gOfaAckxLnNi39MPKL/nPvios=
+github.com/liliang-cn/agent-go/v3 v3.17.1/go.mod h1:79Q8WhRkiz6Zk+202SpzUzrpPsOQB1OG2zQxCwzxkpE=
 github.com/liliang-cn/cortexdb/v2 v2.88.0 h1:iaIhsYf3Is0xalAt0FjsHWwYBrRDwmZaj96K1SchZ0E=
 github.com/liliang-cn/cortexdb/v2 v2.88.0/go.mod h1:O4EPYRbBsEpEsRisT2Hs2jhKVoEMPuRm87xAXpwLMwc=
 github.com/liliang-cn/mcp-swagger-server v1.3.0 h1:PFnm9mSbjVoFv4AelRzmHuxuuJXI8QRUYVeYmjkpsPw=

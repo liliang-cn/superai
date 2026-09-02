@@ -2,6 +2,9 @@ package backend
 
 import (
 	"context"
+	"fmt"
+	"path/filepath"
+	"strings"
 
 	"github.com/liliang-cn/agent-go/v3/pkg/agent"
 )
@@ -86,5 +89,51 @@ func doctorReportFor(ctx context.Context, home string) DoctorReport {
 			Fix:    c.Fix,
 		})
 	}
+	applySettingsProvider(&out, home)
 	return out
+}
+
+// applySettingsProvider corrects the one check the framework cannot get
+// right for this app. agent.Doctor looks for LLM providers in agentgo.db,
+// but SuperAI keeps its brain in settings.json and hands it to the service
+// through WithLLM — so on a healthy install the framework reports
+// "no LLM provider configured", which is exactly wrong. When settings.json
+// names a provider, that check is replaced with what the app will actually
+// use, the key reported only as present or absent, and the counts redone.
+func applySettingsProvider(out *DoctorReport, home string) {
+	st, err := loadSettingsFrom(filepath.Join(home, "settings.json"))
+	if err != nil || st == nil || strings.TrimSpace(st.LLMBaseURL) == "" || strings.TrimSpace(st.LLMModel) == "" {
+		return
+	}
+	key := "key present"
+	status := "ok"
+	fix := ""
+	if strings.TrimSpace(st.LLMKey) == "" {
+		key = "no key"
+		status = "warn"
+		fix = "set llm_key in settings.json unless the gateway needs none"
+	}
+	detail := fmt.Sprintf("settings.json: %s @ %s (%s)", st.LLMModel, st.LLMBaseURL, key)
+	replaced := false
+	for i := range out.Checks {
+		if out.Checks[i].Name == "llm.providers" {
+			out.Checks[i] = DoctorCheck{Name: "llm.providers", Status: status, Detail: detail, Fix: fix}
+			replaced = true
+		}
+	}
+	if !replaced {
+		out.Checks = append(out.Checks, DoctorCheck{Name: "llm.providers", Status: status, Detail: detail, Fix: fix})
+	}
+	out.OK, out.Warn, out.Fail = 0, 0, 0
+	for _, c := range out.Checks {
+		switch c.Status {
+		case "ok":
+			out.OK++
+		case "warn":
+			out.Warn++
+		default:
+			out.Fail++
+		}
+	}
+	out.Healthy = out.Fail == 0
 }
