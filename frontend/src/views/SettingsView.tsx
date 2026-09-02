@@ -194,6 +194,25 @@ function OpenInBrowserCard() {
   );
 }
 
+/**
+ * The settings, in groups.
+ *
+ * They were one column of eight cards, which meant scrolling past the model
+ * accounts to reach the workspace directory and scrolling back to save. The
+ * groups are by what a person came to change, not by which struct the fields
+ * live in — embeddings and the memory backend are one decision made in two
+ * places, so they sit together.
+ */
+type SectionID = "model" | "memory" | "notifications" | "safety" | "runtime";
+
+const SECTIONS: { id: SectionID; label: string }[] = [
+  { id: "model", label: "Model" },
+  { id: "memory", label: "Memory" },
+  { id: "notifications", label: "Notifications" },
+  { id: "safety", label: "Safety" },
+  { id: "runtime", label: "Runtime" },
+];
+
 export default function SettingsView({
   onSaved,
   status,
@@ -204,6 +223,10 @@ export default function SettingsView({
 }) {
   const [s, setS] = useState<backend.Settings | null>(null);
   const [saving, setSaving] = useState(false);
+  // Which group of settings is on screen. Not in the URL and not persisted:
+  // the page is opened to change one thing, and coming back to whatever was
+  // last poked at is less useful than starting where the accounts are.
+  const [section, setSection] = useState<SectionID>("model");
   const [proxy, setProxy] = useState<ProxyStatus | null>(null);
   const [providers, setProviders] = useState<backend.CLIProxyProvider[]>([]);
   const [projectID, setProjectID] = useState("");
@@ -311,9 +334,22 @@ export default function SettingsView({
         <div className="view-title">Settings</div>
         <div className="view-desc">Configure providers and runtime. Saving persists and rebuilds the backend.</div>
       </div>
+      <div className="settings-tabs" role="tablist">
+        {SECTIONS.map((t) => (
+          <button
+            key={t.id}
+            role="tab"
+            aria-selected={section === t.id}
+            className={`settings-tab${section === t.id ? " active" : ""}`}
+            onClick={() => setSection(t.id)}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
       <div className="settings-scroll">
         <div className="settings-grid">
-          <div className="card">
+          <div className="card" hidden={section !== "model"}>
             <div className="card-title">Accounts</div>
             <div className="card-desc">
               Sign in with the AI accounts you already pay for — no API key needed. Everything stays on this machine.
@@ -471,7 +507,7 @@ export default function SettingsView({
             )}
           </div>
 
-          <div className="card">
+          <div className="card" hidden={section !== "model"}>
             <div className="card-title">Advanced</div>
             <div className="card-desc">
               {s.cliproxy_enabled
@@ -493,7 +529,7 @@ export default function SettingsView({
             </div>
           </div>
 
-          <div className="card">
+          <div className="card" hidden={section !== "safety"}>
             <div className="card-title">Safety</div>
             <div className="card-desc">
               Shell commands run on this machine with your permissions — the agent workspace is
@@ -529,7 +565,7 @@ export default function SettingsView({
             <AuditTail info={approval} />
           </div>
 
-          <div className="card">
+          <div className="card" hidden={section !== "memory"}>
             <div className="card-title">Embeddings</div>
             <div className="card-desc">Optional. Enables RAG / vector memory when configured.</div>
             <TextField label="Base URL" value={s.embed_base_url} onChange={(v) => set("embed_base_url", v)} placeholder="https://api.openai.com/v1" />
@@ -537,7 +573,7 @@ export default function SettingsView({
             <TextField label="Model" value={s.embed_model} onChange={(v) => set("embed_model", v)} placeholder="text-embedding-3-small" />
           </div>
 
-          <div className="card">
+          <div className="card" hidden={section !== "memory"}>
             <div className="card-title">Memory</div>
             <div className="card-desc">
               Where durable memory lives. Pick one — a capability should have exactly one route.
@@ -588,7 +624,7 @@ export default function SettingsView({
             )}
           </div>
 
-          <div className="card">
+          <div className="card" hidden={section !== "notifications"}>
             <div className="card-title">Notifications</div>
             <div className="card-desc">
               Where messages go when nobody is looking at this page. notify_user and every
@@ -619,7 +655,7 @@ export default function SettingsView({
             </div>
           </div>
 
-          <div className="card">
+          <div className="card" hidden={section !== "runtime"}>
             <div className="card-title">Runtime</div>
             <div className="card-desc">Workspace, agent loop limits, and avatar bridge.</div>
             <TextField label="Workspace Directory" value={s.workspace_dir} onChange={(v) => set("workspace_dir", v)} placeholder="~/.superai/workspace" hint="Where the agent reads and writes deliverable files." />
@@ -692,11 +728,11 @@ export default function SettingsView({
           </div>
 
           {/* Folded in from what used to be its own sidebar entry. It sits
-              after Runtime because that is where the avatar port it depends on
-              is set. */}
-          <AvatarSection status={status} />
+              after Runtime, and in the same section, because that is where the
+              avatar port it depends on is set. */}
+          {section === "runtime" && <AvatarSection status={status} />}
 
-          {!served && <OpenInBrowserCard />}
+          {!served && section === "runtime" && <OpenInBrowserCard />}
 
           <div className="settings-actions">
             <button className="btn" onClick={save} disabled={saving}>

@@ -1788,3 +1788,20 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
 .toast-close:hover { color: var(--text-1); background: var(--bg-2); }
 .toast-clickable { cursor: pointer; }
 .toast-clickable:hover { border-color: var(--accent, var(--border-strong)); }
+
+/* Settings sections. The save button applies to all of them, so it stays in the
+   footer outside the tabs — a save that only covered the visible group would be
+   a trap, since every field is in one settings.json either way. */
+.settings-tabs {
+  display: flex; gap: 2px; padding: 0 var(--pad, 18px);
+  border-bottom: 1px solid var(--border); flex-wrap: wrap;
+}
+.settings-tab {
+  background: none; border: 0; border-bottom: 2px solid transparent;
+  padding: 9px 12px; margin-bottom: -1px; cursor: pointer;
+  font: inherit; font-size: 13px; color: var(--text-3);
+}
+.settings-tab:hover { color: var(--text-1); }
+.settings-tab.active { color: var(--text-1); border-bottom-color: var(--accent); }
+/* .card sets its own display, so the attribute alone would not hide it. */
+.card[hidden] { display: none; }
