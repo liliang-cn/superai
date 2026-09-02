@@ -37,12 +37,12 @@ interface TaskState {
   taskId: string; goal: string; model: string; startedAt: string; endedAt?: string; done: boolean; running: boolean; stop?: string; final?: string; maxSegments: number;
   segments: SegmentStat[]; rounds: RoundStat[]; plan: PlanItem[]; toolCounts: Record<string, number>; toolCalls: number; toolErrors: number;
   lints: Record<string, number>; lintRetries: number; lintBlocks: number; compactions: number; retries: number; checkpoints: number; errors: number;
-  totalTokens: number; totalCached: number; costUsd: number; log: LogLine[];
+  totalTokens: number; totalCached: number; costUsd: number; unpriced?: boolean; log: LogLine[];
 }
 interface TaskSummary {
   taskId: string; goal: string; model: string; startedAt: string; endedAt?: string; running: boolean; done: boolean; stop?: string;
   segments: number; maxSegments: number; segmentOpen: boolean; rounds: number; lastTokens: number; lastTools: number;
-  totalTokens: number; totalCached: number; costUsd: number; rejected: number; errors: number; planDone: number; planTotal: number; spark: number[];
+  totalTokens: number; totalCached: number; costUsd: number; unpriced?: boolean; rejected: number; errors: number; planDone: number; planTotal: number; spark: number[];
 }
 // Where a task is on the loop, from its summary alone — the same rule the
 // detail view uses, so a card and the orbital never disagree.
@@ -203,7 +203,7 @@ export default function DashboardView() {
           <Stat icon={<Cpu size={14} />} label="Model" value={<span className="cr-stat-txt">{dash?.llm?.model || "—"}</span>} sub={<>{dash?.llm?.maxRounds ?? "—"} rounds/turn · {short(dash?.llm?.baseURL || "", 34)}</>} />
           <Stat icon={<Gauge size={14} />} label="Tokens today" value={<Num v={dash?.usage?.today ?? 0} />} sub={<>{fmtK(dash?.usage?.totalTokens ?? 0)} all time · {pct(dash?.usage?.cachedTokens ?? 0, dash?.usage?.totalTokens ?? 0)}% cached</>} tone="cyan" spark={spark} />
           <Stat icon={<Sparkles size={14} />} label="Cache hit" value={d ? <Num v={d.cacheRate} fmt={(n) => Math.round(n) + "%"} /> : <span className="cr-dim">—</span>} sub={d ? `${fmtK(st!.totalCached)} / ${fmtK(st!.totalTokens)} this task` : "select or start a task"} tone={!d ? undefined : d.cacheRate >= 80 ? "lime" : "amber"} />
-          <Stat icon={<Coins size={14} />} label="Spend" value={st ? <Num v={st.costUsd} fmt={(n) => "$" + n.toFixed(3)} /> : <span className="cr-dim">—</span>} sub={st ? `this task · ${st.segments.length} segments` : "select or start a task"} tone={st ? "amber" : undefined} />
+          <Stat icon={<Coins size={14} />} label="Spend" value={!st ? <span className="cr-dim">—</span> : st.unpriced ? <span className="cr-dim">unpriced</span> : <Num v={st.costUsd} fmt={(n) => "$" + n.toFixed(3)} />} sub={!st ? "select or start a task" : st.unpriced ? "no rates for this model · set llm_price_* in settings" : `this task · ${st.segments.length} segments`} tone={!st ? undefined : st.unpriced ? "rose" : "amber"} />
           <Stat icon={<Activity size={14} />} label="Turns" value={<Num v={dash?.usage?.modelTurns ?? 0} />} sub={<>{dash?.tasks?.length ?? 0} tasks on record · {dash?.activeRuns?.length ?? 0} active</>} />
           <Stat icon={<Shield size={14} />} label="Lint gate" value={d ? <span className={d.rejected ? "rose" : "lime"}><Num v={d.rejected} /></span> : <span className="cr-dim">—</span>} sub={d ? `${pct(d.accepted, Math.max(1, d.rs.length))}% clean turns` : "select or start a task"} tone={!d ? undefined : d.rejected ? "rose" : "lime"} />
         </div>
@@ -248,7 +248,7 @@ export default function DashboardView() {
                   <span><b>{t.planDone}</b>/{t.planTotal || "?"} plan</span>
                   <span><b>{t.rounds}</b> turns</span>
                   <span><b>{cache}%</b> cache</span>
-                  <span><b>${t.costUsd.toFixed(2)}</b></span>
+                  <span>{t.unpriced ? <b className="cr-dim" title="no rates for this model">unpriced</b> : <b>${t.costUsd.toFixed(2)}</b>}</span>
                   <span className={t.rejected ? "rose" : ""}><b>{t.rejected}</b> rej</span>
                   <span className="cr-task-time">{elapsed(t.startedAt, t.endedAt)}</span>
                 </div>

@@ -90,6 +90,9 @@ type TaskState struct {
 	TotalTokens int     `json:"totalTokens"`
 	TotalCached int     `json:"totalCached"`
 	CostUSD     float64 `json:"costUsd"`
+	// Unpriced means CostUSD is 0 because nothing could price the model, not
+	// because the task was free.
+	Unpriced bool `json:"unpriced,omitempty"`
 
 	Log []LogLine `json:"log"`
 }
@@ -233,6 +236,7 @@ func (w *RunWall) OnSegment(_ context.Context, info agent.SegmentInfo) {
 			}
 		}
 		t.CostUSD = info.CostUSD
+		t.Unpriced = t.Unpriced || info.Unpriced
 		status := string(info.StopReason)
 		if info.Err != "" {
 			status = "FAILED: " + oneLine(info.Err, 80)
@@ -475,6 +479,7 @@ type TaskSummary struct {
 	TotalTokens int     `json:"totalTokens"`
 	TotalCached int     `json:"totalCached"`
 	CostUSD     float64 `json:"costUsd"`
+	Unpriced    bool    `json:"unpriced,omitempty"`
 	Rejected    int     `json:"rejected"`
 	Errors      int     `json:"errors"`
 	PlanDone    int     `json:"planDone"`
@@ -499,7 +504,7 @@ func (w *RunWall) List() []TaskSummary {
 			Running: t.Running, Done: t.Done, Stop: t.Stop,
 			Segments: len(t.Segments), MaxSegments: t.MaxSegments,
 			Rounds:      len(t.Rounds),
-			TotalTokens: t.TotalTokens, TotalCached: t.TotalCached, CostUSD: t.CostUSD,
+			TotalTokens: t.TotalTokens, TotalCached: t.TotalCached, CostUSD: t.CostUSD, Unpriced: t.Unpriced,
 			Rejected: t.LintRetries + t.LintBlocks, Errors: t.Errors,
 		}
 		if n := len(t.Segments); n > 0 && t.Segments[n-1].EndedAt == "" {
