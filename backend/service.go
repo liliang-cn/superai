@@ -14,7 +14,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/liliang-cn/agent-go/v3/pkg/agent"
 	"github.com/liliang-cn/agent-go/v3/pkg/config"
 	"github.com/liliang-cn/agent-go/v3/pkg/cortexbridge"
@@ -762,14 +761,11 @@ func (s *Service) registerLifeTools() {
 			"location": sp("Location"), "participants": arr("Names of the participants"),
 		}, "title", "start_at"),
 		func(ctx context.Context, a map[string]any) (any, error) {
-			db.mu.Lock()
-			rec := map[string]any{
-				"id": short(uuid.NewString()), "title": str(a, "title"), "start_at": str(a, "start_at"),
-				"location": str(a, "location"), "participants": strSlice(a, "participants"),
+			rec, err := s.AddSchedule(str(a, "title"), str(a, "start_at"),
+				str(a, "location"), strSlice(a, "participants"))
+			if err != nil {
+				return errResult(err.Error()), nil
 			}
-			db.Schedules = append(db.Schedules, rec)
-			db.mu.Unlock()
-			db.save()
 			return okData(rec), nil
 		}, write)
 
@@ -786,15 +782,11 @@ func (s *Service) registerLifeTools() {
 			"body": sp("Body text"), "tags": arr("Tags"), "project": sp("Project it belongs to (for work records)"),
 		}, "type", "body"),
 		func(ctx context.Context, a map[string]any) (any, error) {
-			db.mu.Lock()
-			rec := map[string]any{
-				"id": short(uuid.NewString()), "type": str(a, "type"), "title": str(a, "title"),
-				"body": str(a, "body"), "tags": strSlice(a, "tags"), "project": str(a, "project"),
-				"occurred_at": time.Now().Format(time.RFC3339),
+			rec, err := s.AddRecord(str(a, "type"), str(a, "title"), str(a, "body"),
+				strSlice(a, "tags"), str(a, "project"))
+			if err != nil {
+				return errResult(err.Error()), nil
 			}
-			db.Records = append(db.Records, rec)
-			db.mu.Unlock()
-			db.save()
 			return okData(rec), nil
 		}, write)
 

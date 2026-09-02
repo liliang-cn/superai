@@ -1509,3 +1509,162 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
 .cr-btn.tiny { padding: 3px 8px; font-size: 10px; gap: 4px; border-radius: 5px; }
 
 .cr-check input[type=checkbox] { width: 14px; height: 14px; accent-color: var(--cr-cyan); padding: 0; }
+
+/* ---------------------------------------------------------------------------
+   AIGUI `ui` blocks (@ai-gui/plugin-ui).
+
+   The plugin mounts semantic DOM and injects a small stylesheet of its own at
+   runtime: layout attributes (data-aigui-ui-stack / -grid, data-gap, data-align)
+   plus a few appearance rules. Those land in <head> after this file loads, so
+   at equal specificity they win — hence the doubled
+   [data-aigui-ui][data-aigui-ui], which outranks the plugin's own
+   `[data-aigui-ui] th` without resorting to !important.
+
+   The tone and error colours are the exception: since 0.35.0 the plugin reads
+   them from three custom properties, so they are set rather than overridden.
+   That is the documented seam, it survives whatever the plugin does to those
+   rules next, and it needs no specificity trick.
+
+   Everything is written against the shadcn tokens above so both themes follow
+   the existing toggle with no second palette to keep in sync.
+--------------------------------------------------------------------------- */
+[data-aigui-ui] {
+  margin: .5rem 0; font-size: 13.5px; line-height: 1.6;
+  /* Establishes the container the width query below asks about. These blocks
+     render in the transcript and in the narrower side panel, and a media query
+     would only ever see the window. */
+  container-type: inline-size;
+}
+/* Only the critical colour is pulled onto the app's palette, because
+   --destructive is the one of the three this app actually defines, and it is
+   defined per theme. Positive and warning are left to the plugin, whose own
+   values already follow the theme it is told about — overriding them with a
+   single hex would be the light-theme-only bug this replaced.
+
+   No specificity trick needed: since 0.35.1 the plugin declares its defaults
+   inside :where(), so writing the property at all wins. */
+[data-aigui-ui] { --aigui-ui-critical: var(--destructive); }
+[data-aigui-ui] > * + * { margin-top: .75rem; }
+
+/* A block that is still streaming has no content yet. Without a height it
+   collapses to nothing and the reply appears to skip a beat. */
+[data-aigui-block-loading][data-block-type="ui"] {
+  min-height: 2.5rem; border-radius: var(--radius-sm);
+  background: linear-gradient(90deg, var(--secondary), var(--muted), var(--secondary));
+  background-size: 200% 100%; animation: aigui-ui-shimmer 1.4s linear infinite;
+}
+@keyframes aigui-ui-shimmer { to { background-position: -200% 0; } }
+
+[data-aigui-ui][data-aigui-ui] :is(h1, h2, h3, h4, h5, h6) {
+  margin: 0; font-weight: 650; line-height: 1.3; color: var(--foreground);
+}
+[data-aigui-ui][data-aigui-ui] h1 { font-size: 1.25rem; }
+[data-aigui-ui][data-aigui-ui] h2 { font-size: 1.1rem; }
+[data-aigui-ui][data-aigui-ui] :is(h3, h4, h5, h6) { font-size: 1rem; }
+[data-aigui-ui][data-aigui-ui] p { margin: 0; color: var(--foreground); }
+/* The tone colours come from the plugin's own tokens, but they have to be
+   restated here: the rule above is more specific than the plugin's
+   `[data-tone="critical"]` and would otherwise paint every tone as body text. */
+[data-aigui-ui][data-aigui-ui] [data-tone="muted"] { color: var(--muted-foreground); }
+[data-aigui-ui][data-aigui-ui] [data-tone="positive"] { color: var(--aigui-ui-positive); }
+[data-aigui-ui][data-aigui-ui] [data-tone="warning"] { color: var(--aigui-ui-warning); }
+[data-aigui-ui][data-aigui-ui] [data-tone="critical"] { color: var(--aigui-ui-critical); }
+[data-aigui-ui][data-aigui-ui] hr {
+  margin: .25rem 0; border: 0; border-top: 1px solid var(--border-color);
+}
+
+[data-aigui-ui][data-aigui-ui] :is(ul, ol) { margin: 0; padding-inline-start: 1.35rem; }
+[data-aigui-ui][data-aigui-ui] li + li { margin-top: .25rem; }
+
+/* keyValue renders as a definition list: label column, value column. */
+[data-aigui-ui][data-aigui-ui] dl {
+  display: grid; grid-template-columns: minmax(6rem, max-content) 1fr;
+  gap: .35rem .9rem; margin: 0;
+}
+[data-aigui-ui][data-aigui-ui] dt { color: var(--muted-foreground); }
+[data-aigui-ui][data-aigui-ui] dd {
+  margin: 0; color: var(--foreground); font-variant-numeric: tabular-nums;
+}
+@container (max-width: 26rem) {
+  [data-aigui-ui][data-aigui-ui] dl { grid-template-columns: 1fr; gap: .1rem; }
+  [data-aigui-ui][data-aigui-ui] dd { margin-bottom: .4rem; }
+}
+
+/* A table can be wider than the transcript; it scrolls inside its own box
+   rather than making the whole message scroll sideways. */
+[data-aigui-ui][data-aigui-ui] table {
+  display: block; overflow-x: auto; width: 100%;
+  border-collapse: collapse; font-size: 13px;
+}
+[data-aigui-ui][data-aigui-ui] caption {
+  caption-side: top; text-align: left; padding: 0 0 .4rem;
+  color: var(--muted-foreground); font-size: 12px;
+}
+[data-aigui-ui][data-aigui-ui] :is(th, td) {
+  padding: .4rem .6rem; border: 1px solid var(--border-color); text-align: left;
+  white-space: nowrap;
+}
+[data-aigui-ui][data-aigui-ui] th { background: var(--secondary); font-weight: 600; }
+[data-aigui-ui][data-aigui-ui] td { font-variant-numeric: tabular-nums; }
+
+[data-aigui-ui][data-aigui-ui] [data-aigui-ui-form] {
+  display: flex; flex-direction: column; gap: .6rem;
+  padding: .85rem; border: 1px solid var(--border-color);
+  border-radius: var(--radius); background: var(--card);
+}
+[data-aigui-ui][data-aigui-ui] [data-aigui-ui-field] {
+  display: flex; flex-direction: column; gap: .3rem;
+}
+[data-aigui-ui][data-aigui-ui] label { color: var(--muted-foreground); font-size: 12px; }
+[data-aigui-ui][data-aigui-ui] :is(input, select, textarea) {
+  width: 100%; padding: .4rem .55rem; font: inherit; font-size: 13px;
+  color: var(--foreground); background: var(--background);
+  border: 1px solid var(--border-color); border-radius: var(--radius-sm);
+}
+[data-aigui-ui][data-aigui-ui] :is(input, select, textarea):focus-visible {
+  outline: 2px solid var(--ring); outline-offset: 1px; border-color: transparent;
+}
+[data-aigui-ui][data-aigui-ui] textarea { min-height: 4.5rem; resize: vertical; }
+
+/* A form's submit button carries no data attribute of its own — only
+   type="submit" — so it is named here too, or the one button in a block that
+   actually writes something is the one that looks like plain text. */
+[data-aigui-ui][data-aigui-ui] :is([data-aigui-ui-button], [data-aigui-ui-form] button[type="submit"]) {
+  align-self: flex-start; padding: .38rem .8rem; font: inherit; font-size: 13px;
+  font-weight: 550; border-radius: var(--radius-sm); cursor: pointer;
+  border: 1px solid var(--border-color); background: var(--secondary);
+  color: var(--secondary-foreground); transition: filter .15s, opacity .15s;
+}
+[data-aigui-ui][data-aigui-ui] :is([data-aigui-ui-button], [data-aigui-ui-form] button[type="submit"]):hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+[data-aigui-ui][data-aigui-ui] :is([data-aigui-ui-button], [data-aigui-ui-form] button[type="submit"]):disabled {
+  opacity: .55; cursor: default;
+}
+/* Submitting is the form's primary act, so it gets the primary colour. */
+[data-aigui-ui][data-aigui-ui] [data-aigui-ui-form] button[type="submit"] {
+  background: var(--primary); color: var(--primary-foreground); border-color: transparent;
+}
+[data-aigui-ui][data-aigui-ui] [data-aigui-ui-button="primary"] {
+  background: var(--primary); color: var(--primary-foreground); border-color: transparent;
+}
+[data-aigui-ui][data-aigui-ui] [data-aigui-ui-button="danger"] {
+  background: var(--destructive); color: var(--destructive-foreground); border-color: transparent;
+}
+
+/* The ways a block tells the reader something went wrong. A refusal is
+   information, so it is given a shape rather than left as a bare line: an
+   invalid document is the model's mistake, and a blank space sends the reader
+   looking for a bug in the app instead. Since 0.35.0 the refusal names the rule
+   that refused it, so this box has a sentence in it worth reading.
+
+   Colour comes from the custom properties set at the top — not from a rule
+   fighting the plugin's own. */
+[data-aigui-ui-invalid],
+[data-aigui-ui][data-aigui-ui] [data-aigui-ui-card-fallback] {
+  display: block; padding: .5rem .7rem; border: 1px dashed var(--border-color);
+  border-radius: var(--radius-sm); font-size: 12.5px;
+}
+[data-aigui-ui][data-aigui-ui] :is([data-aigui-ui-action-error], [data-aigui-ui-field-error]) {
+  color: var(--aigui-ui-critical); font-size: 12px;
+}

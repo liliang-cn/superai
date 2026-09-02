@@ -968,6 +968,41 @@ func (a *App) Life() backend.LifeData {
 	return svc.Life()
 }
 
+// AddSchedule and AddRecord are the life-assistant writes a rendered `ui` block
+// may trigger, and the only two. They exist as App methods so a button the
+// model drew has somewhere bounded to land: the action names are registered in
+// the frontend, the arguments are typed here, and the same Service methods the
+// agent's own tools call do the work. A model that wants a third kind of write
+// has to be given one deliberately, which is the point.
+func (a *App) AddSchedule(title, startAt, location string, participants []string) map[string]any {
+	a.mu.Lock()
+	svc := a.svc
+	a.mu.Unlock()
+	if svc == nil {
+		return map[string]any{"ok": false, "error": "agent is not ready"}
+	}
+	rec, err := svc.AddSchedule(title, startAt, location, participants)
+	if err != nil {
+		return map[string]any{"ok": false, "error": err.Error()}
+	}
+	return map[string]any{"ok": true, "data": rec}
+}
+
+// AddRecord writes one diary / work / note / habit entry.
+func (a *App) AddRecord(kind, title, body string, tags []string, project string) map[string]any {
+	a.mu.Lock()
+	svc := a.svc
+	a.mu.Unlock()
+	if svc == nil {
+		return map[string]any{"ok": false, "error": "agent is not ready"}
+	}
+	rec, err := svc.AddRecord(kind, title, body, tags, project)
+	if err != nil {
+		return map[string]any{"ok": false, "error": err.Error()}
+	}
+	return map[string]any{"ok": true, "data": rec}
+}
+
 // MemoryRecall queries long-term memory and returns the formatted recall context.
 func (a *App) MemoryRecall(query string) string {
 	a.mu.Lock()

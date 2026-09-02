@@ -4,6 +4,10 @@ import {backend} from '../models';
 import {agent} from '../models';
 import {mcp} from '../models';
 
+export function AddRecord(arg1:string,arg2:string,arg3:string,arg4:Array<string>,arg5:string):Promise<Record<string, any>>;
+
+export function AddSchedule(arg1:string,arg2:string,arg3:string,arg4:Array<string>):Promise<Record<string, any>>;
+
 export function CLIProxyAccounts():Promise<Array<backend.CLIProxyAccount>>;
 
 export function CLIProxyLogin(arg1:string,arg2:string):Promise<string>;

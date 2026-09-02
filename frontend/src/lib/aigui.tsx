@@ -1,12 +1,21 @@
 import { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { CardRegistry, buildSystemPrompt, type NodeRenderer } from "@ai-gui/core";
+import {
+  ActionRegistry,
+  ActionRuntime,
+  CardRegistry,
+  buildSystemPrompt,
+  type NodeRenderer,
+} from "@ai-gui/core";
 import { primitives } from "@ai-gui/plugin-primitives";
 import { katex } from "@ai-gui/plugin-katex";
 import { mermaid } from "@ai-gui/plugin-mermaid";
 import { chart } from "@ai-gui/plugin-chart";
 import { citation } from "@ai-gui/plugin-citation";
+import { bigscreen } from "@ai-gui/plugin-bigscreen";
+import { ui } from "@ai-gui/plugin-ui";
 import { CodeBlock } from "@/components/ai-elements/code-block";
+import { AddRecord, AddSchedule } from "../../wailsjs/go/main/App";
 
 /**
  * The language SuperAI speaks. The persona answers in Chinese, so the block
@@ -23,12 +32,93 @@ export const APP_LOCALE = "zh-CN";
 export const registry = new CardRegistry();
 
 /**
+ * What a `ui` block is allowed to invoke.
+ *
+ * The plugin refuses any button or form whose action is not registered here,
+ * and the rules handed to the model list these names, so the set below is the
+ * whole vocabulary — an unregistered action does not fail on its own, it
+ * invalidates the entire block it appears in.
+ *
+ * Each one is added by hand and wired to the App method that performs it. There
+ * is deliberately no passthrough that would let the model name its own call,
+ * and in particular nothing that feeds model-authored text back in as a prompt:
+ * a dashboard can be built out of search results, and a button that re-submits
+ * what those results said is an injection with a click on it.
+ */
+export const actions = new ActionRegistry();
+
+actions.register({
+  type: "life.addSchedule",
+  schema: {
+    type: "object",
+    properties: {
+      title: { type: "string" },
+      start_at: { type: "string" },
+      location: { type: "string" },
+      participants: { type: "array", items: { type: "string" } },
+    },
+    required: ["title", "start_at"],
+  },
+  run: async (p: {
+    title: string;
+    start_at: string;
+    location?: string;
+    participants?: string[];
+  }) => unwrap(await AddSchedule(p.title, p.start_at, p.location ?? "", p.participants ?? [])),
+});
+
+actions.register({
+  type: "life.addRecord",
+  schema: {
+    type: "object",
+    properties: {
+      type: { type: "string" },
+      title: { type: "string" },
+      body: { type: "string" },
+      tags: { type: "array", items: { type: "string" } },
+      project: { type: "string" },
+    },
+    required: ["type", "body"],
+  },
+  run: async (p: {
+    type: string;
+    title?: string;
+    body: string;
+    tags?: string[];
+    project?: string;
+  }) =>
+    unwrap(
+      await AddRecord(p.type, p.title ?? "", p.body, p.tags ?? [], p.project ?? ""),
+    ),
+});
+
+/**
+ * The App methods answer `{ok, data}` rather than throwing, because the same
+ * shape crosses the Wails bridge and the serve-mode JSON RPC. The action
+ * runtime reports a rejected promise as a failed action, so a refusal has to
+ * become one here or the button quietly reports success.
+ */
+function unwrap(res: Record<string, any>): unknown {
+  if (!res?.ok) throw new Error(String(res?.error ?? "action failed"));
+  return res.data;
+}
+
+export const actionRuntime = new ActionRuntime({ registry: actions });
+
+/**
  * Plugins must be a stable reference — rebuilding the array on every render
  * would tear down and remount every diagram and chart mid-stream.
  *
  * `highlight` is deliberately absent: it claims the same `code` node as the
  * host renderer below, and copying a snippet matters more here than colouring
  * it — it also kept a megabyte of Shiki language grammars in the bundle.
+ *
+ * `bigscreen` and `ui` are how a dashboard arrives: the model lays out panels
+ * and interfaces, in a normal reply, with no dedicated page behind it. Neither
+ * one loosens the rule that the renderer's only input is model output — a wall
+ * of counting numbers is presentation, and the figures on it are real only
+ * because the model read them off a tool result first. Both prompt specs say
+ * so; `theme` is left to the renderer context so a dark transcript stays dark.
  */
 export const plugins = [
   primitives(), // list / table / key-value / layout
@@ -36,6 +126,8 @@ export const plugins = [
   mermaid(),    // ```mermaid diagrams
   chart({ interactive: true }), // ```chart ECharts options
   citation(),   // ```sources
+  bigscreen(),  // ```bigscreen KPI / gauge / rank / 3D / globe walls
+  ui({ registry, actionRuntime }), // ```ui declarative interfaces
 ];
 
 /**
