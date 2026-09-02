@@ -222,6 +222,11 @@ func (a *App) rebuild() {
 	// lost its approver would start denying every shell command with "no way
 	// to ask" while the window is sitting right there.
 	svc.ToolGate().SetApprover(a.askToolApproval)
+	// Every notice the backend raises reaches whatever surface is attached.
+	// Installed on each rebuild for the same reason the approver is: a settings
+	// save constructs a whole new Service, and one that lost its emitter would
+	// go on posting webhooks while the open window heard nothing.
+	svc.Notices().SetEmitter(a.emit)
 }
 
 // restartScheduler rebinds the timers to the current service. Callers must not
@@ -1004,6 +1009,32 @@ func (a *App) TestWebhook() string {
 	if err := svc.Notifier().SendTest(ctx); err != nil {
 		return err.Error()
 	}
+	return "ok"
+}
+
+// Notify raises a notice from the frontend through the same fan-out the backend
+// uses, so a message the UI has to show follows one path rather than a second
+// one that drifts from it.
+//
+// Push is not exposed: a toast the frontend raised is about something the user
+// just did in front of the screen, and a person who is standing there does not
+// need their phone to buzz about it. Anything worth sending onward is raised by
+// the code that knows why.
+func (a *App) Notify(level, title, message string) string {
+	a.mu.Lock()
+	svc := a.svc
+	a.mu.Unlock()
+	if svc == nil {
+		// No agent yet is exactly when the frontend most needs to report
+		// something, so the notice still goes to the window.
+		a.emit(backend.NoticeEvent, map[string]any{
+			"level": level, "title": title, "message": message,
+		})
+		return "ok"
+	}
+	svc.Notices().Raise(context.Background(), backend.Notice{
+		Level: backend.Level(level), Title: title, Message: message,
+	})
 	return "ok"
 }
 

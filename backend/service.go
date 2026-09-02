@@ -90,6 +90,11 @@ type Service struct {
 	// whoever is not looking at the screen. See webhook.go.
 	notifier *Notifier
 
+	// notices fans one message out to every surface that is attached — the UI
+	// and the webhook. Raised by notify_user, by a finished scheduled run, and
+	// by anything else that has something to say. See notice.go.
+	notices *Notices
+
 	// SuppressedMCPServers names the MCP servers that were left unmounted
 	// because they route to the same store the memory backend already owns.
 	SuppressedMCPServers []string
@@ -300,6 +305,7 @@ func NewService(s *Settings) (*Service, error) {
 	out.traces = NewTraceStore(TracesDir())
 	svc.RegisterObserver(out.traces)
 	out.notifier = NewNotifier(s)
+	out.notices = NewNotices(out.notifier)
 
 	// --- Built-in framework tools. ---
 	agent.RegisterDateTimeTool(svc)

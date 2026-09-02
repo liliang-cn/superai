@@ -146,6 +146,10 @@ export function MemorySkills() {
   return window['go']['main']['App']['MemorySkills']();
 }
 
+export function Notify(arg1, arg2, arg3) {
+  return window['go']['main']['App']['Notify'](arg1, arg2, arg3);
+}
+
 export function OpenInBrowser() {
   return window['go']['main']['App']['OpenInBrowser']();
 }

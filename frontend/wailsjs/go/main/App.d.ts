@@ -76,6 +76,8 @@ export function MemoryRecall(arg1:string):Promise<string>;
 
 export function MemorySkills():Promise<Array<string>>;
 
+export function Notify(arg1:string,arg2:string,arg3:string):Promise<string>;
+
 export function OpenInBrowser():Promise<string>;
 
 export function OpenWorkspaceFileExternal(arg1:string):Promise<string>;

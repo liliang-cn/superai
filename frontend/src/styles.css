@@ -1740,3 +1740,51 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
 [data-aigui-ui][data-aigui-ui] :is([data-aigui-ui-action-error], [data-aigui-ui-field-error]) {
   color: var(--aigui-ui-critical); font-size: 12px;
 }
+
+/* ---------------- Toasts ---------------- */
+/* Notices published by the backend, drawn for whoever is looking at the page.
+   Bottom left: the scheduled-run toasts own the bottom right and carry a whole
+   answer with buttons on it, and two stacks growing into each other from one
+   corner is how a failure ends up hidden behind a report. Under the modal's
+   z-index for the same reason those are. */
+.toasts {
+  position: fixed; left: 18px; bottom: 18px; z-index: 90;
+  width: 330px; max-width: calc(100vw - 36px);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.toast {
+  display: flex; align-items: flex-start; gap: 9px;
+  background: var(--bg-1); border: 1px solid var(--border-strong);
+  border-left-width: 3px; border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: 10px 11px;
+  animation: toast-in 0.18s ease-out;
+}
+.toast-info    { border-left-color: var(--text-3); }
+.toast-success { border-left-color: var(--green, #3fb950); }
+.toast-warn    { border-left-color: var(--amber, #d29922); }
+.toast-error   { border-left-color: var(--red); }
+.toast-icon { flex: none; margin-top: 1px; color: var(--text-3); }
+.toast-success .toast-icon { color: var(--green, #3fb950); }
+.toast-warn .toast-icon { color: var(--amber, #d29922); }
+.toast-error .toast-icon { color: var(--red); }
+.toast-text { min-width: 0; flex: 1; }
+.toast-title { font-size: 12.5px; font-weight: 600; margin-bottom: 2px; }
+.toast-message {
+  font-size: 12.5px; line-height: 1.5; color: var(--text-2);
+  white-space: pre-wrap; word-break: break-word; user-select: text;
+  /* Long enough to be worth reading, short enough not to become a wall. The
+     full text is in the conversation the toast points at. */
+  display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;
+}
+.toast-source {
+  display: flex; align-items: center; gap: 4px; margin-top: 5px;
+  font-size: 11px; color: var(--text-3);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.toast-close {
+  flex: none; background: none; border: 0; padding: 2px; cursor: pointer;
+  color: var(--text-3); border-radius: 4px; line-height: 0;
+}
+.toast-close:hover { color: var(--text-1); background: var(--bg-2); }
+.toast-clickable { cursor: pointer; }
+.toast-clickable:hover { border-color: var(--accent, var(--border-strong)); }

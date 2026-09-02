@@ -389,6 +389,9 @@ export namespace backend {
 	    llm_base_url: string;
 	    llm_key: string;
 	    llm_model: string;
+	    llm_price_input_per_1k?: number;
+	    llm_price_cached_per_1k?: number;
+	    llm_price_output_per_1k?: number;
 	    embed_base_url: string;
 	    embed_key: string;
 	    embed_model: string;
@@ -423,6 +426,9 @@ export namespace backend {
 	        this.llm_base_url = source["llm_base_url"];
 	        this.llm_key = source["llm_key"];
 	        this.llm_model = source["llm_model"];
+	        this.llm_price_input_per_1k = source["llm_price_input_per_1k"];
+	        this.llm_price_cached_per_1k = source["llm_price_cached_per_1k"];
+	        this.llm_price_output_per_1k = source["llm_price_output_per_1k"];
 	        this.embed_base_url = source["embed_base_url"];
 	        this.embed_key = source["embed_key"];
 	        this.embed_model = source["embed_model"];
@@ -514,6 +520,7 @@ export namespace backend {
 	    totalTokens: number;
 	    totalCached: number;
 	    costUsd: number;
+	    unpriced?: boolean;
 	    log: LogLine[];
 	
 	    static createFrom(source: any = {}) {
@@ -548,6 +555,7 @@ export namespace backend {
 	        this.totalTokens = source["totalTokens"];
 	        this.totalCached = source["totalCached"];
 	        this.costUsd = source["costUsd"];
+	        this.unpriced = source["unpriced"];
 	        this.log = this.convertValues(source["log"], LogLine);
 	    }
 	
@@ -587,6 +595,7 @@ export namespace backend {
 	    totalTokens: number;
 	    totalCached: number;
 	    costUsd: number;
+	    unpriced?: boolean;
 	    rejected: number;
 	    errors: number;
 	    planDone: number;
@@ -616,6 +625,7 @@ export namespace backend {
 	        this.totalTokens = source["totalTokens"];
 	        this.totalCached = source["totalCached"];
 	        this.costUsd = source["costUsd"];
+	        this.unpriced = source["unpriced"];
 	        this.rejected = source["rejected"];
 	        this.errors = source["errors"];
 	        this.planDone = source["planDone"];

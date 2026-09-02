@@ -40,6 +40,22 @@ func (r *recorder) handler() http.HandlerFunc {
 	}
 }
 
+// waitForCalls polls until n payloads have arrived. The fan-out posts the
+// webhook on its own goroutine so a chat turn never waits on a chat API, which
+// means every assertion about it has to wait rather than read immediately.
+func (r *recorder) waitForCalls(t *testing.T, n int) []WebhookPayload {
+	t.Helper()
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		if got := r.calls(); len(got) >= n {
+			return got
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	t.Fatalf("timed out waiting for %d webhook call(s), got %d", n, len(r.calls()))
+	return nil
+}
+
 func (r *recorder) calls() []WebhookPayload {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -195,29 +211,31 @@ func TestSendTestReportsFailures(t *testing.T) {
 
 func TestNotifyScheduledRunShapesTheMessage(t *testing.T) {
 	for _, tc := range []struct {
-		name      string
-		run       agent.PromptRun
-		want      string
-		wantErr   string
-		cancelled bool
+		name    string
+		run     agent.PromptRun
+		want    string
+		wantErr string
+		push    bool
 	}{
 		{
 			name: "answer",
 			run:  agent.PromptRun{Prompt: "check the deploy", Answer: "  all green  "},
 			want: "all green",
+			push: true,
 		},
 		{
-			// A stop is the user's own doing, so it is an outcome and not a fault.
-			name:      "cancelled",
-			run:       agent.PromptRun{Prompt: "long one", Cancelled: true},
-			want:      "Cancelled",
-			cancelled: true,
+			// A stop is the user's own doing, so it is an outcome and not a
+			// fault — and not worth pushing anywhere.
+			name: "cancelled",
+			run:  agent.PromptRun{Prompt: "long one", Cancelled: true},
+			want: "Cancelled",
 		},
 		{
 			name:    "failed",
 			run:     agent.PromptRun{Prompt: "check the deploy", Err: errors.New("no route to host")},
 			want:    "Run failed: no route to host",
-			wantErr: "no route to host",
+			wantErr: "Run failed: no route to host",
+			push:    true,
 		},
 		{
 			// A run that answered nothing still has to say it happened, or a
@@ -225,6 +243,7 @@ func TestNotifyScheduledRunShapesTheMessage(t *testing.T) {
 			name: "empty answer",
 			run:  agent.PromptRun{Prompt: "tidy up"},
 			want: "Scheduled task finished",
+			push: true,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -232,21 +251,25 @@ func TestNotifyScheduledRunShapesTheMessage(t *testing.T) {
 			srv := httptest.NewServer(rec.handler())
 			defer srv.Close()
 
-			s := &Service{notifier: NewNotifier(&Settings{WebhookURL: srv.URL})}
+			s := testNoticeService(srv.URL)
 			s.NotifyScheduledRun(context.Background(), tc.run)
 
-			calls := rec.calls()
-			if len(calls) != 1 {
-				t.Fatalf("got %d calls, want 1", len(calls))
+			if !tc.push {
+				// A stop is the user's own doing and stays local: they were at
+				// the machine, they pressed the button, and a message telling
+				// them what they just did is noise.
+				time.Sleep(150 * time.Millisecond)
+				if got := len(rec.calls()); got != 0 {
+					t.Fatalf("got %d calls for a cancelled run, want 0", got)
+				}
+				return
 			}
+			calls := rec.waitForCalls(t, 1)
 			if calls[0].Message != tc.want {
 				t.Errorf("message = %q, want %q", calls[0].Message, tc.want)
 			}
 			if calls[0].Error != tc.wantErr {
 				t.Errorf("error = %q, want %q", calls[0].Error, tc.wantErr)
-			}
-			if calls[0].Cancelled != tc.cancelled {
-				t.Errorf("cancelled = %v, want %v", calls[0].Cancelled, tc.cancelled)
 			}
 			if calls[0].Event != WebhookEventSchedule {
 				t.Errorf("event = %q", calls[0].Event)
@@ -263,8 +286,15 @@ func TestNotifyScheduledRunIsSafeWithoutAWebhook(t *testing.T) {
 	var nilService *Service
 	nilService.NotifyScheduledRun(context.Background(), agent.PromptRun{Answer: "x"})
 
-	s := &Service{notifier: NewNotifier(&Settings{})}
+	s := testNoticeService("")
 	s.NotifyScheduledRun(context.Background(), agent.PromptRun{Answer: "x"})
+}
+
+// testNoticeService wires the fan-out the way NewService does, without building
+// a whole agent.
+func testNoticeService(webhookURL string) *Service {
+	n := NewNotifier(&Settings{WebhookURL: webhookURL})
+	return &Service{notifier: n, notices: NewNotices(n)}
 }
 
 // The persona ends every answer with a trailing "情绪: X" tag for the avatar.
@@ -275,13 +305,13 @@ func TestNotifyScheduledRunStripsTheEmotionTag(t *testing.T) {
 	srv := httptest.NewServer(rec.handler())
 	defer srv.Close()
 
-	s := &Service{notifier: NewNotifier(&Settings{WebhookURL: srv.URL})}
+	s := testNoticeService(srv.URL)
 	s.NotifyScheduledRun(context.Background(), agent.PromptRun{
 		Prompt: "check the deploy",
 		Answer: "all green\n\n情绪: 中性",
 	})
 
-	got := rec.calls()[0].Message
+	got := rec.waitForCalls(t, 1)[0].Message
 	if got != "all green" {
 		t.Errorf("message = %q, want the answer without the emotion tag", got)
 	}

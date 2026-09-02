@@ -9,6 +9,8 @@ import SkillsView from "./views/SkillsView";
 import MCPView from "./views/MCPView";
 import RecordsView from "./views/RecordsView";
 import { ScheduleRunToasts } from "./components/ScheduleRuns";
+import { Toaster } from "./components/Toaster";
+import { useBackendToasts } from "./lib/toasts";
 import ToolApprovals from "./components/ToolApprovals";
 import YoloBanner from "./components/YoloBanner";
 import { Accent, AppStatus, Theme, ViewKey, normalizeStatus } from "./lib/types";
@@ -18,6 +20,11 @@ import { uiRules } from "./lib/aigui";
 import { GetStatus, SetUIRules, SetWindowTheme } from "../wailsjs/go/main/App";
 
 export default function App() {
+  // Draw every notice the backend publishes. Mounted here so it survives every
+  // view change: a toast about a run that just failed must not disappear
+  // because the user clicked to another screen to look into it.
+  useBackendToasts();
+
   const [view, setView] = useState<ViewKey>("chat");
   const [status, setStatus] = useState<AppStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -128,6 +135,8 @@ export default function App() {
       {view !== "records" && (
         <ScheduleRunToasts log={runs} onOpenConversation={openConversation} />
       )}
+      {/* Everything the backend publishes, whatever raised it. */}
+      <Toaster onOpenConversation={openConversation} />
       <YoloBanner />
       <ToolApprovals
         pending={approvals.pending}

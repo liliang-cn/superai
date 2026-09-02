@@ -3,6 +3,7 @@ package backend
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/liliang-cn/agent-go/v3/pkg/agent"
 )
@@ -15,6 +16,15 @@ func (s *Service) Notifier() *Notifier {
 		return nil
 	}
 	return s.notifier
+}
+
+// Notices is the fan-out every message goes through. Nil-safe by way of its own
+// methods, so callers never branch on it.
+func (s *Service) Notices() *Notices {
+	if s == nil {
+		return nil
+	}
+	return s.notices
 }
 
 // registerNotifyTool gives the model a way to send standalone interim messages
@@ -41,16 +51,19 @@ func (s *Service) registerNotifyTool() {
 		},
 		func(ctx context.Context, args map[string]any) (any, error) {
 			message, _ := args["message"].(string)
-			message = strings.TrimSpace(message)
 
-			// Reported as delivered either way: the SSE half has already
-			// happened by the time this handler runs, and a webhook that is
-			// down is not a reason to tell the model its message was lost —
-			// it would only send it again.
-			s.Notifier().Send(ctx, WebhookPayload{
-				Event:   WebhookEventNotify,
+			// Pushed: the whole point of an interim message is that the task is
+			// long, which is exactly when the person who asked for it has gone
+			// to do something else.
+			s.Notices().Raise(ctx, Notice{
+				Level:   LevelInfo,
 				Message: message,
+				Push:    true,
 			})
+			// Reported as delivered either way. The in-page half has already
+			// happened by the time this returns, and a webhook that is down is
+			// not a reason to tell the model its message was lost — it would
+			// only send it again.
 			return map[string]any{"delivered": true}, nil
 		},
 		agent.ToolMetadata{
@@ -67,34 +80,39 @@ func (s *Service) registerNotifyTool() {
 // and a reminder that reads differently depending on which one fired it is a
 // bug the user would have to reproduce twice to see.
 func (s *Service) NotifyScheduledRun(ctx context.Context, run agent.PromptRun) {
-	n := s.Notifier()
-	if !n.Enabled() {
-		return
-	}
-
 	// The persona ends every answer with a trailing "情绪: X" tag that drives the
-	// avatar. The chat transcript peels it off before display; a webhook that
-	// did not would put an internal marker at the bottom of every message the
-	// user reads in Telegram.
+	// avatar. The chat transcript peels it off before display; anything that did
+	// not would put an internal marker at the bottom of every message the user
+	// reads in Telegram.
 	message, _ := SplitEmotion(run.Answer)
 	message = strings.TrimSpace(message)
-	payload := WebhookPayload{
-		Event:     WebhookEventSchedule,
-		Source:    strings.TrimSpace(run.Prompt),
-		Cancelled: run.Cancelled,
+
+	notice := Notice{
+		Source:  strings.TrimSpace(run.Prompt),
+		Session: run.SessionID,
+		// One toast per run. A run that reports twice — the observer and a
+		// retry, say — should replace its own toast rather than stack a second.
+		Key:  "run:" + run.SessionID + ":" + run.StartedAt.Format(time.RFC3339Nano),
+		Push: true,
 	}
 	switch {
 	case run.Cancelled:
 		// A stop is the user's own doing, so it is an outcome and not a fault —
-		// the same rule onScheduledRun follows for the transcript.
-		payload.Message = "Cancelled"
+		// the same rule the transcript follows. It is also the one case not
+		// pushed: the user was at the machine, they pressed the button, and a
+		// message telling them what they just did is noise.
+		notice.Level = LevelInfo
+		notice.Message = "Cancelled"
+		notice.Push = false
 	case run.Err != nil:
-		payload.Error = run.Err.Error()
-		payload.Message = "Run failed: " + run.Err.Error()
+		notice.Level = LevelError
+		notice.Message = "Run failed: " + run.Err.Error()
 	case message == "":
-		payload.Message = "Scheduled task finished"
+		notice.Level = LevelSuccess
+		notice.Message = "Scheduled task finished"
 	default:
-		payload.Message = message
+		notice.Level = LevelSuccess
+		notice.Message = message
 	}
-	n.Send(ctx, payload)
+	s.Notices().Raise(ctx, notice)
 }
