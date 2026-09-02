@@ -165,9 +165,6 @@ func (w *RunWall) Finish(taskID string, done bool, stop, final string, err error
 
 // get returns the state for a task, creating it. Caller holds w.mu.
 func (w *RunWall) get(taskID string) *TaskState {
-	if taskID == "" {
-		taskID = "(untracked)"
-	}
 	t, ok := w.tasks[taskID]
 	if !ok {
 		t = &TaskState{
@@ -179,6 +176,17 @@ func (w *RunWall) get(taskID string) *TaskState {
 		w.order = append(w.order, taskID)
 	}
 	return t
+}
+
+// watching reports whether a task is one the wall was told about.
+//
+// The observer sees every run the service makes — every chat turn included —
+// and those are not the wall's to narrate. Only a task that went through
+// Begin is: without this, one chat message put a stray task on the wall and
+// pushed longrun:tick events at a page that never asked. Caller holds w.mu.
+func (w *RunWall) watching(taskID string) bool {
+	_, ok := w.tasks[taskID]
+	return ok
 }
 
 // log appends a narration line. Caller holds w.mu.
@@ -199,6 +207,10 @@ func (w *RunWall) notify(taskID, kind string) {
 
 func (w *RunWall) OnSegment(_ context.Context, info agent.SegmentInfo) {
 	w.mu.Lock()
+	if !w.watching(info.TaskID) {
+		w.mu.Unlock()
+		return
+	}
 	t := w.get(info.TaskID)
 	if !info.Ending {
 		w.seg[info.TaskID] = info.Index
@@ -233,6 +245,10 @@ func (w *RunWall) OnSegment(_ context.Context, info agent.SegmentInfo) {
 
 func (w *RunWall) OnModelStart(_ context.Context, info agent.ModelInfo) {
 	w.mu.Lock()
+	if !w.watching(info.TaskID) {
+		w.mu.Unlock()
+		return
+	}
 	t := w.get(info.TaskID)
 	r := &RoundStat{Segment: w.seg[info.TaskID], Round: info.Round}
 	w.open[info.TaskID] = r
@@ -242,6 +258,10 @@ func (w *RunWall) OnModelStart(_ context.Context, info agent.ModelInfo) {
 
 func (w *RunWall) OnModelEnd(_ context.Context, info agent.ModelInfo, res *agent.ModelResult, err error) {
 	w.mu.Lock()
+	if !w.watching(info.TaskID) {
+		w.mu.Unlock()
+		return
+	}
 	t := w.get(info.TaskID)
 	r := w.open[info.TaskID]
 	if r == nil {
@@ -279,6 +299,10 @@ func (w *RunWall) OnModelEnd(_ context.Context, info agent.ModelInfo, res *agent
 
 func (w *RunWall) OnToolStart(_ context.Context, info agent.ToolInfo) {
 	w.mu.Lock()
+	if !w.watching(info.TaskID) {
+		w.mu.Unlock()
+		return
+	}
 	t := w.get(info.TaskID)
 	t.ToolCalls++
 	t.ToolCounts[info.Tool]++
@@ -292,6 +316,10 @@ func (w *RunWall) OnToolEnd(_ context.Context, info agent.ToolInfo, _ any, err e
 		return
 	}
 	w.mu.Lock()
+	if !w.watching(info.TaskID) {
+		w.mu.Unlock()
+		return
+	}
 	t := w.get(info.TaskID)
 	t.ToolErrors++
 	w.log(t, "error", "     "+info.Tool+" failed: "+oneLine(err.Error(), 160))
@@ -301,6 +329,10 @@ func (w *RunWall) OnToolEnd(_ context.Context, info agent.ToolInfo, _ any, err e
 
 func (w *RunWall) OnLint(_ context.Context, info agent.LintInfo) {
 	w.mu.Lock()
+	if !w.watching(info.TaskID) {
+		w.mu.Unlock()
+		return
+	}
 	t := w.get(info.TaskID)
 	t.Lints[info.Lint]++
 	if info.Retrying {
@@ -324,6 +356,10 @@ func (w *RunWall) OnLint(_ context.Context, info agent.LintInfo) {
 
 func (w *RunWall) OnCompaction(_ context.Context, info agent.CompactionInfo) {
 	w.mu.Lock()
+	if !w.watching(info.TaskID) {
+		w.mu.Unlock()
+		return
+	}
 	t := w.get(info.TaskID)
 	t.Compactions++
 	if r := w.open[info.TaskID]; r != nil {
@@ -339,6 +375,10 @@ func (w *RunWall) OnCompaction(_ context.Context, info agent.CompactionInfo) {
 
 func (w *RunWall) OnModelRetry(_ context.Context, info agent.ModelRetryInfo) {
 	w.mu.Lock()
+	if !w.watching(info.TaskID) {
+		w.mu.Unlock()
+		return
+	}
 	t := w.get(info.TaskID)
 	t.Retries++
 	if r := w.open[info.TaskID]; r != nil {
@@ -356,6 +396,10 @@ func (w *RunWall) OnModelRetry(_ context.Context, info agent.ModelRetryInfo) {
 
 func (w *RunWall) OnError(_ context.Context, info agent.ErrorInfo) {
 	w.mu.Lock()
+	if !w.watching(info.TaskID) {
+		w.mu.Unlock()
+		return
+	}
 	t := w.get(info.TaskID)
 	t.Errors++
 	marker := info.Marker
@@ -369,6 +413,10 @@ func (w *RunWall) OnError(_ context.Context, info agent.ErrorInfo) {
 
 func (w *RunWall) OnCheckpoint(_ context.Context, info agent.CheckpointInfo) {
 	w.mu.Lock()
+	if !w.watching(info.TaskID) {
+		w.mu.Unlock()
+		return
+	}
 	t := w.get(info.TaskID)
 	t.Checkpoints++
 	w.mu.Unlock()

@@ -60,3 +60,29 @@ func TestRunWallNarratesASegmentedRun(t *testing.T) {
 		t.Errorf("list = %+v, want the one task", list)
 	}
 }
+
+// A run the wall was not told about — every chat turn, for instance — must
+// leave nothing on it and push nothing at the page.
+func TestRunWallIgnoresRunsItWasNotToldAbout(t *testing.T) {
+	svc := newTestLongRunService(t)
+	defer svc.Close()
+
+	var mu sync.Mutex
+	ticks := 0
+	wall := NewRunWall(nil, func(string, string) { mu.Lock(); ticks++; mu.Unlock() })
+	svc.Agent().RegisterObserver(wall)
+
+	// No Begin. This is a chat turn as far as the wall is concerned.
+	if _, err := svc.StreamLong(context.Background(), "Say hello.",
+		LongRunOptions{MaxSegments: 1, RoundsPerSegment: 1, TaskID: "not-mine"}, nil); err != nil {
+		t.Fatalf("StreamLong: %v", err)
+	}
+	if got := wall.List(); len(got) != 0 {
+		t.Fatalf("wall picked up a task it was never told about: %+v", got)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if ticks != 0 {
+		t.Fatalf("wall pushed %d ticks for a run it should have ignored", ticks)
+	}
+}

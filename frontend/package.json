@@ -16,6 +16,7 @@
     "@ai-gui/plugin-mermaid": "^0.33.0",
     "@ai-gui/plugin-primitives": "^0.33.0",
     "@ai-gui/react": "^0.33.0",
+    "@types/three": "^0.185.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.469.0",
@@ -24,7 +25,8 @@
     "react-dom": "^19.0.0",
     "react-markdown": "^9.0.1",
     "remark-gfm": "^4.0.0",
-    "tailwind-merge": "^2.6.0"
+    "tailwind-merge": "^2.6.0",
+    "three": "^0.185.1"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.0.0",

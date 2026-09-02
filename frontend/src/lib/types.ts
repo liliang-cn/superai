@@ -5,7 +5,6 @@ export type Accent = "copper" | "cobalt" | "jade" | "rose" | "violet";
 export type ViewKey =
   | "chat"
   | "dashboard"
-  | "runs"
   | "settings"
   | "knowledge"
   | "skills"
