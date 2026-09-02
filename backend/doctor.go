@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/liliang-cn/agent-go/v3/pkg/agent"
+	"github.com/liliang-cn/agent-go/v3/pkg/pool"
 )
 
 // Checking the install without running the agent.
@@ -124,6 +125,19 @@ func applySettingsProvider(out *DoctorReport, home string) {
 	if !replaced {
 		out.Checks = append(out.Checks, DoctorCheck{Name: "llm.providers", Status: status, Detail: detail, Fix: fix})
 	}
+	// agent-go's own per-provider checks never run here — the provider lives
+	// in settings.json, not agentgo.db — so ask the one question of theirs
+	// that matters for a long task: can this model be priced at all? Loading
+	// the settings above already registered any rates they carry.
+	pricing := DoctorCheck{Name: "llm.pricing", Status: "ok", Detail: st.LLMModel + " is priced"}
+	if _, known := pool.LookupModelPricing(st.LLMModel); !known {
+		pricing = DoctorCheck{
+			Name: "llm.pricing", Status: "warn",
+			Detail: "no rates for " + st.LLMModel + "; spend reads 0 and the cost ceiling never fires",
+			Fix:    "set llm_price_input_per_1k, llm_price_cached_per_1k and llm_price_output_per_1k in settings.json",
+		}
+	}
+	out.Checks = append(out.Checks, pricing)
 	out.OK, out.Warn, out.Fail = 0, 0, 0
 	for _, c := range out.Checks {
 		switch c.Status {
