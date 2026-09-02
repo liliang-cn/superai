@@ -14,15 +14,29 @@ import * as THREE from "three";
  * animates when its number changes; this breathes.
  */
 
-export interface OrbitalTelemetry {
-  /** 0..5 — which station is lit. */
+/** One task in flight: where it is on the loop, and its colour on the ring. */
+export interface OrbitalRunner {
+  id: string;
+  /** 0..5 — the station this task is at. */
   stage: number;
-  /** Rough activity, 0..1: drives particle count and speed. */
+  /** Hue 0..360, so tasks stay telling-apart on the ring and on the cards. */
+  hue: number;
+}
+
+export interface OrbitalTelemetry {
+  /** Every task in flight. Empty means idle. */
+  runners: OrbitalRunner[];
+  /** Rough activity across all runners, 0..1: drives particle count and speed. */
   activity: number;
-  /** 0..1 share of turns rejected at the lint gate: tints the gate. */
+  /** 0..1 share of turns rejected at the lint gate, across tasks: tints the gate. */
   rejected: number;
-  /** True while a run is in flight. Idle rings dim and slow. */
-  live: boolean;
+}
+
+/** A stable hue for a task id, the same one the fleet card uses. */
+export function hueFor(id: string): number {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return h % 360;
 }
 
 const STATIONS = ["context", "model", "tools", "lint", "checkpoint", "segment"];
@@ -106,6 +120,21 @@ export default function LoopOrbital({ t }: { t: OrbitalTelemetry }) {
       halos.push(h);
     }
 
+    // Runners: one glowing bead per task in flight, parked at its station and
+    // easing toward the next as the task moves. A pool, so a fleet of tasks
+    // does not allocate on every frame.
+    const runnerPool: { core: THREE.Mesh; halo: THREE.Mesh; angle: number }[] = [];
+    const runnerGeo = new THREE.SphereGeometry(0.09, 20, 20);
+    const haloGeo = new THREE.SphereGeometry(0.2, 20, 20);
+    const ensureRunners = (n: number) => {
+      while (runnerPool.length < n) {
+        const core = new THREE.Mesh(runnerGeo, new THREE.MeshBasicMaterial({ color: 0xffffff }));
+        const halo = new THREE.Mesh(haloGeo, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.25 }));
+        group.add(core); group.add(halo);
+        runnerPool.push({ core, halo, angle: -Math.PI / 2 });
+      }
+    };
+
     // Particles on the ring.
     const N = 220;
     const pg = new THREE.BufferGeometry();
@@ -163,15 +192,17 @@ export default function LoopOrbital({ t }: { t: OrbitalTelemetry }) {
     const render = (now: number) => {
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
-      const { stage, activity, rejected, live } = tel.current;
+      const { runners, activity, rejected } = tel.current;
+      const live = runners.length > 0;
       const act = live ? 0.3 + activity * 0.7 : 0.18;
+      const lit = new Set(runners.map((r) => r.stage));
       if (!reduce) tt += dt * (live ? 0.18 : 0.07);
       group.rotation.y = tt;
 
       // Stations: the lit one breathes, the rest sit dim. Lint tints toward
       // rose as rejections rise; checkpoint/segment lean lime once done.
       for (let i = 0; i < STATIONS.length; i++) {
-        const on = live && i === stage;
+        const on = lit.has(i);
         const base = i === 3 ? new THREE.Color(pal.alive).lerp(new THREE.Color(pal.rose), Math.min(1, rejected * 1.6)) : new THREE.Color(pal.alive);
         (stations[i].material as THREE.MeshBasicMaterial).color.copy(on ? base : new THREE.Color(pal.dim).lerp(base, 0.35));
         const pulse = reduce ? 0.5 : 0.5 + 0.5 * Math.sin(now / 320 + i);
@@ -180,6 +211,32 @@ export default function LoopOrbital({ t }: { t: OrbitalTelemetry }) {
         const s = on ? 1 + pulse * 0.25 : 1;
         stations[i].scale.setScalar(s);
         halos[i].scale.setScalar(on ? 1 + pulse * 0.5 : 1);
+      }
+
+      // Runners.
+      ensureRunners(runners.length);
+      for (let i = 0; i < runnerPool.length; i++) {
+        const rp = runnerPool[i];
+        const r = runners[i];
+        rp.core.visible = rp.halo.visible = Boolean(r);
+        if (!r) continue;
+        // Target angle for the station, nudged outward per runner so several
+        // tasks at one station fan out instead of stacking.
+        const target = (r.stage / STATIONS.length) * Math.PI * 2 - Math.PI / 2;
+        let da = target - rp.angle;
+        while (da > Math.PI) da -= Math.PI * 2;
+        while (da < -Math.PI) da += Math.PI * 2;
+        rp.angle += reduce ? da : da * Math.min(1, dt * 4);
+        const rad = R + 0.16 + (i % 3) * 0.14;
+        const bob = reduce ? 0 : Math.sin(now / 260 + i * 1.7) * 0.05;
+        rp.core.position.set(Math.cos(rp.angle) * rad, 0.12 + bob, Math.sin(rp.angle) * rad);
+        rp.halo.position.copy(rp.core.position);
+        const col = new THREE.Color().setHSL(r.hue / 360, 0.85, isDark() ? 0.62 : 0.45);
+        (rp.core.material as THREE.MeshBasicMaterial).color.copy(col);
+        (rp.halo.material as THREE.MeshBasicMaterial).color.copy(col);
+        const p2 = reduce ? 0.5 : 0.5 + 0.5 * Math.sin(now / 300 + i);
+        (rp.halo.material as THREE.MeshBasicMaterial).opacity = 0.15 + p2 * 0.2;
+        rp.halo.scale.setScalar(1 + p2 * 0.35);
       }
 
       // Particles: advance along the ring; only a share proportional to
@@ -217,7 +274,7 @@ export default function LoopOrbital({ t }: { t: OrbitalTelemetry }) {
     <div className="orbital" ref={host} aria-hidden>
       <div className="orbital-labels">
         {STATIONS.map((s, i) => (
-          <span key={s} className={i === t.stage && t.live ? "on" : ""}>{s}</span>
+          <span key={s} className={t.runners.some((r) => r.stage === i) ? "on" : ""}>{s}</span>
         ))}
       </div>
     </div>

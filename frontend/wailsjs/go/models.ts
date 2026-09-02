@@ -440,12 +440,26 @@ export namespace backend {
 	export class TaskSummary {
 	    taskId: string;
 	    goal: string;
+	    model: string;
 	    startedAt: string;
+	    endedAt?: string;
 	    running: boolean;
 	    done: boolean;
 	    stop?: string;
 	    segments: number;
+	    maxSegments: number;
+	    segmentOpen: boolean;
 	    rounds: number;
+	    lastTokens: number;
+	    lastTools: number;
+	    totalTokens: number;
+	    totalCached: number;
+	    costUsd: number;
+	    rejected: number;
+	    errors: number;
+	    planDone: number;
+	    planTotal: number;
+	    spark: number[];
 	
 	    static createFrom(source: any = {}) {
 	        return new TaskSummary(source);
@@ -455,12 +469,26 @@ export namespace backend {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.taskId = source["taskId"];
 	        this.goal = source["goal"];
+	        this.model = source["model"];
 	        this.startedAt = source["startedAt"];
+	        this.endedAt = source["endedAt"];
 	        this.running = source["running"];
 	        this.done = source["done"];
 	        this.stop = source["stop"];
 	        this.segments = source["segments"];
+	        this.maxSegments = source["maxSegments"];
+	        this.segmentOpen = source["segmentOpen"];
 	        this.rounds = source["rounds"];
+	        this.lastTokens = source["lastTokens"];
+	        this.lastTools = source["lastTools"];
+	        this.totalTokens = source["totalTokens"];
+	        this.totalCached = source["totalCached"];
+	        this.costUsd = source["costUsd"];
+	        this.rejected = source["rejected"];
+	        this.errors = source["errors"];
+	        this.planDone = source["planDone"];
+	        this.planTotal = source["planTotal"];
+	        this.spark = source["spark"];
 	    }
 	}
 

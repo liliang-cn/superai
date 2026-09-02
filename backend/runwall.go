@@ -455,30 +455,84 @@ func (w *RunWall) Snapshot(ctx context.Context, taskID string) *TaskState {
 	return &cp
 }
 
-// TaskSummary is one row of the task list.
+// TaskSummary is one card on the fleet: enough to see how every task is
+// doing at once without opening any of them.
 type TaskSummary struct {
-	TaskID    string `json:"taskId"`
-	Goal      string `json:"goal"`
-	StartedAt string `json:"startedAt"`
-	Running   bool   `json:"running"`
-	Done      bool   `json:"done"`
-	Stop      string `json:"stop,omitempty"`
-	Segments  int    `json:"segments"`
-	Rounds    int    `json:"rounds"`
+	TaskID      string  `json:"taskId"`
+	Goal        string  `json:"goal"`
+	Model       string  `json:"model"`
+	StartedAt   string  `json:"startedAt"`
+	EndedAt     string  `json:"endedAt,omitempty"`
+	Running     bool    `json:"running"`
+	Done        bool    `json:"done"`
+	Stop        string  `json:"stop,omitempty"`
+	Segments    int     `json:"segments"`
+	MaxSegments int     `json:"maxSegments"`
+	SegmentOpen bool    `json:"segmentOpen"`
+	Rounds      int     `json:"rounds"`
+	LastTokens  int     `json:"lastTokens"`
+	LastTools   int     `json:"lastTools"`
+	TotalTokens int     `json:"totalTokens"`
+	TotalCached int     `json:"totalCached"`
+	CostUSD     float64 `json:"costUsd"`
+	Rejected    int     `json:"rejected"`
+	Errors      int     `json:"errors"`
+	PlanDone    int     `json:"planDone"`
+	PlanTotal   int     `json:"planTotal"`
+	// Spark is tokens per turn for the last few turns, for a card sparkline.
+	Spark []int `json:"spark"`
 }
 
-// List returns every task the wall has seen, newest first.
+// runWallSparkLen is how many recent turns a card's sparkline shows.
+const runWallSparkLen = 24
+
+// List returns every task the wall has seen, newest first, each with the
+// figures a fleet card draws. Plans are read outside the lock.
 func (w *RunWall) List() []TaskSummary {
 	w.mu.Lock()
-	defer w.mu.Unlock()
 	out := make([]TaskSummary, 0, len(w.order))
 	for _, id := range w.order {
 		t := w.tasks[id]
-		out = append(out, TaskSummary{
-			TaskID: t.TaskID, Goal: t.Goal, StartedAt: t.StartedAt,
+		s := TaskSummary{
+			TaskID: t.TaskID, Goal: t.Goal, Model: t.Model,
+			StartedAt: t.StartedAt, EndedAt: t.EndedAt,
 			Running: t.Running, Done: t.Done, Stop: t.Stop,
-			Segments: len(t.Segments), Rounds: len(t.Rounds),
-		})
+			Segments: len(t.Segments), MaxSegments: t.MaxSegments,
+			Rounds:      len(t.Rounds),
+			TotalTokens: t.TotalTokens, TotalCached: t.TotalCached, CostUSD: t.CostUSD,
+			Rejected: t.LintRetries + t.LintBlocks, Errors: t.Errors,
+		}
+		if n := len(t.Segments); n > 0 && t.Segments[n-1].EndedAt == "" {
+			s.SegmentOpen = true
+		}
+		if n := len(t.Rounds); n > 0 {
+			s.LastTokens = t.Rounds[n-1].Tokens
+			s.LastTools = t.Rounds[n-1].Tools
+			from := n - runWallSparkLen
+			if from < 0 {
+				from = 0
+			}
+			for _, r := range t.Rounds[from:] {
+				s.Spark = append(s.Spark, r.Tokens)
+			}
+		}
+		if s.Spark == nil {
+			s.Spark = []int{}
+		}
+		out = append(out, s)
+	}
+	w.mu.Unlock()
+
+	if w.plan != nil {
+		ctx := context.Background()
+		for i := range out {
+			for _, p := range w.plan(ctx, out[i].TaskID) {
+				out[i].PlanTotal++
+				if p.Done {
+					out[i].PlanDone++
+				}
+			}
+		}
 	}
 	sort.SliceStable(out, func(i, j int) bool { return out[i].StartedAt > out[j].StartedAt })
 	return out

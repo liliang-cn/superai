@@ -7,7 +7,7 @@ import {
   Activity, AlertTriangle, Brain, Clock, Coins, Cpu, Database, Gauge, GitBranch, Grid3x3, Layers,
   ListChecks, Network, Play, Radio, RotateCcw, ScrollText, Shield, Sparkles, Square, Wrench, Zap,
 } from "lucide-react";
-import LoopOrbital from "../components/LoopOrbital";
+import LoopOrbital, { hueFor } from "../components/LoopOrbital";
 import { useTween } from "../lib/useTween";
 import { useImeGuard } from "@/lib/ime";
 
@@ -37,7 +37,14 @@ interface TaskState {
   lints: Record<string, number>; lintRetries: number; lintBlocks: number; compactions: number; retries: number; checkpoints: number; errors: number;
   totalTokens: number; totalCached: number; costUsd: number; log: LogLine[];
 }
-interface TaskSummary { taskId: string; goal: string; startedAt: string; running: boolean; done: boolean; stop?: string; segments: number; rounds: number }
+interface TaskSummary {
+  taskId: string; goal: string; model: string; startedAt: string; endedAt?: string; running: boolean; done: boolean; stop?: string;
+  segments: number; maxSegments: number; segmentOpen: boolean; rounds: number; lastTokens: number; lastTools: number;
+  totalTokens: number; totalCached: number; costUsd: number; rejected: number; errors: number; planDone: number; planTotal: number; spark: number[];
+}
+// Where a task is on the loop, from its summary alone — the same rule the
+// detail view uses, so a card and the orbital never disagree.
+const stageOf = (t: TaskSummary) => (!t.running ? 5 : !t.segmentOpen ? 5 : t.lastTools > 0 ? 2 : 1);
 interface DashData {
   ready: boolean;
   llm?: { model: string; baseURL: string; embedModel: string; maxRounds: number; workspace: string };
@@ -116,8 +123,9 @@ export default function DashboardView() {
   useEffect(() => {
     let timer: number | undefined;
     const off = EventsOn("longrun:tick", (p: { taskId?: string; kind?: string }) => {
-      if (p?.kind === "begin" || p?.kind === "finish") { loadList(); loadDash(); }
-      if (p?.taskId && p.taskId === taskId) { if (timer) window.clearTimeout(timer); timer = window.setTimeout(() => loadState(taskId), 180); }
+      if (p?.kind === "begin" || p?.kind === "finish") loadDash();
+      if (timer) window.clearTimeout(timer);
+      timer = window.setTimeout(() => { loadList(); if (p?.taskId && p.taskId === taskId) loadState(taskId); }, 180);
     });
     return () => { off(); if (timer) window.clearTimeout(timer); };
   }, [taskId, loadList, loadState, loadDash]);
@@ -126,13 +134,8 @@ export default function DashboardView() {
   const start = useCallback(async () => {
     const g = goal.trim(); if (!g || busy) return;
     setBusy(true);
-    try { const id = await LongRunStart(g, segs, rounds, minutes, 0, ""); if (id) { setTaskId(id); setGoal(""); await loadList(); } } finally { setBusy(false); }
+    try { const id = await LongRunStart(g, segs, rounds, minutes, 0, ""); if (id) { setTaskId((cur) => cur || id); setGoal(""); await loadList(); } } finally { setBusy(false); }
   }, [goal, segs, rounds, minutes, busy, loadList]);
-  const resume = useCallback(async () => {
-    if (!st || st.running || busy) return;
-    setBusy(true);
-    try { await LongRunStart(st.goal, segs, rounds, minutes, 0, st.taskId); await loadList(); } finally { setBusy(false); }
-  }, [st, segs, rounds, minutes, busy, loadList]);
 
   // ---- derived ----
   const d = useMemo(() => {
@@ -177,10 +180,14 @@ export default function DashboardView() {
       {/* ── hero: orbital + system ── */}
       <section className="cr-hero">
         <div className="cr-panel cr-orbital">
-          <div className="cr-panel-h"><Layers size={13} /><span className="cr-eyebrow">The loop · one state machine</span><span className="cr-tag cyan">{d && st?.running ? `stage 0${d.stage + 1}/06` : "orbit"}</span></div>
-          <LoopOrbital t={{ stage: d?.stage ?? 5, activity: d?.activity ?? 0, rejected: d ? d.rejected / Math.max(1, d.rs.length) : 0, live: Boolean(st?.running) }} />
+          <div className="cr-panel-h"><Layers size={13} /><span className="cr-eyebrow">The loop · one state machine</span><span className="cr-tag cyan">{tasks.filter((t) => t.running).length ? `${tasks.filter((t) => t.running).length} in flight` : "orbit"}</span></div>
+          <LoopOrbital t={{
+            runners: tasks.filter((t) => t.running).map((t) => ({ id: t.taskId, stage: stageOf(t), hue: hueFor(t.taskId) })),
+            activity: Math.min(1, tasks.filter((t) => t.running).reduce((a, t) => a + t.lastTools, 0) / Math.max(1, tasks.filter((t) => t.running).length * 2)),
+            rejected: (() => { const r = tasks.filter((t) => t.running); const rej = r.reduce((a, t) => a + t.rejected, 0); const rd = r.reduce((a, t) => a + t.rounds, 0); return rd ? rej / rd : 0; })(),
+          }} />
           <div className="cr-orbital-foot">
-            <span><b>{d ? d.rs.length : 0}</b> turns</span><span><b>{st?.toolCalls ?? 0}</b> tool calls</span><span className="rose"><b>{d?.rejected ?? 0}</b> rejected</span><span className="lime"><b>{d?.accepted ?? 0}</b> accepted</span>
+            <span><b>{tasks.reduce((a, t) => a + t.rounds, 0)}</b> turns</span><span><b>{tasks.length}</b> tasks</span><span className="rose"><b>{tasks.reduce((a, t) => a + t.rejected, 0)}</b> rejected</span><span className="lime"><b>{fmtK(tasks.reduce((a, t) => a + t.totalTokens, 0))}</b> tokens</span>
           </div>
         </div>
         <div className="cr-stats">
@@ -195,22 +202,55 @@ export default function DashboardView() {
 
       {/* ── task bar ── */}
       <section className="cr-taskbar">
-        <ListChecks size={14} className="cr-dim" />
-        <select value={taskId} onChange={(e) => setTaskId(e.target.value)}>
-          {tasks.length === 0 && <option value="">— no long runs yet —</option>}
-          {tasks.map((t) => <option key={t.taskId} value={t.taskId}>{t.running ? "● " : t.done ? "✓ " : "○ "}{short(t.goal || t.taskId, 46)} · {t.segments}s/{t.rounds}r</option>)}
-        </select>
+        <Play size={14} className="cr-dim" />
         <input className="input" value={goal} onChange={(e) => setGoal(e.target.value)}
           onCompositionStart={ime.handlers.onCompositionStart} onCompositionEnd={ime.handlers.onCompositionEnd}
           onKeyDown={(e) => { if (e.key === "Enter" && !ime.composing(e)) { e.preventDefault(); start(); } }}
-          placeholder="Give the supervisor a goal that takes hours" autoComplete="off" />
+          placeholder="Launch a task — press Enter, then launch another; they run side by side" autoComplete="off" />
         <label className="cr-knob">seg<input type="number" min={1} value={segs} onChange={(e) => setSegs(+e.target.value || 1)} /></label>
         <label className="cr-knob">rounds<input type="number" min={1} value={rounds} onChange={(e) => setRounds(+e.target.value || 1)} /></label>
         <label className="cr-knob">min<input type="number" min={0} value={minutes} onChange={(e) => setMinutes(+e.target.value || 0)} /></label>
-        <button className="cr-btn primary" onClick={start} disabled={busy || !goal.trim()}><Play size={13} />{busy ? "Starting…" : "Run"}</button>
-        {st?.running && <button className="cr-btn" onClick={() => LongRunStop(st.taskId)}><Square size={12} />Stop</button>}
-        {st && !st.running && !st.done && <button className="cr-btn" onClick={resume} disabled={busy} title="Same task id — plan and checkpoints picked back up"><RotateCcw size={12} />Resume</button>}
+        <button className="cr-btn primary" onClick={start} disabled={busy || !goal.trim()}><Play size={13} />{busy ? "Launching…" : "Launch"}</button>
       </section>
+
+      {/* ── the fleet: every task, side by side ── */}
+      {tasks.length > 0 && (
+        <section className="cr-fleet">
+          {tasks.map((t) => {
+            const hue = hueFor(t.taskId);
+            const cache = pct(t.totalCached, t.totalTokens);
+            const stage = stageOf(t);
+            const mx = Math.max(1, ...t.spark);
+            return (
+              <button key={t.taskId} className={`cr-task${t.taskId === taskId ? " focus" : ""}${t.running ? " live" : ""}`} style={{ ["--hue" as string]: hue }} onClick={() => setTaskId(t.taskId)}>
+                <div className="cr-task-h">
+                  <span className={`cr-task-led${t.running ? " on" : t.done ? " done" : t.stop ? " off" : ""}`} />
+                  <span className="cr-task-goal" title={t.goal}>{short(t.goal || t.taskId, 64)}</span>
+                  <span className="cr-tag">{t.running ? ["context", "model", "tools", "lint", "checkpoint", "segment"][stage] : t.done ? "finished" : t.stop || "idle"}</span>
+                </div>
+                <div className="cr-task-segs">
+                  {Array.from({ length: Math.max(1, t.maxSegments, t.segments) }).map((_, i) => <i key={i} className={i < t.segments - (t.segmentOpen ? 1 : 0) ? "done" : i === t.segments - 1 && t.segmentOpen ? "on" : ""} />)}
+                </div>
+                <div className="cr-task-row">
+                  <span><b>{t.planDone}</b>/{t.planTotal || "?"} plan</span>
+                  <span><b>{t.rounds}</b> turns</span>
+                  <span><b>{cache}%</b> cache</span>
+                  <span><b>${t.costUsd.toFixed(2)}</b></span>
+                  <span className={t.rejected ? "rose" : ""}><b>{t.rejected}</b> rej</span>
+                  <span className="cr-task-time">{elapsed(t.startedAt, t.endedAt)}</span>
+                </div>
+                <svg className="cr-task-spark" viewBox={`0 0 ${Math.max(1, t.spark.length - 1)} 20`} preserveAspectRatio="none">
+                  {t.spark.length > 1 && <polyline points={t.spark.map((v, i) => `${i},${20 - (v / mx) * 18}`).join(" ")} />}
+                </svg>
+                <div className="cr-task-actions" onClick={(e) => e.stopPropagation()}>
+                  {t.running && <span role="button" className="cr-btn tiny" onClick={() => LongRunStop(t.taskId)}><Square size={10} />Stop</span>}
+                  {!t.running && !t.done && <span role="button" className="cr-btn tiny" onClick={() => LongRunStart(t.goal, segs, rounds, minutes, 0, t.taskId).then(loadList)}><RotateCcw size={10} />Resume</span>}
+                </div>
+              </button>
+            );
+          })}
+        </section>
+      )}
 
       {!st && (
         <div className="cr-empty"><Zap size={16} /> Nothing on the wall yet. Give the supervisor a goal above: it runs the agent segment by segment, carrying the plan and workspace across, and everything it does lands here as it happens.</div>
@@ -218,9 +258,9 @@ export default function DashboardView() {
 
       {st && d && (
         <>
-          {/* ── segment strip ── */}
-          <section className="cr-segs">
-            <span className="cr-eyebrow cr-segs-meta"><GitBranch size={12} />task {st.taskId.slice(0, 8)} · {elapsed(st.startedAt, st.endedAt)} · ctx {fmtK(d.last?.tokens ?? 0)}</span>
+          {/* ── segment strip (focused task) ── */}
+          <section className="cr-segs" style={{ ["--hue" as string]: hueFor(st.taskId) }}>
+            <span className="cr-eyebrow cr-segs-meta"><span className="cr-task-led on hue" /><GitBranch size={12} />{short(st.goal, 40)} · {elapsed(st.startedAt, st.endedAt)} · ctx {fmtK(d.last?.tokens ?? 0)}</span>
             {Array.from({ length: Math.max(st.maxSegments, st.segments.length) || 1 }).map((_, i) => {
               const s = st.segments.find((x) => x.index === i);
               const cls = !s ? "" : s.err ? "failed" : s.endedAt ? "done" : "active";

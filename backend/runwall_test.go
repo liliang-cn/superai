@@ -86,3 +86,47 @@ func TestRunWallIgnoresRunsItWasNotToldAbout(t *testing.T) {
 		t.Fatalf("wall pushed %d ticks for a run it should have ignored", ticks)
 	}
 }
+
+// Two tasks at once are two tasks on the wall, each with its own figures.
+// The task id is the identity; nothing about one may leak into the other.
+func TestRunWallTracksTwoTasksAtOnce(t *testing.T) {
+	svc := newTestLongRunService(t)
+	defer svc.Close()
+
+	wall := NewRunWall(nil, nil)
+	svc.Agent().RegisterObserver(wall)
+
+	ids := []string{"fleet-a", "fleet-b"}
+	var wg sync.WaitGroup
+	for _, id := range ids {
+		wall.Begin(id, "Task "+id, "m", 2)
+		wg.Add(1)
+		go func(id string) {
+			defer wg.Done()
+			r, err := svc.StreamLong(context.Background(), "Task "+id,
+				LongRunOptions{MaxSegments: 2, RoundsPerSegment: 1, TaskID: id}, nil)
+			if err != nil {
+				t.Errorf("%s: %v", id, err)
+				return
+			}
+			wall.Finish(id, r.Done, r.Stop, r.Text, nil)
+		}(id)
+	}
+	wg.Wait()
+
+	list := wall.List()
+	if len(list) != 2 {
+		t.Fatalf("wall holds %d tasks, want 2: %+v", len(list), list)
+	}
+	for _, s := range list {
+		if s.Rounds == 0 || s.Segments == 0 {
+			t.Errorf("%s recorded nothing: %+v", s.TaskID, s)
+		}
+		if s.Running {
+			t.Errorf("%s still running after Finish", s.TaskID)
+		}
+		if s.Goal != "Task "+s.TaskID {
+			t.Errorf("%s carries another task's goal: %q", s.TaskID, s.Goal)
+		}
+	}
+}
