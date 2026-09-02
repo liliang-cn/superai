@@ -80,7 +80,7 @@ func (s *Service) registerNotifyTool() {
 // and a reminder that reads differently depending on which one fired it is a
 // bug the user would have to reproduce twice to see.
 func (s *Service) NotifyScheduledRun(ctx context.Context, run agent.PromptRun) {
-	// The persona ends every answer with a trailing "情绪: X" tag that drives the
+	// The persona may end an answer with a trailing "MOOD: x" tag that drives the
 	// avatar. The chat transcript peels it off before display; anything that did
 	// not would put an internal marker at the bottom of every message the user
 	// reads in Telegram.

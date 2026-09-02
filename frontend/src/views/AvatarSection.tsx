@@ -12,13 +12,21 @@ import { openExternal } from "../lib/openExternal";
  * asked to be visited, and there was nothing to visit it for.
  */
 
-const EMOTIONS: { key: string; emoji: string }[] = [
-  { key: "happy", emoji: "😄" },
-  { key: "sad", emoji: "😢" },
-  { key: "thinking", emoji: "🤔" },
-  { key: "excited", emoji: "🤩" },
-  { key: "neutral", emoji: "😐" },
-];
+/**
+ * The emotions, in the order the sprite sheet's rows are in.
+ *
+ * The buttons used to show an emoji, which was drawn by the operating system
+ * and so looked like a different face here than in the avatar it was testing.
+ * They show the sprite the renderer will actually draw, from the same sheet, so
+ * what you press is what you get.
+ */
+const EMOTIONS = ["neutral", "happy", "sad", "thinking", "excited"];
+
+/** One frame of the sheet: 20x24 pixels, drawn at 2x. */
+const SPRITE_W = 20;
+const SPRITE_H = 24;
+const SPRITE_ZOOM = 2;
+const SHEET_FRAMES = 4;
 
 export default function AvatarSection({
   status,
@@ -83,14 +91,14 @@ export default function AvatarSection({
           Emit a test emotion to check a renderer is receiving.
         </div>
         <div className="emotion-btns">
-          {EMOTIONS.map((e) => (
+          {EMOTIONS.map((e, i) => (
             <button
-              key={e.key}
+              key={e}
               className="emotion-btn"
-              onClick={() => test(e.key)}
+              onClick={() => test(e)}
               disabled={!port}
               style={
-                fired === e.key
+                fired === e
                   ? {
                       borderColor: "var(--accent)",
                       background: "var(--accent-soft)",
@@ -98,8 +106,20 @@ export default function AvatarSection({
                   : undefined
               }
             >
-              <span className="em-emoji">{e.emoji}</span>
-              <span className="em-label">{e.key}</span>
+              <span
+                className="em-sprite"
+                style={{
+                  // The still frame of each row. Testing is about which face
+                  // the renderer picks, so the button holds still and the
+                  // avatar page is where the animation lives.
+                  backgroundImage: `url(${base}/avatar/sprites/cat.png)`,
+                  backgroundSize: `${SPRITE_W * SHEET_FRAMES * SPRITE_ZOOM}px ${SPRITE_H * EMOTIONS.length * SPRITE_ZOOM}px`,
+                  backgroundPositionY: `${-i * SPRITE_H * SPRITE_ZOOM}px`,
+                  width: SPRITE_W * SPRITE_ZOOM,
+                  height: SPRITE_H * SPRITE_ZOOM,
+                }}
+              />
+              <span className="em-label">{e}</span>
             </button>
           ))}
         </div>

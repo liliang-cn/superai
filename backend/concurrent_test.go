@@ -65,7 +65,7 @@ func (l *slowLLM) start(t *testing.T) string {
 				"index": 0,
 				"message": map[string]string{
 					"role":    "assistant",
-					"content": "ANSWER-" + marker + "\n情绪: 中性",
+					"content": "ANSWER-" + marker + "\nMOOD: neutral",
 				},
 				"finish_reason": "stop",
 			}},

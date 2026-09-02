@@ -211,8 +211,8 @@ func TestPTCLive(t *testing.T) {
 		(strings.HasPrefix(strings.TrimSpace(o.final), "{") && strings.HasSuffix(strings.TrimSpace(o.final), "}")) {
 		t.Errorf("final reply is the execution report rather than an answer: %q", truncate(o.final, 400))
 	}
-	if !strings.Contains(o.final, "情绪:") {
-		t.Errorf("final reply lost the 情绪 tag the Avatar needs: %q", truncate(o.final, 400))
+	if !strings.Contains(o.final, "MOOD:") {
+		t.Errorf("final reply lost the MOOD tag the avatar needs: %q", truncate(o.final, 400))
 	}
 }
 

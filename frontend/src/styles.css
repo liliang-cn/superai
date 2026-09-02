@@ -1805,3 +1805,12 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
 .settings-tab.active { color: var(--text-1); border-bottom-color: var(--accent); }
 /* .card sets its own display, so the attribute alone would not hide it. */
 .card[hidden] { display: none; }
+
+/* The emotion test buttons show the sprite the renderer will draw, rather than
+   an emoji the operating system draws — otherwise the button testing a face is
+   showing a different face than the one under test. */
+.em-sprite {
+  display: block; margin: 0 auto 4px;
+  background-repeat: no-repeat; background-position-x: 0;
+  image-rendering: pixelated;
+}

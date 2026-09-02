@@ -49,7 +49,7 @@ func scheduleTestAppWith(t *testing.T, beforeReply func(*http.Request)) (*App, f
 			"id": "c", "object": "chat.completion", "created": 1, "model": "test-model",
 			"choices": []map[string]any{{
 				"index":         0,
-				"message":       map[string]string{"role": "assistant", "content": "今日收益 +1.2%。\n情绪: 开心"},
+				"message":       map[string]string{"role": "assistant", "content": "今日收益 +1.2%。\nMOOD: happy"},
 				"finish_reason": "stop",
 			}},
 		})

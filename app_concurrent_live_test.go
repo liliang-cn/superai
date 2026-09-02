@@ -46,7 +46,7 @@ func (p *overlappingProvider) start(t *testing.T) string {
 			"id": "c", "object": "chat.completion", "created": 1, "model": "test-model",
 			"choices": []map[string]any{{
 				"index":         0,
-				"message":       map[string]string{"role": "assistant", "content": "REPLY-" + tag + "\n情绪: 中性"},
+				"message":       map[string]string{"role": "assistant", "content": "REPLY-" + tag + "\nMOOD: neutral"},
 				"finish_reason": "stop",
 			}},
 		})

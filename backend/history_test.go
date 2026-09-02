@@ -15,7 +15,7 @@ func TestVisibleTurnsStripsInjectedContext(t *testing.T) {
 		{Role: "user", Content: "<skill-discovery>\nSkills relevant…\n</skill-discovery>"},
 		{Role: "assistant", Content: "", ToolCalls: []domain.ToolCall{{ID: "1"}}},
 		{Role: "tool", Content: `{"ok":true}`},
-		{Role: "assistant", Content: "他有五年经验。\n情绪: 开心"},
+		{Role: "assistant", Content: "他有五年经验。\nMOOD: happy"},
 		{Role: "assistant", Content: "   "},
 	}
 
@@ -32,8 +32,8 @@ func TestVisibleTurnsStripsInjectedContext(t *testing.T) {
 	if turns[1].Content != "他有五年经验。" {
 		t.Errorf("assistant content = %q, emotion tag should be split off", turns[1].Content)
 	}
-	if turns[1].Emotion != "开心" {
-		t.Errorf("emotion = %q, want 开心", turns[1].Emotion)
+	if turns[1].Emotion != "happy" {
+		t.Errorf("emotion = %q, want happy", turns[1].Emotion)
 	}
 }
 
@@ -103,7 +103,7 @@ func TestVisibleTurnsHidesToolScripts(t *testing.T) {
 		{Role: "assistant", Content: "我查一下。\n<code>\nreturn callTool('mcp_websearch_websearch', {query: '上证'});\n</code>Object containing 1 item: \n1. `results`: Array containing 10 items: \n  - `0`: \"3865.23\"<code>\nreturn \"3865.23\";\n</code>上证指数收盘 3865.23 点。"},
 		// A turn stored before the agent summarised its own runs.
 		{Role: "assistant", Content: `{"results":[{"snippet":"3865.23"}]}`},
-		{Role: "assistant", Content: "上证指数收盘 3865.23 点。\n情绪: 开心"},
+		{Role: "assistant", Content: "上证指数收盘 3865.23 点。\nMOOD: happy"},
 	}
 
 	turns := visibleTurns(messages)
@@ -117,7 +117,7 @@ func TestVisibleTurnsHidesToolScripts(t *testing.T) {
 			}
 		}
 	}
-	if turns[1].Content != "上证指数收盘 3865.23 点。" || turns[1].Emotion != "开心" {
+	if turns[1].Content != "上证指数收盘 3865.23 点。" || turns[1].Emotion != "happy" {
 		t.Errorf("the real answer should be untouched: %+v", turns[1])
 	}
 }
@@ -129,12 +129,12 @@ func TestVisibleTurnsHidesToolScripts(t *testing.T) {
 func TestVisibleTurnsSalvagesALoneTranscript(t *testing.T) {
 	turns := visibleTurns([]domain.Message{
 		{Role: "user", Content: "搜一下上证指数收盘"},
-		{Role: "assistant", Content: "<code>\nreturn \"截至收盘，上证指数报 3865.23 点。\\n\\n情绪: 开心\";\n</code>截至收盘，上证指数报 3865.23 点。\n\n情绪: 开心"},
+		{Role: "assistant", Content: "<code>\nreturn \"截至收盘，上证指数报 3865.23 点。\\n\\nMOOD: happy\";\n</code>截至收盘，上证指数报 3865.23 点。\n\nMOOD: happy"},
 	})
 	if len(turns) != 2 {
 		t.Fatalf("the answer must survive when nothing follows it: %+v", turns)
 	}
-	if turns[1].Content != "截至收盘，上证指数报 3865.23 点。" || turns[1].Emotion != "开心" {
+	if turns[1].Content != "截至收盘，上证指数报 3865.23 点。" || turns[1].Emotion != "happy" {
 		t.Errorf("salvaged answer is wrong: %+v", turns[1])
 	}
 
@@ -153,7 +153,7 @@ func TestVisibleTurnsSalvagesALoneTranscript(t *testing.T) {
 // not be mistaken for the tool-calling protocol.
 func TestVisibleTurnsKeepsFencedCode(t *testing.T) {
 	turns := visibleTurns([]domain.Message{
-		{Role: "assistant", Content: "用这段就行：\n```js\nconst a = 1;\n```\n情绪: 中性"},
+		{Role: "assistant", Content: "用这段就行：\n```js\nconst a = 1;\n```\nMOOD: neutral"},
 	})
 	if len(turns) != 1 || !strings.Contains(turns[0].Content, "const a = 1;") {
 		t.Fatalf("a fenced code reply must survive: %+v", turns)

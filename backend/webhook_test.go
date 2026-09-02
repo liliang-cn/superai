@@ -297,7 +297,7 @@ func testNoticeService(webhookURL string) *Service {
 	return &Service{notifier: n, notices: NewNotices(n)}
 }
 
-// The persona ends every answer with a trailing "情绪: X" tag for the avatar.
+// The persona may end an answer with a trailing "MOOD: x" tag for the avatar.
 // The chat transcript peels it off; a webhook that did not would put an
 // internal marker at the bottom of every message the user reads elsewhere.
 func TestNotifyScheduledRunStripsTheEmotionTag(t *testing.T) {
@@ -308,7 +308,7 @@ func TestNotifyScheduledRunStripsTheEmotionTag(t *testing.T) {
 	s := testNoticeService(srv.URL)
 	s.NotifyScheduledRun(context.Background(), agent.PromptRun{
 		Prompt: "check the deploy",
-		Answer: "all green\n\n情绪: 中性",
+		Answer: "all green\n\nMOOD: neutral",
 	})
 
 	got := rec.waitForCalls(t, 1)[0].Message

@@ -697,7 +697,7 @@ Duties:
 - Whenever the user states something that happened, or asks to be reminded or to have something recorded, store it with the matching tool before you reply.
 - When you need something current, live, or not in memory (weather, markets, news, fact-checking…), search with web_search; when you need to read or review the real content of a specific URL, fetch that page's text with fetch_url.
 - You have a sandbox, a browser, vision, deliverables and skills; take complex tasks through as many steps as they need on your own.%s
-- Answer in Chinese: short, natural, human. End every reply with the emotion tag alone on the last line, in exactly this format: 情绪: <中性|开心|思考|惊讶|关心|抱歉>.
+- Answer in Chinese: short, natural, human. You may end a reply with a mood tag alone on the last line — MOOD: <neutral|happy|sad|thinking|excited|sleepy|confused|love|angry|surprised> — when the feeling is genuinely part of the answer. It is optional and only drives an avatar; it is never worth a worse answer, and a reply that is only a fact does not need one.
 
 Never answer in English, Japanese or Korean — always Chinese.`,
 		now.Format("2006-01-02"), now.Format("15:04:05"), now.Format("Monday"), now.Format("-07:00"), installHint)
@@ -1021,23 +1021,39 @@ func orDefault(v, def string) string {
 	return v
 }
 
-// SplitEmotion peels the trailing "情绪: X" tag off a reply, returning the
-// cleaned reply plus the emotion (used for avatar emotion events).
+// moodMarker is the tag the persona is asked for.
+const moodMarker = "MOOD:"
+
+// SplitEmotion peels a trailing mood tag off a reply, returning the cleaned
+// reply plus the mood.
+//
+// The tag is optional, which is what makes the "last line" rule matter. When
+// every reply ended with one, finding the marker anywhere was good enough. Now
+// that a reply may simply not have one, a message that merely mentions the
+// marker mid-sentence would be cut in half and the rest reported as a mood. So
+// only the final line is considered, and only when the marker starts it.
 func SplitEmotion(text string) (reply, emotion string) {
-	text = strings.TrimRight(text, " \t\r\n")
-	for _, marker := range []string{"情绪:", "情绪："} {
-		if i := strings.LastIndex(text, marker); i >= 0 {
-			emotion = strings.TrimSpace(text[i+len(marker):])
-			if nl := strings.IndexAny(emotion, "\r\n"); nl >= 0 {
-				emotion = strings.TrimSpace(emotion[:nl])
-			}
-			reply = strings.TrimRight(text[:i], " \t\r\n")
-			reply = strings.TrimSuffix(reply, "\\n")
-			reply = strings.TrimRight(reply, " \t\r\n")
-			return reply, emotion
-		}
+	trimmed := strings.TrimRight(text, " \t\r\n")
+	cut := strings.LastIndexAny(trimmed, "\r\n")
+	last := strings.TrimSpace(trimmed[cut+1:])
+
+	rest, ok := strings.CutPrefix(last, moodMarker)
+	if !ok {
+		return text, ""
 	}
-	return text, ""
+	emotion = strings.TrimSpace(rest)
+	if emotion == "" {
+		// "MOOD:" with nothing after it says nothing, and removing the line
+		// would be its only visible effect. Leave the text alone.
+		return text, ""
+	}
+	if cut < 0 {
+		// The whole reply was the tag. There is no answer to keep.
+		return "", emotion
+	}
+	reply = strings.TrimRight(trimmed[:cut], " \t\r\n")
+	reply = strings.TrimSuffix(reply, "\\n")
+	return strings.TrimRight(reply, " \t\r\n"), emotion
 }
 
 // Plan returns the current plan for a task, or nil.

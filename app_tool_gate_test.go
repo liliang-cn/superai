@@ -43,7 +43,7 @@ func startToolCallingLLM(t *testing.T, command string) string {
 				"id": "chatcmpl", "object": "chat.completion", "created": 1, "model": "test-model",
 				"choices": []map[string]any{{
 					"index":         0,
-					"message":       map[string]string{"role": "assistant", "content": "done\n情绪: 中性"},
+					"message":       map[string]string{"role": "assistant", "content": "done\nMOOD: neutral"},
 					"finish_reason": "stop",
 				}},
 			})
