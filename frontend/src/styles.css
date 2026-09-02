@@ -1556,6 +1556,32 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
 .cr-health-more:hover { color: var(--cr-cyan); }
 .cr-health-list { max-height: 300px; overflow: auto; }
 
+/* ---- run trace: one row per event ----
+   The wall is prose; this is the ledger. Fixed columns and tabular numerals
+   because the questions asked of it — which tool took eleven seconds, where
+   the cache stopped hitting — are all comparisons down a column. */
+.cr-trace-overlay { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 32px; background: rgba(0,0,0,.55); backdrop-filter: blur(3px); }
+.cr-trace { width: 100%; max-width: 1180px; max-height: 86vh; display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; background: linear-gradient(180deg, var(--cr-panel-2), var(--cr-panel)); border: 1px solid var(--cr-line-2); border-radius: 10px; box-shadow: 0 20px 60px rgba(0,0,0,.45); }
+.cr-trace .cr-panel-h { margin-bottom: 0; }
+.cr-trace-x { background: none; border: none; color: var(--cr-dim); cursor: pointer; padding: 2px 4px; border-radius: 5px; display: inline-flex; }
+.cr-trace-x:hover { color: var(--cr-text); background: var(--cr-line); }
+.cr-trace-bar { display: flex; align-items: center; gap: 6px; }
+.cr-trace-bar .input { flex: 1; min-width: 0; font-family: var(--cr-mono); font-size: 12px; background: var(--cr-bg); color: var(--cr-text); border: 1px solid var(--cr-line-2); border-radius: 7px; padding: 6px 10px; }
+.cr-trace-rows { flex: 1; min-height: 0; overflow: auto; border: 1px solid var(--cr-line); border-radius: 8px; background: var(--cr-bg); padding: 4px 0; }
+.cr-trace-row { display: grid; grid-template-columns: 64px 92px 30px minmax(90px, 180px) 56px 76px minmax(0, 1fr); gap: 8px; align-items: baseline; padding: 2px 10px; font-family: var(--cr-mono); font-size: 10.5px; line-height: 1.6; color: var(--cr-dim); font-variant-numeric: tabular-nums; }
+.cr-trace-row > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cr-trace-row.head { position: sticky; top: -4px; z-index: 1; background: var(--cr-bg); color: var(--cr-mute); text-transform: uppercase; letter-spacing: .08em; font-size: 9px; border-bottom: 1px solid var(--cr-line); padding-bottom: 4px; margin-bottom: 3px; }
+.cr-trace-row:not(.head):hover { background: var(--cr-panel-2); }
+.cr-trace-row .e { color: var(--cr-cyan); }
+.cr-trace-row.tool_start .e, .cr-trace-row.tool_end .e { color: var(--cr-lime); }
+.cr-trace-row.lint .e, .cr-trace-row.error .e, .cr-trace-row.bad .e { color: var(--cr-rose); }
+.cr-trace-row.compaction .e, .cr-trace-row.model_retry .e { color: var(--cr-amber); }
+.cr-trace-row .s { color: var(--cr-text); }
+.cr-trace-row .k i { font-style: normal; color: var(--cr-lime); }
+.cr-trace-row .x { color: var(--cr-mute); }
+.cr-trace-row.bad .x { color: var(--cr-rose); }
+.cr-trace-rows .cr-note { padding: 14px 12px; }
+
 /* ---------------------------------------------------------------------------
    AIGUI `ui` blocks (@ai-gui/plugin-ui).
 

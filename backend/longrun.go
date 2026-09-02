@@ -99,6 +99,14 @@ type LongRunReport struct {
 	Duration string  `json:"duration"`
 }
 
+// Traces is the store this service writes per-task traces through.
+func (s *Service) Traces() *TraceStore {
+	if s == nil {
+		return nil
+	}
+	return s.traces
+}
+
 // StreamLong drives one goal across many runs, forwarding every event to emit
 // exactly as Stream does, and returns what the task ended up doing.
 //
@@ -118,6 +126,14 @@ func (s *Service) StreamLong(ctx context.Context, goal string, o LongRunOptions,
 	var opts []agent.RunOption
 	if o.TaskID != "" {
 		opts = append(opts, agent.WithTaskID(o.TaskID))
+	}
+	// The task's own trace. Opened here rather than in the app because this
+	// is the one place that knows both that a long run is starting and which
+	// task id it belongs to; closed below whichever way the run ends, so a
+	// task that fails between segments does not leave a file handle behind.
+	if o.TaskID != "" && s.traces != nil {
+		s.traces.Begin(o.TaskID)
+		defer s.traces.Finish(o.TaskID)
 	}
 	if o.Unattended && s.gate != nil && o.TaskID != "" {
 		obs := &unattendedObserver{gate: s.gate, taskID: o.TaskID}

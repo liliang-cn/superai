@@ -79,6 +79,11 @@ type Service struct {
 	// dashboard. Fed by an observer registered at build time; see dashboard.go.
 	usage *usageTracker
 
+	// traces writes a JSONL trace per long-run task. Another observer
+	// registered at build time, beside the usage one — a trace is about the
+	// run, not about whichever window happens to be open. See trace.go.
+	traces *TraceStore
+
 	// SuppressedMCPServers names the MCP servers that were left unmounted
 	// because they route to the same store the memory backend already owns.
 	SuppressedMCPServers []string
@@ -283,6 +288,11 @@ func NewService(s *Settings) (*Service, error) {
 	// whichever entry point started the run.
 	out.usage = newUsageTracker(filepath.Join(cfg.DataDir(), "usage.json"))
 	svc.RegisterObserver(&usageObserver{u: out.usage})
+	// One writer per task, opened by StreamLong and closed when the task
+	// stops. Registered here rather than in the app because every run reaches
+	// this observer whichever entry point started it.
+	out.traces = NewTraceStore(TracesDir())
+	svc.RegisterObserver(out.traces)
 
 	// --- Built-in framework tools. ---
 	agent.RegisterDateTimeTool(svc)
@@ -359,6 +369,9 @@ func (s *Service) Close() error {
 	}
 	if s.svc != nil {
 		_ = s.svc.Close()
+	}
+	if s.traces != nil {
+		_ = s.traces.Close()
 	}
 	if s.sb != nil {
 		_ = s.sb.Close()

@@ -5,10 +5,11 @@ import {
 } from "../../wailsjs/go/main/App";
 import {
   Activity, AlertTriangle, Brain, Clock, Coins, Cpu, Database, Gauge, GitBranch, Grid3x3, Layers,
-  ListChecks, Network, Play, Radio, RotateCcw, ScrollText, Shield, Sparkles, Square, Wrench, Zap,
+  ListChecks, Network, Play, Radio, RotateCcw, ScrollText, Shield, Sparkles, Square, Terminal, Wrench, Zap,
 } from "lucide-react";
 import LoopOrbital, { hueFor } from "../components/LoopOrbital";
 import HealthCard from "../components/HealthCard";
+import RunTracePanel from "../components/RunTracePanel";
 import { useTween } from "../lib/useTween";
 import { useImeGuard } from "@/lib/ime";
 
@@ -104,6 +105,10 @@ export default function DashboardView() {
   // the audit log still records every call it lets through.
   const [unattended, setUnattended] = useState(true);
   const [busy, setBusy] = useState(false);
+  // The task whose JSONL trace is open, if any. Its own state rather than a
+  // mode of taskId: reading one task's trace must not move the focus of every
+  // other panel on the page.
+  const [traceId, setTraceId] = useState("");
   const [clock, setClock] = useState(new Date());
   const ime = useImeGuard();
   const logRef = useRef<HTMLDivElement | null>(null);
@@ -251,6 +256,7 @@ export default function DashboardView() {
                   {t.spark.length > 1 && <polyline points={t.spark.map((v, i) => `${i},${20 - (v / mx) * 18}`).join(" ")} />}
                 </svg>
                 <div className="cr-task-actions" onClick={(e) => e.stopPropagation()}>
+                  <span role="button" className="cr-btn tiny" onClick={() => setTraceId(t.taskId)} title="Every event this task emitted, one per row"><Terminal size={10} />Trace</span>
                   {t.running && <span role="button" className="cr-btn tiny" onClick={() => LongRunStop(t.taskId)}><Square size={10} />Stop</span>}
                   {!t.running && !t.done && <span role="button" className="cr-btn tiny" onClick={() => LongRunStart(t.goal, segs, rounds, minutes, 0, t.taskId, unattended).then(loadList)}><RotateCcw size={10} />Resume</span>}
                 </div>
@@ -344,6 +350,14 @@ export default function DashboardView() {
             </div>
           </section>
         </>
+      )}
+
+      {traceId && (
+        <RunTracePanel
+          taskId={traceId}
+          live={tasks.some((t) => t.taskId === traceId && t.running)}
+          onClose={() => setTraceId("")}
+        />
       )}
 
       <footer className="cr-foot"><span>a long run is many runs, not a long run · the plan is the hand-off · checkpoints are the way back</span><span>superai · control room</span></footer>

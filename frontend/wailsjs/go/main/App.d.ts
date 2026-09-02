@@ -125,3 +125,5 @@ export function StartYoloMode(arg1:number):Promise<Record<string, any>>;
 export function StopYoloMode():Promise<Record<string, any>>;
 
 export function ToolApprovalInfo(arg1:number):Promise<Record<string, any>>;
+
+export function TraceLines(arg1:string,arg2:number):Promise<Array<string>>;

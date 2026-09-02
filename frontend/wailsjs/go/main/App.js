@@ -245,3 +245,7 @@ export function StopYoloMode() {
 export function ToolApprovalInfo(arg1) {
   return window['go']['main']['App']['ToolApprovalInfo'](arg1);
 }
+
+export function TraceLines(arg1, arg2) {
+  return window['go']['main']['App']['TraceLines'](arg1, arg2);
+}
