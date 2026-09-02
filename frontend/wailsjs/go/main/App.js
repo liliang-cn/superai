@@ -6,10 +6,6 @@ export function CLIProxyAccounts() {
   return window['go']['main']['App']['CLIProxyAccounts']();
 }
 
-export function Dashboard() {
-  return window['go']['main']['App']['Dashboard']();
-}
-
 export function CLIProxyLogin(arg1, arg2) {
   return window['go']['main']['App']['CLIProxyLogin'](arg1, arg2);
 }
@@ -52,6 +48,10 @@ export function ChatHistory(arg1) {
 
 export function ChatSessions() {
   return window['go']['main']['App']['ChatSessions']();
+}
+
+export function Dashboard() {
+  return window['go']['main']['App']['Dashboard']();
 }
 
 export function DeleteChatSession(arg1) {
@@ -104,6 +104,22 @@ export function InstallSkill(arg1, arg2) {
 
 export function Life() {
   return window['go']['main']['App']['Life']();
+}
+
+export function LongRunList() {
+  return window['go']['main']['App']['LongRunList']();
+}
+
+export function LongRunStart(arg1, arg2, arg3, arg4, arg5, arg6) {
+  return window['go']['main']['App']['LongRunStart'](arg1, arg2, arg3, arg4, arg5, arg6);
+}
+
+export function LongRunState(arg1) {
+  return window['go']['main']['App']['LongRunState'](arg1);
+}
+
+export function LongRunStop(arg1) {
+  return window['go']['main']['App']['LongRunStop'](arg1);
 }
 
 export function MCP() {

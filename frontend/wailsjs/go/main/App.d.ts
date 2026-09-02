@@ -28,6 +28,8 @@ export function ChatHistory(arg1:string):Promise<Array<backend.ChatTurn>>;
 
 export function ChatSessions():Promise<Array<backend.ChatSessionInfo>>;
 
+export function Dashboard():Promise<Record<string, any>>;
+
 export function DeleteChatSession(arg1:string):Promise<string>;
 
 export function DeleteScheduledPrompt(arg1:string):Promise<string>;
@@ -39,8 +41,6 @@ export function EmitAvatarTest(arg1:string):Promise<void>;
 export function ExportWorkspaceFile(arg1:string):Promise<string>;
 
 export function GetSettings():Promise<backend.Settings>;
-
-export function Dashboard():Promise<Record<string, any>>;
 
 export function GetStatus():Promise<Record<string, any>>;
 
@@ -55,6 +55,14 @@ export function InstallMCPServer(arg1:string,arg2:string,arg3:Array<string>,arg4
 export function InstallSkill(arg1:string,arg2:string):Promise<string>;
 
 export function Life():Promise<backend.LifeData>;
+
+export function LongRunList():Promise<Array<backend.TaskSummary>>;
+
+export function LongRunStart(arg1:string,arg2:number,arg3:number,arg4:number,arg5:number,arg6:string):Promise<string>;
+
+export function LongRunState(arg1:string):Promise<backend.TaskState>;
+
+export function LongRunStop(arg1:string):Promise<boolean>;
 
 export function MCP():Promise<Array<mcp.ServerStatus>>;
 

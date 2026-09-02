@@ -3,6 +3,7 @@ import Sidebar from "./components/Sidebar";
 import StatusBar from "./components/StatusBar";
 import ChatView from "./views/ChatView";
 import DashboardView from "./views/DashboardView";
+import RunsView from "./views/RunsView";
 import SettingsView from "./views/SettingsView";
 import KnowledgeView from "./views/KnowledgeView";
 import SkillsView from "./views/SkillsView";
@@ -113,6 +114,7 @@ export default function App() {
               />
             )}
             {view === "dashboard" && <DashboardView />}
+            {view === "runs" && <RunsView />}
             {view === "settings" && <SettingsView onSaved={refreshStatus} status={status} />}
             {view === "knowledge" && <KnowledgeView />}
             {view === "skills" && <SkillsView />}

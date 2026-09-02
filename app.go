@@ -40,6 +40,15 @@ type App struct {
 	runMu sync.Mutex
 	runs  map[string]*chatRun
 
+	// wall narrates every long run into state a window can draw. It outlives
+	// a rebuild on purpose: a settings save must not erase the run wall.
+	wallOnce sync.Once
+	wall     *backend.RunWall
+	// longRuns holds the segmented tasks in flight, by task id, so a stop
+	// button has something to press.
+	longMu   sync.Mutex
+	longRuns map[string]context.CancelFunc
+
 	// scheduler drives prompts that run on a clock. It is rebuilt with the
 	// service, since a run is an agent turn against the current settings.
 	scheduler    *agent.PromptScheduler
@@ -205,6 +214,8 @@ func (a *App) rebuild() {
 	}
 	a.buildErr = ""
 	a.svc = svc
+	// The run wall watches this service the way it watched the last one.
+	svc.Agent().RegisterObserver(a.runWall())
 	// The service is built with its approval gate already installed but with
 	// nobody to ask; this is where the app volunteers. Done on every rebuild
 	// because SaveSettings constructs a whole new Service, and a gate that

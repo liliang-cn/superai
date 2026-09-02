@@ -70,6 +70,9 @@ type Service struct {
 	// approver — the service is built before the window knows about it, and a
 	// gate with no approver denies rather than allows.
 	gate *ToolGate
+	// plans is the store the agent's scratchpad persists to, kept so the run
+	// wall can read a task's plan back without going through the agent.
+	plans *GraphPlanStore
 
 	MemoryMode string
 
@@ -275,7 +278,7 @@ func NewService(s *Settings) (*Service, error) {
 		svc: svc, sb: sb, settings: s, MemoryMode: memMode, dataDir: cfg.DataDir(),
 		claims: newScheduleClaims(),
 		brain:  brain, SuppressedMCPServers: droppedMCP,
-		gate: gate,
+		gate: gate, plans: planStore,
 	}
 	// Token accounting for the dashboard: one observer sees every model turn,
 	// whichever entry point started the run.
@@ -1003,4 +1006,19 @@ func SplitEmotion(text string) (reply, emotion string) {
 		}
 	}
 	return text, ""
+}
+
+// Plan returns the current plan for a task, or nil.
+//
+// RunSegments scopes an unnamed plan to its task id under the scratchpad's
+// default key, which is how two long tasks against one store stay apart.
+func (s *Service) Plan(ctx context.Context, taskID string) []agent.PlanItem {
+	if s == nil || s.plans == nil || taskID == "" {
+		return nil
+	}
+	items, err := s.plans.LoadPlan(ctx, "default:"+taskID)
+	if err != nil {
+		return nil
+	}
+	return items
 }

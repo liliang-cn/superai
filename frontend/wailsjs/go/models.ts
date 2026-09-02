@@ -16,6 +16,22 @@ export namespace agent {
 	        this.type = source["type"];
 	    }
 	}
+	export class PlanItem {
+	    text: string;
+	    done: boolean;
+	    note?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PlanItem(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.text = source["text"];
+	        this.done = source["done"];
+	        this.note = source["note"];
+	    }
+	}
 	export class ScheduledPrompt {
 	    id: string;
 	    prompt: string;
@@ -165,6 +181,82 @@ export namespace backend {
 	        this.reminders = source["reminders"];
 	    }
 	}
+	export class LogLine {
+	    at: string;
+	    kind: string;
+	    text: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new LogLine(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.at = source["at"];
+	        this.kind = source["kind"];
+	        this.text = source["text"];
+	    }
+	}
+	export class RoundStat {
+	    segment: number;
+	    round: number;
+	    tokens: number;
+	    cached: number;
+	    tools: number;
+	    text: number;
+	    durMs: number;
+	    compacted?: boolean;
+	    lint?: string;
+	    retried?: boolean;
+	    failed?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new RoundStat(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.segment = source["segment"];
+	        this.round = source["round"];
+	        this.tokens = source["tokens"];
+	        this.cached = source["cached"];
+	        this.tools = source["tools"];
+	        this.text = source["text"];
+	        this.durMs = source["durMs"];
+	        this.compacted = source["compacted"];
+	        this.lint = source["lint"];
+	        this.retried = source["retried"];
+	        this.failed = source["failed"];
+	    }
+	}
+	export class SegmentStat {
+	    index: number;
+	    sessionId: string;
+	    startedAt: string;
+	    endedAt?: string;
+	    stopReason?: string;
+	    productive: boolean;
+	    costUsd: number;
+	    err?: string;
+	    rounds: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new SegmentStat(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.index = source["index"];
+	        this.sessionId = source["sessionId"];
+	        this.startedAt = source["startedAt"];
+	        this.endedAt = source["endedAt"];
+	        this.stopReason = source["stopReason"];
+	        this.productive = source["productive"];
+	        this.costUsd = source["costUsd"];
+	        this.err = source["err"];
+	        this.rounds = source["rounds"];
+	    }
+	}
 	export class Settings {
 	    llm_base_url: string;
 	    llm_key: string;
@@ -261,6 +353,114 @@ export namespace backend {
 	        this.description = source["description"];
 	        this.when_to_use = source["when_to_use"];
 	        this.collection = source["collection"];
+	    }
+	}
+	export class TaskState {
+	    taskId: string;
+	    goal: string;
+	    model: string;
+	    startedAt: string;
+	    endedAt?: string;
+	    done: boolean;
+	    running: boolean;
+	    stop?: string;
+	    final?: string;
+	    maxSegments: number;
+	    segments: SegmentStat[];
+	    rounds: RoundStat[];
+	    plan: agent.PlanItem[];
+	    toolCounts: Record<string, number>;
+	    toolCalls: number;
+	    toolErrors: number;
+	    lints: Record<string, number>;
+	    lintRetries: number;
+	    lintBlocks: number;
+	    compactions: number;
+	    retries: number;
+	    checkpoints: number;
+	    errors: number;
+	    totalTokens: number;
+	    totalCached: number;
+	    costUsd: number;
+	    log: LogLine[];
+	
+	    static createFrom(source: any = {}) {
+	        return new TaskState(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.taskId = source["taskId"];
+	        this.goal = source["goal"];
+	        this.model = source["model"];
+	        this.startedAt = source["startedAt"];
+	        this.endedAt = source["endedAt"];
+	        this.done = source["done"];
+	        this.running = source["running"];
+	        this.stop = source["stop"];
+	        this.final = source["final"];
+	        this.maxSegments = source["maxSegments"];
+	        this.segments = this.convertValues(source["segments"], SegmentStat);
+	        this.rounds = this.convertValues(source["rounds"], RoundStat);
+	        this.plan = this.convertValues(source["plan"], agent.PlanItem);
+	        this.toolCounts = source["toolCounts"];
+	        this.toolCalls = source["toolCalls"];
+	        this.toolErrors = source["toolErrors"];
+	        this.lints = source["lints"];
+	        this.lintRetries = source["lintRetries"];
+	        this.lintBlocks = source["lintBlocks"];
+	        this.compactions = source["compactions"];
+	        this.retries = source["retries"];
+	        this.checkpoints = source["checkpoints"];
+	        this.errors = source["errors"];
+	        this.totalTokens = source["totalTokens"];
+	        this.totalCached = source["totalCached"];
+	        this.costUsd = source["costUsd"];
+	        this.log = this.convertValues(source["log"], LogLine);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class TaskSummary {
+	    taskId: string;
+	    goal: string;
+	    startedAt: string;
+	    running: boolean;
+	    done: boolean;
+	    stop?: string;
+	    segments: number;
+	    rounds: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new TaskSummary(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.taskId = source["taskId"];
+	        this.goal = source["goal"];
+	        this.startedAt = source["startedAt"];
+	        this.running = source["running"];
+	        this.done = source["done"];
+	        this.stop = source["stop"];
+	        this.segments = source["segments"];
+	        this.rounds = source["rounds"];
 	    }
 	}
 

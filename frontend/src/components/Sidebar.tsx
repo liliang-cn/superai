@@ -8,6 +8,7 @@ const NAV: { section: string; items: { key: ViewKey; label: string; icon: string
     items: [
       { key: "chat", label: "Chat", icon: "💬" },
       { key: "dashboard", label: "Dashboard", icon: "📊" },
+      { key: "runs", label: "Runs", icon: "🛰️" },
     ],
   },
   {
