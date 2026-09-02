@@ -54,13 +54,16 @@ case "${1:-deploy}" in
   ;;
 esac
 
-say "tests"
-go test ./...
-
 say "frontend"
 # The SPA is embedded in the serve binary, so it has to be built first or the
-# upload ships the previous UI with the new backend.
+# upload ships the previous UI with the new backend. It also has to exist
+# before `go test`: the root package embeds frontend/dist, and on a fresh
+# checkout — a release worktree, a CI runner — there is no dist yet, so the
+# tests failed at setup before a single test ran.
 (cd frontend && npm run build)
+
+say "tests"
+go test ./...
 
 say "cross-compile linux/amd64"
 mkdir -p build/bin
