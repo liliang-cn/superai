@@ -40,8 +40,11 @@ func (a *App) runWall() *backend.RunWall {
 // LongRunStart begins a segmented task and returns its id. Everything the
 // run does reaches the page as longrun:tick events; LongRunState reads the
 // wall back. maxSegments / roundsPerSegment / maxMinutes / maxCostUSD at zero
-// take agent-go's defaults. taskID non-empty resumes that task.
-func (a *App) LongRunStart(goal string, maxSegments, roundsPerSegment, maxMinutes int, maxCostUSD float64, taskID string) string {
+// take agent-go's defaults. taskID non-empty resumes that task. unattended
+// lets its tool calls through the approval gate without asking (audited),
+// which a task that runs for hours needs and a page nobody has open cannot
+// give.
+func (a *App) LongRunStart(goal string, maxSegments, roundsPerSegment, maxMinutes int, maxCostUSD float64, taskID string, unattended bool) string {
 	goal = strings.TrimSpace(goal)
 	if goal == "" {
 		return ""
@@ -87,6 +90,7 @@ func (a *App) LongRunStart(goal string, maxSegments, roundsPerSegment, maxMinute
 			RoundsPerSegment: roundsPerSegment,
 			MaxCostUSD:       maxCostUSD,
 			TaskID:           taskID,
+			Unattended:       unattended,
 		}
 		if maxMinutes > 0 {
 			opts.MaxDuration = time.Duration(maxMinutes) * time.Minute

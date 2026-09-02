@@ -3,6 +3,7 @@ package backend
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/liliang-cn/agent-go/v3/pkg/agent"
@@ -43,6 +44,46 @@ type LongRunOptions struct {
 	// back up: the plan and its checkpoints live under it, so a resumed run
 	// starts from what was already finished instead of from nothing.
 	TaskID string
+	// Unattended lets the task's tool calls through the approval gate without
+	// asking — every one still audited. A task that runs for hours exists so
+	// that nobody has to be there; an approval prompt on it is a two-minute
+	// wait followed by a denial that ends the segment.
+	Unattended bool
+}
+
+// unattendedObserver marks each segment's session as unattended for as long
+// as the segment runs, and only for this task's sessions.
+type unattendedObserver struct {
+	agent.BaseObserver
+	gate   *ToolGate
+	taskID string
+	mu     sync.Mutex
+	seen   []string
+}
+
+func (o *unattendedObserver) OnSegment(_ context.Context, info agent.SegmentInfo) {
+	if o.gate == nil || info.TaskID != o.taskID || info.SessionID == "" {
+		return
+	}
+	if info.Ending {
+		o.gate.Attend(info.SessionID)
+		return
+	}
+	o.gate.Unattend(info.SessionID)
+	o.mu.Lock()
+	o.seen = append(o.seen, info.SessionID)
+	o.mu.Unlock()
+}
+
+// release clears every mark this observer set; a task that stops between
+// segments or on error must not leave a session allowed forever.
+func (o *unattendedObserver) release() {
+	o.mu.Lock()
+	ids := append([]string(nil), o.seen...)
+	o.mu.Unlock()
+	for _, id := range ids {
+		o.gate.Attend(id)
+	}
 }
 
 // LongRunReport is what the task did.
@@ -77,6 +118,11 @@ func (s *Service) StreamLong(ctx context.Context, goal string, o LongRunOptions,
 	var opts []agent.RunOption
 	if o.TaskID != "" {
 		opts = append(opts, agent.WithTaskID(o.TaskID))
+	}
+	if o.Unattended && s.gate != nil && o.TaskID != "" {
+		obs := &unattendedObserver{gate: s.gate, taskID: o.TaskID}
+		s.svc.RegisterObserver(obs)
+		defer obs.release()
 	}
 
 	// Whatever the task writes into the workspace belongs to it, the same way

@@ -99,6 +99,9 @@ export default function DashboardView() {
   const [segs, setSegs] = useState(8);
   const [rounds, setRounds] = useState(40);
   const [minutes, setMinutes] = useState(240);
+  // A task that runs for hours is one nobody is sitting beside. Default on;
+  // the audit log still records every call it lets through.
+  const [unattended, setUnattended] = useState(true);
   const [busy, setBusy] = useState(false);
   const [clock, setClock] = useState(new Date());
   const ime = useImeGuard();
@@ -134,7 +137,7 @@ export default function DashboardView() {
   const start = useCallback(async () => {
     const g = goal.trim(); if (!g || busy) return;
     setBusy(true);
-    try { const id = await LongRunStart(g, segs, rounds, minutes, 0, ""); if (id) { setTaskId((cur) => cur || id); setGoal(""); await loadList(); } } finally { setBusy(false); }
+    try { const id = await LongRunStart(g, segs, rounds, minutes, 0, "", unattended); if (id) { setTaskId((cur) => cur || id); setGoal(""); await loadList(); } } finally { setBusy(false); }
   }, [goal, segs, rounds, minutes, busy, loadList]);
 
   // ---- derived ----
@@ -210,6 +213,7 @@ export default function DashboardView() {
         <label className="cr-knob">seg<input type="number" min={1} value={segs} onChange={(e) => setSegs(+e.target.value || 1)} /></label>
         <label className="cr-knob">rounds<input type="number" min={1} value={rounds} onChange={(e) => setRounds(+e.target.value || 1)} /></label>
         <label className="cr-knob">min<input type="number" min={0} value={minutes} onChange={(e) => setMinutes(+e.target.value || 0)} /></label>
+        <label className="cr-knob cr-check" title="Tool calls go through the approval gate without asking; every one is audited"><input type="checkbox" checked={unattended} onChange={(e) => setUnattended(e.target.checked)} />unattended</label>
         <button className="cr-btn primary" onClick={start} disabled={busy || !goal.trim()}><Play size={13} />{busy ? "Launching…" : "Launch"}</button>
       </section>
 
@@ -244,7 +248,7 @@ export default function DashboardView() {
                 </svg>
                 <div className="cr-task-actions" onClick={(e) => e.stopPropagation()}>
                   {t.running && <span role="button" className="cr-btn tiny" onClick={() => LongRunStop(t.taskId)}><Square size={10} />Stop</span>}
-                  {!t.running && !t.done && <span role="button" className="cr-btn tiny" onClick={() => LongRunStart(t.goal, segs, rounds, minutes, 0, t.taskId).then(loadList)}><RotateCcw size={10} />Resume</span>}
+                  {!t.running && !t.done && <span role="button" className="cr-btn tiny" onClick={() => LongRunStart(t.goal, segs, rounds, minutes, 0, t.taskId, unattended).then(loadList)}><RotateCcw size={10} />Resume</span>}
                 </div>
               </button>
             );

@@ -1507,3 +1507,5 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
 .cr-task-spark { position: absolute; right: 10px; top: 34px; width: 90px; height: 20px; fill: none; stroke: hsl(var(--hue) 80% 55%); stroke-width: 1.5; opacity: .75; }
 .cr-task-actions { position: absolute; left: 12px; bottom: 8px; display: flex; gap: 6px; }
 .cr-btn.tiny { padding: 3px 8px; font-size: 10px; gap: 4px; border-radius: 5px; }
+
+.cr-check input[type=checkbox] { width: 14px; height: 14px; accent-color: var(--cr-cyan); padding: 0; }

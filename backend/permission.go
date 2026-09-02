@@ -101,9 +101,52 @@ type ToolGate struct {
 	// comparing clocks instead of by a timer someone has to remember to fire.
 	yoloUntil time.Time
 
+	// unattended holds the session ids of runs nobody is watching — a long
+	// task the supervisor is driving segment by segment. A tool call from one
+	// of them is allowed without asking, because asking is the one thing that
+	// cannot work: the run exists precisely so that nobody has to be there,
+	// and a two-minute wait for an approval that never comes ends the segment.
+	// Still audited, every call, under its own name.
+	unattended map[string]struct{}
+
 	// Injected so tests can pin ids and timestamps.
 	newID func() string
 	now   func() time.Time
+}
+
+// DecidedByUnattended marks an approval granted because the run's session was
+// registered as unattended.
+const DecidedByUnattended = "unattended"
+
+// Unattend marks a session as running with nobody watching: its tool calls
+// are allowed without asking, and recorded as such.
+func (g *ToolGate) Unattend(sessionID string) {
+	if g == nil || sessionID == "" {
+		return
+	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.unattended == nil {
+		g.unattended = map[string]struct{}{}
+	}
+	g.unattended[sessionID] = struct{}{}
+}
+
+// Attend reverses Unattend.
+func (g *ToolGate) Attend(sessionID string) {
+	if g == nil {
+		return
+	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	delete(g.unattended, sessionID)
+}
+
+func (g *ToolGate) isUnattended(sessionID string) bool {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	_, ok := g.unattended[sessionID]
+	return ok
 }
 
 // NewToolGate builds a gate. auditPath may be empty, which disables the log
@@ -266,6 +309,18 @@ func (g *ToolGate) decide(ctx context.Context, req agent.PermissionRequest) (*ag
 	// whether a surface exists to ask — that is the point of it.
 	if dec := g.yoloDecision(); dec != nil {
 		return g.answer(ask, *dec)
+	}
+
+	// A run nobody is watching cannot be asked. Seen for real: a segmented
+	// writing task ran `wc -w` to check its own gate, waited two minutes for
+	// an approval on a page nobody had open, was denied, and the segment died
+	// with the brief already written.
+	if g.isUnattended(req.SessionID) {
+		return g.answer(ask, ApprovalDecision{
+			Allowed: true,
+			By:      DecidedByUnattended,
+			Reason:  "run is unattended; allowed without asking and recorded",
+		})
 	}
 
 	if approver == nil {
