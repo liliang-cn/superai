@@ -27,9 +27,11 @@ import {
   Trash2Icon,
   PaperclipIcon,
   SquareIcon,
+  ScanEyeIcon,
 } from "lucide-react";
 import { HistoryBar, HistoryList, useHistory } from "../components/HistoryBar";
 import TracePanel from "../components/TracePanel";
+import PromptPreviewPanel from "../components/PromptPreviewPanel";
 import DeliverablesBar from "../components/DeliverablesBar";
 import ContextBlock from "../components/ContextBlock";
 import AgentProgress from "../components/AgentProgress";
@@ -53,6 +55,10 @@ export default function ChatView({
   // The composer is controlled so the send button can know whether there is
   // anything to send — which is what decides between "send" and "stop" below.
   const [draft, setDraft] = useState("");
+  // The prompt preview is opened against the draft as it stood when the button
+  // was pressed, not against the live one: re-assembling on every keystroke
+  // would be a request per character.
+  const [preview, setPreview] = useState<string | null>(null);
 
   // Loading it here rather than in App keeps the transcript the only thing that
   // owns a session id. Picking a run's conversation is the same act as picking
@@ -285,6 +291,20 @@ export default function ChatView({
                     Claude put it. Type anything and it turns back into send, so
                     asking a second question mid-answer (which this transcript
                     supports) is never taken away; ⏎ sends either way. */}
+                {/* Look before paying for a turn. Read-only, and beside the
+                    send button because the thing it previews is the thing that
+                    button would do. */}
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="rounded-lg text-muted-foreground"
+                  title="Preview the prompt this would send"
+                  aria-label="Preview the prompt this would send"
+                  onClick={() => setPreview(draft)}
+                >
+                  <ScanEyeIcon className="size-3.5" />
+                </Button>
                 {chat.sending && draft.trim() === "" ? (
                   <Button
                     type="button"
@@ -306,6 +326,13 @@ export default function ChatView({
         </div>
         <TracePanel trace={chat.trace} asks={chat.asks} />
       </div>
+      {preview !== null && (
+        <PromptPreviewPanel
+          sessionId={chat.sessionId}
+          goal={preview}
+          onClose={() => setPreview(null)}
+        />
+      )}
     </div>
   );
 }

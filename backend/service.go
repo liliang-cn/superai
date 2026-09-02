@@ -369,12 +369,19 @@ func (s *Service) Close() error {
 	return nil
 }
 
-// Stream runs one turn, forwarding every agent event to emit, and returns the
-// final completion text.
-func (s *Service) Stream(ctx context.Context, sessionID, message string, imagePaths []string, emit func(ev *agent.Event)) (string, error) {
+// chatRunOptions are the RunOptions one chat turn is made with.
+//
+// Its own function because Preview takes the same list: a preview assembled
+// from options the send path does not use is a picture of a run nobody is
+// about to make. Anything added here reaches both.
+func (s *Service) chatRunOptions(sessionID string, imagePaths []string) []agent.RunOption {
+	maxRounds := 0
+	if s.settings != nil {
+		maxRounds = s.settings.MaxRounds
+	}
 	opts := []agent.RunOption{
 		agent.WithSessionID(sessionID),
-		agent.WithMaxTurns(s.settings.MaxRounds),
+		agent.WithMaxTurns(maxRounds),
 	}
 	// Route dropped images straight to the vision model as multimodal input
 	// (workspace-relative paths -> absolute, so the provider can read them).
@@ -393,6 +400,13 @@ func (s *Service) Stream(ctx context.Context, sessionID, message string, imagePa
 		}
 		opts = append(opts, agent.WithInputImages(abs...))
 	}
+	return opts
+}
+
+// Stream runs one turn, forwarding every agent event to emit, and returns the
+// final completion text.
+func (s *Service) Stream(ctx context.Context, sessionID, message string, imagePaths []string, emit func(ev *agent.Event)) (string, error) {
+	opts := s.chatRunOptions(sessionID, imagePaths)
 	// Whatever the turn writes into the workspace belongs to this conversation.
 	root := ""
 	if s.sb != nil {

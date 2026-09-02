@@ -259,6 +259,72 @@ export namespace backend {
 	        this.text = source["text"];
 	    }
 	}
+	export class PreviewMessage {
+	    role: string;
+	    content: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PreviewMessage(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.role = source["role"];
+	        this.content = source["content"];
+	    }
+	}
+	export class PromptPreview {
+	    sessionId: string;
+	    taskId: string;
+	    model: string;
+	    systemPrompt: string;
+	    messages: PreviewMessage[];
+	    tools: string[];
+	    estimatedTokens: number;
+	    constraintsDeclared: boolean;
+	    constraintExtractionSkipped: boolean;
+	    forbidTools: boolean;
+	    deliverables: string[];
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PromptPreview(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.sessionId = source["sessionId"];
+	        this.taskId = source["taskId"];
+	        this.model = source["model"];
+	        this.systemPrompt = source["systemPrompt"];
+	        this.messages = this.convertValues(source["messages"], PreviewMessage);
+	        this.tools = source["tools"];
+	        this.estimatedTokens = source["estimatedTokens"];
+	        this.constraintsDeclared = source["constraintsDeclared"];
+	        this.constraintExtractionSkipped = source["constraintExtractionSkipped"];
+	        this.forbidTools = source["forbidTools"];
+	        this.deliverables = source["deliverables"];
+	        this.error = source["error"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class RoundStat {
 	    segment: number;
 	    round: number;

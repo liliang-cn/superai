@@ -162,6 +162,10 @@ export function PickFiles() {
   return window['go']['main']['App']['PickFiles']();
 }
 
+export function PreviewPrompt(arg1, arg2) {
+  return window['go']['main']['App']['PreviewPrompt'](arg1, arg2);
+}
+
 export function ReadWorkspaceFile(arg1) {
   return window['go']['main']['App']['ReadWorkspaceFile'](arg1);
 }

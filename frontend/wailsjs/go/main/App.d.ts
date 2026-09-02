@@ -84,6 +84,8 @@ export function PendingToolApprovals():Promise<Array<Record<string, any>>>;
 
 export function PickFiles():Promise<Array<string>>;
 
+export function PreviewPrompt(arg1:string,arg2:string):Promise<backend.PromptPreview>;
+
 export function ReadWorkspaceFile(arg1:string):Promise<string>;
 
 export function ReadWorkspaceFileDataURL(arg1:string):Promise<string>;

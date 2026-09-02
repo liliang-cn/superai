@@ -852,6 +852,29 @@ input, textarea, select { font-family: inherit; }
 .modal-body { overflow: auto; padding: 16px 18px; }
 .modal-body pre { font-family: var(--font-mono); font-size: 12.5px; color: var(--text-1); white-space: pre-wrap; word-break: break-word; user-select: text; }
 
+/* ---------------- Prompt preview ----------------
+   The turn a send would make, read-only. Monospace throughout because what is
+   being shown is the literal text a provider would receive, and a proportional
+   font quietly lies about how a prompt is laid out. */
+.pp-modal { max-width: 900px; max-height: 86vh; }
+.pp-body { display: flex; flex-direction: column; gap: 10px; }
+.pp-facts { display: flex; flex-wrap: wrap; gap: 14px; font-family: var(--font-mono); font-size: 11px; color: var(--text-2); }
+.pp-facts b { color: var(--text-0); font-size: 13px; font-variant-numeric: tabular-nums; margin-right: 3px; }
+.pp-note { font-family: var(--font-mono); font-size: 10.5px; line-height: 1.5; color: var(--text-2); }
+.pp-problem { font-family: var(--font-mono); font-size: 12px; color: var(--red); border: 1px dashed var(--red); border-radius: var(--radius-sm); padding: 10px 12px; }
+.pp-section { border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
+.pp-section-h { display: flex; align-items: center; gap: 7px; width: 100%; padding: 8px 10px; background: none; border: none; cursor: pointer; color: var(--text-1); text-align: left; }
+.pp-section-h:hover { background: var(--bg-hover); }
+.pp-section-t { font-family: var(--font-mono); font-size: 11.5px; font-weight: 600; }
+.pp-section-m { margin-left: auto; font-family: var(--font-mono); font-size: 10px; color: var(--text-2); }
+.pp-section-b { border-top: 1px solid var(--border); padding: 10px; max-height: 340px; overflow: auto; display: flex; flex-direction: column; gap: 8px; }
+.pp-section-b pre { font-family: var(--font-mono); font-size: 11.5px; line-height: 1.55; color: var(--text-1); white-space: pre-wrap; word-break: break-word; user-select: text; margin: 0; }
+.pp-empty { font-family: var(--font-mono); font-size: 11px; line-height: 1.55; color: var(--text-2); }
+.pp-msg { display: flex; flex-direction: column; gap: 3px; border-left: 2px solid var(--border-strong); padding-left: 8px; }
+.pp-role { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--text-2); }
+.pp-tools { display: flex; flex-wrap: wrap; gap: 5px; }
+.pp-tools code { font-family: var(--font-mono); font-size: 10.5px; padding: 2px 7px; border: 1px solid var(--border); border-radius: 999px; color: var(--text-1); background: var(--bg-0); }
+
 .spinner {
   width: 14px; height: 14px; border: 2px solid rgba(127,127,127,0.35); border-top-color: currentColor;
   border-radius: 50%; animation: spin 0.7s linear infinite; display: inline-block;
