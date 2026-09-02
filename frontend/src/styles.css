@@ -1510,6 +1510,29 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
 
 .cr-check input[type=checkbox] { width: 14px; height: 14px; accent-color: var(--cr-cyan); padding: 0; }
 
+/* ---- health: the install, not the run ----
+   Three counts and then only what is wrong. A failing check keeps its fix
+   text on the card, because the detail alone ("no LLM provider configured")
+   is the half nobody can act on. */
+.cr-health-top { display: flex; align-items: center; gap: 12px; }
+.cr-health-counts { display: flex; gap: 12px; font-family: var(--cr-mono); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--cr-dim); }
+.cr-health-counts b { font-size: 17px; font-weight: 800; margin-right: 4px; font-variant-numeric: tabular-nums; }
+.cr-health-counts .lime b { color: var(--cr-lime); } .cr-health-counts .amber b { color: var(--cr-amber); } .cr-health-counts .rose b { color: var(--cr-rose); }
+.cr-health-counts .cr-dim b { color: var(--cr-mute); }
+.cr-health-top .cr-btn { margin-left: auto; }
+.cr-health-home { font-family: var(--cr-mono); font-size: 9.5px; color: var(--cr-mute); margin: 7px 0 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; }
+.cr-health-check { display: grid; gap: 2px; font-family: var(--cr-mono); font-size: 10.5px; line-height: 1.45; border-left: 2px solid var(--cr-line-2); padding: 5px 0 5px 8px; margin-top: 7px; animation: cr-slide .3s both; }
+.cr-health-check b { font-size: 10px; letter-spacing: .04em; color: var(--cr-text); }
+.cr-health-check span { color: var(--cr-dim); word-break: break-word; }
+.cr-health-check em { font-style: normal; color: var(--cr-amber); }
+.cr-health-check.fail { border-left-color: var(--cr-rose); background: rgba(var(--cr-rose-rgb),.06); }
+.cr-health-check.fail b { color: var(--cr-rose); }
+.cr-health-check.warn { border-left-color: var(--cr-amber); }
+.cr-health-check.ok b { color: var(--cr-lime); }
+.cr-health-more { display: inline-flex; align-items: center; gap: 4px; margin-top: 9px; padding: 0; border: 0; background: none; cursor: pointer; font-family: var(--cr-mono); font-size: 9.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--cr-dim); }
+.cr-health-more:hover { color: var(--cr-cyan); }
+.cr-health-list { max-height: 300px; overflow: auto; }
+
 /* ---------------------------------------------------------------------------
    AIGUI `ui` blocks (@ai-gui/plugin-ui).
 

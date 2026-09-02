@@ -8,6 +8,7 @@ import {
   ListChecks, Network, Play, Radio, RotateCcw, ScrollText, Shield, Sparkles, Square, Wrench, Zap,
 } from "lucide-react";
 import LoopOrbital, { hueFor } from "../components/LoopOrbital";
+import HealthCard from "../components/HealthCard";
 import { useTween } from "../lib/useTween";
 import { useImeGuard } from "@/lib/ime";
 
@@ -202,6 +203,9 @@ export default function DashboardView() {
           <Stat icon={<Shield size={14} />} label="Lint gate" value={d ? <span className={d.rejected ? "rose" : "lime"}><Num v={d.rejected} /></span> : <span className="cr-dim">—</span>} sub={d ? `${pct(d.accepted, Math.max(1, d.rs.length))}% clean turns` : "select or start a task"} tone={!d ? undefined : d.rejected ? "rose" : "lime"} />
         </div>
       </section>
+
+      {/* ── health: is the install itself sound ── */}
+      <HealthCard />
 
       {/* ── task bar ── */}
       <section className="cr-taskbar">

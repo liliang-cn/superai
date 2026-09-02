@@ -40,6 +40,8 @@ export function DeleteScheduledPrompt(arg1:string):Promise<string>;
 
 export function Deliverables(arg1:string):Promise<Array<agent.Deliverable>>;
 
+export function Doctor():Promise<backend.DoctorReport>;
+
 export function EmitAvatarTest(arg1:string):Promise<void>;
 
 export function ExportWorkspaceFile(arg1:string):Promise<string>;

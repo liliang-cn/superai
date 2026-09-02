@@ -74,6 +74,10 @@ export function Deliverables(arg1) {
   return window['go']['main']['App']['Deliverables'](arg1);
 }
 
+export function Doctor() {
+  return window['go']['main']['App']['Doctor']();
+}
+
 export function EmitAvatarTest(arg1) {
   return window['go']['main']['App']['EmitAvatarTest'](arg1);
 }
