@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -140,12 +141,30 @@ func TestAccountChangesAreNotRevertedByTheProxy(t *testing.T) {
 			`"access_token":"secret-token","expired":"2026-08-08T21:01:48+08:00"}`), 0o600); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
-	// Deliberately NOT waiting for the proxy to settle first. The revert this
-	// guards against happens when the change lands while the proxy is still
-	// taking the file in — waiting for it first is exactly what makes the race
+	// Deliberately NOT waiting for the proxy to settle. The revert this guards
+	// against happens when the change lands while the proxy is still taking
+	// the file in — waiting for it first is exactly what makes the race
 	// disappear, and a test that waits would pass against the broken code.
-	if err := p.SetAccountDisabled(name, true); err != nil {
-		t.Fatalf("SetAccountDisabled: %v", err)
+	//
+	// But the proxy has to have noticed the file at all before it can be
+	// asked to change it, and until it has, the management API answers "auth
+	// file not found". Retrying until the call is accepted lands the change
+	// at the earliest moment it can land, which is the window the revert
+	// happens in — so this removes a setup flake (about two runs in five,
+	// both before and after this was noticed) without weakening what the
+	// test asserts.
+	var disableErr error
+	for start := time.Now(); time.Since(start) < 5*time.Second; {
+		if disableErr = p.SetAccountDisabled(name, true); disableErr == nil {
+			break
+		}
+		if !strings.Contains(disableErr.Error(), "auth file not found") {
+			break // a real failure, not the proxy still catching up
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if disableErr != nil {
+		t.Fatalf("SetAccountDisabled: %v", disableErr)
 	}
 
 	// Long enough for a write-back to land, checked throughout rather than
