@@ -12,6 +12,7 @@ import {
   GetSettings,
   OpenInBrowser,
   SaveSettings,
+  TestWebhook,
   ToolApprovalInfo,
 } from "../../wailsjs/go/main/App";
 import { BrowserOpenURL, EventsOff, EventsOn } from "../../wailsjs/runtime/runtime";
@@ -208,6 +209,30 @@ export default function SettingsView({
   const [projectID, setProjectID] = useState("");
   const [login, setLogin] = useState<{ status: string; provider: string; message: string } | null>(null);
   const [pasted, setPasted] = useState("");
+
+  const [webhookTesting, setWebhookTesting] = useState(false);
+  const [webhookResult, setWebhookResult] = useState("");
+
+  /**
+   * A webhook is configured once and then relied on at 08:00 while nobody is
+   * watching, which is the worst moment to find out the URL was wrong — so the
+   * settings screen can prove it now. Saves first: the backend sends through
+   * the notifier built from the last save, not from what is on screen.
+   */
+  async function testWebhook() {
+    if (!s) return;
+    setWebhookTesting(true);
+    setWebhookResult("");
+    try {
+      await SaveSettings(s);
+      const res = await TestWebhook();
+      setWebhookResult(res === "ok" ? "Delivered." : res);
+    } catch (e) {
+      setWebhookResult(String(e));
+    } finally {
+      setWebhookTesting(false);
+    }
+  }
 
   const [accounts, setAccounts] = useState<backend.CLIProxyAccount[]>([]);
   const [confirmOut, setConfirmOut] = useState("");
@@ -562,6 +587,37 @@ export default function SettingsView({
                 />
               </>
             )}
+          </div>
+
+          <div className="card">
+            <div className="card-title">Notifications</div>
+            <div className="card-desc">
+              Where messages go when nobody is looking at this page. notify_user and every
+              scheduled run are POSTed as JSON, so Telegram, a WeCom bot, bark, ntfy or a
+              script of your own can all receive them behind a short adapter.
+            </div>
+            <TextField
+              label="Webhook URL"
+              value={s.webhook_url}
+              onChange={(v) => set("webhook_url", v)}
+              placeholder="https://example.com/superai-hook"
+              hint="Empty disables it. Serve mode has no desktop notification, so without this a reminder that fires reaches only the log."
+            />
+            <PasswordField
+              label="Webhook Secret"
+              value={s.webhook_secret}
+              onChange={(v) => set("webhook_secret", v)}
+            />
+            <span className="hint">
+              Sent as <code>Authorization: Bearer &lt;secret&gt;</code>. Optional, but worth setting
+              if the receiver is reachable from the internet.
+            </span>
+            <div className="row">
+              <button className="btn" onClick={testWebhook} disabled={webhookTesting || !s.webhook_url}>
+                {webhookTesting ? "Sending…" : "Send test"}
+              </button>
+              {webhookResult && <span className="hint">{webhookResult}</span>}
+            </div>
           </div>
 
           <div className="card">

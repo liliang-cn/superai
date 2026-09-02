@@ -84,6 +84,12 @@ type Service struct {
 	// run, not about whichever window happens to be open. See trace.go.
 	traces *TraceStore
 
+	// notifier posts the outbound webhook, if one is configured. Reachable
+	// from the process that owns the scheduler as well as from notify_user,
+	// because a reminder and a mid-task message are the same kind of thing to
+	// whoever is not looking at the screen. See webhook.go.
+	notifier *Notifier
+
 	// SuppressedMCPServers names the MCP servers that were left unmounted
 	// because they route to the same store the memory backend already owns.
 	SuppressedMCPServers []string
@@ -293,6 +299,7 @@ func NewService(s *Settings) (*Service, error) {
 	// this observer whichever entry point started it.
 	out.traces = NewTraceStore(TracesDir())
 	svc.RegisterObserver(out.traces)
+	out.notifier = NewNotifier(s)
 
 	// --- Built-in framework tools. ---
 	agent.RegisterDateTimeTool(svc)

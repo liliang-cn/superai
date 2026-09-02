@@ -242,6 +242,10 @@ export function StopYoloMode() {
   return window['go']['main']['App']['StopYoloMode']();
 }
 
+export function TestWebhook() {
+  return window['go']['main']['App']['TestWebhook']();
+}
+
 export function ToolApprovalInfo(arg1) {
   return window['go']['main']['App']['ToolApprovalInfo'](arg1);
 }

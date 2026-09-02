@@ -411,6 +411,8 @@ export namespace backend {
 	    shared_memory_endpoint: string;
 	    shared_memory_token: string;
 	    shared_memory_namespace: string;
+	    webhook_url: string;
+	    webhook_secret: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Settings(source);
@@ -443,6 +445,8 @@ export namespace backend {
 	        this.shared_memory_endpoint = source["shared_memory_endpoint"];
 	        this.shared_memory_token = source["shared_memory_token"];
 	        this.shared_memory_namespace = source["shared_memory_namespace"];
+	        this.webhook_url = source["webhook_url"];
+	        this.webhook_secret = source["webhook_secret"];
 	    }
 	}
 	export class SkillCandidate {

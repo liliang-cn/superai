@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"strings"
@@ -122,6 +123,16 @@ func (a *App) onScheduledRun(run agent.PromptRun) {
 		summary = "已取消"
 	case run.Err != nil:
 		summary = "运行失败：" + run.Err.Error()
+	}
+
+	// Out to whoever is not looking at the page. The emit below only reaches an
+	// open frontend, and in serve mode on a headless box there is never one —
+	// which is how a reminder that fired at 08:00 reached a log and nobody.
+	a.mu.Lock()
+	notifySvc := a.svc
+	a.mu.Unlock()
+	if notifySvc != nil {
+		notifySvc.NotifyScheduledRun(context.Background(), run)
 	}
 
 	a.emit("schedule:run", map[string]any{

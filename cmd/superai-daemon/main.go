@@ -79,6 +79,10 @@ func main() {
 		agent.WithPromptSessionID("scheduled"),
 		agent.WithPromptObserver(func(run agent.PromptRun) {
 			logRun(run)
+			// The webhook first: it is the only one of the three that reaches a
+			// person who is not at this machine, and it is the whole reason the
+			// daemon exists on a headless box.
+			svc.NotifyScheduledRun(context.Background(), run)
 			if *notifyOn {
 				notify(run)
 			}

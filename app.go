@@ -988,6 +988,25 @@ func (a *App) AddSchedule(title, startAt, location string, participants []string
 	return map[string]any{"ok": true, "data": rec}
 }
 
+// TestWebhook posts a sample notification so the settings screen can prove the
+// URL works before a reminder depends on it. A webhook is configured once and
+// then relied on at 08:00 while nobody is watching, which is the worst moment
+// to discover a typo — so unlike the real sends, this one reports the failure.
+func (a *App) TestWebhook() string {
+	a.mu.Lock()
+	svc := a.svc
+	a.mu.Unlock()
+	if svc == nil {
+		return "agent is not ready"
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	if err := svc.Notifier().SendTest(ctx); err != nil {
+		return err.Error()
+	}
+	return "ok"
+}
+
 // AddRecord writes one diary / work / note / habit entry.
 func (a *App) AddRecord(kind, title, body string, tags []string, project string) map[string]any {
 	a.mu.Lock()
