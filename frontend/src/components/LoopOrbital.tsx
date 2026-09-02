@@ -26,7 +26,14 @@ export interface OrbitalTelemetry {
 }
 
 const STATIONS = ["context", "model", "tools", "lint", "checkpoint", "segment"];
-const CYAN = 0x5ee0ff, ROSE = 0xff5c7a, LIME = 0x9dff6a, DIM = 0x2a3550;
+
+// The orbital follows the app theme. Light is paper and cobalt, dark is the
+// cockpit; the same signal colours as the CSS, so the canvas and the panel
+// around it read as one instrument.
+type Palette = { alive: number; rose: number; dim: number; ring: number; ringLive: number; disc: number; mote: number; discOpacity: number };
+const DARK: Palette = { alive: 0x5ee0ff, rose: 0xff5c7a, dim: 0x2a3550, ring: 0x1f2d4d, ringLive: 0x2a5a80, disc: 0x0b1224, mote: 0x3a4a6e, discOpacity: 0.55 };
+const LIGHT: Palette = { alive: 0x1f5eff, rose: 0xd6335a, dim: 0xb9c3d6, ring: 0xc8d1e2, ringLive: 0x8fb0ff, disc: 0xe9eef7, mote: 0x9aa4b8, discOpacity: 0.7 };
+const isDark = () => document.documentElement.dataset.theme === "dark";
 
 export default function LoopOrbital({ t }: { t: OrbitalTelemetry }) {
   const host = useRef<HTMLDivElement | null>(null);
@@ -38,6 +45,7 @@ export default function LoopOrbital({ t }: { t: OrbitalTelemetry }) {
     if (!el) return;
     const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 
+    let pal: Palette = isDark() ? DARK : LIGHT;
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
     camera.position.set(0, 3.2, 6.4);
@@ -53,7 +61,7 @@ export default function LoopOrbital({ t }: { t: OrbitalTelemetry }) {
     // The ring: a thin torus, the road the loop runs on.
     const ring = new THREE.Mesh(
       new THREE.TorusGeometry(R, 0.012, 8, 160),
-      new THREE.MeshBasicMaterial({ color: DIM, transparent: true, opacity: 0.9 }),
+      new THREE.MeshBasicMaterial({ color: pal.ring, transparent: true, opacity: 0.9 }),
     );
     ring.rotation.x = Math.PI / 2;
     group.add(ring);
@@ -61,13 +69,13 @@ export default function LoopOrbital({ t }: { t: OrbitalTelemetry }) {
     // A faint inner ring and a grid disc: depth without clutter.
     const inner = new THREE.Mesh(
       new THREE.TorusGeometry(R * 0.62, 0.006, 6, 120),
-      new THREE.MeshBasicMaterial({ color: DIM, transparent: true, opacity: 0.45 }),
+      new THREE.MeshBasicMaterial({ color: pal.ring, transparent: true, opacity: 0.45 }),
     );
     inner.rotation.x = Math.PI / 2;
     group.add(inner);
     const disc = new THREE.Mesh(
       new THREE.RingGeometry(R * 0.2, R * 1.35, 96, 1),
-      new THREE.MeshBasicMaterial({ color: 0x0b1224, transparent: true, opacity: 0.55, side: THREE.DoubleSide }),
+      new THREE.MeshBasicMaterial({ color: pal.disc, transparent: true, opacity: pal.discOpacity, side: THREE.DoubleSide }),
     );
     disc.rotation.x = -Math.PI / 2;
     disc.position.y = -0.02;
@@ -84,14 +92,14 @@ export default function LoopOrbital({ t }: { t: OrbitalTelemetry }) {
       const p = pos(i);
       const m = new THREE.Mesh(
         new THREE.SphereGeometry(0.11, 24, 24),
-        new THREE.MeshBasicMaterial({ color: DIM }),
+        new THREE.MeshBasicMaterial({ color: pal.dim }),
       );
       m.position.copy(p);
       group.add(m);
       stations.push(m);
       const h = new THREE.Mesh(
         new THREE.SphereGeometry(0.28, 24, 24),
-        new THREE.MeshBasicMaterial({ color: CYAN, transparent: true, opacity: 0 }),
+        new THREE.MeshBasicMaterial({ color: pal.alive, transparent: true, opacity: 0 }),
       );
       h.position.copy(p);
       group.add(h);
@@ -109,7 +117,7 @@ export default function LoopOrbital({ t }: { t: OrbitalTelemetry }) {
       speed[i] = 0.6 + Math.random() * 0.9;
     }
     pg.setAttribute("position", new THREE.BufferAttribute(parr, 3));
-    const pm = new THREE.PointsMaterial({ color: CYAN, size: 0.045, transparent: true, opacity: 0.9, sizeAttenuation: true });
+    const pm = new THREE.PointsMaterial({ color: pal.alive, size: 0.045, transparent: true, opacity: 0.9, sizeAttenuation: true });
     const points = new THREE.Points(pg, pm);
     group.add(points);
 
@@ -122,7 +130,21 @@ export default function LoopOrbital({ t }: { t: OrbitalTelemetry }) {
       marr[i * 3] = Math.cos(a) * r; marr[i * 3 + 1] = (Math.random() - 0.5) * 1.2; marr[i * 3 + 2] = Math.sin(a) * r;
     }
     mg.setAttribute("position", new THREE.BufferAttribute(marr, 3));
-    group.add(new THREE.Points(mg, new THREE.PointsMaterial({ color: 0x3a4a6e, size: 0.02, transparent: true, opacity: 0.6 })));
+    const motes = new THREE.PointsMaterial({ color: pal.mote, size: 0.02, transparent: true, opacity: 0.6 });
+    group.add(new THREE.Points(mg, motes));
+
+    // Re-skin when the app flips theme: the attribute on <html> is the one
+    // source of truth, so watch it rather than poll.
+    const applyPalette = () => {
+      pal = isDark() ? DARK : LIGHT;
+      (inner.material as THREE.MeshBasicMaterial).color.set(pal.ring);
+      (disc.material as THREE.MeshBasicMaterial).color.set(pal.disc);
+      (disc.material as THREE.MeshBasicMaterial).opacity = pal.discOpacity;
+      pm.color.set(pal.alive);
+      motes.color.set(pal.mote);
+    };
+    const mo = new MutationObserver(applyPalette);
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
 
     const resize = () => {
       const w = el.clientWidth || 1, h = el.clientHeight || 1;
@@ -142,16 +164,16 @@ export default function LoopOrbital({ t }: { t: OrbitalTelemetry }) {
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
       const { stage, activity, rejected, live } = tel.current;
-      const act = live ? 0.25 + activity * 0.75 : 0.08;
-      if (!reduce) tt += dt * (live ? 0.18 : 0.05);
+      const act = live ? 0.3 + activity * 0.7 : 0.18;
+      if (!reduce) tt += dt * (live ? 0.18 : 0.07);
       group.rotation.y = tt;
 
       // Stations: the lit one breathes, the rest sit dim. Lint tints toward
       // rose as rejections rise; checkpoint/segment lean lime once done.
       for (let i = 0; i < STATIONS.length; i++) {
         const on = live && i === stage;
-        const base = i === 3 ? new THREE.Color(CYAN).lerp(new THREE.Color(ROSE), Math.min(1, rejected * 1.6)) : new THREE.Color(CYAN);
-        (stations[i].material as THREE.MeshBasicMaterial).color.copy(on ? base : new THREE.Color(DIM).lerp(base, 0.35));
+        const base = i === 3 ? new THREE.Color(pal.alive).lerp(new THREE.Color(pal.rose), Math.min(1, rejected * 1.6)) : new THREE.Color(pal.alive);
+        (stations[i].material as THREE.MeshBasicMaterial).color.copy(on ? base : new THREE.Color(pal.dim).lerp(base, 0.35));
         const pulse = reduce ? 0.5 : 0.5 + 0.5 * Math.sin(now / 320 + i);
         (halos[i].material as THREE.MeshBasicMaterial).opacity = on ? 0.18 + pulse * 0.22 : 0;
         (halos[i].material as THREE.MeshBasicMaterial).color.copy(base);
@@ -174,8 +196,8 @@ export default function LoopOrbital({ t }: { t: OrbitalTelemetry }) {
         parr[i * 3] = tmpV.x; parr[i * 3 + 1] = tmpV.y; parr[i * 3 + 2] = tmpV.z;
       }
       pg.attributes.position.needsUpdate = true;
-      pm.opacity = live ? 0.9 : 0.35;
-      (ring.material as THREE.MeshBasicMaterial).color.set(live ? 0x22405f : DIM);
+      pm.opacity = live ? 0.95 : 0.55;
+      (ring.material as THREE.MeshBasicMaterial).color.set(live ? pal.ringLive : pal.ring);
 
       renderer.render(scene, camera);
       raf = requestAnimationFrame(render);
@@ -185,6 +207,7 @@ export default function LoopOrbital({ t }: { t: OrbitalTelemetry }) {
     return () => {
       cancelAnimationFrame(raf);
       ro.disconnect();
+      mo.disconnect();
       renderer.dispose();
       el.removeChild(renderer.domElement);
     };

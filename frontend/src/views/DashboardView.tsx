@@ -186,10 +186,10 @@ export default function DashboardView() {
         <div className="cr-stats">
           <Stat icon={<Cpu size={14} />} label="Model" value={<span className="cr-stat-txt">{dash?.llm?.model || "—"}</span>} sub={<>{dash?.llm?.maxRounds ?? "—"} rounds/turn · {short(dash?.llm?.baseURL || "", 34)}</>} />
           <Stat icon={<Gauge size={14} />} label="Tokens today" value={<Num v={dash?.usage?.today ?? 0} />} sub={<>{fmtK(dash?.usage?.totalTokens ?? 0)} all time · {pct(dash?.usage?.cachedTokens ?? 0, dash?.usage?.totalTokens ?? 0)}% cached</>} tone="cyan" spark={spark} />
-          <Stat icon={<Sparkles size={14} />} label="Cache hit" value={<><Num v={d?.cacheRate ?? pct(dash?.usage?.cachedTokens ?? 0, dash?.usage?.totalTokens ?? 0)} fmt={(n) => Math.round(n) + "%"} /></>} sub={d ? `${fmtK(st!.totalCached)} / ${fmtK(st!.totalTokens)} this task` : "no task selected"} tone={(d?.cacheRate ?? 0) >= 80 ? "lime" : "amber"} />
-          <Stat icon={<Coins size={14} />} label="Spend" value={<><Num v={st?.costUsd ?? 0} fmt={(n) => "$" + n.toFixed(3)} /></>} sub={st ? `this task · ${st.segments.length} segments` : "—"} tone="amber" />
+          <Stat icon={<Sparkles size={14} />} label="Cache hit" value={d ? <Num v={d.cacheRate} fmt={(n) => Math.round(n) + "%"} /> : <span className="cr-dim">—</span>} sub={d ? `${fmtK(st!.totalCached)} / ${fmtK(st!.totalTokens)} this task` : "select or start a task"} tone={!d ? undefined : d.cacheRate >= 80 ? "lime" : "amber"} />
+          <Stat icon={<Coins size={14} />} label="Spend" value={st ? <Num v={st.costUsd} fmt={(n) => "$" + n.toFixed(3)} /> : <span className="cr-dim">—</span>} sub={st ? `this task · ${st.segments.length} segments` : "select or start a task"} tone={st ? "amber" : undefined} />
           <Stat icon={<Activity size={14} />} label="Turns" value={<Num v={dash?.usage?.modelTurns ?? 0} />} sub={<>{dash?.tasks?.length ?? 0} tasks on record · {dash?.activeRuns?.length ?? 0} active</>} />
-          <Stat icon={<Shield size={14} />} label="Lint gate" value={<span className={d && d.rejected ? "rose" : "lime"}><Num v={d?.rejected ?? 0} /></span>} sub={d ? `${pct(d.accepted, Math.max(1, d.rs.length))}% clean turns` : "—"} tone={d && d.rejected ? "rose" : "lime"} />
+          <Stat icon={<Shield size={14} />} label="Lint gate" value={d ? <span className={d.rejected ? "rose" : "lime"}><Num v={d.rejected} /></span> : <span className="cr-dim">—</span>} sub={d ? `${pct(d.accepted, Math.max(1, d.rs.length))}% clean turns` : "select or start a task"} tone={!d ? undefined : d.rejected ? "rose" : "lime"} />
         </div>
       </section>
 
