@@ -39,6 +39,13 @@ import (
 //     able to move a secret from a config file into a tool call.
 //   - llm_base_url and shared_memory_endpoint decide who SuperAI talks to. The
 //     brain and the memory are not somewhere a conversation gets to redirect.
+//   - external_agents is disable_tool_approval wearing another hat. Turning it
+//     on hands work to another agent CLI that writes files with its own
+//     approval prompt bypassed, spends someone's subscription, and — through
+//     roots and unattended — decides where and whether anyone is asked. A
+//     model that can switch that on has granted itself everything the gate
+//     above was withholding, so it is not writable here and its nested keys
+//     are not reachable from this tool at all.
 //
 // What is left is preference: how hard it tries, where it works, whether the
 // avatar bridge is on, and where a notice is sent.
@@ -193,22 +200,26 @@ func (s *Service) settingsSnapshot() map[string]interface{} {
 		writable[k] = v
 	}
 	return map[string]interface{}{
-		"llm_base_url":            cfg.LLMBaseURL,
-		"llm_model":               cfg.LLMModel,
-		"llm_key_set":             strings.TrimSpace(cfg.LLMKey) != "",
-		"embed_model":             cfg.EmbedModel,
-		"embed_key_set":           strings.TrimSpace(cfg.EmbedKey) != "",
-		"memory_backend":          cfg.MemoryBackend,
-		"shared_memory_endpoint":  cfg.SharedMemoryEndpoint,
-		"max_rounds":              cfg.MaxRounds,
-		"workspace_dir":           cfg.WorkspaceDir,
-		"headless":                cfg.Headless,
-		"avatar_port":             cfg.AvatarPort,
-		"webhook_url":             cfg.WebhookURL,
-		"webhook_secret_set":      strings.TrimSpace(cfg.WebhookSecret) != "",
-		"pii_redaction":           cfg.PIIRedaction,
-		"disable_ptc":             cfg.DisablePTC,
-		"tool_approval_enabled":   !cfg.DisableToolApproval,
+		"llm_base_url":           cfg.LLMBaseURL,
+		"llm_model":              cfg.LLMModel,
+		"llm_key_set":            strings.TrimSpace(cfg.LLMKey) != "",
+		"embed_model":            cfg.EmbedModel,
+		"embed_key_set":          strings.TrimSpace(cfg.EmbedKey) != "",
+		"memory_backend":         cfg.MemoryBackend,
+		"shared_memory_endpoint": cfg.SharedMemoryEndpoint,
+		"max_rounds":             cfg.MaxRounds,
+		"workspace_dir":          cfg.WorkspaceDir,
+		"headless":               cfg.Headless,
+		"avatar_port":            cfg.AvatarPort,
+		"webhook_url":            cfg.WebhookURL,
+		"webhook_secret_set":     strings.TrimSpace(cfg.WebhookSecret) != "",
+		"pii_redaction":          cfg.PIIRedaction,
+		"disable_ptc":            cfg.DisablePTC,
+		"tool_approval_enabled":  !cfg.DisableToolApproval,
+		// Readable so the agent can answer "can you hand this to Claude Code",
+		// and no more than that: the roots, the binaries and the unattended
+		// flag are policy about this machine, not something a reply needs.
+		"external_agents_enabled": cfg.ExternalAgents.Enabled,
 		"self_install_enabled":    !cfg.DisableSelfInstall,
 		"writable_from_this_tool": writable,
 	}

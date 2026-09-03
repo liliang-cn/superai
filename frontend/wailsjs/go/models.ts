@@ -273,6 +273,48 @@ export namespace backend {
 		    return a;
 		}
 	}
+	export class ExternalAgentStatus {
+	    name: string;
+	    installed: boolean;
+	    path?: string;
+	    version?: string;
+	    overridden: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new ExternalAgentStatus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.installed = source["installed"];
+	        this.path = source["path"];
+	        this.version = source["version"];
+	        this.overridden = source["overridden"];
+	    }
+	}
+	export class ExternalAgents {
+	    enabled: boolean;
+	    roots?: string[];
+	    unattended: boolean;
+	    binaries?: Record<string, string>;
+	    models?: Record<string, string>;
+	    timeout_seconds?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ExternalAgents(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.enabled = source["enabled"];
+	        this.roots = source["roots"];
+	        this.unattended = source["unattended"];
+	        this.binaries = source["binaries"];
+	        this.models = source["models"];
+	        this.timeout_seconds = source["timeout_seconds"];
+	    }
+	}
 	export class LifeData {
 	    schedules: any[];
 	    records: any[];
@@ -653,6 +695,7 @@ export namespace backend {
 	    shared_memory_namespace: string;
 	    webhook_url: string;
 	    webhook_secret: string;
+	    external_agents: ExternalAgents;
 	
 	    static createFrom(source: any = {}) {
 	        return new Settings(source);
@@ -690,7 +733,26 @@ export namespace backend {
 	        this.shared_memory_namespace = source["shared_memory_namespace"];
 	        this.webhook_url = source["webhook_url"];
 	        this.webhook_secret = source["webhook_secret"];
+	        this.external_agents = this.convertValues(source["external_agents"], ExternalAgents);
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class SkillCandidate {
 	    name: string;

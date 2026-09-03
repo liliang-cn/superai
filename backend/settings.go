@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/liliang-cn/agent-go/v3/pkg/pool"
 )
@@ -163,6 +164,138 @@ type Settings struct {
 	// usually a few lines of script, and a token it can compare is the check it
 	// will actually implement.
 	WebhookSecret string `json:"webhook_secret"`
+
+	// ExternalAgents lets SuperAI hand a task to an agent CLI installed on
+	// this machine. Nested rather than flattened into a dozen top-level keys
+	// so the whole feature is one object a person can read, delete or diff in
+	// settings.json — and so nothing here can be reached by a settings key the
+	// agent is allowed to write (see settingsWritable in selftools.go).
+	ExternalAgents ExternalAgents `json:"external_agents"`
+}
+
+// ExternalAgents configures handing work to agent CLIs installed on this
+// machine. Off by default: it spends money through someone else's
+// subscription and writes files with a bypassed approval prompt.
+type ExternalAgents struct {
+	Enabled bool `json:"enabled"`
+	// Roots bounds the directories a delegated run may work in. Empty means
+	// the workspace only.
+	Roots []string `json:"roots,omitempty"`
+	// Unattended lets a delegated run through this app's approval gate
+	// without asking. Meant for scheduled work with nobody watching; every
+	// call it lets through is still audited.
+	Unattended bool `json:"unattended"`
+	// Binaries overrides where an agent's CLI lives, by name.
+	Binaries map[string]string `json:"binaries,omitempty"`
+	// Models overrides which model an agent is asked for, by name.
+	Models map[string]string `json:"models,omitempty"`
+	// TimeoutSeconds bounds one delegated run. Zero takes the default.
+	TimeoutSeconds int `json:"timeout_seconds,omitempty"`
+}
+
+// DefaultExternalAgentTimeout bounds one delegated run when the settings do
+// not. Generous on purpose: the whole point of handing a task to Claude Code
+// is that it is a task, and a five-minute ceiling would kill the runs worth
+// delegating. It exists so a CLI sitting on a login prompt nobody can answer
+// eventually gives the turn back instead of holding it forever.
+const DefaultExternalAgentTimeout = 20 * time.Minute
+
+// Timeout is how long one delegated run may take.
+func (e ExternalAgents) Timeout() time.Duration {
+	if e.TimeoutSeconds <= 0 {
+		return DefaultExternalAgentTimeout
+	}
+	return time.Duration(e.TimeoutSeconds) * time.Second
+}
+
+// Binary returns the configured path to an agent's CLI, or the bare name for
+// PATH lookup. A GUI app launched from Finder inherits a very short PATH — not
+// the one the login shell builds — so a CLI that works in a terminal can be
+// invisible here, and the override is how that gets fixed without asking
+// anyone to relaunch the app from a shell.
+func (e ExternalAgents) Binary(name string) string {
+	if v := strings.TrimSpace(e.Binaries[name]); v != "" {
+		return expandHome(v)
+	}
+	return name
+}
+
+// Model returns the configured model for an agent, or "" to let the CLI pick
+// its own default.
+func (e ExternalAgents) Model(name string) string {
+	return strings.TrimSpace(e.Models[name])
+}
+
+// ExternalAgentRoots is the set of directories a delegated run may work in.
+//
+// Empty roots mean the workspace, not the whole disk: an unconfigured feature
+// that would let another agent write anywhere is a footgun handed out by
+// default. The workspace is always included even when roots are named, because
+// a delegated run still reports back through the same deliverable directory
+// every other tool writes to.
+func (s *Settings) ExternalAgentRoots() []string {
+	out := []string{}
+	seen := map[string]bool{}
+	add := func(p string) {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			return
+		}
+		p = expandHome(p)
+		if abs, err := filepath.Abs(p); err == nil {
+			p = abs
+		}
+		if !seen[p] {
+			seen[p] = true
+			out = append(out, p)
+		}
+	}
+	add(s.WorkspaceDir)
+	for _, r := range s.ExternalAgents.Roots {
+		add(r)
+	}
+	return out
+}
+
+// normalize drops what a hand-edited or UI-written settings file leaves
+// behind: blank rows from an "add root" button nobody filled in, and a
+// negative timeout, which would otherwise mean "already expired".
+func (e *ExternalAgents) normalize() {
+	roots := e.Roots[:0]
+	for _, r := range e.Roots {
+		if r = strings.TrimSpace(r); r != "" {
+			roots = append(roots, r)
+		}
+	}
+	e.Roots = roots
+	if len(e.Roots) == 0 {
+		e.Roots = nil
+	}
+	e.Binaries = trimmedPairs(e.Binaries)
+	e.Models = trimmedPairs(e.Models)
+	if e.TimeoutSeconds < 0 {
+		e.TimeoutSeconds = 0
+	}
+}
+
+// trimmedPairs drops entries whose value is blank. The settings UI writes a
+// key the moment a field is focused, so an override someone typed and then
+// cleared would otherwise persist as "" and shadow the real binary.
+func trimmedPairs(m map[string]string) map[string]string {
+	if len(m) == 0 {
+		return nil
+	}
+	out := map[string]string{}
+	for k, v := range m {
+		k, v = strings.TrimSpace(k), strings.TrimSpace(v)
+		if k != "" && v != "" {
+			out[k] = v
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 // Memory backend choices for Settings.MemoryBackend.
@@ -320,6 +453,12 @@ func (s *Settings) backfill(def *Settings) {
 	if strings.TrimSpace(s.SharedMemoryNamespace) == "" {
 		s.SharedMemoryNamespace = def.SharedMemoryNamespace
 	}
+	// Nothing here is backfilled from defaults. External agents are off in the
+	// zero value, which is what a settings file written before this existed
+	// unmarshals to, and an upgrade must not switch on a feature that spends
+	// money — the same reasoning DisableToolApproval uses, from the other
+	// direction.
+	s.ExternalAgents.normalize()
 }
 
 // Save writes the settings to ~/.superai-desktop/settings.json (creating the
@@ -343,6 +482,10 @@ func (s *Settings) Save() error {
 	if err := os.MkdirAll(DataDir(), 0o755); err != nil {
 		return err
 	}
+	// On the way in as well as on the way out. The settings page appends an
+	// empty row the moment "Add a directory" is pressed, and a file full of
+	// blank roots is a file nobody can read to answer "where may it write".
+	s.ExternalAgents.normalize()
 	raw, err := json.MarshalIndent(s, "", "  ")
 	if err != nil {
 		return err

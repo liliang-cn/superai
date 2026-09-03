@@ -9,6 +9,7 @@ import {
   CLIProxySignOut,
   CLIProxyStatus,
   CLIProxySubmitPrompt,
+  ExternalAgentsStatus,
   GetSettings,
   OpenInBrowser,
   SaveSettings,
@@ -203,15 +204,210 @@ function OpenInBrowserCard() {
  * live in — embeddings and the memory backend are one decision made in two
  * places, so they sit together.
  */
-type SectionID = "model" | "memory" | "notifications" | "safety" | "runtime";
+type SectionID = "model" | "memory" | "notifications" | "safety" | "agents" | "runtime";
 
 const SECTIONS: { id: SectionID; label: string }[] = [
   { id: "model", label: "Model" },
   { id: "memory", label: "Memory" },
   { id: "notifications", label: "Notifications" },
   { id: "safety", label: "Safety" },
+  // Next to Safety, not to Runtime: the decisions on this tab are who else
+  // gets to touch this machine, which is the same question the tab before it
+  // asks about SuperAI itself.
+  { id: "agents", label: "External agents" },
   { id: "runtime", label: "Runtime" },
 ];
+
+/** The agent CLIs SuperAI can hand a task to, in the order they are listed. */
+const AGENT_CLIS: { name: string; label: string }[] = [
+  { name: "claude", label: "Claude Code" },
+  { name: "codex", label: "Codex" },
+  { name: "gemini", label: "Gemini" },
+  { name: "cursor-agent", label: "Cursor Agent" },
+];
+
+/**
+ * Handing work to another agent CLI.
+ *
+ * The switch is not offered blind: every known CLI is listed with what the
+ * doctor found, because "installed" is the first thing someone needs to know
+ * and the app can answer it without being asked. What it deliberately does not
+ * claim is that a listed CLI *works* — they authenticate separately, and one
+ * with a dead token still prints a version quite happily. So the row says
+ * where the binary is, and the note underneath says the rest is untested.
+ */
+function ExternalAgentsCard({
+  ea,
+  onChange,
+  statuses,
+  probing,
+  onRecheck,
+}: {
+  ea: backend.ExternalAgents;
+  onChange: (patch: Partial<backend.ExternalAgents>) => void;
+  statuses: backend.ExternalAgentStatus[];
+  probing: boolean;
+  onRecheck: () => void;
+}) {
+  const roots = ea.roots ?? [];
+  const binaries = ea.binaries ?? {};
+  const models = ea.models ?? {};
+  const found = (name: string) => statuses.find((st) => st.name === name);
+
+  const setRoot = (i: number, v: string) => {
+    const next = [...roots];
+    next[i] = v;
+    onChange({ roots: next });
+  };
+  const setPair = (key: "binaries" | "models", name: string, v: string) =>
+    onChange({ [key]: { ...(key === "binaries" ? binaries : models), [name]: v } } as Partial<backend.ExternalAgents>);
+
+  return (
+    <div className="card">
+      <div className="card-title">External agents</div>
+      <div className="card-desc">
+        Let SuperAI hand a task to an agent CLI already installed here. It spends that
+        subscription, not this app's, and the CLI writes files with its own approval prompt
+        bypassed — so this is off until you turn it on.
+      </div>
+
+      <div className="field">
+        <label>Delegate to agent CLIs</label>
+        <div className="toggle" onClick={() => onChange({ enabled: !ea.enabled })} style={{ cursor: "pointer", marginTop: 2 }}>
+          <div className={`switch${ea.enabled ? " on" : ""}`}><div className="knob" /></div>
+          <span style={{ fontSize: 13, color: "var(--text-1)" }}>
+            {ea.enabled ? "On — SuperAI may hand work to the CLIs below" : "Off — SuperAI does every task itself"}
+          </span>
+        </div>
+      </div>
+
+      <div className="field">
+        <label>On this machine</label>
+        <div className="ea-agents">
+          {AGENT_CLIS.map((cli) => {
+            const st = found(cli.name);
+            return (
+              <div key={cli.name} className={`ea-agent${st?.installed ? "" : " missing"}`}>
+                <div className="ea-agent-head">
+                  <span className="ea-agent-name">{cli.label}</span>
+                  <span className={`ea-dot${st?.installed ? " on" : ""}`} />
+                  <span className="ea-agent-state">
+                    {probing && !st ? "checking…" : st?.installed ? st.version || "installed" : "not installed"}
+                  </span>
+                </div>
+                {st?.installed && <div className="ea-agent-path" title={st.path}>{st.path}</div>}
+                {ea.enabled && (
+                  <div className="ea-agent-overrides">
+                    <input
+                      className="input"
+                      value={binaries[cli.name] ?? ""}
+                      onChange={(e) => setPair("binaries", cli.name, e.target.value)}
+                      placeholder={st?.installed ? "path override (optional)" : `full path to ${cli.name}`}
+                      autoComplete="off"
+                      spellCheck={false}
+                    />
+                    <input
+                      className="input"
+                      value={models[cli.name] ?? ""}
+                      onChange={(e) => setPair("models", cli.name, e.target.value)}
+                      placeholder="model (optional)"
+                      autoComplete="off"
+                      spellCheck={false}
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        <span className="hint">
+          Whether each one is signed in is not checked here — that would cost a real request to
+          the provider on every page load. A CLI that works in your terminal but reads as
+          missing usually has a path this app never inherited; type it in above.
+        </span>
+        <div className="row" style={{ marginTop: 8 }}>
+          <button className="btn ghost sm" onClick={onRecheck} disabled={probing}>
+            {probing ? "Checking…" : "Save and re-check"}
+          </button>
+        </div>
+      </div>
+
+      {ea.enabled && (
+        <>
+          <div className="field">
+            <label>Directories it may work in</label>
+            <span className="hint">
+              The workspace is always allowed. Add a directory to let a delegated run read and
+              write there too — a repository it is meant to fix, and nothing else.
+            </span>
+            <div className="ea-roots">
+              {roots.map((r, i) => (
+                <div key={i} className="ea-root">
+                  <input
+                    className="input"
+                    value={r}
+                    onChange={(e) => setRoot(i, e.target.value)}
+                    placeholder="/Users/you/code/some-repo"
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                  <button
+                    type="button"
+                    className="btn ghost sm"
+                    onClick={() => onChange({ roots: roots.filter((_, j) => j !== i) })}
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+            <button
+              type="button"
+              className="btn ghost sm"
+              style={{ alignSelf: "flex-start", marginTop: 8 }}
+              onClick={() => onChange({ roots: [...roots, ""] })}
+            >
+              Add a directory
+            </button>
+          </div>
+
+          <div className="field">
+            <label>Run unattended</label>
+            <div className="toggle" onClick={() => onChange({ unattended: !ea.unattended })} style={{ cursor: "pointer", marginTop: 2 }}>
+              <div className={`switch${ea.unattended ? " on" : ""}`}><div className="knob" /></div>
+              <span style={{ fontSize: 13, color: "var(--text-1)" }}>
+                {ea.unattended
+                  ? "On — a delegated run is not put to you for approval"
+                  : "Off — you are asked before another agent is handed the task"}
+              </span>
+            </div>
+            {ea.unattended && (
+              <span className="hint">
+                For scheduled work with nobody at the machine. Every call it lets through is
+                still written to the audit log under Safety.
+              </span>
+            )}
+          </div>
+
+          <div className="field">
+            <label>Timeout (seconds)</label>
+            <input
+              className="input"
+              type="number"
+              min={0}
+              value={ea.timeout_seconds ?? 0}
+              onChange={(e) => onChange({ timeout_seconds: Number(e.target.value) })}
+            />
+            <span className="hint">
+              How long one delegated run may take. 0 uses the built-in 20 minutes — long enough
+              for a real task, short enough that a CLI sitting on a login prompt gives up.
+            </span>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 export default function SettingsView({
   onSaved,
@@ -260,6 +456,32 @@ export default function SettingsView({
   const [accounts, setAccounts] = useState<backend.CLIProxyAccount[]>([]);
   const [confirmOut, setConfirmOut] = useState("");
   const [approval, setApproval] = useState<ApprovalInfo | null>(null);
+  const [agentCLIs, setAgentCLIs] = useState<backend.ExternalAgentStatus[]>([]);
+  const [probing, setProbing] = useState(false);
+
+  const refreshAgentCLIs = () => {
+    setProbing(true);
+    ExternalAgentsStatus()
+      .then(setAgentCLIs)
+      .catch(() => setAgentCLIs([]))
+      .finally(() => setProbing(false));
+  };
+
+  /**
+   * The probe runs against the binary paths the backend has, which are the
+   * ones from the last save — so a path just typed in has to be saved before
+   * re-checking, or the button would report on the old value and look broken.
+   */
+  async function recheckAgentCLIs() {
+    if (!s) return;
+    setProbing(true);
+    try {
+      await SaveSettings(s);
+    } catch (e: any) {
+      toast.error(String(e?.message || e));
+    }
+    refreshAgentCLIs();
+  }
 
   const refreshApproval = () => {
     ToolApprovalInfo(20)
@@ -283,6 +505,7 @@ export default function SettingsView({
     CLIProxyProviders().then(setProviders).catch(() => setProviders([]));
     refreshProxy();
     refreshApproval();
+    refreshAgentCLIs();
 
     EventsOn("cliproxy:login", (ev: any) => {
       setLogin(ev);
@@ -297,6 +520,19 @@ export default function SettingsView({
 
   const set = <K extends keyof backend.Settings>(k: K, v: backend.Settings[K]) => {
     setS((prev) => (prev ? Object.assign(new backend.Settings(prev), { [k]: v }) : prev));
+  };
+
+  // External agents is the one nested object in Settings, so it patches rather
+  // than replaces: the card edits one field at a time and must not drop the
+  // rest of the section on the way.
+  const setEA = (patch: Partial<backend.ExternalAgents>) => {
+    setS((prev) =>
+      prev
+        ? Object.assign(new backend.Settings(prev), {
+            external_agents: Object.assign(new backend.ExternalAgents(prev.external_agents), patch),
+          })
+        : prev,
+    );
   };
 
   const save = async () => {
@@ -654,6 +890,16 @@ export default function SettingsView({
               {webhookResult && <span className="hint">{webhookResult}</span>}
             </div>
           </div>
+
+          {section === "agents" && (
+            <ExternalAgentsCard
+              ea={s.external_agents ?? new backend.ExternalAgents()}
+              onChange={setEA}
+              statuses={agentCLIs}
+              probing={probing}
+              onRecheck={recheckAgentCLIs}
+            />
+          )}
 
           <div className="card" hidden={section !== "runtime"}>
             <div className="card-title">Runtime</div>

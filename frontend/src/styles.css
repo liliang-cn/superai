@@ -1803,6 +1803,38 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
 /* .card sets its own display, so the attribute alone would not hide it. */
 .card[hidden] { display: none; }
 
+/* External agents. Each CLI is one block rather than a table row: the version
+   string and the path are both long enough to need their own line on a phone,
+   and a table that reflows into unlabelled fragments is worse than a stack. */
+.ea-agents { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+.ea-agent {
+  background: var(--bg-2); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 10px 12px;
+}
+/* A CLI that is not here is dimmed, not hidden: the list of four is the answer
+   to "what could I use", and a missing one is where the path override goes. */
+.ea-agent.missing { opacity: 0.62; }
+.ea-agent-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ea-agent-name { font-size: 13px; font-weight: 600; color: var(--text-0); }
+.ea-agent-state { font-size: 11.5px; color: var(--text-2); }
+/* The dot repeats what the words already say. Colour alone would be the only
+   signal for anyone who cannot see it, which is why the state is spelled out
+   beside it. */
+.ea-dot {
+  width: 7px; height: 7px; border-radius: 50%; flex: none;
+  background: var(--text-3);
+}
+.ea-dot.on { background: var(--accent); }
+/* A path is one unbreakable token and ran straight out of the card. */
+.ea-agent-path {
+  font-family: var(--font-mono); font-size: 11px; color: var(--text-3);
+  margin-top: 4px; overflow-wrap: anywhere;
+}
+.ea-agent-overrides { display: grid; grid-template-columns: 2fr 1fr; gap: 8px; margin-top: 8px; }
+.ea-roots { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.ea-root { display: flex; align-items: center; gap: 8px; }
+.ea-root .input { flex: 1; min-width: 0; }
+
 /* The emotion test buttons show the sprite the renderer will draw, rather than
    an emoji the operating system draws — otherwise the button testing a face is
    showing a different face than the one under test. */
@@ -2151,6 +2183,7 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
   .pw-toggle,
   .tab,
   .btn,
+  .ea-root .btn.sm,
   .cr-btn,
   .link-btn,
   .cr-health-more,
@@ -2158,6 +2191,11 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
     min-height: 44px;
   }
   .pw-toggle, .link-btn, .session-id { padding-inline: 12px; }
+  /* Two inputs side by side inside a card that is already narrow leaves the
+     model field about eight characters wide. Stacked, each one is a full-width
+     44px target. */
+  .ea-agent-overrides { grid-template-columns: 1fr; }
+  .ea-agent-overrides .input, .ea-root .input { min-height: 44px; }
   /* The composer's own controls — Attach, Clear, prompt preview, send. They
      come from the shadcn button, which has no class of ours to hang a rule on,
      so they are reached through the toolbar they sit in. These are the buttons

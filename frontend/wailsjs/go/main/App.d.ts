@@ -50,6 +50,8 @@ export function EmitAvatarTest(arg1:string):Promise<void>;
 
 export function ExportWorkspaceFile(arg1:string):Promise<string>;
 
+export function ExternalAgentsStatus():Promise<Array<backend.ExternalAgentStatus>>;
+
 export function GetSettings():Promise<backend.Settings>;
 
 export function GetStatus():Promise<Record<string, any>>;

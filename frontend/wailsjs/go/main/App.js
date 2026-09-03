@@ -94,6 +94,10 @@ export function ExportWorkspaceFile(arg1) {
   return window['go']['main']['App']['ExportWorkspaceFile'](arg1);
 }
 
+export function ExternalAgentsStatus() {
+  return window['go']['main']['App']['ExternalAgentsStatus']();
+}
+
 export function GetSettings() {
   return window['go']['main']['App']['GetSettings']();
 }
