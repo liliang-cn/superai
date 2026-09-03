@@ -7,6 +7,8 @@ import (
 	"io/fs"
 	"net"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -263,4 +265,49 @@ func AvatarStates() []string {
 		AvatarStateIdle, AvatarStateThinking, AvatarStateWorking,
 		AvatarStateSpeaking, AvatarStateWaiting, AvatarStateError,
 	}
+}
+
+// AvatarProxyPrefix is where the avatar server is mounted on the serve mux.
+const AvatarProxyPrefix = "/avatar"
+
+// NewAvatarProxy forwards /avatar/* to the avatar server on this host.
+//
+// The avatar bridge binds 127.0.0.1 and nothing else, which is right for a
+// renderer running on the same machine and useless for a phone: served over the
+// network, the pet asked its own browser for 127.0.0.1:47615 — the phone
+// itself — and got nothing. Its sprites never loaded and its event stream never
+// connected, so letting it out did nothing at all.
+//
+// Proxied here it is same-origin, which also means it inherits the session gate
+// rather than exposing a second unauthenticated port to the network.
+func NewAvatarProxy(target func() string) http.Handler {
+	proxy := &httputil.ReverseProxy{
+		// The event stream is the point; buffering it would hold every state
+		// change until something else flushed the connection.
+		FlushInterval: -1,
+		Rewrite: func(r *httputil.ProxyRequest) {
+			raw := target()
+			if raw == "" {
+				return
+			}
+			u, err := url.Parse(raw)
+			if err != nil {
+				return
+			}
+			r.Out.URL.Scheme = u.Scheme
+			r.Out.URL.Host = u.Host
+			r.Out.Host = u.Host
+			// No prefix to strip: the avatar server serves these very paths.
+		},
+		ErrorHandler: func(w http.ResponseWriter, _ *http.Request, err error) {
+			http.Error(w, "the avatar bridge is not running: "+err.Error(), http.StatusServiceUnavailable)
+		},
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if target() == "" {
+			http.Error(w, "the avatar bridge is not running", http.StatusServiceUnavailable)
+			return
+		}
+		proxy.ServeHTTP(w, r)
+	})
 }

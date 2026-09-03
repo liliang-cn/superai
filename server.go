@@ -231,6 +231,11 @@ func newAPIMux(app *App, hub *eventHub, creds *credentials, handoff *handoffStor
 	// here, behind requireAuth, and nowhere else.
 	mux.Handle(backend.GraphProxyPrefix, app.graphProxy())
 	mux.Handle(backend.GraphProxyPrefix+"/", app.graphProxy())
+	// The avatar bridge, same-origin. It binds loopback on this host, so over
+	// the network the pet was asking the *viewer's* machine for port 47615 and
+	// getting nothing — its sprites never loaded and its events never
+	// connected. Behind requireAuth like everything else here.
+	mux.Handle(backend.AvatarProxyPrefix+"/", app.avatarProxy())
 	// SuperAI as an MCP server — see mcp.go for why it lives in this process
 	// and why it adds no gate of its own.
 	mux.Handle(mcpPath, newMCPHandler(app, mcpServerVersion))

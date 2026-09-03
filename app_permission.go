@@ -12,6 +12,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -245,3 +246,19 @@ func (a *App) graphProxy() http.Handler {
 		return ""
 	})
 }
+
+// avatarProxy forwards to the avatar bridge this process is running.
+//
+// The port is read per request rather than captured: it comes from settings and
+// a save rebuilds the server on a new one.
+func (a *App) avatarProxy() http.Handler {
+	return backend.NewAvatarProxy(func() string {
+		a.mu.Lock()
+		defer a.mu.Unlock()
+		if a.settings == nil || a.settings.AvatarPort <= 0 {
+			return ""
+		}
+		return fmt.Sprintf("http://127.0.0.1:%d", a.settings.AvatarPort)
+	})
+}
+

@@ -54,6 +54,18 @@ const MARGIN = 8;
 
 const STORAGE_KEY = "superai-pet-char";
 
+/**
+ * Where the avatar bridge is, from this page.
+ *
+ * In the desktop window the app is not served over HTTP at all, so the bridge
+ * is reached on loopback by port. Served — a browser tab, a phone — loopback is
+ * the *viewer's* machine: on a phone 127.0.0.1:47615 is the phone, which is why
+ * letting the pet out over the network did nothing at all. There the app
+ * proxies /avatar itself, same origin, behind the same session.
+ */
+const served = Boolean((window as unknown as Record<string, unknown>).superaiServed);
+const avatarBase = (port: number) => (served ? "" : `http://127.0.0.1:${port}`);
+
 type Pos = { x: number; y: number };
 
 function readSavedChar(): string {
@@ -186,7 +198,7 @@ function useAvatarStream(port: number) {
 
   useEffect(() => {
     if (!port) return;
-    const es = new EventSource(`http://127.0.0.1:${port}/avatar/events`);
+    const es = new EventSource(`${avatarBase(port)}/avatar/events`);
     es.onmessage = (e) => {
       let ev: { type?: string; state?: string; emotion?: string };
       try {
@@ -229,7 +241,7 @@ export default function Pet({ port, onDismiss }: { port: number; onDismiss: () =
     () => ({
       width: FRAME_W,
       height: FRAME_H,
-      backgroundImage: `url("http://127.0.0.1:${port}/avatar/sprites/${character}.png")`,
+      backgroundImage: `url("${avatarBase(port)}/avatar/sprites/${character}.png")`,
       backgroundSize: `${SHEET_W}px ${SHEET_H}px`,
       backgroundPositionY: `${-row * FRAME_H}px`,
       // The frame width the walk keyframes step by, so the stylesheet and the

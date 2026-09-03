@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { PreviewPrompt } from "../../wailsjs/go/main/App";
 import { backend } from "../../wailsjs/go/models";
-import { ChevronDown, ChevronRight, XIcon } from "lucide-react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 
 /**
  * What the model is about to be told, before it is told.
@@ -41,14 +41,23 @@ function Section({
   );
 }
 
-export default function PromptPreviewPanel({
+/**
+ * The preview, as a panel body.
+ *
+ * It used to be a modal over the whole window, which is the wrong shape for the
+ * thing it shows: you look at the assembled turn *while* editing the message
+ * that produced it, and a dialog covers the message. It lives in the rail
+ * beside the tool trace now, and follows the draft as it is typed.
+ */
+export function PromptPreviewBody({
   sessionId,
   goal,
-  onClose,
 }: {
   sessionId: string;
+  /** The draft as it stands. Debounced by the caller — assembling a turn is a
+   *  round trip through the whole persona, memory and tool catalogue, and it is
+   *  not worth doing per keystroke. */
   goal: string;
-  onClose: () => void;
 }) {
   const [p, setP] = useState<backend.PromptPreview | null>(null);
   const [busy, setBusy] = useState(true);
@@ -80,16 +89,12 @@ export default function PromptPreviewPanel({
   const problem = err || p?.error || "";
 
   return (
-    <div className="modal-overlay pp-overlay" onClick={onClose}>
-      <div className="modal pp-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-head">
-          <div className="modal-title">Prompt preview — nothing is sent</div>
-          <button className="modal-close" onClick={onClose} aria-label="Close preview">
-            <XIcon className="size-4" />
-          </button>
-        </div>
-
-        <div className="modal-body pp-body">
+    <>
+      <div className="trace-head">
+        <span>Prompt preview</span>
+        <span style={{ color: "var(--text-3)", fontWeight: 400 }}>nothing is sent</span>
+      </div>
+      <div className="pp-body">
           {busy && <div className="loading-row"><span className="spinner" /> assembling the turn…</div>}
 
           {!busy && problem && <div className="pp-problem">⚠ {problem}</div>}
@@ -174,8 +179,7 @@ export default function PromptPreviewPanel({
               </Section>
             </>
           )}
-        </div>
       </div>
-    </div>
+    </>
   );
 }

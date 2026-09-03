@@ -32,7 +32,6 @@ import {
 } from "lucide-react";
 import { HistoryBar, HistoryList, useHistory } from "../components/HistoryBar";
 import SidePanel from "../components/SidePanel";
-import PromptPreviewPanel from "../components/PromptPreviewPanel";
 import DeliverablesBar from "../components/DeliverablesBar";
 import ContextBlock from "../components/ContextBlock";
 import NameDashboardModal from "../components/NameDashboardModal";
@@ -58,10 +57,8 @@ export default function ChatView({
   // The composer is controlled so the send button can know whether there is
   // anything to send — which is what decides between "send" and "stop" below.
   const [draft, setDraft] = useState("");
-  // The prompt preview is opened against the draft as it stood when the button
-  // was pressed, not against the live one: re-assembling on every keystroke
-  // would be a request per character.
-  const [preview, setPreview] = useState<string | null>(null);
+  // A tab to show in the rail, consumed once by SidePanel.
+  const [railTab, setRailTab] = useState<"trace" | "dashboards" | "preview" | null>(null);
   // The message index whose save just landed, for a moment of green.
   const [saved, setSaved] = useState(-1);
   // The reply waiting to be named. Null when the dialog is closed.
@@ -366,7 +363,7 @@ export default function ChatView({
                   className="rounded-lg text-muted-foreground"
                   title="Preview the prompt this would send"
                   aria-label="Preview the prompt this would send"
-                  onClick={() => setPreview(draft)}
+                  onClick={() => setRailTab("preview")}
                 >
                   <ScanEyeIcon className="size-3.5" />
                 </Button>
@@ -389,7 +386,14 @@ export default function ChatView({
             </PromptInput>
           </div>
         </div>
-        <SidePanel trace={chat.trace} asks={chat.asks} />
+        <SidePanel
+          trace={chat.trace}
+          asks={chat.asks}
+          sessionId={chat.sessionId}
+          draft={draft}
+          tab={railTab}
+          onTabHandled={() => setRailTab(null)}
+        />
       </div>
       {naming && (
         <NameDashboardModal
@@ -400,13 +404,6 @@ export default function ChatView({
         />
       )}
       {saveError && <div className="nd-error">⚠ {saveError}</div>}
-      {preview !== null && (
-        <PromptPreviewPanel
-          sessionId={chat.sessionId}
-          goal={preview}
-          onClose={() => setPreview(null)}
-        />
-      )}
     </div>
   );
 }

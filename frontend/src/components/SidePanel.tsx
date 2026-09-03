@@ -2,11 +2,13 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   LayoutDashboardIcon,
   PanelRightCloseIcon,
+  ScanEyeIcon,
   WrenchIcon,
 } from "lucide-react";
 import { AskSummary, TraceItem } from "../lib/types";
 import { TraceBody } from "./TracePanel";
 import DashboardsPanel from "./DashboardsPanel";
+import { PromptPreviewBody } from "./PromptPreviewPanel";
 
 /**
  * The rail down the right of a conversation, and whichever panel it is showing.
@@ -21,7 +23,7 @@ import DashboardsPanel from "./DashboardsPanel";
  * would make the trace icon sometimes mean dashboards.
  */
 
-type Tab = "trace" | "dashboards";
+type Tab = "trace" | "dashboards" | "preview";
 
 const OPEN_KEY = "superai-trace-open";
 const TAB_KEY = "superai-side-tab";
@@ -40,6 +42,10 @@ const DEFAULT_WIDTH = 330;
 const TABS: { key: Tab; label: string; Icon: typeof WrenchIcon }[] = [
   { key: "trace", label: "Tool trace", Icon: WrenchIcon },
   { key: "dashboards", label: "Dashboards", Icon: LayoutDashboardIcon },
+  // What the model is about to be told. It was a modal over the whole window,
+  // which covers the message you are editing — the one thing you want in front
+  // of you while reading the turn it produces.
+  { key: "preview", label: "Prompt preview", Icon: ScanEyeIcon },
 ];
 
 function read(key: string, fallback: string): string {
@@ -66,9 +72,20 @@ function write(key: string, value: string) {
 export default function SidePanel({
   trace,
   asks = [],
+  sessionId = "",
+  draft = "",
+  tab: forcedTab,
+  onTabHandled,
 }: {
   trace: TraceItem[];
   asks?: AskSummary[];
+  /** The conversation and the message being written, for the preview tab. */
+  sessionId?: string;
+  draft?: string;
+  /** A tab asked for from outside — the composer's eye button opens the
+   *  preview here rather than a dialog of its own. */
+  tab?: Tab | null;
+  onTabHandled?: () => void;
 }) {
   // The key is the one the trace panel has always used, so an existing install
   // opens the way it was left rather than resetting because the code moved.
@@ -83,6 +100,22 @@ export default function SidePanel({
 
   useEffect(() => write(OPEN_KEY, open ? "1" : "0"), [open]);
   useEffect(() => write(TAB_KEY, tab), [tab]);
+
+  useEffect(() => {
+    if (!forcedTab) return;
+    setTab(forcedTab);
+    setOpen(true);
+    onTabHandled?.();
+  }, [forcedTab, onTabHandled]);
+
+  // The draft, settled. Assembling a turn is a round trip through the persona,
+  // the recalled memory and the whole tool catalogue; per keystroke would put
+  // the backend under a load this does not justify.
+  const [settledDraft, setSettledDraft] = useState(draft);
+  useEffect(() => {
+    const t = setTimeout(() => setSettledDraft(draft), 500);
+    return () => clearTimeout(t);
+  }, [draft]);
 
   /**
    * Dragging the left edge.
@@ -197,11 +230,11 @@ export default function SidePanel({
           <PanelRightCloseIcon className="size-4" />
         </button>
       </div>
-      {tab === "trace" ? (
-        <TraceBody trace={trace} asks={asks} />
-      ) : (
-        <DashboardsPanel />
-      )}
+      {tab === "trace" && <TraceBody trace={trace} asks={asks} />}
+      {tab === "dashboards" && <DashboardsPanel />}
+      {/* Mounted only while it is the visible tab, so nothing is assembled when
+          nobody is looking at it. */}
+      {tab === "preview" && <PromptPreviewBody sessionId={sessionId} goal={settledDraft} />}
     </div>
   );
 }

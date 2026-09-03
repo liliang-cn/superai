@@ -2268,10 +2268,17 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
     background-clip: content-box;
     border: none;
   }
-  .tp-swatch.on { box-shadow: inset 0 0 0 11px transparent, 0 0 0 2px var(--bg-1) inset; }
-  /* The ring has to follow the dot, not the button, so it is drawn on an inner
-     shadow sized to the padding rather than the element's own edge. */
-  .tp-swatch.on { box-shadow: 0 0 0 2px var(--bg-1), 0 0 0 4px var(--sw); }
+  /* The ring belongs to the dot, not to the button. A box-shadow follows the
+     element's own edge, so on a 44px hit area it drew a large circle floating
+     well clear of the 22px swatch — the "big ring around it" this was supposed
+     to avoid. Drawn as a pseudo-element inset to the padding instead, it sits
+     where the colour is. */
+  .tp-swatch { position: relative; box-shadow: none; }
+  .tp-swatch.on { box-shadow: none; }
+  .tp-swatch.on::after {
+    content: ""; position: absolute; inset: 8px;
+    border-radius: 50%; border: 2px solid var(--sw);
+  }
   .tp-swatches { gap: 0; margin-inline: -11px; }
 
   /* iOS zooms the whole page when a field smaller than 16px takes focus, and
@@ -2342,4 +2349,31 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
   padding: 10px 14px; border-radius: var(--radius);
   background: rgba(240, 85, 107, 0.12); border: 1px solid rgba(240, 85, 107, 0.4);
   color: var(--red); font-size: 13px;
+}
+
+/* ---------------- One shape along the status bar ---------------- */
+/*
+ * The row mixed three radii and two heights: the readout pills were 20px, the
+ * avatar button 999px, and the theme and sign-out buttons square-cornered at
+ * --radius-sm — so a single strip of controls read as three different kinds of
+ * thing. They are all the same kind of thing: a small piece of status you can
+ * sometimes press.
+ *
+ * Fully round, one height, one border. The icon buttons become circles because
+ * a pill with nothing but an icon in it is a circle.
+ */
+.statusbar .pill,
+.statusbar .pill-btn,
+.statusbar .theme-toggle {
+  border-radius: 999px;
+  min-height: 26px;
+  border: 1px solid var(--border);
+  box-sizing: border-box;
+}
+.statusbar .theme-toggle { width: 26px; height: 26px; padding: 0; }
+
+@media (max-width: 640px) {
+  /* Touch sizing keeps the shape: bigger circles, not rounded rectangles. */
+  .statusbar .pill-btn { min-height: 44px; }
+  .statusbar .theme-toggle { width: 44px; height: 44px; min-height: 44px; }
 }
