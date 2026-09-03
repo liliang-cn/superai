@@ -21,6 +21,7 @@ package backend
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -285,7 +286,7 @@ func (g *ToolGate) decide(ctx context.Context, req agent.PermissionRequest) (*ag
 	ask := ApprovalRequest{
 		ID:        g.newID(),
 		Tool:      req.ToolName,
-		Command:   commandOf(req.ToolName, req.ToolArgs),
+		Command:   approvalCommand(req.ToolName, req.ToolArgs),
 		Args:      req.ToolArgs,
 		SessionID: req.SessionID,
 		AgentID:   req.AgentID,
@@ -429,6 +430,15 @@ func (g *ToolGate) record(ask ApprovalRequest, dec ApprovalDecision) {
 // commandOf pulls the shell command out of a tool's arguments. agent-go's bash
 // tool takes {"command": "..."}; MCP shells vary, so a couple of spellings are
 // tried before giving up and letting the UI fall back to the raw args.
+// approvalCommand is what the card shows on its command line, from whichever
+// renderer knows this tool.
+func approvalCommand(tool string, args map[string]any) string {
+	if c := delegatedCommand(tool, args); c != "" {
+		return c
+	}
+	return commandOf(tool, args)
+}
+
 func commandOf(tool string, args map[string]any) string {
 	lower := strings.ToLower(tool)
 	shellish := false
@@ -447,4 +457,38 @@ func commandOf(tool string, args map[string]any) string {
 		}
 	}
 	return ""
+}
+
+// delegatedCommand renders what cli_agent_run is about to hand to another
+// agent CLI, for the approval card.
+//
+// This one is not shell-family and has no "command" argument, so commandOf
+// cannot find it — but it is the call on this machine that most needs a person
+// to read it before saying yes. What it does is bounded by a prompt and a
+// directory, and neither is visible in a tool name. Shown as the argv it
+// amounts to rather than as JSON, because "claude -p ..." is a thing someone
+// recognises and an args blob is not.
+func delegatedCommand(tool string, args map[string]any) string {
+	if tool != "cli_agent_run" || args == nil {
+		return ""
+	}
+	name, _ := args["agent"].(string)
+	if strings.TrimSpace(name) == "" {
+		name = "agent"
+	}
+	prompt, _ := args["prompt"].(string)
+	prompt = strings.TrimSpace(prompt)
+	// One line: the card is a few hundred pixels wide and a wrapped prompt
+	// pushes the buttons off it. The whole prompt is still in the args below.
+	if i := strings.IndexAny(prompt, "\r\n"); i >= 0 {
+		prompt = strings.TrimSpace(prompt[:i]) + " …"
+	}
+	if len([]rune(prompt)) > 160 {
+		prompt = string([]rune(prompt)[:159]) + "…"
+	}
+	out := name + " -p " + strconv.Quote(prompt)
+	if cwd, _ := args["cwd"].(string); strings.TrimSpace(cwd) != "" {
+		out += "   in " + cwd
+	}
+	return out
 }

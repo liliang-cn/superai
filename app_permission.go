@@ -261,4 +261,3 @@ func (a *App) avatarProxy() http.Handler {
 		return fmt.Sprintf("http://127.0.0.1:%d", a.settings.AvatarPort)
 	})
 }
-

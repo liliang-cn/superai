@@ -42,7 +42,7 @@ func TestUIRulesRoundTrip(t *testing.T) {
 		t.Error("different rules must report a change")
 	}
 
-	persona := buildPersona(time.Now(), true) + uiRulesSection()
+	persona := buildPersona(time.Now(), true, false) + uiRulesSection()
 	if !strings.Contains(persona, "```chart") {
 		t.Error("persona must carry the rendering rules")
 	}
@@ -55,8 +55,8 @@ func TestUIRulesRoundTrip(t *testing.T) {
 // search_mcp_servers when no such tool is registered is an invitation to spend
 // a round finding that out.
 func TestPersonaOmitsSelfInstallWhenThoseToolsAreWithheld(t *testing.T) {
-	with := buildPersona(time.Now(), true)
-	without := buildPersona(time.Now(), false)
+	with := buildPersona(time.Now(), true, false)
+	without := buildPersona(time.Now(), false, false)
 
 	for _, tool := range []string{"search_mcp_servers", "add_mcp_server", "search_skills", "install_skill"} {
 		if !strings.Contains(with, tool) {

@@ -60,7 +60,7 @@ func TestSplitEmotion(t *testing.T) {
 // The persona offers the tag rather than requiring it: a reply that is only a
 // fact should not be made worse by hunting for a feeling to attach.
 func TestPersonaDoesNotDemandAMood(t *testing.T) {
-	p := buildPersona(time.Now(), false)
+	p := buildPersona(time.Now(), false, false)
 	if !strings.Contains(p, "MOOD:") {
 		t.Error("the persona should still name the tag")
 	}

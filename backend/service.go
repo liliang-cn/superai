@@ -213,7 +213,7 @@ func NewService(s *Settings) (*Service, error) {
 
 	// --- Build the agent service. ---
 	b := agent.New("SuperAI").
-		WithPrompt(buildPersona(time.Now(), !s.DisableSelfInstall) + uiRulesSection()).
+		WithPrompt(buildPersona(time.Now(), !s.DisableSelfInstall, s.ExternalAgents.Enabled) + uiRulesSection()).
 		WithConfig(cfg).
 		WithLLM(brain).
 		WithSandbox(sb).
@@ -356,6 +356,25 @@ func NewService(s *Settings) (*Service, error) {
 	// DisableSelfInstall — that switch is about acquiring new capabilities from
 	// the outside, and these are the app's own controls.
 	out.registerSelfTools()
+	// Handing work to another agent CLI on this machine — Claude Code, Codex,
+	// Gemini, cursor-agent. Off unless the operator turned it on: a delegated
+	// run spends someone else's subscription and writes files with that CLI's
+	// own approval prompt bypassed, so it is not a capability an install
+	// should acquire by upgrading. The roots come from settings and always
+	// include the workspace; cli_agent_run is Destructive, so every call
+	// meets this app's approval gate on the way out unless unattended is set.
+	if s.ExternalAgents.Enabled {
+		if err := agent.RegisterCLIAgentTools(svc, agent.CLIAgentConfig{
+			Binaries:       s.ExternalAgents.Binaries,
+			AllowedRoots:   s.ExternalAgentRoots(),
+			DefaultTimeout: s.ExternalAgents.Timeout(),
+		}); err != nil {
+			// Not fatal. A machine with no agent CLI installed is a normal
+			// machine, and the rest of the app has nothing to do with this.
+			log.Printf("superai: external agents not registered: %v", err)
+		}
+	}
+
 	// Self-extension: chat-driven install of skills and MCP servers, plus
 	// "here's a URL, work out how to install it". Withheld for one-shot runs —
 	// see Settings.DisableSelfInstall.
@@ -712,10 +731,24 @@ const selfInstallSection = `
   · If the server you found lists required_env (an API key and the like), ask the user for it first; never install with empty values.
   · Once installed, resume the original task without waiting to be asked again. Install a capability once, and check the tools you already have before installing anything.`
 
-func buildPersona(now time.Time, selfInstall bool) string {
+// delegateSection tells the model that another agent is a tool, and when it is
+// the right one. Only appended when the operator has turned delegation on.
+//
+// The negative half is the half that matters. A coding agent given a general
+// assistant's work does it worse and bills a subscription for the privilege,
+// and the failure mode of a tool called "run another agent" is that it becomes
+// the answer to everything.
+const delegateSection = `
+- You can hand a whole task to another agent CLI on this machine: cli_agent_list to see which, cli_agent_run to delegate. Right for work that is a coding job in a directory — refactor this repo, write and run a test suite, work through a build failure — where that agent has the file access and the patience for it. Wrong for anything you can do yourself, anything that is a question rather than a job, and anything without a directory to work in. It costs the user another subscription's tokens and takes minutes, so it is never the cheap option. Say which agent you gave it to, and if it reports a failure, say so and what it said — a delegated run that failed to sign in returns text that reads like an answer.`
+
+func buildPersona(now time.Time, selfInstall, externalAgents bool) string {
 	installHint := ""
 	if selfInstall {
 		installHint = selfInstallSection
+	}
+	delegateHint := ""
+	if externalAgents {
+		delegateHint = delegateSection
 	}
 	return fmt.Sprintf(`You are SuperAI, a warm everyday AI assistant for life and work, running as a desktop app.
 Current system time: %s %s (%s), timezone %s.
@@ -728,11 +761,11 @@ Duties:
 - When you need something current, live, or not in memory (weather, markets, news, fact-checking…), search with web_search; when you need to read or review the real content of a specific URL, fetch that page's text with fetch_url.
 - You have a sandbox, a browser, vision, deliverables and skills; take complex tasks through as many steps as they need on your own.
 - Operating this app on the user's behalf: "save this as a dashboard / I want to open it often" → dashboard_save, with the reply text as source and the question that produces it as prompt; dashboard_list and dashboard_delete for the rest. Settings the user asks you to change → settings_get, then settings_set.
-- Report what you actually did, tool by tool. If a request needs something you have no tool for, say which part you could not do and name what you did instead — never present a near neighbour as the thing that was asked for. Asked to save a dashboard, saving a skill and a note instead and calling all three "saved" is the failure this rule exists for: the user opened the panel and it was empty.%s
+- Report what you actually did, tool by tool. If a request needs something you have no tool for, say which part you could not do and name what you did instead — never present a near neighbour as the thing that was asked for. Asked to save a dashboard, saving a skill and a note instead and calling all three "saved" is the failure this rule exists for: the user opened the panel and it was empty.%s%s
 - Answer in Chinese: short, natural, human. You may end a reply with a mood tag alone on the last line — MOOD: <neutral|happy|sad|thinking|excited|sleepy|confused|love|angry|surprised> — when the feeling is genuinely part of the answer. It is optional and only drives an avatar; it is never worth a worse answer, and a reply that is only a fact does not need one.
 
 Never answer in English, Japanese or Korean — always Chinese.`,
-		now.Format("2006-01-02"), now.Format("15:04:05"), now.Format("Monday"), now.Format("-07:00"), installHint)
+		now.Format("2006-01-02"), now.Format("15:04:05"), now.Format("Monday"), now.Format("-07:00"), installHint, delegateHint)
 }
 
 // uiRulesSection appends the transcript's rendering rules to the persona, so
