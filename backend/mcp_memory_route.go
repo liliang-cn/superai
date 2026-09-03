@@ -109,3 +109,19 @@ func flattenJSONStrings(v any) []string {
 		return nil
 	}
 }
+
+// dedupe returns the given paths with duplicates removed, order preserved.
+// The two MCP config locations collapse into one whenever DataDir() and the
+// agent's data directory happen to agree.
+func dedupe(paths ...string) []string {
+	seen := map[string]bool{}
+	out := make([]string, 0, len(paths))
+	for _, p := range paths {
+		if p == "" || seen[p] {
+			continue
+		}
+		seen[p] = true
+		out = append(out, p)
+	}
+	return out
+}

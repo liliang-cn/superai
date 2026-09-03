@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { PanelLeftCloseIcon, PanelLeftOpenIcon } from "lucide-react";
 import { ViewKey } from "../lib/types";
 
@@ -29,23 +29,24 @@ const NAV: { section: string; items: { key: ViewKey; label: string; icon: string
   },
 ];
 
-const OPEN_KEY = "superai-sidebar-open";
-
 export default function Sidebar({
   current,
   onNavigate,
   badges,
+  open,
+  onToggle,
 }: {
   current: ViewKey;
   onNavigate: (v: ViewKey) => void;
   /** Counts of things that happened on their own, per view. */
   badges?: Partial<Record<ViewKey, number>>;
+  /** Expanded on a desktop; on a phone this is the drawer being out. The state
+   *  lives in App because on a narrow screen the button that opens it cannot be
+   *  in here — a closed drawer has translated itself off the screen, and its own
+   *  toggle with it. */
+  open: boolean;
+  onToggle: () => void;
 }) {
-  const [open, setOpen] = useState(() => localStorage.getItem(OPEN_KEY) !== "0");
-
-  useEffect(() => {
-    localStorage.setItem(OPEN_KEY, open ? "1" : "0");
-  }, [open]);
 
   // Collapsed keeps the icons rather than hiding the nav outright — navigation
   // stays one click away, it just stops spending width on labels.
@@ -90,7 +91,7 @@ export default function Sidebar({
         <button
           type="button"
           className="panel-toggle"
-          onClick={() => setOpen((v) => !v)}
+          onClick={onToggle}
           title={open ? "Collapse sidebar" : "Expand sidebar"}
           aria-label={open ? "Collapse sidebar" : "Expand sidebar"}
         >

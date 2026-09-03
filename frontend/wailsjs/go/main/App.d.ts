@@ -34,7 +34,11 @@ export function ChatSessions():Promise<Array<backend.ChatSessionInfo>>;
 
 export function Dashboard():Promise<Record<string, any>>;
 
+export function Dashboards():Promise<Array<backend.Dashboard>>;
+
 export function DeleteChatSession(arg1:string):Promise<string>;
+
+export function DeleteDashboard(arg1:string):Promise<Record<string, any>>;
 
 export function DeleteScheduledPrompt(arg1:string):Promise<string>;
 
@@ -92,13 +96,19 @@ export function ReadWorkspaceFile(arg1:string):Promise<string>;
 
 export function ReadWorkspaceFileDataURL(arg1:string):Promise<string>;
 
+export function RefreshDashboard(arg1:string):Promise<Record<string, any>>;
+
 export function RemoveMCPServer(arg1:string):Promise<string>;
 
 export function RemoveSkill(arg1:string):Promise<string>;
 
+export function RenameDashboard(arg1:string,arg2:string):Promise<Record<string, any>>;
+
 export function ResolveToolApproval(arg1:string,arg2:boolean):Promise<string>;
 
 export function RunScheduledPromptNow(arg1:string):Promise<string>;
+
+export function SaveDashboard(arg1:string,arg2:string,arg3:string):Promise<Record<string, any>>;
 
 export function SaveSettings(arg1:backend.Settings):Promise<void>;
 
@@ -113,6 +123,8 @@ export function SearchMCPServers(arg1:string):Promise<Record<string, any>>;
 export function SearchSkills(arg1:string):Promise<Array<backend.SkillCandidate>>;
 
 export function SendChat(arg1:string,arg2:string,arg3:Array<string>):Promise<string>;
+
+export function SetDashboardCron(arg1:string,arg2:string):Promise<Record<string, any>>;
 
 export function SetScheduledPromptEnabled(arg1:string,arg2:boolean):Promise<string>;
 

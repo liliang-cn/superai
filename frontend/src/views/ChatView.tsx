@@ -28,12 +28,14 @@ import {
   PaperclipIcon,
   SquareIcon,
   ScanEyeIcon,
+  LayoutDashboardIcon,
 } from "lucide-react";
 import { HistoryBar, HistoryList, useHistory } from "../components/HistoryBar";
-import TracePanel from "../components/TracePanel";
+import SidePanel from "../components/SidePanel";
 import PromptPreviewPanel from "../components/PromptPreviewPanel";
 import DeliverablesBar from "../components/DeliverablesBar";
 import ContextBlock from "../components/ContextBlock";
+import { dashboards, hasRenderableBlock, suggestName } from "../lib/dashboards";
 import AgentProgress from "../components/AgentProgress";
 
 export default function ChatView({
@@ -59,6 +61,8 @@ export default function ChatView({
   // was pressed, not against the live one: re-assembling on every keystroke
   // would be a request per character.
   const [preview, setPreview] = useState<string | null>(null);
+  // The message index whose save just landed, for a moment of green.
+  const [saved, setSaved] = useState(-1);
 
   // Loading it here rather than in App keeps the transcript the only thing that
   // owns a session id. Picking a run's conversation is the same act as picking
@@ -91,13 +95,43 @@ export default function ChatView({
    * answers, and which one a person acted on is not recoverable from a
    * transcript that kept only the last.
    */
-  const regenerate = (index: number) => {
-    for (let i = index - 1; i >= 0; i--) {
-      const prev = messages[i];
-      if (prev.role === "user" && prev.kind !== "context" && prev.content) {
-        chat.send(prev.content);
-        return;
+  /** The ask a reply answered: the nearest user message above it. */
+  const askBehind = useCallback(
+    (index: number): string => {
+      for (let i = index - 1; i >= 0; i--) {
+        const prev = messages[i];
+        if (prev.role === "user" && prev.kind !== "context" && prev.content) {
+          return prev.content;
+        }
       }
+      return "";
+    },
+    [messages],
+  );
+
+  const regenerate = (index: number) => {
+    const prompt = askBehind(index);
+    if (prompt) chat.send(prompt);
+  };
+
+  /**
+   * Keep a reply, and the question behind it.
+   *
+   * The question is what makes a saved dashboard more than a screenshot: it is
+   * what Refresh re-asks. So it is saved even though nothing here shows it —
+   * and a reply with no ask above it (a scheduled run opened from Records, say)
+   * still saves, it just cannot refresh itself, which the panel says.
+   */
+  const saveDashboard = async (index: number, content: string) => {
+    const prompt = askBehind(index);
+    const name = window.prompt("Name this dashboard", suggestName(prompt));
+    if (name === null) return;
+    try {
+      await dashboards.save(name.trim(), content, prompt);
+      setSaved(index);
+      setTimeout(() => setSaved(-1), 1600);
+    } catch (e: any) {
+      window.alert(String(e?.message || e));
     }
   };
 
@@ -230,6 +264,29 @@ export default function ChatView({
                                   >
                                     <RefreshCwIcon className="size-3.5" />
                                   </Action>
+                                  {/* Only on a reply that actually drew
+                                      something. Prose is worth copying, not
+                                      pinning to a wall. */}
+                                  {hasRenderableBlock(m.content) && (
+                                    <Action
+                                      label="Save as dashboard"
+                                      tooltip={
+                                        saved === mi
+                                          ? "Saved"
+                                          : "Save as dashboard"
+                                      }
+                                      onClick={() => saveDashboard(mi, m.content)}
+                                    >
+                                      <LayoutDashboardIcon
+                                        className="size-3.5"
+                                        style={
+                                          saved === mi
+                                            ? { color: "var(--green)" }
+                                            : undefined
+                                        }
+                                      />
+                                    </Action>
+                                  )}
                                 </Actions>
                               )}
                               {m.emotion && (
@@ -324,7 +381,7 @@ export default function ChatView({
             </PromptInput>
           </div>
         </div>
-        <TracePanel trace={chat.trace} asks={chat.asks} />
+        <SidePanel trace={chat.trace} asks={chat.asks} />
       </div>
       {preview !== null && (
         <PromptPreviewPanel

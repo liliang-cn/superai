@@ -72,6 +72,9 @@ type Service struct {
 	// plans is the store the agent's scratchpad persists to, kept so the run
 	// wall can read a task's plan back without going through the agent.
 	plans *GraphPlanStore
+	// dashboards are replies someone kept, with the question that produced each
+	// one. See dashboards.go.
+	dashboards *dashboardStore
 
 	MemoryMode string
 
@@ -254,32 +257,53 @@ func NewService(s *Settings) (*Service, error) {
 		b = b.WithMemory(agent.WithMemoryStoreType("file"))
 	}
 
-	// MCP: any user-defined servers from ~/.superai-desktop/mcpServers.json.
-	// Drop that file in to add MCP servers. Web search does NOT come from here —
-	// it is the built-in web_search tool registered below, so a fresh install
-	// with no MCP config can still look something up.
+	// MCP: any user-defined servers, from both files SuperAI has ever read.
+	// Web search does NOT come from here — it is the built-in web_search tool
+	// registered below, so a fresh install with no MCP config can still look
+	// something up.
+	//
+	// Two paths, because for a while there were two files and only one of them
+	// was ever written to:
+	//
+	//   ~/.superai-desktop/mcpServers.json       ← mcpConfigPath(), where
+	//     InstallMCPServer writes and RemoveMCPServer deletes, and the path
+	//     the add_mcp_server tool names in its own description
+	//   ~/.superai-desktop/data/mcpServers.json  ← cfg.DataDir(), the only one
+	//     this function used to read
+	//
+	// So anything installed through the UI or by the agent started, worked for
+	// the rest of the session, and was silently gone on the next launch. The
+	// documented path is now read; the older one still is too, so an install
+	// made back when it was the only one that counted keeps working.
 	mcpOpts := []agent.MCPOption{}
 	var droppedMCP []string
-	mcpCfgPath := filepath.Join(cfg.DataDir(), "mcpServers.json")
-	if _, statErr := os.Stat(mcpCfgPath); statErr == nil {
-		// One capability, one route: if the memory backend now owns an
-		// endpoint, an MCP server pointed at that same endpoint is a second
-		// name for the same store, and gets left out of the tool surface.
-		owned := ""
-		if useShared {
-			owned = cfg.Memory.DSN
+	// One capability, one route: if the memory backend now owns an endpoint,
+	// an MCP server pointed at that same endpoint is a second name for the
+	// same store, and gets left out of the tool surface.
+	owned := ""
+	if useShared {
+		owned = cfg.Memory.DSN
+	}
+	var mcpPaths []string
+	for _, src := range dedupe(mcpConfigPath(), filepath.Join(cfg.DataDir(), "mcpServers.json")) {
+		if _, statErr := os.Stat(src); statErr != nil {
+			continue
 		}
+		dir, base := filepath.Split(src)
 		effectivePath, dropped, ferr := resolveMCPConfigPath(
-			mcpCfgPath, filepath.Join(cfg.DataDir(), "mcpServers.effective.json"), owned)
+			src, filepath.Join(dir, strings.TrimSuffix(base, ".json")+".effective.json"), owned)
 		if ferr != nil {
-			log.Printf("superai: mcp config filter: %v", ferr)
+			log.Printf("superai: mcp config filter (%s): %v", src, ferr)
 		}
-		droppedMCP = dropped
+		droppedMCP = append(droppedMCP, dropped...)
 		if len(dropped) > 0 {
 			log.Printf("superai: memory backend owns %s; not mounting MCP server(s) %v that route to the same store",
 				owned, dropped)
 		}
-		mcpOpts = append(mcpOpts, agent.WithMCPConfigPaths(effectivePath))
+		mcpPaths = append(mcpPaths, effectivePath)
+	}
+	if len(mcpPaths) > 0 {
+		mcpOpts = append(mcpOpts, agent.WithMCPConfigPaths(mcpPaths...))
 	}
 	b = b.WithMCP(mcpOpts...)
 
@@ -321,6 +345,7 @@ func NewService(s *Settings) (*Service, error) {
 	})
 
 	// --- Life-assistant store + tools (ported from examples/superai). ---
+	out.dashboards = newDashboardStore(filepath.Join(cfg.DataDir(), "dashboards.json"))
 	out.files = newSessionFiles(filepath.Join(cfg.DataDir(), "session-files.json"))
 	out.store = newLifeStore(filepath.Join(cfg.DataDir(), "superai-store.json"))
 	out.store.load()
@@ -662,10 +687,6 @@ func (s *Service) Agent() *agent.Service {
 
 // InstalledSkills returns the skills discovered/installed for this service.
 func (s *Service) InstalledSkills() []string { return s.svc.InstalledSkills() }
-
-// HasBrowser reports whether browsing is available. Always false since
-// agent-go v3 dropped pkg/browser; wire an MCP browser server instead.
-func (s *Service) HasBrowser() bool { return false }
 
 // ----------------------------------------------------------------------------
 // Persona

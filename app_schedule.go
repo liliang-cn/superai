@@ -114,6 +114,13 @@ func (a *App) stopScheduler() {
 // onScheduledRun reports a finished run. It runs on the scheduler's goroutine,
 // so it does no work beyond publishing.
 func (a *App) onScheduledRun(run agent.PromptRun) {
+	// A dashboard bringing itself up to date is not news — see
+	// onDashboardScheduledRun. It stores the answer and claims the run, so
+	// nothing below it fires.
+	if a.onDashboardScheduledRun(run) {
+		return
+	}
+
 	// One notice, drawn by every surface that is attached: the toast in an open
 	// window, the native banner on this desktop, and the webhook for whoever is
 	// nowhere near either. What the message says is decided once, in Go, rather

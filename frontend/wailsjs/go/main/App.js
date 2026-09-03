@@ -62,8 +62,16 @@ export function Dashboard() {
   return window['go']['main']['App']['Dashboard']();
 }
 
+export function Dashboards() {
+  return window['go']['main']['App']['Dashboards']();
+}
+
 export function DeleteChatSession(arg1) {
   return window['go']['main']['App']['DeleteChatSession'](arg1);
+}
+
+export function DeleteDashboard(arg1) {
+  return window['go']['main']['App']['DeleteDashboard'](arg1);
 }
 
 export function DeleteScheduledPrompt(arg1) {
@@ -178,6 +186,10 @@ export function ReadWorkspaceFileDataURL(arg1) {
   return window['go']['main']['App']['ReadWorkspaceFileDataURL'](arg1);
 }
 
+export function RefreshDashboard(arg1) {
+  return window['go']['main']['App']['RefreshDashboard'](arg1);
+}
+
 export function RemoveMCPServer(arg1) {
   return window['go']['main']['App']['RemoveMCPServer'](arg1);
 }
@@ -186,12 +198,20 @@ export function RemoveSkill(arg1) {
   return window['go']['main']['App']['RemoveSkill'](arg1);
 }
 
+export function RenameDashboard(arg1, arg2) {
+  return window['go']['main']['App']['RenameDashboard'](arg1, arg2);
+}
+
 export function ResolveToolApproval(arg1, arg2) {
   return window['go']['main']['App']['ResolveToolApproval'](arg1, arg2);
 }
 
 export function RunScheduledPromptNow(arg1) {
   return window['go']['main']['App']['RunScheduledPromptNow'](arg1);
+}
+
+export function SaveDashboard(arg1, arg2, arg3) {
+  return window['go']['main']['App']['SaveDashboard'](arg1, arg2, arg3);
 }
 
 export function SaveSettings(arg1) {
@@ -220,6 +240,10 @@ export function SearchSkills(arg1) {
 
 export function SendChat(arg1, arg2, arg3) {
   return window['go']['main']['App']['SendChat'](arg1, arg2, arg3);
+}
+
+export function SetDashboardCron(arg1, arg2) {
+  return window['go']['main']['App']['SetDashboardCron'](arg1, arg2);
 }
 
 export function SetScheduledPromptEnabled(arg1, arg2) {

@@ -1,0 +1,116 @@
+/* The avatar page.
+ *
+ * Ported from the hand-written stylesheet that used to live as a Go string in
+ * backend/avatar.go. The stage is unchanged — what changed is underneath the
+ * character, where a reply is now rendered rather than printed. */
+
+:root {
+  color-scheme: dark;
+  --bg: #0e1116;
+  --fg: #e6edf3;
+  --dim: #8b949e;
+  --line: #30363d;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "PingFang SC", sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 32px 0;
+}
+
+/* The stage. A ring of light behind the character carries the state, so the
+   sprite itself never has to be redrawn to say "working" — the sheet has ten
+   emotions and no states, and inventing more frames to encode six states would
+   be six times the art for something a colour says. */
+#stage { position: relative; width: 200px; height: 200px; display: grid; place-items: center; flex: none; }
+#glow { position: absolute; inset: 18px; border-radius: 50%; background: #30363d; transition: background .3s ease; }
+#stage.thinking #glow { background: #8957e5; }
+#stage.working  #glow { background: #d29922; animation: pulse 1.2s infinite; }
+#stage.speaking #glow { background: #2ea043; }
+#stage.idle     #glow { background: #30363d; }
+/* Waiting is on you, not on the agent, so it does not settle — it keeps
+   blinking until someone answers. */
+#stage.waiting  #glow { background: #1f6feb; animation: blink 1s steps(2) infinite; }
+#stage.error    #glow { background: #da3633; }
+@keyframes blink { 50% { opacity: .35; } }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(210,153,34,.45); } 100% { box-shadow: 0 0 0 28px rgba(210,153,34,0); } }
+
+/* The character. One sprite window onto a sheet that is 8 frames wide (four
+   standing, four walking) and ten emotions tall; the animation walks the frames
+   with steps(), so the browser runs it and no timer here has to keep up. */
+#sprite {
+  position: relative;
+  width: 120px; height: 144px;                 /* 20x24 at 6x */
+  background-repeat: no-repeat;
+  background-size: 960px 1440px;               /* 160x240 at 6x */
+  image-rendering: pixelated;
+  animation: stand 1.4s steps(4) infinite;
+}
+/* An animation is a window travelling four frame-widths across one strip, and
+   a state picks which. steps(4) over exactly four widths lands back where it
+   started. */
+@keyframes stand { from { background-position-x: 0; }      to { background-position-x: -480px; } }
+@keyframes walk  { from { background-position-x: -480px; } to { background-position-x: -960px; } }
+
+/* Working is the one state with somewhere to be. */
+#stage.working #sprite { animation-name: walk; animation-duration: .6s; }
+#stage.speaking #sprite { animation-duration: .8s; }
+#stage.thinking #sprite { animation-duration: 1.1s; }
+#stage.waiting #sprite { animation-duration: 1.8s; }
+/* An error stops the character where it is: something has gone wrong and a
+   cheerful breathing loop under a red light is the wrong thing to watch. */
+#stage.error #sprite { animation-play-state: paused; }
+
+.tags { display: flex; gap: 8px; flex: none; }
+.tag { padding: 3px 11px; border-radius: 999px; background: #161b22; border: 1px solid var(--line); font-size: 13px; }
+
+/* The reply. Wider than the old one-line caption because it now holds tables,
+   diagrams and charts, which have a minimum readable width; it stays centred
+   in the page while its own contents stay left-aligned, because centred prose
+   is unreadable past two lines. */
+.speech {
+  width: min(760px, calc(100vw - 48px));
+  padding: 0 24px;
+  font-size: 14px;
+  line-height: 1.6;
+  text-align: left;
+}
+.speech:empty { display: none; }
+
+#pick { display: flex; gap: 6px; flex: none; }
+#pick button {
+  font: inherit; font-size: 12px; color: var(--dim); background: #161b22;
+  border: 1px solid var(--line); border-radius: 7px; padding: 5px 12px; cursor: pointer;
+}
+#pick button.on { color: var(--fg); border-color: #58a6ff; }
+
+/* Plugin output lands inside .speech and brings no colours of its own for
+   text, rules and code — those follow the page, and the page is dark. */
+.speech :where(h1, h2, h3, h4) { margin: 1.2em 0 .5em; line-height: 1.3; }
+.speech :where(p, ul, ol, blockquote, table, pre) { margin: 0 0 .8em; }
+.speech :where(ul, ol) { padding-left: 1.4em; }
+.speech :where(a) { color: #58a6ff; }
+.speech :where(code) { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .92em; }
+.speech :where(:not(pre) > code) { background: #161b22; border: 1px solid var(--line); border-radius: 4px; padding: .1em .35em; }
+.speech :where(pre) { background: #161b22; border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; overflow-x: auto; }
+.speech :where(blockquote) { border-left: 3px solid var(--line); margin-left: 0; padding-left: 12px; color: var(--dim); }
+.speech :where(table) { border-collapse: collapse; width: 100%; font-size: 13px; }
+.speech :where(th, td) { border: 1px solid var(--line); padding: 6px 10px; text-align: left; }
+.speech :where(th) { background: #161b22; }
+.speech :where(hr) { border: none; border-top: 1px solid var(--line); }
+/* Wide content scrolls inside its own box rather than widening the page. */
+.speech :where(table, pre) { max-width: 100%; }

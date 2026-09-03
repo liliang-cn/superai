@@ -437,8 +437,16 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
-  user-select: none;
 }
+
+/* Selection is on by default, and switched off only on chrome.
+   It used to be the other way round: body forbade it and every place holding
+   words a person might want to quote had to remember to ask for it back. That
+   list reached nineteen rules and was still missing places, which is the shape
+   of a default that is wrong — a reply, a run report, an error string and a
+   file path all exist to be copied out. Buttons and navigation are the actual
+   exceptions, because a double-click there should not paint a label blue. */
+.sidebar, .statusbar, .tabs, .settings-tabs, button { user-select: none; }
 
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -519,10 +527,13 @@ input, textarea, select { font-family: inherit; }
 
 /* ---------------- Status bar ---------------- */
 .statusbar {
-  height: 46px;
+  /* min-height, not height: the pills wrap when there is no room for them, and
+     a bar fixed at 46px does not grow to hold the second row — it spills it
+     over the page heading underneath. */
+  min-height: 46px;
   border-bottom: 1px solid var(--border);
   display: flex; align-items: center; gap: 16px;
-  padding: 0 20px;
+  padding: 5px 20px;
   background: var(--bg-1);
   flex-shrink: 0;
 }
@@ -568,7 +579,6 @@ input, textarea, select { font-family: inherit; }
   background: var(--bg-2); border: 1px solid var(--border);
   border-radius: var(--radius); padding: 11px 14px;
   font-size: 14px; white-space: pre-wrap; word-break: break-word;
-  user-select: text;
 }
 .msg.user .msg-body { background: var(--accent-soft); border-color: var(--accent-border); }
 .msg-cursor { display: inline-block; width: 7px; height: 15px; background: var(--accent); margin-left: 2px; vertical-align: text-bottom; animation: blink 1s steps(2) infinite; border-radius: 1px; }
@@ -582,7 +592,7 @@ input, textarea, select { font-family: inherit; }
   background: rgba(240, 85, 107, 0.08);
   border: 1px solid rgba(240, 85, 107, 0.28);
   border-radius: var(--radius-sm);
-  white-space: pre-wrap; word-break: break-word; user-select: text;
+  white-space: pre-wrap; word-break: break-word;
 }
 
 /* A stopped answer is not a failed one, so it is muted rather than red. */
@@ -592,7 +602,6 @@ input, textarea, select { font-family: inherit; }
   background: var(--bg-2);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  user-select: text;
 }
 
 .emotion-chip {
@@ -621,8 +630,7 @@ input, textarea, select { font-family: inherit; }
 /* Composer now uses the AI Elements <PromptInput>; legacy .composer-box /
    .composer textarea / .send-btn rules were removed — the unlayered
    `.composer textarea` was overriding the component's Tailwind px-4 py-3
-   padding (text hugged the edge). The textarea keeps text-selectable. */
-.composer textarea { user-select: text; }
+   padding (text hugged the edge). */
 
 /* ---------------- Tool trace ---------------- */
 .trace-panel {
@@ -635,8 +643,16 @@ input, textarea, select { font-family: inherit; }
 .trace-panel.collapsed {
   width: 0; border-left: none; overflow: visible;
 }
-.trace-panel.collapsed .panel-toggle {
+/* The collapsed rail floats over the conversation, because the panel itself is
+   nought pixels wide. The absolute positioning is on the rail, not on each
+   button: put it on the buttons and every one of them lands on the same
+   coordinates, which is exactly what happened when a second icon was added —
+   two buttons, one visible, the other underneath it. */
+.trace-panel.collapsed .panel-rail {
   position: absolute; top: 10px; right: 10px; z-index: 2;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.trace-panel.collapsed .panel-toggle {
   background: var(--bg-1); border: 1px solid var(--border);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
 }
@@ -664,7 +680,7 @@ input, textarea, select { font-family: inherit; }
   font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px;
   color: var(--text-2); display: flex; align-items: center; justify-content: space-between;
 }
-.trace-list { flex: 1; overflow-y: auto; padding: 10px; font-family: var(--font-mono); font-size: 12px; display: flex; flex-direction: column; gap: 3px; user-select: text; }
+.trace-list { flex: 1; overflow-y: auto; padding: 10px; font-family: var(--font-mono); font-size: 12px; display: flex; flex-direction: column; gap: 3px; }
 .trace-row {
   display: flex; gap: 7px; align-items: baseline;
   padding: 5px 8px; border-radius: var(--radius-sm); color: var(--text-1);
@@ -770,7 +786,7 @@ input, textarea, select { font-family: inherit; }
 .field .hint { font-size: 11px; color: var(--text-3); }
 .input {
   background: var(--bg-2); border: 1px solid var(--border-strong); border-radius: 8px;
-  color: var(--text-0); padding: 9px 12px; font-size: 13px; outline: none; width: 100%; user-select: text;
+  color: var(--text-0); padding: 9px 12px; font-size: 13px; outline: none; width: 100%;
 }
 .input:focus { border-color: var(--accent-border); }
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
@@ -802,7 +818,7 @@ input, textarea, select { font-family: inherit; }
 .url-box {
   display: flex; align-items: center; gap: 10px;
   background: var(--bg-2); border: 1px solid var(--border); border-radius: 8px;
-  padding: 10px 12px; font-family: var(--font-mono); font-size: 12.5px; color: var(--cyan); user-select: text;
+  padding: 10px 12px; font-family: var(--font-mono); font-size: 12.5px; color: var(--cyan);
 }
 .url-box .url-label { color: var(--text-3); font-family: var(--font-sans); }
 .emotion-btns { display: flex; flex-wrap: wrap; gap: 10px; }
@@ -850,7 +866,7 @@ input, textarea, select { font-family: inherit; }
 .modal-close { background: none; border: none; color: var(--text-2); font-size: 18px; padding: 2px 8px; border-radius: 6px; }
 .modal-close:hover { color: var(--text-0); background: var(--bg-hover); }
 .modal-body { overflow: auto; padding: 16px 18px; }
-.modal-body pre { font-family: var(--font-mono); font-size: 12.5px; color: var(--text-1); white-space: pre-wrap; word-break: break-word; user-select: text; }
+.modal-body pre { font-family: var(--font-mono); font-size: 12.5px; color: var(--text-1); white-space: pre-wrap; word-break: break-word; }
 
 /* ---------------- Prompt preview ----------------
    The turn a send would make, read-only. Monospace throughout because what is
@@ -868,7 +884,7 @@ input, textarea, select { font-family: inherit; }
 .pp-section-t { font-family: var(--font-mono); font-size: 11.5px; font-weight: 600; }
 .pp-section-m { margin-left: auto; font-family: var(--font-mono); font-size: 10px; color: var(--text-2); }
 .pp-section-b { border-top: 1px solid var(--border); padding: 10px; max-height: 340px; overflow: auto; display: flex; flex-direction: column; gap: 8px; }
-.pp-section-b pre { font-family: var(--font-mono); font-size: 11.5px; line-height: 1.55; color: var(--text-1); white-space: pre-wrap; word-break: break-word; user-select: text; margin: 0; }
+.pp-section-b pre { font-family: var(--font-mono); font-size: 11.5px; line-height: 1.55; color: var(--text-1); white-space: pre-wrap; word-break: break-word; margin: 0; }
 .pp-empty { font-family: var(--font-mono); font-size: 11px; line-height: 1.55; color: var(--text-2); }
 .pp-msg { display: flex; flex-direction: column; gap: 3px; border-left: 2px solid var(--border-strong); padding-left: 8px; }
 .pp-role { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--text-2); }
@@ -913,10 +929,10 @@ input, textarea, select { font-family: inherit; }
 .record-card .rc-title { font-size: 14px; font-weight: 600; color: var(--text-0); margin-bottom: 6px; }
 .record-card .rc-row { display: flex; gap: 8px; font-size: 12.5px; line-height: 1.55; }
 .record-card .rc-key { color: var(--text-3); min-width: 86px; flex-shrink: 0; font-weight: 600; }
-.record-card .rc-val { color: var(--text-1); word-break: break-word; user-select: text; }
+.record-card .rc-val { color: var(--text-1); word-break: break-word; }
 .record-card .rc-json {
   margin-top: 8px; font-family: var(--font-mono); font-size: 11.5px; color: var(--text-2);
-  white-space: pre-wrap; word-break: break-word; user-select: text;
+  white-space: pre-wrap; word-break: break-word;
   background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 10px;
 }
 
@@ -933,14 +949,14 @@ input, textarea, select { font-family: inherit; }
 .chip {
   font-size: 12px; padding: 5px 12px; border-radius: 20px;
   background: var(--bg-3); color: var(--text-1); border: 1px solid var(--border);
-  font-family: var(--font-mono); user-select: text;
+  font-family: var(--font-mono);
 }
 
 /* prose / recall panel */
 .prose-panel {
   background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--radius);
   padding: 14px 16px; font-family: var(--font-mono); font-size: 12.5px; line-height: 1.65;
-  color: var(--text-1); white-space: pre-wrap; word-break: break-word; user-select: text;
+  color: var(--text-1); white-space: pre-wrap; word-break: break-word;
   min-height: 60px;
 }
 .search-row { display: flex; gap: 10px; align-items: stretch; }
@@ -948,7 +964,7 @@ input, textarea, select { font-family: inherit; }
 
 .report-error {
   background: rgba(240,85,107,0.08); border: 1px solid rgba(240,85,107,0.3); color: var(--red);
-  border-radius: var(--radius); padding: 12px 14px; font-size: 13px; white-space: pre-wrap; word-break: break-word; user-select: text;
+  border-radius: var(--radius); padding: 12px 14px; font-size: 13px; white-space: pre-wrap; word-break: break-word;
 }
 
 /* ---------------- Chat history ---------------- */
@@ -1098,17 +1114,13 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
 }
 .rt-body {
   margin-top: 4px; font-size: 12px; line-height: 1.5; color: var(--text-2);
-  white-space: pre-wrap; word-break: break-word; user-select: text;
+  white-space: pre-wrap; word-break: break-word;
   display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
 }
 .run-failed { color: var(--red); }
 .rt-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
 .run-meta { font-size: 11px; color: var(--text-3); }
 .run-toast-more { font-size: 11.5px; color: var(--text-3); text-align: center; }
-/* A run's answer is a report someone will want to quote from, and the body sets
-   user-select: none. */
-.modal-body .ai-response { user-select: text; }
-
 /* ---------------- Gate ---------------- */
 /* The one screen shown before anything else exists, so it gets to be quiet:
    centred, no chrome, nothing to read but the one thing being asked for. */
@@ -1151,7 +1163,7 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
   color: var(--text-0); background: var(--bg-0);
   border: 1px solid var(--border-strong); border-radius: var(--radius);
   padding: 10px 12px; margin-bottom: 10px;
-  white-space: pre-wrap; word-break: break-word; user-select: text;
+  white-space: pre-wrap; word-break: break-word;
   max-height: 40vh; overflow: auto;
 }
 .approval-actions {
@@ -1169,7 +1181,6 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
 .audit-row {
   display: flex; align-items: baseline; gap: 8px;
   font-family: var(--font-mono); font-size: 11.5px; color: var(--text-2);
-  user-select: text;
 }
 .audit-row .audit-cmd { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .audit-row.denied { color: var(--red); }
@@ -1771,7 +1782,7 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
 .toast-title { font-size: 12.5px; font-weight: 600; margin-bottom: 2px; }
 .toast-message {
   font-size: 12.5px; line-height: 1.5; color: var(--text-2);
-  white-space: pre-wrap; word-break: break-word; user-select: text;
+  white-space: pre-wrap; word-break: break-word;
   /* Long enough to be worth reading, short enough not to become a wall. The
      full text is in the conversation the toast points at. */
   display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;
@@ -1813,4 +1824,344 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
   display: block; margin: 0 auto 4px;
   background-repeat: no-repeat; background-position-x: 0;
   image-rendering: pixelated;
+}
+
+/* ---------------- The pet ---------------- */
+/* A character loose in the window, opened from the avatar pill.
+ *
+ * The layer covers everything and catches nothing: pointer-events pass through
+ * it to the app, and only the character itself takes a click. An animal you
+ * cannot type through is a toy you switch off after a minute. */
+.pet-layer {
+  position: fixed; inset: 0; z-index: 60;
+  pointer-events: none;
+  overflow: hidden;
+}
+.pet {
+  position: absolute; top: 0; left: 0;
+  pointer-events: auto;
+  cursor: pointer;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+  /* The sheet is two strips of four frames: standing, then walking. An
+     animation is a window travelling four frame-widths across one of them, and
+     what the character is doing picks which. steps(4) over exactly four widths
+     lands back where it started. The width comes from --pet-frame, set inline
+     from the same constant the walk uses, so the two cannot disagree. */
+  animation: pet-stand 1.4s steps(4) infinite;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.35));
+  transition: filter .2s ease;
+}
+@keyframes pet-stand {
+  from { background-position-x: 0; }
+  to   { background-position-x: calc(var(--pet-frame) * -4); }
+}
+@keyframes pet-walk {
+  from { background-position-x: calc(var(--pet-frame) * -4); }
+  to   { background-position-x: calc(var(--pet-frame) * -8); }
+}
+
+.pet.pet-walking { animation-name: pet-walk; animation-duration: .6s; }
+.pet.pet-thinking { animation-duration: 1.1s; }
+.pet.pet-waiting { animation-duration: 1.8s; }
+/* Waiting is on you, not on the agent — it should catch the eye rather than
+   settle. An error stops the character where it stands: a cheerful breathing
+   loop is the wrong thing to watch after something has gone wrong. */
+.pet.pet-waiting { filter: drop-shadow(0 0 6px var(--accent)); }
+.pet.pet-error { animation-play-state: paused; filter: drop-shadow(0 0 6px var(--red)); }
+
+/* Walking left is the same frames mirrored, and the mirror is written into the
+   same inline transform as the position — see Pet.tsx. */
+
+/* The pill that opens it, which is a button rather than a readout. */
+.pill-btn {
+  font: inherit; font-size: 11.5px; color: var(--text-2);
+  background: var(--bg-2); border: 1px solid var(--border);
+  border-radius: 999px; padding: 3px 10px; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 5px;
+}
+.pill-btn:hover { color: var(--text-1); border-color: var(--border-strong); }
+.pill-btn.on { color: var(--text-0); border-color: var(--accent); background: var(--accent-soft); }
+
+/* ---------------- Saved dashboards ---------------- */
+/* The right rail holds two panels now, so it gets a tab strip. Icons only:
+   the rail is narrow, and a wrench and a grid are both unambiguous at 16px. */
+.panel-tabs {
+  display: flex; align-items: center; gap: 2px;
+  padding: 6px 8px; border-bottom: 1px solid var(--border);
+}
+.panel-tab {
+  display: grid; place-items: center;
+  width: 28px; height: 28px; padding: 0;
+  color: var(--text-3); background: transparent;
+  border: 1px solid transparent; border-radius: var(--radius-sm);
+}
+.panel-tab:hover { color: var(--text-1); background: var(--bg-2); }
+.panel-tab.active { color: var(--text-0); background: var(--bg-2); border-color: var(--border); }
+
+.dash-card {
+  display: flex; align-items: stretch; gap: 4px;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--bg-1);
+}
+.dash-card:hover { border-color: var(--border-strong); }
+.dash-card-main {
+  flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px;
+  padding: 9px 11px; text-align: left;
+  background: transparent; border: none; color: inherit; font: inherit;
+}
+.dash-card-name {
+  font-size: 13px; font-weight: 500; color: var(--text-0);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.dash-card-meta {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 11.5px; color: var(--text-3);
+}
+.dash-cron { display: inline-flex; align-items: center; color: var(--accent); }
+.dash-card-err { font-size: 11.5px; color: var(--red); }
+.dash-card-actions {
+  display: flex; flex-direction: column; justify-content: center; gap: 2px;
+  padding-right: 6px;
+}
+
+/* The name is editable in place: renaming is the only edit a dashboard has,
+   and a field that looks like a heading is less machinery than a dialog. */
+.dash-name-input {
+  flex: 1; min-width: 0;
+  font: inherit; font-size: 13px; font-weight: 600; color: var(--text-0);
+  background: transparent; border: 1px solid transparent;
+  border-radius: var(--radius-sm); padding: 3px 6px;
+}
+.dash-name-input:hover { border-color: var(--border); }
+.dash-name-input:focus { border-color: var(--accent); outline: none; background: var(--bg-2); }
+
+.dash-detail { flex: 1; overflow-y: auto; padding: 12px; }
+/* Before the numbers, never after. A wall of prices carries no clue in itself
+   about which day it is a picture of. */
+.dash-age {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11.5px; color: var(--text-3); margin-bottom: 10px;
+}
+.dash-error {
+  font-size: 12px; color: var(--red); margin-bottom: 10px;
+  padding: 7px 10px; border-radius: var(--radius-sm);
+  background: rgba(240, 85, 107, 0.08);
+  border: 1px solid rgba(240, 85, 107, 0.28);
+}
+.dash-foot {
+  margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 7px;
+}
+.dash-foot-label { font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.6px; }
+.dash-prompt {
+  font-size: 12.5px; color: var(--text-2); line-height: 1.5;
+  padding: 8px 10px; border-radius: var(--radius-sm);
+  background: var(--bg-2); border: 1px solid var(--border);
+}
+
+/* Dragging the side panel wider. On the border itself, and wider than the
+   border so it can actually be grabbed — a 1px target is a target nobody hits. */
+.trace-panel { position: relative; }
+.panel-resizer {
+  position: absolute; left: -3px; top: 0; bottom: 0; width: 7px;
+  cursor: col-resize; z-index: 3;
+}
+.panel-resizer:hover, .panel-resizer:active { background: var(--accent); opacity: 0.5; }
+
+/* A dashboard with the window to itself. A twelve-column data wall in a
+   three-hundred-pixel panel is a column of squeezed cards; this is the same
+   source, given room. */
+.dash-full {
+  position: fixed; inset: 0; z-index: 80;
+  display: flex; flex-direction: column;
+  background: var(--bg-0);
+}
+.dash-full-bar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 14px; border-bottom: 1px solid var(--border);
+  background: var(--bg-1);
+}
+.dash-full-name { font-size: 14px; font-weight: 600; color: var(--text-0); }
+.dash-full-age {
+  flex: 1; display: flex; align-items: center; gap: 6px;
+  font-size: 11.5px; color: var(--text-3);
+}
+.dash-full-body { flex: 1; overflow-y: auto; padding: 24px 28px; }
+
+/* A block the renderer refused.
+ *
+ * Every AIGUI plugin refuses a block it cannot trust and says why, and the
+ * reason is worth reading: it is the difference between "the app is broken" and
+ * "the model wrote a 54-character caption into a field that takes 40".
+ *
+ * Seven plugins used to paint that box with `background: currentColor` — the
+ * box in the very colour of its own text — so the message was legible only
+ * through the aria-label and showed on screen as an unexplained slab. Fixed
+ * upstream in 0.36.1, where the defaults also became :where() so this file wins
+ * without a fight. Kept here because the app has its own error styling and a
+ * refused block should look like every other failure in the window.
+ *
+ * The selectors stay doubled anyway: plugin CSS is injected at runtime and
+ * takes every tie on order, so a host override that means it wins on
+ * specificity or not at all. */
+[data-aigui-bigscreen-error][data-aigui-bigscreen-error],
+[data-aigui-chart-error][data-aigui-chart-error],
+[data-aigui-mermaid-error][data-aigui-mermaid-error],
+[data-aigui-async-error][data-aigui-async-error],
+[data-aigui-ui-action-error][data-aigui-ui-action-error],
+[data-aigui-ui-field-error][data-aigui-ui-field-error] {
+  display: block;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: rgba(240, 85, 107, 0.08);
+  border: 1px solid rgba(240, 85, 107, 0.28);
+  color: var(--red);
+  opacity: 1;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+/* Named, so the string is a reason rather than a riddle. */
+[data-aigui-bigscreen-error]::before { content: "bigscreen block refused: "; opacity: 0.75; }
+[data-aigui-chart-error]::before { content: "chart block refused: "; opacity: 0.75; }
+[data-aigui-mermaid-error]::before { content: "diagram refused: "; opacity: 0.75; }
+
+/* ---------------- Narrow screens ---------------- */
+/*
+ * Measured on a 390x844 viewport before any of this existed: every one of the
+ * seven views scrolled sideways, the document 706px wide inside a 390px window.
+ * One element did most of it — the status pills, 553px of unbreakable row, with
+ * a memory pill carrying a host and port. Everything to its right (the theme
+ * picker, sign out, the avatar button) sat off-screen, reachable only by
+ * dragging the whole page sideways, which drags the conversation with it.
+ *
+ * These rules are ordered the way the failures were: stop the page overflowing
+ * at all, then make the rows that caused it behave, then give a phone the shape
+ * of an app rather than a shrunken desktop.
+ */
+
+/* --- 1. Nothing may push the document wider than the window. --- */
+.status-pills { flex-wrap: wrap; justify-content: flex-end; row-gap: 4px; min-width: 0; }
+/* The memory pill is the long one: a host and a port that nobody reads twice.
+   Truncated rather than wrapped, because a two-line pill is worse than an
+   elided one, and the whole value is still on the title. */
+.pill { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pill b { overflow: hidden; text-overflow: ellipsis; }
+
+/* --- 2. The rows that overflowed, page by page. --- */
+/* Knowledge: a row of actions 407px wide. It carries flex-shrink: 0 — the
+   buttons are deliberately never squeezed — inside a header that says nowrap,
+   so it could only overflow. The header wraps instead, and the actions drop to
+   a line of their own at full size, which is what they wanted all along.
+   Records: the tab strip, same shape. */
+.view-header.with-action { flex-wrap: wrap; }
+.vh-actions, .tabs { flex-wrap: wrap; min-width: 0; }
+/* Dashboard: the run clock. It is one line of numbers that must stay one line,
+   so it scrolls inside its own box instead of widening the page. */
+.cr-clock { max-width: 100%; overflow-x: auto; }
+
+@media (max-width: 640px) {
+  /* --- 3. The shape of the thing. --- */
+  /* The sidebar leaves the layout and becomes a drawer. Sixty pixels of icon
+     rail is fifteen per cent of a phone, spent on navigation that is used once
+     a minute. */
+  .app { grid-template-columns: 1fr; }
+  .sidebar {
+    position: fixed; inset: 0 auto 0 0; z-index: 70;
+    width: 232px; padding: 18px 12px;
+    transform: translateX(-100%);
+    transition: transform 0.18s ease;
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.35);
+  }
+  /* Open by the same flag the desktop uses for expanded, so the drawer is the
+     existing state under another layout rather than a second one to keep in
+     step. */
+  .sidebar:not(.collapsed) { transform: translateX(0); }
+  .sidebar.collapsed { width: 232px; padding: 18px 12px; }
+  /* Tapping anywhere else closes it. The backdrop is the sidebar's own
+     ::before so no element has to be added to the tree. */
+  .sidebar:not(.collapsed)::before {
+    content: ""; position: fixed; inset: 0; z-index: -1;
+    background: rgba(0, 0, 0, 0.45);
+  }
+  /* A drawer that is open must show its labels; collapsed styling belongs to
+     the desktop rail. */
+  .sidebar.collapsed .brand { flex-direction: row; gap: 10px; padding: 0 0 14px; }
+  .sidebar.collapsed .nav-item { justify-content: flex-start; padding: 9px 10px; }
+
+  /* The side panel becomes a sheet across the bottom. At 330px on a 390px
+     screen it was the whole window anyway, and half a conversation behind a
+     panel is worse than a sheet you can dismiss. */
+  .trace-panel {
+    position: fixed; inset: auto 0 0 0; z-index: 65;
+    width: auto !important; height: 72vh;
+    border-left: none; border-top: 1px solid var(--border);
+    border-radius: 14px 14px 0 0;
+    box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.3);
+  }
+  .trace-panel.collapsed { position: static; height: auto; box-shadow: none; }
+  /* Dragging an edge is a mouse gesture; a sheet has a fixed height. */
+  .panel-resizer { display: none; }
+
+  /* Touch targets. 44px is the smallest thing a finger hits reliably, and
+     nearly every control here was built at 22–30px for a cursor. */
+  .panel-toggle, .nav-item, .pill-btn, .theme-toggle, .btn.sm, .emotion-btn {
+    min-height: 44px;
+  }
+  .panel-toggle { width: 44px; height: 44px; }
+  .panel-toggle.inline { width: 40px; height: 40px; margin: 0; }
+  .panel-tab { width: 44px; height: 44px; }
+
+  /* The composer is what a phone is actually here for, so it gets the room. */
+  .composer { padding: 10px 12px; }
+  .content { padding: 0; }
+
+  /* An action row that refuses to shrink has to be given a line of its own,
+     or it sizes to its content and wraps nothing. Full width, allowed to
+     shrink, and then its buttons wrap inside it. */
+  .vh-actions { flex: 1 1 100%; min-width: 0; }
+  /* The header carries three read-only pills — memory, skills, MCP — that are
+     diagnostics, not controls. On a phone they cost the whole width and wrap
+     into a second row, which is how the header ended up sitting on top of the
+     page. They are on the Settings page in full; the header keeps the things
+     you can actually press. */
+  .status-pills { flex-wrap: nowrap; }
+  /* Tab strips scroll sideways rather than wrap. Wrapped, Settings' five tabs
+     put "Runtime" alone on a second row, which reads as a separate thing
+     rather than the last of five. A strip that scrolls keeps them one rank,
+     and a phone already knows how to swipe one. */
+  .settings-tabs, .tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .settings-tabs::-webkit-scrollbar, .tabs::-webkit-scrollbar { display: none; }
+  .settings-tab, .tab { flex: none; }
+  .status-pills .pill { display: none; }
+  .statusbar { gap: 10px; padding-inline: 12px; }
+
+  /* Every remaining control built for a cursor. Measured, not guessed: these
+     are the classes a sweep of all seven views found still under 40px tall. */
+  .settings-tab,
+  .pw-toggle,
+  .tab,
+  .btn,
+  .cr-btn,
+  .link-btn,
+  .cr-health-more,
+  .session-id {
+    min-height: 44px;
+  }
+  .pw-toggle, .link-btn, .session-id { padding-inline: 12px; }
+}
+
+/* The drawer's handle. Off the desktop entirely — there the sidebar is always
+   on screen and carries its own collapse button. */
+.nav-open { display: none; }
+@media (max-width: 640px) {
+  .nav-open { display: grid; margin-right: 2px; }
 }

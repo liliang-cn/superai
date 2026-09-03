@@ -53,7 +53,9 @@ export interface AppStatus {
   error: string;
   skills: string[];
   memoryMode: string;
-  browser: boolean;
+  /** Running MCP servers, and the tools they add up to. */
+  mcp: number;
+  mcpTools: number;
   avatarPort: number;
   /** False only when the backend says so — see normalizeStatus. */
   scheduler: boolean;
@@ -131,7 +133,8 @@ export function normalizeStatus(raw: Record<string, any> | null): AppStatus {
     error: String(raw?.error ?? ""),
     skills: Array.isArray(raw?.skills) ? raw!.skills : [],
     memoryMode: String(raw?.memoryMode ?? "—"),
-    browser: Boolean(raw?.browser),
+    mcp: Number(raw?.mcp ?? 0),
+    mcpTools: Number(raw?.mcpTools ?? 0),
     avatarPort: Number(raw?.avatarPort ?? 0),
     // Absent reads as running: the Schedules view warns when this is false, and
     // a warning about a healthy scheduler is worse than none at all.

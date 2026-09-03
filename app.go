@@ -119,7 +119,7 @@ func (a *App) boot() {
 	s, _ := backend.LoadSettings() // returns defaults even on error
 	a.settings = s
 
-	sse := backend.NewSSEServer(s.AvatarPort)
+	sse := backend.NewSSEServer(s.AvatarPort, avatarWeb())
 	if err := sse.Start(); err != nil {
 		a.avatar = backend.NoopDriver{}
 	} else {
@@ -537,7 +537,8 @@ func (a *App) GetStatus() map[string]any {
 		"error":          a.buildErr,
 		"skills":         []string{},
 		"memoryMode":     "",
-		"browser":        false,
+		"mcp":            0,
+		"mcpTools":       0,
 		"avatarPort":     0,
 		"cliproxy":       a.proxy != nil,
 		"cliproxyError":  a.proxyErr,
@@ -551,7 +552,18 @@ func (a *App) GetStatus() map[string]any {
 	if a.svc != nil {
 		st["skills"] = a.svc.InstalledSkills()
 		st["memoryMode"] = a.svc.MemoryMode
-		st["browser"] = a.svc.HasBrowser()
+		// Counted here rather than shipped as the whole list: the status bar
+		// only needs a number, and this is polled every fifteen seconds.
+		running, tools := 0, 0
+		for _, srv := range a.svc.MCPServers() {
+			if !srv.Running {
+				continue
+			}
+			running++
+			tools += srv.ToolCount
+		}
+		st["mcp"] = running
+		st["mcpTools"] = tools
 	}
 	return st
 }

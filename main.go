@@ -2,6 +2,7 @@ package main
 
 import (
 	"embed"
+	"io/fs"
 	"net/http"
 	"os"
 	"strings"
@@ -13,6 +14,21 @@ import (
 
 //go:embed all:frontend/dist
 var assets embed.FS
+
+// avatarWeb is the built frontend, rooted so "avatar.html" and "assets/…"
+// resolve — the avatar server serves its page out of the same build the app
+// itself runs on, rather than carrying a second copy of a renderer.
+//
+// Returns nil if the embed is somehow not there, which leaves the page
+// unavailable and everything an external renderer actually needs — the event
+// stream and the sprites — working.
+func avatarWeb() fs.FS {
+	sub, err := fs.Sub(assets, "frontend/dist")
+	if err != nil {
+		return nil
+	}
+	return sub
+}
 
 // noCache stops WKWebView/WebView2 from persisting index.html across rebuilds.
 // Each build emits new hashed asset filenames, but a cached index.html keeps

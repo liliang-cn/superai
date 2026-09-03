@@ -1,5 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { PanelRightCloseIcon, PanelRightOpenIcon } from "lucide-react";
+import React, { useMemo } from "react";
 import { AskSummary, TraceItem } from "../lib/types";
 import { CodeBlock } from "@/components/ai-elements/code-block";
 import {
@@ -90,7 +89,6 @@ export function TraceTool({ t }: { t: TraceItem }) {
   );
 }
 
-const OPEN_KEY = "superai-trace-open";
 
 interface TraceGroup {
   askId: string;
@@ -114,58 +112,28 @@ function groupByAsk(trace: TraceItem[], asks: AskSummary[]): TraceGroup[] {
   return groups;
 }
 
-export default function TracePanel({
+/**
+ * Tool activity, as a list.
+ *
+ * The shell around it — the rail, the collapse, and which of the two panels is
+ * showing — belongs to SidePanel now that the trace shares that rail with the
+ * saved dashboards.
+ */
+export function TraceBody({
   trace,
   asks = [],
-  title = "Tool Trace",
 }: {
   trace: TraceItem[];
   /** The asks the trace belongs to, used to label overlapping questions. */
   asks?: AskSummary[];
-  title?: string;
 }) {
-  const [open, setOpen] = useState(() => localStorage.getItem(OPEN_KEY) !== "0");
   const groups = useMemo(() => groupByAsk(trace, asks), [trace, asks]);
 
-  useEffect(() => {
-    localStorage.setItem(OPEN_KEY, open ? "1" : "0");
-  }, [open]);
-
-  // Collapsed: a rail wide enough for the toggle, keeping the tool count
-  // visible so activity while it is hidden is not silent.
-  if (!open) {
-    return (
-      <div className="trace-panel collapsed">
-        <button
-          type="button"
-          className="panel-toggle"
-          onClick={() => setOpen(true)}
-          title={`Show ${title.toLowerCase()}`}
-          aria-label={`Show ${title.toLowerCase()}`}
-        >
-          <PanelRightOpenIcon className="size-4" />
-          {trace.length > 0 && <span className="panel-badge">{trace.length}</span>}
-        </button>
-      </div>
-    );
-  }
-
   return (
-    <div className="trace-panel">
+    <>
       <div className="trace-head">
-        <span>{title}</span>
-        <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ color: "var(--text-3)", fontWeight: 400 }}>{trace.length}</span>
-          <button
-            type="button"
-            className="panel-toggle inline"
-            onClick={() => setOpen(false)}
-            title={`Hide ${title.toLowerCase()}`}
-            aria-label={`Hide ${title.toLowerCase()}`}
-          >
-            <PanelRightCloseIcon className="size-4" />
-          </button>
-        </span>
+        <span>Tool Trace</span>
+        <span style={{ color: "var(--text-3)", fontWeight: 400 }}>{trace.length}</span>
       </div>
       <div
         className="trace-list"
@@ -197,6 +165,6 @@ export default function TracePanel({
           ))
         )}
       </div>
-    </div>
+    </>
   );
 }

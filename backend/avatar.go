@@ -4,6 +4,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"net"
 	"net/http"
 	"strings"
@@ -68,6 +69,7 @@ func (NoopDriver) Emit(AvatarEvent) {}
 // each AvatarEvent as `data: <json>\n\n`.
 type SSEServer struct {
 	port int
+	web  fs.FS
 
 	srv *http.Server
 	ln  net.Listener
@@ -78,9 +80,18 @@ type SSEServer struct {
 
 // NewSSEServer constructs an SSE avatar server bound (on Start) to
 // 127.0.0.1:port.
-func NewSSEServer(port int) *SSEServer {
+//
+// web is the built frontend (frontend/dist), holding avatar.html and the
+// hashed assets it loads. The page is a Vite entry built beside the app rather
+// than a string in this file: it renders a reply with the same AIGUI plugins
+// the chat window uses, and a second hand-written renderer would have gone on
+// printing markdown as asterisks. A nil FS leaves the page unavailable while
+// the event stream and the sprites keep working — an external renderer needs
+// neither.
+func NewSSEServer(port int, web fs.FS) *SSEServer {
 	return &SSEServer{
 		port:    port,
+		web:     web,
 		clients: make(map[chan []byte]struct{}),
 	}
 }
@@ -91,6 +102,12 @@ func (s *SSEServer) Start() error {
 	mux.HandleFunc("/avatar/events", s.handleEvents)
 	mux.HandleFunc("/avatar", s.handlePage)
 	mux.HandleFunc("/avatar/sprites/", s.handleSprite)
+	// The page's own script and stylesheet. Vite writes them under /assets
+	// with hashed names, and the page asks for them at the root, so they are
+	// served from the root here too rather than under /avatar.
+	if s.web != nil {
+		mux.Handle("/assets/", http.FileServer(http.FS(s.web)))
+	}
 
 	ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", s.port))
 	if err != nil {
@@ -189,8 +206,20 @@ func (s *SSEServer) handleEvents(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *SSEServer) handlePage(w http.ResponseWriter, r *http.Request) {
+	if s.web == nil {
+		http.Error(w, "avatar page not built into this binary", http.StatusServiceUnavailable)
+		return
+	}
+	page, err := fs.ReadFile(s.web, "avatar.html")
+	if err != nil {
+		http.Error(w, "avatar page missing from the build", http.StatusServiceUnavailable)
+		return
+	}
+	// Same reason index.html is uncached in the desktop app: each build emits
+	// new hashed asset names, and a cached page keeps asking for the old ones.
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_, _ = w.Write([]byte(avatarRefHTML))
+	_, _ = w.Write(page)
 }
 
 // handleSprite serves one character's sheet.
@@ -235,137 +264,3 @@ func AvatarStates() []string {
 		AvatarStateSpeaking, AvatarStateWaiting, AvatarStateError,
 	}
 }
-
-// avatarRefHTML is a tiny reference renderer proving the avatar protocol works:
-// a 2D placeholder that reacts to state + emotion + speech events.
-const avatarRefHTML = `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>SuperAI Avatar (reference)</title>
-<style>
-  :root { color-scheme: dark; --bg:#0e1116; --fg:#e6edf3; --dim:#8b949e; --line:#30363d; }
-  * { box-sizing: border-box; }
-  body { margin:0; font-family: system-ui, -apple-system, "PingFang SC", sans-serif;
-         background:var(--bg); color:var(--fg); height:100vh;
-         display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; }
-
-  /* The stage. A ring of light behind the character carries the state, so the
-     sprite itself never has to be redrawn to say "working" — the sheet has
-     five emotions and no states, and inventing twenty more frames to encode
-     four states would be four times the art for something a colour says. */
-  #stage { position:relative; width:200px; height:200px; display:grid; place-items:center; }
-  #glow { position:absolute; inset:18px; border-radius:50%; background:#30363d; transition:background .3s ease; }
-  #stage.thinking #glow { background:#8957e5; }
-  #stage.working  #glow { background:#d29922; animation:pulse 1.2s infinite; }
-  #stage.speaking #glow { background:#2ea043; }
-  #stage.idle     #glow { background:#30363d; }
-  /* Waiting is on you, not on the agent, so it does not settle — it keeps
-     blinking until someone answers. */
-  #stage.waiting  #glow { background:#1f6feb; animation:blink 1s steps(2) infinite; }
-  #stage.error    #glow { background:#da3633; }
-  @keyframes blink { 50% { opacity:.35; } }
-  @keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(210,153,34,.45);} 100%{box-shadow:0 0 0 28px rgba(210,153,34,0);} }
-
-  /* The character. One sprite window onto a sheet that is 4 frames wide and 5
-     emotions tall; the animation walks the frames with steps(), so the browser
-     runs it and no timer here has to keep up with it. */
-  #sprite {
-    position:relative; width:120px; height:144px;   /* 20x24 at 6x */
-    background-image:url("/avatar/sprites/cat.png");
-    background-repeat:no-repeat;
-    background-size:960px 1440px;                   /* 160x240 at 6x */
-    image-rendering:pixelated;
-    animation:stand 1.4s steps(4) infinite;
-  }
-  /* The sheet is two strips of four: standing, then walking. An animation is a
-     window travelling four frame-widths across one of them, and a state picks
-     which. steps(4) over exactly four widths lands back where it started. */
-  @keyframes stand { from { background-position-x:0; }     to { background-position-x:-480px; } }
-  @keyframes walk  { from { background-position-x:-480px; } to { background-position-x:-960px; } }
-
-  /* Working is the one state with somewhere to be. */
-  #stage.working #sprite { animation-name:walk; animation-duration:.6s; }
-  #stage.speaking #sprite { animation-duration:.8s; }
-  #stage.thinking #sprite { animation-duration:1.1s; }
-  #stage.waiting #sprite { animation-duration:1.8s; }
-  /* An error stops the character where it is: something has gone wrong and a
-     cheerful breathing loop under a red light is the wrong thing to watch. */
-  #stage.error #sprite { animation-play-state:paused; }
-
-  .tags { display:flex; gap:8px; }
-  .tag { padding:3px 11px; border-radius:999px; background:#161b22; border:1px solid var(--line); font-size:13px; }
-  #speech { max-width:520px; min-height:24px; text-align:center; line-height:1.55; padding:0 20px; }
-  #pick { display:flex; gap:6px; }
-  #pick button {
-    font:inherit; font-size:12px; color:var(--dim); background:#161b22;
-    border:1px solid var(--line); border-radius:7px; padding:5px 12px; cursor:pointer;
-  }
-  #pick button.on { color:var(--fg); border-color:#58a6ff; }
-</style>
-</head>
-<body>
-  <div id="stage" class="idle">
-    <div id="glow"></div>
-    <div id="sprite"></div>
-  </div>
-  <div class="tags">
-    <span class="tag" id="state">state: idle</span>
-    <span class="tag" id="emotion">emotion: neutral</span>
-  </div>
-  <div id="speech"></div>
-  <div id="pick"></div>
-<script>
-  var CHARS = ["cat", "bunny", "robot"];
-  // The sheet's rows, in the order it was generated in. A name not in this
-  // list leaves the row where it is rather than falling back to row 0: the
-  // mood tag is optional and free-form enough that a model will eventually
-  // invent one, and snapping the face to neutral every time it does would look
-  // like the avatar had broken.
-  var ROWS = { neutral:0, happy:1, sad:2, thinking:3, excited:4,
-               sleepy:5, confused:6, love:7, angry:8, surprised:9 };
-
-  var stage = document.getElementById("stage");
-  var sprite = document.getElementById("sprite");
-  var pick = document.getElementById("pick");
-
-  function setChar(name) {
-    sprite.style.backgroundImage = 'url("/avatar/sprites/' + name + '.png")';
-    try { localStorage.setItem("superai-avatar-char", name); } catch (_) {}
-    [].forEach.call(pick.children, function (b) { b.className = b.textContent === name ? "on" : ""; });
-  }
-  function setEmotion(name) {
-    var row = ROWS[name];
-    if (row === undefined) return;
-    // 144px per row at 6x; negative because the window moves down the sheet.
-    sprite.style.backgroundPositionY = (-row * 144) + "px";
-  }
-
-  CHARS.forEach(function (name) {
-    var b = document.createElement("button");
-    b.textContent = name;
-    b.onclick = function () { setChar(name); };
-    pick.appendChild(b);
-  });
-  var saved;
-  try { saved = localStorage.getItem("superai-avatar-char"); } catch (_) {}
-  setChar(CHARS.indexOf(saved) >= 0 ? saved : "cat");
-
-  var es = new EventSource("/avatar/events");
-  es.onmessage = function (e) {
-    var ev; try { ev = JSON.parse(e.data); } catch (_) { return; }
-    if (ev.type === "state") {
-      stage.className = ev.state || "idle";
-      document.getElementById("state").textContent = "state: " + (ev.state || "idle");
-    } else if (ev.type === "emotion") {
-      document.getElementById("emotion").textContent = "emotion: " + (ev.emotion || "neutral");
-      setEmotion(ev.emotion);
-    } else if (ev.type === "speech") {
-      document.getElementById("speech").textContent = ev.text || "";
-    }
-  };
-  es.onerror = function () { document.getElementById("state").textContent = "state: disconnected"; };
-</script>
-</body>
-</html>`

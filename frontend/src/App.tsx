@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import Sidebar from "./components/Sidebar";
+import Pet from "./components/Pet";
 import StatusBar from "./components/StatusBar";
 import ChatView from "./views/ChatView";
 import DashboardView from "./views/DashboardView";
@@ -20,6 +21,10 @@ import { useToolApprovals } from "./lib/useToolApprovals";
 import { uiRules } from "./lib/aigui";
 import { GetStatus, SetUIRules, SetWindowTheme } from "../wailsjs/go/main/App";
 
+/** Where the sidebar remembers being expanded. Shared with the drawer on a
+ *  phone, which is the same state seen through a different layout. */
+const NAV_OPEN_KEY = "superai-sidebar-open";
+
 export default function App() {
   // Draw every notice the backend publishes. Mounted here so it survives every
   // view change: a toast about a run that just failed must not disappear
@@ -28,6 +33,27 @@ export default function App() {
 
   const [view, setView] = useState<ViewKey>("chat");
   const [status, setStatus] = useState<AppStatus | null>(null);
+  // Off until asked for. Something walking across the window is charming when
+  // you let it out and an interruption when it arrives on its own.
+  const [petOpen, setPetOpen] = useState(false);
+  // The sidebar: expanded on a desktop, a drawer on a phone. It starts closed
+  // on a narrow screen whatever was stored, because a drawer covering the app
+  // on arrival is not a navigation aid.
+  const [navOpen, setNavOpen] = useState(() => {
+    try {
+      if (window.matchMedia("(max-width: 640px)").matches) return false;
+      return localStorage.getItem(NAV_OPEN_KEY) !== "0";
+    } catch {
+      return true;
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(NAV_OPEN_KEY, navOpen ? "1" : "0");
+    } catch {
+      // A private window. It simply opens on its default next time.
+    }
+  }, [navOpen]);
   const [loading, setLoading] = useState(true);
   const [theme, setTheme] = useState<Theme>(
     () => (localStorage.getItem("superai-theme") as Theme) || "dark"
@@ -113,7 +139,18 @@ export default function App() {
   return (
     <>
       <div className="app">
-        <Sidebar current={view} onNavigate={setView} badges={{ records: runs.unseen }} />
+        <Sidebar
+          current={view}
+          onNavigate={(v) => {
+            setView(v);
+            // On a phone the sidebar is a drawer over the page, so navigating
+            // has to close it or the destination is behind it.
+            if (window.matchMedia("(max-width: 640px)").matches) setNavOpen(false);
+          }}
+          badges={{ records: runs.unseen }}
+          open={navOpen}
+          onToggle={() => setNavOpen((v) => !v)}
+        />
         <div className="main">
           <StatusBar
             status={status}
@@ -122,6 +159,9 @@ export default function App() {
             onTheme={setTheme}
             accent={accent}
             onAccent={setAccent}
+            petOpen={petOpen}
+            onTogglePet={() => setPetOpen((open) => !open)}
+            onOpenNav={() => setNavOpen(true)}
           />
           <div className="content">
             {view === "chat" && (
@@ -142,6 +182,12 @@ export default function App() {
           </div>
         </div>
       </div>
+      {/* Loose in the window, over everything, catching nothing but its own
+          clicks. Needs the avatar server for its sprites and its state, which
+          is also the only condition under which the pill that opens it shows. */}
+      {petOpen && status && status.avatarPort > 0 && (
+        <Pet port={status.avatarPort} onDismiss={() => setPetOpen(false)} />
+      )}
       {/* Records lists the same runs, so a toast there would only repeat what
           is already on screen. */}
       {view !== "records" && (

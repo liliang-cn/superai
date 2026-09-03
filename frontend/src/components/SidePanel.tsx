@@ -1,0 +1,207 @@
+import React, { useEffect, useRef, useState } from "react";
+import {
+  LayoutDashboardIcon,
+  PanelRightCloseIcon,
+  WrenchIcon,
+} from "lucide-react";
+import { AskSummary, TraceItem } from "../lib/types";
+import { TraceBody } from "./TracePanel";
+import DashboardsPanel from "./DashboardsPanel";
+
+/**
+ * The rail down the right of a conversation, and whichever panel it is showing.
+ *
+ * It used to be the tool trace and nothing else, so the trace owned the rail,
+ * the collapse and the remembering. Now the saved dashboards live there too and
+ * that shell belongs to neither of them — a panel should know what it draws and
+ * not whether it is the one on screen.
+ *
+ * Collapsed, the rail is a column of icons rather than a single toggle: what a
+ * click opens is now a choice, and a rail that opened "whatever was last shown"
+ * would make the trace icon sometimes mean dashboards.
+ */
+
+type Tab = "trace" | "dashboards";
+
+const OPEN_KEY = "superai-trace-open";
+const TAB_KEY = "superai-side-tab";
+const WIDTH_KEY = "superai-side-width";
+
+/** How wide the panel may be dragged.
+ *
+ *  The floor is the width it has always had, and the ceiling leaves enough of
+ *  the conversation visible to still be a conversation — a panel that can eat
+ *  the whole window is a worse full screen than the real one, which a dashboard
+ *  has its own button for. */
+const MIN_WIDTH = 300;
+const MAX_WIDTH = 900;
+const DEFAULT_WIDTH = 330;
+
+const TABS: { key: Tab; label: string; Icon: typeof WrenchIcon }[] = [
+  { key: "trace", label: "Tool trace", Icon: WrenchIcon },
+  { key: "dashboards", label: "Dashboards", Icon: LayoutDashboardIcon },
+];
+
+function read(key: string, fallback: string): string {
+  try {
+    return localStorage.getItem(key) ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+/** Keeps a dragged width inside what the layout can actually hold. */
+function clamp(px: number): number {
+  return Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, Math.round(px)));
+}
+
+function write(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // A private window. The panel simply opens on its default next time.
+  }
+}
+
+export default function SidePanel({
+  trace,
+  asks = [],
+}: {
+  trace: TraceItem[];
+  asks?: AskSummary[];
+}) {
+  // The key is the one the trace panel has always used, so an existing install
+  // opens the way it was left rather than resetting because the code moved.
+  const [open, setOpen] = useState(() => read(OPEN_KEY, "1") !== "0");
+  const [tab, setTab] = useState<Tab>(() =>
+    read(TAB_KEY, "trace") === "dashboards" ? "dashboards" : "trace",
+  );
+  const [width, setWidth] = useState(() => {
+    const saved = Number(read(WIDTH_KEY, ""));
+    return saved >= MIN_WIDTH && saved <= MAX_WIDTH ? saved : DEFAULT_WIDTH;
+  });
+
+  useEffect(() => write(OPEN_KEY, open ? "1" : "0"), [open]);
+  useEffect(() => write(TAB_KEY, tab), [tab]);
+
+  /**
+   * Dragging the left edge.
+   *
+   * Pointer capture rather than window listeners: the pointer leaves the 5px
+   * handle on the first millimetre of any real drag, and without capture the
+   * events stop arriving the moment it does — the panel would jump once and
+   * then stick. Capture also ends the drag correctly when the button is
+   * released outside the window.
+   *
+   * The width is written to the element during the drag and to state only at
+   * the end: resizing re-renders a live tool trace or a chart, and doing that
+   * on every pointer move is what makes a drag feel like it is fighting back.
+   */
+  const panelRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<number | null>(null);
+
+  const onResizeStart = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    dragRef.current = width;
+  };
+
+  const onResizeMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (dragRef.current === null || !panelRef.current) return;
+    // Measured from the right edge of the window, which is where the panel is
+    // anchored, so the handle stays under the pointer whatever the layout does.
+    const next = clamp(window.innerWidth - e.clientX);
+    dragRef.current = next;
+    panelRef.current.style.width = `${next}px`;
+  };
+
+  const onResizeEnd = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (dragRef.current === null) return;
+    e.currentTarget.releasePointerCapture(e.pointerId);
+    const next = dragRef.current;
+    dragRef.current = null;
+    setWidth(next);
+    write(WIDTH_KEY, String(next));
+  };
+
+  if (!open) {
+    return (
+      <div className="trace-panel collapsed">
+        <div className="panel-rail">
+          {TABS.map(({ key, label, Icon }) => (
+            <button
+              key={key}
+              type="button"
+              className="panel-toggle"
+              onClick={() => {
+                setTab(key);
+                setOpen(true);
+              }}
+              title={`Show ${label.toLowerCase()}`}
+              aria-label={`Show ${label.toLowerCase()}`}
+            >
+              <Icon className="size-4" />
+              {/* The count keeps activity from being silent while hidden. Only
+                the trace has one worth watching go up mid-turn. */}
+              {key === "trace" && trace.length > 0 && (
+                <span className="panel-badge">{trace.length}</span>
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="trace-panel" ref={panelRef} style={{ width }}>
+      {/* The drag handle sits on the border, outside the scrolling content, so
+          grabbing it never scrolls whatever is underneath. */}
+      <div
+        className="panel-resizer"
+        onPointerDown={onResizeStart}
+        onPointerMove={onResizeMove}
+        onPointerUp={onResizeEnd}
+        onPointerCancel={onResizeEnd}
+        onDoubleClick={() => {
+          setWidth(DEFAULT_WIDTH);
+          write(WIDTH_KEY, String(DEFAULT_WIDTH));
+        }}
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize panel (double-click to reset)"
+        title="Drag to resize · double-click to reset"
+      />
+      <div className="panel-tabs">
+        {TABS.map(({ key, label, Icon }) => (
+          <button
+            key={key}
+            type="button"
+            className={`panel-tab${tab === key ? " active" : ""}`}
+            onClick={() => setTab(key)}
+            title={label}
+            aria-label={label}
+            aria-selected={tab === key}
+          >
+            <Icon className="size-4" />
+          </button>
+        ))}
+        <span style={{ flex: 1 }} />
+        <button
+          type="button"
+          className="panel-toggle inline"
+          onClick={() => setOpen(false)}
+          title="Hide panel"
+          aria-label="Hide panel"
+        >
+          <PanelRightCloseIcon className="size-4" />
+        </button>
+      </div>
+      {tab === "trace" ? (
+        <TraceBody trace={trace} asks={asks} />
+      ) : (
+        <DashboardsPanel />
+      )}
+    </div>
+  );
+}

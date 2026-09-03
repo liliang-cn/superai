@@ -31,7 +31,7 @@ func TestSmokeLive(t *testing.T) {
 		t.Fatalf("NewService: %v", err)
 	}
 	defer svc.Close()
-	t.Logf("memory=%s browser=%v skills=%v", svc.MemoryMode, svc.HasBrowser(), svc.InstalledSkills())
+	t.Logf("memory=%s mcp=%d skills=%v", svc.MemoryMode, len(svc.MCPServers()), svc.InstalledSkills())
 
 	trace := func(label string) func(ev *agent.Event) {
 		return func(ev *agent.Event) {
