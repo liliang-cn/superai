@@ -74,18 +74,12 @@ export default function SidePanel({
   asks = [],
   sessionId = "",
   draft = "",
-  tab: forcedTab,
-  onTabHandled,
 }: {
   trace: TraceItem[];
   asks?: AskSummary[];
   /** The conversation and the message being written, for the preview tab. */
   sessionId?: string;
   draft?: string;
-  /** A tab asked for from outside — the composer's eye button opens the
-   *  preview here rather than a dialog of its own. */
-  tab?: Tab | null;
-  onTabHandled?: () => void;
 }) {
   // The key is the one the trace panel has always used, so an existing install
   // opens the way it was left rather than resetting because the code moved.
@@ -100,13 +94,6 @@ export default function SidePanel({
 
   useEffect(() => write(OPEN_KEY, open ? "1" : "0"), [open]);
   useEffect(() => write(TAB_KEY, tab), [tab]);
-
-  useEffect(() => {
-    if (!forcedTab) return;
-    setTab(forcedTab);
-    setOpen(true);
-    onTabHandled?.();
-  }, [forcedTab, onTabHandled]);
 
   // The draft, settled. Assembling a turn is a round trip through the persona,
   // the recalled memory and the whole tool catalogue; per keystroke would put

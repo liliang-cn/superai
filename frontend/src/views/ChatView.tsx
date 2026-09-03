@@ -27,7 +27,6 @@ import {
   Trash2Icon,
   PaperclipIcon,
   SquareIcon,
-  ScanEyeIcon,
   LayoutDashboardIcon,
 } from "lucide-react";
 import { HistoryBar, HistoryList, useHistory } from "../components/HistoryBar";
@@ -57,8 +56,6 @@ export default function ChatView({
   // The composer is controlled so the send button can know whether there is
   // anything to send — which is what decides between "send" and "stop" below.
   const [draft, setDraft] = useState("");
-  // A tab to show in the rail, consumed once by SidePanel.
-  const [railTab, setRailTab] = useState<"trace" | "dashboards" | "preview" | null>(null);
   // The message index whose save just landed, for a moment of green.
   const [saved, setSaved] = useState(-1);
   // The reply waiting to be named. Null when the dialog is closed.
@@ -353,20 +350,6 @@ export default function ChatView({
                     Claude put it. Type anything and it turns back into send, so
                     asking a second question mid-answer (which this transcript
                     supports) is never taken away; ⏎ sends either way. */}
-                {/* Look before paying for a turn. Read-only, and beside the
-                    send button because the thing it previews is the thing that
-                    button would do. */}
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="ghost"
-                  className="rounded-lg text-muted-foreground"
-                  title="Preview the prompt this would send"
-                  aria-label="Preview the prompt this would send"
-                  onClick={() => setRailTab("preview")}
-                >
-                  <ScanEyeIcon className="size-3.5" />
-                </Button>
                 {chat.sending && draft.trim() === "" ? (
                   <Button
                     type="button"
@@ -391,8 +374,6 @@ export default function ChatView({
           asks={chat.asks}
           sessionId={chat.sessionId}
           draft={draft}
-          tab={railTab}
-          onTabHandled={() => setRailTab(null)}
         />
       </div>
       {naming && (
