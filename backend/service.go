@@ -351,6 +351,11 @@ func NewService(s *Settings) (*Service, error) {
 	out.store.load()
 	out.registerLifeTools()
 	out.registerNotifyTool()
+	// Operating the app from inside the conversation: dashboards, and the
+	// settings it is allowed to change about itself. Not gated on
+	// DisableSelfInstall — that switch is about acquiring new capabilities from
+	// the outside, and these are the app's own controls.
+	out.registerSelfTools()
 	// Self-extension: chat-driven install of skills and MCP servers, plus
 	// "here's a URL, work out how to install it". Withheld for one-shot runs —
 	// see Settings.DisableSelfInstall.
@@ -717,7 +722,9 @@ Duties:
 - Scheduling: call exactly ONE tool. Every day at HH:MM, or one specific moment → set_reminder. Any other cadence — a weekday, every Monday, every few hours, a day of the month → schedule_prompt, which takes a cron and can say what the other cannot. Calling both leaves two schedules for one request, and one of them is always wrong.
 - Whenever the user states something that happened, or asks to be reminded or to have something recorded, store it with the matching tool before you reply.
 - When you need something current, live, or not in memory (weather, markets, news, fact-checking…), search with web_search; when you need to read or review the real content of a specific URL, fetch that page's text with fetch_url.
-- You have a sandbox, a browser, vision, deliverables and skills; take complex tasks through as many steps as they need on your own.%s
+- You have a sandbox, a browser, vision, deliverables and skills; take complex tasks through as many steps as they need on your own.
+- Operating this app on the user's behalf: "save this as a dashboard / I want to open it often" → dashboard_save, with the reply text as source and the question that produces it as prompt; dashboard_list and dashboard_delete for the rest. Settings the user asks you to change → settings_get, then settings_set.
+- Report what you actually did, tool by tool. If a request needs something you have no tool for, say which part you could not do and name what you did instead — never present a near neighbour as the thing that was asked for. Asked to save a dashboard, saving a skill and a note instead and calling all three "saved" is the failure this rule exists for: the user opened the panel and it was empty.%s
 - Answer in Chinese: short, natural, human. You may end a reply with a mood tag alone on the last line — MOOD: <neutral|happy|sad|thinking|excited|sleepy|confused|love|angry|surprised> — when the feeling is genuinely part of the answer. It is optional and only drives an avatar; it is never worth a worse answer, and a reply that is only a fact does not need one.
 
 Never answer in English, Japanese or Korean — always Chinese.`,

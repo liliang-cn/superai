@@ -335,6 +335,17 @@ export default function KnowledgeView() {
             saves memories and draws relations.
           </div>
         )}
+        {/* The viewer is CortexDB's own page in a frame, and its overlay of
+            filters and view controls is laid out for a desktop: at 342px it
+            squeezes the graph into a strip and breaks its own labels one word
+            per line. Nothing here can restyle another app's document, and
+            shipping a squeezed frame is worse than saying so. On a phone the
+            frame is left out and the button below — which was always there —
+            is the way in. */}
+        <div className="graph-narrow">
+          A 3D graph wants a wider screen than this. Open it in a browser, or
+          come back on a desktop.
+        </div>
         <iframe
           key={`${GRAPH_SRC ?? status?.url}#${nonce}`}
           ref={frameRef}

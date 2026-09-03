@@ -78,8 +78,17 @@ function Stat({ icon, label, value, sub, tone, spark }: { icon: React.ReactNode;
       <div className="cr-stat-v">{value}</div>
       {sub && <div className="cr-stat-s">{sub}</div>}
       {spark && spark.length > 1 && (
+        // vector-effect is what keeps this a line rather than a slab. The
+        // viewBox is one unit per sample and preserveAspectRatio is none, so a
+        // two-sample spark is a viewBox 1 unit wide stretched across 88px —
+        // and without this the 1.5 stroke is scaled by that same 88 and paints
+        // the whole card blue. Non-scaling-stroke draws it in screen pixels,
+        // whatever the box is stretched to.
         <svg className="cr-spark" viewBox={`0 0 ${spark.length - 1} 24`} preserveAspectRatio="none">
-          <polyline points={spark.map((v, i) => `${i},${24 - v * 22}`).join(" ")} />
+          <polyline
+            vectorEffect="non-scaling-stroke"
+            points={spark.map((v, i) => `${i},${24 - v * 22}`).join(" ")}
+          />
         </svg>
       )}
     </div>
