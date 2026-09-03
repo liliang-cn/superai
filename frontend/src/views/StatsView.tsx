@@ -4,10 +4,11 @@ import {
   Dashboard, GraphView as startGraphView, LongRunList, LongRunStart, LongRunState, LongRunStop,
 } from "../../wailsjs/go/main/App";
 import {
-  Activity, AlertTriangle, Brain, Clock, Coins, Cpu, Database, Gauge, GitBranch, Grid3x3, Layers,
-  ListChecks, Network, Play, Radio, RotateCcw, ScrollText, Shield, Sparkles, Square, Terminal, Wrench, Zap,
+  Activity, AlertTriangle, Brain, Clock, Coins, Cpu, Database, Gauge, GitBranch, Grid3x3,
+  ListChecks, Play, Radio, RotateCcw, ScrollText, Shield, Sparkles, Square, Terminal, Wrench, Zap,
 } from "lucide-react";
-import LoopOrbital, { hueFor } from "../components/LoopOrbital";
+import Reactor, { PulseTicker, ToolTable, usePulse } from "../components/Reactor";
+import { hueFor } from "../lib/hues";
 import HealthCard from "../components/HealthCard";
 import RunTracePanel from "../components/RunTracePanel";
 import { useTween } from "../lib/useTween";
@@ -71,26 +72,16 @@ const elapsed = (from: string, to?: string) => {
   return h ? `${h}h ${String(m).padStart(2, "0")}m` : m ? `${m}m ${String(r).padStart(2, "0")}s` : `${r}s`;
 };
 
-function Stat({ icon, label, value, sub, tone, spark }: { icon: React.ReactNode; label: string; value: React.ReactNode; sub?: React.ReactNode; tone?: "cyan" | "amber" | "rose" | "lime"; spark?: number[] }) {
+// Numbers only, below the reactor. Every picture this page had — the
+// sparkline in a card, the heat grid of turns, the cache bars, the fleet
+// cards' little polylines — moved into the wheel or became a figure. One
+// place draws; everything under it can be read.
+function Stat({ icon, label, value, sub, tone }: { icon: React.ReactNode; label: string; value: React.ReactNode; sub?: React.ReactNode; tone?: "cyan" | "amber" | "rose" | "lime" }) {
   return (
     <div className={`cr-stat ${tone ?? ""}`}>
       <div className="cr-stat-h"><span className="cr-ico">{icon}</span><span className="cr-eyebrow">{label}</span></div>
       <div className="cr-stat-v">{value}</div>
       {sub && <div className="cr-stat-s">{sub}</div>}
-      {spark && spark.length > 1 && (
-        // vector-effect is what keeps this a line rather than a slab. The
-        // viewBox is one unit per sample and preserveAspectRatio is none, so a
-        // two-sample spark is a viewBox 1 unit wide stretched across 88px —
-        // and without this the 1.5 stroke is scaled by that same 88 and paints
-        // the whole card blue. Non-scaling-stroke draws it in screen pixels,
-        // whatever the box is stretched to.
-        <svg className="cr-spark" viewBox={`0 0 ${spark.length - 1} 24`} preserveAspectRatio="none">
-          <polyline
-            vectorEffect="non-scaling-stroke"
-            points={spark.map((v, i) => `${i},${24 - v * 22}`).join(" ")}
-          />
-        </svg>
-      )}
     </div>
   );
 }
@@ -100,7 +91,7 @@ function Num({ v, fmt = fmtK }: { v: number; fmt?: (n: number) => string }) {
   return <>{fmt(t)}</>;
 }
 
-export default function DashboardView() {
+export default function StatsView() {
   const [dash, setDash] = useState<DashData | null>(null);
   const [graph, setGraph] = useState<{ url?: string; nodes?: number; edges?: number } | null>(null);
   const [tasks, setTasks] = useState<TaskSummary[]>([]);
@@ -119,6 +110,9 @@ export default function DashboardView() {
   // other panel on the page.
   const [traceId, setTraceId] = useState("");
   const [clock, setClock] = useState(new Date());
+  // The live meter, polled once here and shared by the reactor, the columns
+  // and the ticker below it.
+  const pulse = usePulse();
   const ime = useImeGuard();
   const logRef = useRef<HTMLDivElement | null>(null);
 
@@ -176,8 +170,6 @@ export default function DashboardView() {
   }, [st]);
 
   const days = dash?.usage?.days ?? [];
-  const dayMax = Math.max(1, ...days.map((x) => x.tokens));
-  const spark = days.map((x) => x.tokens / dayMax);
   const live = Boolean(st?.running) || (dash?.activeRuns?.length ?? 0) > 0;
   const brainLabel = dash?.memoryMode?.startsWith("shared") ? "shared brain" : dash?.memoryMode || "local brain";
 
@@ -195,26 +187,41 @@ export default function DashboardView() {
         <div className="cr-clock"><Clock size={13} />{hhmmss(clock)}<span className={`cr-tag ${live ? "cyan" : ""}`}>{live ? "LIVE" : "IDLE"}</span></div>
       </header>
 
-      {/* ── hero: orbital + system ── */}
-      <section className="cr-hero">
-        <div className="cr-panel cr-orbital">
-          <div className="cr-panel-h"><Layers size={13} /><span className="cr-eyebrow">The loop · one state machine</span><span className="cr-tag cyan">{tasks.filter((t) => t.running).length ? `${tasks.filter((t) => t.running).length} in flight` : "orbit"}</span></div>
-          <LoopOrbital t={{
-            runners: tasks.filter((t) => t.running).map((t) => ({ id: t.taskId, stage: stageOf(t), hue: hueFor(t.taskId) })),
-            activity: Math.min(1, tasks.filter((t) => t.running).reduce((a, t) => a + t.lastTools, 0) / Math.max(1, tasks.filter((t) => t.running).length * 2)),
-            rejected: (() => { const r = tasks.filter((t) => t.running); const rej = r.reduce((a, t) => a + t.rejected, 0); const rd = r.reduce((a, t) => a + t.rounds, 0); return rd ? rej / rd : 0; })(),
-          }} />
-          <div className="cr-orbital-foot">
-            <span><b>{tasks.reduce((a, t) => a + t.rounds, 0)}</b> turns</span><span><b>{tasks.length}</b> tasks</span><span className="rose"><b>{tasks.reduce((a, t) => a + t.rejected, 0)}</b> rejected</span><span className="lime"><b>{fmtK(tasks.reduce((a, t) => a + t.totalTokens, 0))}</b> tokens</span>
+      {/* ── the reactor: the whole width, the brain in its hub ── */}
+      <section className="cr-panel cr-reactor">
+        {/* The live view's own switches, set from the URL: no control panels
+            (inside a disc this size they would cover the graph), orbiting from
+            the start, and the reactor's own black behind it. */}
+        <Reactor snap={pulse} brain={(GRAPH_SRC ?? graph?.url) ? `${GRAPH_SRC ?? graph?.url}?panels=0&spin=1&bg=05070f` : null} />
+      </section>
+
+      {/* ── the system ── */}
+      <section className="cr-stats six">
+        <Stat icon={<Cpu size={14} />} label="Model" value={<span className="cr-stat-txt">{dash?.llm?.model || "—"}</span>} sub={<>{dash?.llm?.maxRounds ?? "—"} rounds/turn · {short(dash?.llm?.baseURL || "", 34)}</>} />
+        <Stat icon={<Gauge size={14} />} label="Tokens today" value={<Num v={dash?.usage?.today ?? 0} />} sub={<>{fmtK(dash?.usage?.totalTokens ?? 0)} all time · {pct(dash?.usage?.cachedTokens ?? 0, dash?.usage?.totalTokens ?? 0)}% cached · 7d {fmtK(days.reduce((a, x) => a + x.tokens, 0))}</>} tone="cyan" />
+        <Stat icon={<Sparkles size={14} />} label="Cache hit" value={d ? <Num v={d.cacheRate} fmt={(n) => Math.round(n) + "%"} /> : <span className="cr-dim">—</span>} sub={d ? `${fmtK(st!.totalCached)} / ${fmtK(st!.totalTokens)} this task` : "select or start a task"} tone={!d ? undefined : d.cacheRate >= 80 ? "lime" : "amber"} />
+        <Stat icon={<Coins size={14} />} label="Spend" value={!st ? <span className="cr-dim">—</span> : st.unpriced ? <span className="cr-dim">unpriced</span> : <Num v={st.costUsd} fmt={(n) => "$" + n.toFixed(3)} />} sub={!st ? "select or start a task" : st.unpriced ? "no rates for this model · set llm_price_* in settings" : `this task · ${st.segments.length} segments`} tone={!st ? undefined : st.unpriced ? "rose" : "amber"} />
+        <Stat icon={<Activity size={14} />} label="Turns" value={<Num v={dash?.usage?.modelTurns ?? 0} />} sub={<>{dash?.tasks?.length ?? 0} tasks on record · {dash?.activeRuns?.length ?? 0} active</>} />
+        <Stat icon={<Shield size={14} />} label="Lint gate" value={d ? <span className={d.rejected ? "rose" : "lime"}><Num v={d.rejected} /></span> : <span className="cr-dim">—</span>} sub={d ? `${pct(d.accepted, Math.max(1, d.rs.length))}% clean turns` : "select or start a task"} tone={!d ? undefined : d.rejected ? "rose" : "lime"} />
+      </section>
+
+      {/* ── the traffic the reactor is drawing ── */}
+      <section className="cr-live">
+        <div className="cr-panel rx-tools">
+          <div className="cr-panel-h">
+            <Wrench size={13} />
+            <span className="cr-eyebrow">Tools</span>
+            <span className="cr-tag">{pulse.tools.length}</span>
           </div>
+          <ToolTable snap={pulse} />
         </div>
-        <div className="cr-stats">
-          <Stat icon={<Cpu size={14} />} label="Model" value={<span className="cr-stat-txt">{dash?.llm?.model || "—"}</span>} sub={<>{dash?.llm?.maxRounds ?? "—"} rounds/turn · {short(dash?.llm?.baseURL || "", 34)}</>} />
-          <Stat icon={<Gauge size={14} />} label="Tokens today" value={<Num v={dash?.usage?.today ?? 0} />} sub={<>{fmtK(dash?.usage?.totalTokens ?? 0)} all time · {pct(dash?.usage?.cachedTokens ?? 0, dash?.usage?.totalTokens ?? 0)}% cached</>} tone="cyan" spark={spark} />
-          <Stat icon={<Sparkles size={14} />} label="Cache hit" value={d ? <Num v={d.cacheRate} fmt={(n) => Math.round(n) + "%"} /> : <span className="cr-dim">—</span>} sub={d ? `${fmtK(st!.totalCached)} / ${fmtK(st!.totalTokens)} this task` : "select or start a task"} tone={!d ? undefined : d.cacheRate >= 80 ? "lime" : "amber"} />
-          <Stat icon={<Coins size={14} />} label="Spend" value={!st ? <span className="cr-dim">—</span> : st.unpriced ? <span className="cr-dim">unpriced</span> : <Num v={st.costUsd} fmt={(n) => "$" + n.toFixed(3)} />} sub={!st ? "select or start a task" : st.unpriced ? "no rates for this model · set llm_price_* in settings" : `this task · ${st.segments.length} segments`} tone={!st ? undefined : st.unpriced ? "rose" : "amber"} />
-          <Stat icon={<Activity size={14} />} label="Turns" value={<Num v={dash?.usage?.modelTurns ?? 0} />} sub={<>{dash?.tasks?.length ?? 0} tasks on record · {dash?.activeRuns?.length ?? 0} active</>} />
-          <Stat icon={<Shield size={14} />} label="Lint gate" value={d ? <span className={d.rejected ? "rose" : "lime"}><Num v={d.rejected} /></span> : <span className="cr-dim">—</span>} sub={d ? `${pct(d.accepted, Math.max(1, d.rs.length))}% clean turns` : "select or start a task"} tone={!d ? undefined : d.rejected ? "rose" : "lime"} />
+        <div className="cr-panel rx-ticker">
+          <div className="cr-panel-h">
+            <ScrollText size={13} />
+            <span className="cr-eyebrow">Activity</span>
+            <span className="cr-tag">newest first</span>
+          </div>
+          <PulseTicker snap={pulse} />
         </div>
       </section>
 
@@ -242,7 +249,6 @@ export default function DashboardView() {
             const hue = hueFor(t.taskId);
             const cache = pct(t.totalCached, t.totalTokens);
             const stage = stageOf(t);
-            const mx = Math.max(1, ...t.spark);
             return (
               <button key={t.taskId} className={`cr-task${t.taskId === taskId ? " focus" : ""}${t.running ? " live" : ""}`} style={{ ["--hue" as string]: hue }} onClick={() => setTaskId(t.taskId)}>
                 <div className="cr-task-h">
@@ -261,9 +267,12 @@ export default function DashboardView() {
                   <span className={t.rejected ? "rose" : ""}><b>{t.rejected}</b> rej</span>
                   <span className="cr-task-time">{elapsed(t.startedAt, t.endedAt)}</span>
                 </div>
-                <svg className="cr-task-spark" viewBox={`0 0 ${Math.max(1, t.spark.length - 1)} 20`} preserveAspectRatio="none">
-                  {t.spark.length > 1 && <polyline points={t.spark.map((v, i) => `${i},${20 - (v / mx) * 18}`).join(" ")} />}
-                </svg>
+                <div className="cr-task-row dim">
+                  <span><b>{fmtK(t.totalTokens)}</b> tok</span>
+                  <span><b>{fmtK(t.lastTokens)}</b> last turn</span>
+                  <span><b>{t.lastTools}</b> tools last turn</span>
+                  <span><b>{t.segments}</b>/{t.maxSegments} seg</span>
+                </div>
                 <div className="cr-task-actions" onClick={(e) => e.stopPropagation()}>
                   <span role="button" className="cr-btn tiny" onClick={() => setTraceId(t.taskId)} title="Every event this task emitted, one per row"><Terminal size={10} />Trace</span>
                   {t.running && <span role="button" className="cr-btn tiny" onClick={() => LongRunStop(t.taskId)}><Square size={10} />Stop</span>}
@@ -305,27 +314,24 @@ export default function DashboardView() {
                     </li>))}
                 </ol>)}
             </div>
-            <div className="cr-panel">
-              <div className="cr-panel-h"><Grid3x3 size={13} /><span className="cr-eyebrow">Context window · per turn</span><span className="cr-tag amber">{st.compactions} folds</span></div>
-              <div className="cr-grid">
-                {d.rs.map((r, i) => { const q = r.tokens / d.maxTok; const lvl = r.failed ? "fail" : q > .75 ? "l4" : q > .5 ? "l3" : q > .25 ? "l2" : q > 0 ? "l1" : "";
-                  return <i key={i} className={`${lvl}${r.compacted ? " compact" : ""}${r.lint ? " lint" : ""}`} style={{ animationDelay: `${Math.min(i, 60) * 12}ms` }} title={`r${r.round} s${r.segment + 1} · ${fmtK(r.tokens)} tok · ${fmtK(r.cached)} cached${r.compacted ? " · folded" : ""}${r.lint ? " · " + r.lint : ""}`} />; })}
+            <div className="cr-panel span2">
+              <div className="cr-panel-h"><Grid3x3 size={13} /><span className="cr-eyebrow">Turns · newest first</span><span className="cr-tag amber">{st.compactions} folds</span><span className={`cr-tag ${d.cacheRate >= 80 ? "lime" : d.cacheRate >= 40 ? "amber" : "rose"}`}>{d.cacheRate}% cached</span><span className="cr-tag">peak {fmtK(d.maxTok)}</span></div>
+              <div className="cr-table-wrap">
+                <table className="cr-table">
+                  <thead><tr><th>turn</th><th>seg</th><th className="num">tokens</th><th className="num">cached</th><th className="num">%</th><th className="num">tools</th><th className="num">text</th><th className="num">ms</th><th>flags</th></tr></thead>
+                  <tbody>
+                    {d.rs.slice(-60).reverse().map((r, i) => (
+                      <tr key={i} className={r.failed ? "bad" : ""}>
+                        <td>r{r.round}</td><td>{r.segment + 1}</td>
+                        <td className="num">{fmtK(r.tokens)}</td><td className="num">{fmtK(r.cached)}</td><td className="num">{pct(r.cached, r.tokens)}</td>
+                        <td className="num">{r.tools}</td><td className="num">{fmtK(r.text)}</td><td className="num">{r.durMs}</td>
+                        <td className="flags">{r.compacted ? "folded " : ""}{r.lint ? r.lint + " " : ""}{r.retried ? "retried " : ""}{r.failed ? "failed" : ""}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-              <div className="cr-legend"><span><i className="l4" />hot</span><span><i className="compact" />folded</span><span><i className="lint" />lint</span><span>peak {fmtK(d.maxTok)}</span></div>
             </div>
-            <div className="cr-panel">
-              <div className="cr-panel-h"><Sparkles size={13} /><span className="cr-eyebrow">Cache hit · per turn</span><span className={`cr-tag ${d.cacheRate >= 80 ? "lime" : d.cacheRate >= 40 ? "amber" : "rose"}`}>{d.cacheRate}%</span></div>
-              <div className="cr-bars">
-                {d.rs.slice(-48).map((r, i) => <i key={i} style={{ height: `${Math.max(3, (r.tokens / d.maxTok) * 100)}%` }} title={`r${r.round}: ${pct(r.cached, r.tokens)}% cached`}><b style={{ height: `${r.tokens ? (r.cached / r.tokens) * 100 : 0}%` }} /></i>)}
-              </div>
-              <div className="cr-axis"><span>older</span><span>{fmtK(st.totalCached)} / {fmtK(st.totalTokens)}</span><span>newest</span></div>
-            </div>
-          </section>
-
-          {/* ── graph ── */}
-          <section className="cr-panel cr-graph">
-            <div className="cr-panel-h float"><Network size={13} /><span className="cr-eyebrow">Knowledge graph · live · every entity the run touches becomes a node</span><span className="cr-tag">{graph?.nodes ?? "—"} · {graph?.edges ?? "—"}</span></div>
-            {(GRAPH_SRC ?? graph?.url) ? <iframe src={GRAPH_SRC ?? graph?.url} title="knowledge graph" /> : <div className="cr-note">graph view unavailable</div>}
           </section>
 
           {/* ── wall · activity · ledger ── */}

@@ -44,6 +44,11 @@ type App struct {
 	// a rebuild on purpose: a settings save must not erase the run wall.
 	wallOnce sync.Once
 	wall     *backend.RunWall
+	// pulse is the live meter: every run this process makes, chat turns
+	// included, folded into a per-second histogram. Like the wall it outlives
+	// a rebuild, so a settings save does not reset the counters.
+	pulseOnce sync.Once
+	pulse     *backend.Pulse
 	// longRuns holds the segmented tasks in flight, by task id, so a stop
 	// button has something to press.
 	longMu   sync.Mutex
@@ -214,8 +219,9 @@ func (a *App) rebuild() {
 	}
 	a.buildErr = ""
 	a.svc = svc
-	// The run wall watches this service the way it watched the last one.
-	svc.Agent().RegisterObserver(a.runWall())
+	// The run wall watches this service the way it watched the last one, and
+	// so does the meter beside it.
+	svc.Agent().RegisterObserver(a.runWall(), a.livePulse())
 	// The service is built with its approval gate already installed but with
 	// nobody to ask; this is where the app volunteers. Done on every rebuild
 	// because SaveSettings constructs a whole new Service, and a gate that

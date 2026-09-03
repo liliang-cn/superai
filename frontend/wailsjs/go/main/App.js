@@ -178,6 +178,10 @@ export function PreviewPrompt(arg1, arg2) {
   return window['go']['main']['App']['PreviewPrompt'](arg1, arg2);
 }
 
+export function Pulse() {
+  return window['go']['main']['App']['Pulse']();
+}
+
 export function ReadWorkspaceFile(arg1) {
   return window['go']['main']['App']['ReadWorkspaceFile'](arg1);
 }

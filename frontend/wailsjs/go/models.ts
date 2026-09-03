@@ -373,6 +373,195 @@ export namespace backend {
 		    return a;
 		}
 	}
+	export class PulseBin {
+	    sec: number;
+	    tokens: number;
+	    cached: number;
+	    calls: number;
+	    rounds: number;
+	    reads: number;
+	    writes: number;
+	    shells: number;
+	    fails: number;
+	    mcp: number;
+	    memory: number;
+	    think: number;
+	    cpu: number;
+	    heap: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new PulseBin(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.sec = source["sec"];
+	        this.tokens = source["tokens"];
+	        this.cached = source["cached"];
+	        this.calls = source["calls"];
+	        this.rounds = source["rounds"];
+	        this.reads = source["reads"];
+	        this.writes = source["writes"];
+	        this.shells = source["shells"];
+	        this.fails = source["fails"];
+	        this.mcp = source["mcp"];
+	        this.memory = source["memory"];
+	        this.think = source["think"];
+	        this.cpu = source["cpu"];
+	        this.heap = source["heap"];
+	    }
+	}
+	export class PulseEvent {
+	    seq: number;
+	    at: string;
+	    kind: string;
+	    name: string;
+	    text: string;
+	    n?: number;
+	    ms?: number;
+	    bad?: boolean;
+	    inner?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new PulseEvent(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.seq = source["seq"];
+	        this.at = source["at"];
+	        this.kind = source["kind"];
+	        this.name = source["name"];
+	        this.text = source["text"];
+	        this.n = source["n"];
+	        this.ms = source["ms"];
+	        this.bad = source["bad"];
+	        this.inner = source["inner"];
+	    }
+	}
+	export class PulseRun {
+	    runId: string;
+	    model: string;
+	    round: number;
+	    session?: string;
+	    doing: string;
+	    since: string;
+	    seen: string;
+	    think?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PulseRun(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.runId = source["runId"];
+	        this.model = source["model"];
+	        this.round = source["round"];
+	        this.session = source["session"];
+	        this.doing = source["doing"];
+	        this.since = source["since"];
+	        this.seen = source["seen"];
+	        this.think = source["think"];
+	    }
+	}
+	export class PulseTool {
+	    name: string;
+	    calls: number;
+	    errors: number;
+	    lastAt: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PulseTool(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.calls = source["calls"];
+	        this.errors = source["errors"];
+	        this.lastAt = source["lastAt"];
+	    }
+	}
+	export class PulseSnapshot {
+	    now: string;
+	    since: string;
+	    live: boolean;
+	    runs: PulseRun[];
+	    bins: PulseBin[];
+	    tools: PulseTool[];
+	    events: PulseEvent[];
+	    tokens: number;
+	    cached: number;
+	    rounds: number;
+	    calls: number;
+	    reads: number;
+	    writes: number;
+	    shells: number;
+	    fails: number;
+	    mcp: number;
+	    memory: number;
+	    errors: number;
+	    peak: number;
+	    peakThink: number;
+	    heap: number;
+	    heapLow: number;
+	    heapHigh: number;
+	    cpu: number;
+	    goroutines: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new PulseSnapshot(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.now = source["now"];
+	        this.since = source["since"];
+	        this.live = source["live"];
+	        this.runs = this.convertValues(source["runs"], PulseRun);
+	        this.bins = this.convertValues(source["bins"], PulseBin);
+	        this.tools = this.convertValues(source["tools"], PulseTool);
+	        this.events = this.convertValues(source["events"], PulseEvent);
+	        this.tokens = source["tokens"];
+	        this.cached = source["cached"];
+	        this.rounds = source["rounds"];
+	        this.calls = source["calls"];
+	        this.reads = source["reads"];
+	        this.writes = source["writes"];
+	        this.shells = source["shells"];
+	        this.fails = source["fails"];
+	        this.mcp = source["mcp"];
+	        this.memory = source["memory"];
+	        this.errors = source["errors"];
+	        this.peak = source["peak"];
+	        this.peakThink = source["peakThink"];
+	        this.heap = source["heap"];
+	        this.heapLow = source["heapLow"];
+	        this.heapHigh = source["heapHigh"];
+	        this.cpu = source["cpu"];
+	        this.goroutines = source["goroutines"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
 	export class RoundStat {
 	    segment: number;
 	    round: number;

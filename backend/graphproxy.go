@@ -60,6 +60,9 @@ func NewGraphProxy(target func() string) http.Handler {
 			if r.Out.URL.Path == "" {
 				r.Out.URL.Path = "/"
 			}
+			// The query goes through untouched: the view reads its own options
+			// from it (?panels=0 and friends), and the proxy has no opinion.
+			r.Out.URL.RawQuery = r.In.URL.RawQuery
 		},
 		ErrorHandler: func(w http.ResponseWriter, _ *http.Request, err error) {
 			// The view is loopback on this host, so a failure here is it being

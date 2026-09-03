@@ -1392,18 +1392,14 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
 .cr-clock svg { color: var(--cr-dim); }
 
 /* hero */
-.cr-hero { display: grid; grid-template-columns: minmax(300px, 38%) 1fr; gap: 10px; }
-.cr-orbital { padding-bottom: 8px; display: flex; flex-direction: column; }
-.orbital { position: relative; height: 280px; border-radius: 8px; overflow: hidden; background: radial-gradient(60% 60% at 50% 55%, rgba(var(--cr-cyan-rgb),.08), transparent 70%); }
-.orbital canvas { width: 100% !important; height: 100% !important; display: block; }
-.orbital-labels { position: absolute; left: 10px; right: 10px; bottom: 8px; display: flex; justify-content: space-between; font-family: var(--cr-mono); font-size: 9px; letter-spacing: .12em; text-transform: uppercase; color: var(--cr-mute); pointer-events: none; }
-.orbital-labels span { transition: color .3s, text-shadow .3s; }
-.orbital-labels span.on { color: var(--cr-cyan); text-shadow: 0 0 10px var(--cr-cyan); }
 .cr-orbital-foot { display: flex; justify-content: space-between; margin-top: 8px; font-family: var(--cr-mono); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--cr-dim); }
 .cr-orbital-foot b { color: var(--cr-text); font-size: 13px; margin-right: 4px; }
 .cr-orbital-foot .rose b { color: var(--cr-rose); } .cr-orbital-foot .lime b { color: var(--cr-lime); }
 
 .cr-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.cr-stats.six { grid-template-columns: repeat(6, 1fr); }
+@media (max-width: 1100px) { .cr-stats.six { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 640px) { .cr-stats.six { grid-template-columns: repeat(2, 1fr); } }
 .cr-stat { background: linear-gradient(180deg, var(--cr-panel-2), var(--cr-panel)); border: 1px solid var(--cr-line); border-radius: 10px; padding: 12px 14px; position: relative; overflow: hidden; animation: cr-in .5s cubic-bezier(.2,.8,.2,1) both; }
 .cr-stat:nth-child(2) { animation-delay: .05s } .cr-stat:nth-child(3) { animation-delay: .1s } .cr-stat:nth-child(4) { animation-delay: .15s } .cr-stat:nth-child(5) { animation-delay: .2s } .cr-stat:nth-child(6) { animation-delay: .25s }
 .cr-stat::after { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 2px; background: var(--cr-line-2); }
@@ -1423,7 +1419,6 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
 /* This line carries a URL, which is one unbreakable token and so ran straight
    out of the card. */
 .cr-stat-s { font-family: var(--cr-mono); font-size: 10px; color: var(--cr-dim); margin-top: 5px; letter-spacing: .02em; overflow-wrap: anywhere; }
-.cr-spark { position: absolute; right: 10px; bottom: 8px; width: 88px; height: 24px; fill: none; stroke: var(--cr-cyan); stroke-width: 1.5; opacity: .8; filter: drop-shadow(0 0 4px rgba(var(--cr-cyan-rgb),.6)); }
 
 /* task bar */
 .cr-taskbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: var(--cr-panel); border: 1px solid var(--cr-line); border-radius: 10px; padding: 8px 12px; }
@@ -1469,26 +1464,10 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
 .cr-note.small { font-size: 9.5px; margin-top: 8px; text-transform: uppercase; letter-spacing: .06em; }
 
 /* context heat grid */
-.cr-grid { display: grid; grid-template-columns: repeat(auto-fill, 14px); gap: 3px; }
-.cr-grid i, .cr-legend i { display: block; width: 14px; height: 14px; border-radius: 3px; background: var(--cr-line); position: relative; animation: cr-pop .35s cubic-bezier(.2,.9,.3,1.4) both; }
-.cr-legend i { width: 10px; height: 10px; animation: none; display: inline-block; vertical-align: -1px; margin-right: 5px; }
-.cr-grid .l1, .cr-legend .l1 { background: rgba(var(--cr-cyan-rgb),.25); } .cr-grid .l2 { background: rgba(var(--cr-cyan-rgb),.45); } .cr-grid .l3 { background: rgba(var(--cr-cyan-rgb),.7); }
-.cr-grid .l4, .cr-legend .l4 { background: var(--cr-cyan); box-shadow: 0 0 8px rgba(var(--cr-cyan-rgb),.5); }
-.cr-grid .compact::after, .cr-legend .compact::after { content: ""; position: absolute; inset: 3px; border: 1.5px solid var(--cr-amber); border-radius: 2px; }
-.cr-legend .compact { background: var(--cr-line); }
-.cr-grid .lint, .cr-legend .lint { outline: 1.5px solid var(--cr-rose); outline-offset: -1.5px; }
-.cr-grid .fail { background: var(--cr-rose); }
-.cr-legend { display: flex; gap: 14px; margin-top: 10px; font-family: var(--cr-mono); font-size: 9px; letter-spacing: .08em; text-transform: uppercase; color: var(--cr-dim); align-items: center; flex-wrap: wrap; }
 
 /* cache bars */
-.cr-bars { display: flex; align-items: flex-end; gap: 2px; height: 96px; border-bottom: 1px solid var(--cr-line-2); }
-.cr-bars i { flex: 1 1 0; min-width: 3px; max-width: 16px; background: var(--cr-line-2); border-radius: 2px 2px 0 0; position: relative; transition: height .5s cubic-bezier(.2,.8,.2,1); }
-.cr-bars i > b { position: absolute; left: 0; right: 0; bottom: 0; background: var(--cr-cyan); border-radius: 2px 2px 0 0; box-shadow: 0 0 6px rgba(var(--cr-cyan-rgb),.4); transition: height .5s cubic-bezier(.2,.8,.2,1); }
-.cr-axis { display: flex; justify-content: space-between; margin-top: 5px; font-family: var(--cr-mono); font-size: 9px; letter-spacing: .08em; text-transform: uppercase; color: var(--cr-dim); }
 
 /* graph */
-.cr-graph { height: 400px; padding: 0; overflow: hidden; position: relative; }
-.cr-graph iframe { width: 100%; height: 100%; border: 0; display: block; background: var(--cr-bg); }
 
 /* wall */
 .cr-wall { display: grid; grid-template-columns: repeat(auto-fill, 16px); gap: 3px; }
@@ -1546,7 +1525,6 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
 .cr-task-row b { color: var(--cr-text); font-size: 11.5px; }
 .cr-task-row .rose b { color: var(--cr-rose); }
 .cr-task-time { margin-left: auto; }
-.cr-task-spark { position: absolute; right: 10px; top: 34px; width: 90px; height: 20px; fill: none; stroke: hsl(var(--hue) 80% 55%); stroke-width: 1.5; opacity: .75; }
 .cr-task-actions { position: absolute; left: 12px; bottom: 8px; display: flex; gap: 6px; }
 .cr-btn.tiny { padding: 3px 8px; font-size: 10px; gap: 4px; border-radius: 5px; }
 
@@ -1931,6 +1909,7 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
   font-size: 13px; font-weight: 500; color: var(--text-0);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+
 .dcard-meta {
   display: flex; align-items: center; gap: 5px;
   font-size: 11.5px; color: var(--text-3);
@@ -2377,3 +2356,118 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
   .statusbar .pill-btn { min-height: 44px; }
   .statusbar .theme-toggle { width: 44px; height: 44px; min-height: 44px; }
 }
+
+/* ================= The reactor =================
+   A screen inside the panel: always the cockpit, whatever the theme, because
+   additive light needs black behind it. WebGL draws the wheel; the DOM draws
+   the numbers over it, because canvas text is soft at any device pixel ratio
+   the browser did not pick and these are numbers someone is checking. */
+.cr-reactor { padding: 0; overflow: hidden; background: #05070f; border-color: #16203a; flex: none; }
+.rx { position: relative; height: clamp(360px, 46vh, 560px); overflow: hidden; background: #05070f; }
+.rx-canvas { position: absolute; inset: 0; display: block; mix-blend-mode: screen; pointer-events: none; }
+/* The brain, masked to the hub. It sits under the canvas; screen blending lets
+   the light pass over it without the canvas having to be transparent, which
+   bloom cannot be. */
+.rx-brain {
+  position: absolute; border: 0; border-radius: 50%; overflow: hidden;
+  background: #05070f; box-shadow: 0 0 60px rgba(94,224,255,.18), inset 0 0 80px rgba(5,7,15,.9);
+}
+
+.rx-head {
+  position: absolute; left: 14px; top: 10px; z-index: 2; pointer-events: none;
+  display: flex; align-items: center; gap: 10px; font-family: var(--cr-mono);
+}
+.rx-led { width: 9px; height: 9px; border-radius: 50%; background: #2a3550; transition: all .4s; }
+.rx-led.on { background: #5ee0ff; box-shadow: 0 0 12px #5ee0ff, 0 0 0 3px rgba(94,224,255,.2); animation: cr-breathe 2.2s ease-in-out infinite; }
+.rx-title { font-size: 13px; letter-spacing: .22em; font-weight: 800; color: #e6ebf7; }
+.rx-state { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: #6b7690; padding: 2px 8px; border: 1px solid #26314f; border-radius: 999px; }
+.rx-state.on { color: #5ee0ff; border-color: rgba(94,224,255,.5); background: rgba(94,224,255,.08); box-shadow: 0 0 14px rgba(94,224,255,.25); }
+.rx-run { font-size: 11px; color: #c9d4ea; padding: 2px 10px; border: 1px solid #26314f; border-radius: 999px; background: rgba(255,255,255,.02); }
+.rx-run em { font-style: normal; color: #6b7690; }
+
+/* The readout, top right, where the columns are longest and the eye lands. */
+.rx-core {
+  position: absolute; right: 18px; top: 12px; z-index: 2; pointer-events: none;
+  display: flex; flex-direction: column; align-items: flex-end;
+  font-family: var(--cr-mono); text-align: right; line-height: 1.05;
+}
+.rx-core-n {
+  font-size: clamp(34px, 5vw, 64px); font-weight: 800; letter-spacing: .01em;
+  font-variant-numeric: tabular-nums; color: #f2f6ff;
+  text-shadow: 0 0 30px rgba(94,224,255,.6), 0 0 2px rgba(94,224,255,.9);
+}
+.rx-core-l { font-size: 10px; letter-spacing: .26em; text-transform: uppercase; color: #6b7690; margin-top: 4px; }
+.rx-core-r { font-size: 13px; color: #5ee0ff; margin-top: 6px; font-variant-numeric: tabular-nums; text-shadow: 0 0 12px rgba(94,224,255,.6); }
+
+/* The reasoning, where it is being written: over the hub, top left, under
+   the header. One line, the newest end kept in view. */
+.rx-think {
+  position: absolute; left: 14px; top: 40px; z-index: 2; pointer-events: none;
+  max-width: 46%; display: flex; align-items: baseline; gap: 8px;
+  font-family: var(--cr-mono); font-size: 11px;
+}
+.rx-think-l { flex: none; font-size: 9px; letter-spacing: .18em; text-transform: uppercase; color: #9dff6a; text-shadow: 0 0 10px rgba(157,255,106,.5); }
+.rx-think-t { flex: 1; min-width: 0; color: #aab6cc; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; }
+
+/* Every counter, one strip along the floor. */
+/* A fade behind the strip, because the brightest part of the wheel is the
+   newest second, and the newest second is at the bottom. */
+.rx::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 64px; z-index: 1; pointer-events: none;
+  background: linear-gradient(180deg, rgba(5,7,15,0) 0%, rgba(5,7,15,.85) 100%); }
+.rx-strip {
+  position: absolute; left: 14px; right: 14px; bottom: 10px; z-index: 2; pointer-events: none;
+  display: flex; flex-wrap: wrap; gap: 4px 18px;
+  font-family: var(--cr-mono); font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; color: #6b7690;
+}
+.rx-strip span { display: inline-flex; align-items: baseline; gap: 6px; }
+.rx-strip b { font-size: 14px; letter-spacing: 0; font-variant-numeric: tabular-nums; color: #e6ebf7; }
+.rx-strip .c-cyan b { color: #7fe6ff; } .rx-strip .c-amber b { color: #ffb547; } .rx-strip .c-white b { color: #ffffff; }
+.rx-strip .c-pink b { color: #ff73d9; } .rx-strip .c-teal b { color: #4dffdb; } .rx-strip .c-rose b { color: #ff5c7a; }
+.rx-strip .c-violet b { color: #b87aff; } .rx-strip .c-dim b { color: #8a96b0; }
+
+/* Tools on the left, narration on the right. */
+.cr-live { display: grid; grid-template-columns: minmax(280px, 38%) 1fr; gap: 10px; align-items: stretch; }
+.rx-tools, .rx-ticker { display: flex; flex-direction: column; min-width: 0; }
+
+/* Figures under the wheel. One table style for tools and turns. */
+.cr-table-wrap { flex: 1; overflow: auto; max-height: 260px; }
+.cr-table { width: 100%; border-collapse: collapse; font-family: var(--cr-mono); font-size: 11.5px; }
+.cr-table th { text-align: left; font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--cr-dim); font-weight: 600; padding: 4px 8px 6px 2px; border-bottom: 1px solid var(--cr-line-2); position: sticky; top: 0; background: var(--cr-panel); }
+.cr-table td { padding: 4px 8px 4px 2px; border-bottom: 1px solid var(--cr-line); color: var(--cr-text); white-space: nowrap; }
+.cr-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.cr-table td.name { max-width: 240px; overflow: hidden; text-overflow: ellipsis; color: var(--cr-amber); }
+.cr-table td.flags { color: var(--cr-dim); }
+.cr-table tr.hot td { color: var(--cr-amber); text-shadow: 0 0 10px rgba(var(--cr-amber-rgb), .5); }
+.cr-table tr.bad td.num:nth-child(3), .cr-table tr.bad td.flags { color: var(--cr-rose); }
+.cr-panel.span2 { grid-column: span 2; }
+.cr-task-row.dim { color: var(--cr-dim); }
+
+.rx-lines { flex: 1; max-height: 236px; overflow-y: auto; font-family: var(--cr-mono); font-size: 11.5px; }
+.rx-line {
+  display: grid; grid-template-columns: 64px 56px minmax(90px, 200px) 1fr auto;
+  gap: 10px; padding: 3px 2px; align-items: baseline;
+  border-bottom: 1px solid var(--cr-line); color: var(--cr-text);
+}
+.rx-line:last-child { border-bottom: 0; }
+.rx-at { color: var(--cr-mute); font-variant-numeric: tabular-nums; }
+.rx-kind { color: var(--cr-dim); text-transform: uppercase; font-size: 9.5px; letter-spacing: .1em; }
+.rx-line.tool .rx-name { color: var(--cr-amber); }
+.rx-line.model .rx-name { color: var(--cr-cyan); }
+.rx-line.compact .rx-name { color: var(--cr-lime); }
+.rx-line.bad .rx-name, .rx-line.bad .rx-text { color: var(--cr-rose); }
+.rx-name, .rx-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rx-text { color: var(--cr-dim); }
+.rx-n { color: var(--cr-cyan); font-variant-numeric: tabular-nums; }
+.rx-empty { color: var(--cr-dim); font-size: 12px; padding: 22px 2px; }
+
+@media (max-width: 900px) {
+  .cr-live { grid-template-columns: 1fr; }
+  .rx-line { grid-template-columns: 60px minmax(80px, 1fr) 1fr auto; }
+  .rx-kind { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rx-beam-bar { transition: none; }
+}
+
+.rx-line.think .rx-name { color: var(--cr-lime); }
+.rx-line.think .rx-text { color: var(--cr-text); opacity: .85; }
