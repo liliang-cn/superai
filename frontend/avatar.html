@@ -2,7 +2,12 @@
 <html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8"/>
-    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <!-- viewport-fit=cover is what makes env(safe-area-inset-*) report anything
+         other than zero on a notched phone. Without it iOS letterboxes the page
+         inside the safe area and the insets are all 0; with it the page owns the
+         whole screen and has to keep its own content clear of the notch and the
+         home indicator, which styles.css does. -->
+    <meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport"/>
     <title>SuperAI Avatar</title>
 </head>
 <body>

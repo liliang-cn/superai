@@ -167,7 +167,7 @@ export default function App() {
             onAccent={setAccent}
             petOpen={petOpen}
             onTogglePet={() => setPetOpen((open) => !open)}
-            onOpenNav={() => setNavOpen(true)}
+            onOpenNav={() => setNavOpen((v) => !v)}
           />
           <div className="content">
             {view === "chat" && (

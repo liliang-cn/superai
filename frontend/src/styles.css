@@ -2081,10 +2081,9 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
      step. */
   .sidebar:not(.collapsed) { transform: translateX(0); }
   .sidebar.collapsed { width: 232px; padding: 18px 12px; }
-  /* Tapping anywhere else closes it. The backdrop is the sidebar's own
-     ::before so no element has to be added to the tree. */
-  .sidebar:not(.collapsed)::before {
-    content: ""; position: fixed; inset: 0; z-index: -1;
+  /* Tapping anywhere else closes it. */
+  .sidebar-scrim {
+    display: block; position: fixed; inset: 0; z-index: 69;
     background: rgba(0, 0, 0, 0.45);
   }
   /* A drawer that is open must show its labels; collapsed styling belongs to
@@ -2157,11 +2156,71 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
     min-height: 44px;
   }
   .pw-toggle, .link-btn, .session-id { padding-inline: 12px; }
+  /* The composer's own controls — Attach, Clear, prompt preview, send. They
+     come from the shadcn button, which has no class of ours to hang a rule on,
+     so they are reached through the toolbar they sit in. These are the buttons
+     a phone presses most and they were the smallest left on the page, at 32
+     and 36 pixels. */
+  .composer button { min-height: 44px; }
 }
 
-/* The drawer's handle. Off the desktop entirely — there the sidebar is always
-   on screen and carries its own collapse button. */
+/* The drawer's handle, and the scrim behind it. Both off the desktop entirely —
+   there the sidebar is always on screen and carries its own collapse button. */
 .nav-open { display: none; }
+.sidebar-scrim { display: none; }
 @media (max-width: 640px) {
   .nav-open { display: grid; margin-right: 2px; }
+}
+
+/* ---------------- Safe area ---------------- */
+/*
+ * A notched phone, once viewport-fit=cover hands the page the whole screen.
+ * Every one of these elements touches an edge, and an edge on an iPhone is
+ * under the notch, the rounded corner, or the home indicator.
+ *
+ * env() is zero everywhere else — a desktop, an Android without cutouts, the
+ * Wails window — so these rules cost nothing off a phone and there is no media
+ * query around them. The fallback argument covers browsers that do not know
+ * env() at all, where it is also zero.
+ *
+ * Untested on real hardware: this is the standard treatment, applied to every
+ * element that reaches an edge, but a simulated 390x844 viewport reports no
+ * insets, so nothing here has been seen working.
+ */
+.statusbar {
+  padding-top: max(5px, env(safe-area-inset-top, 0px));
+  padding-left: max(20px, env(safe-area-inset-left, 0px));
+  padding-right: max(20px, env(safe-area-inset-right, 0px));
+}
+/* The composer is the one thing a thumb reaches for, and the home indicator
+   sits exactly where its buttons are. */
+.composer {
+  padding-bottom: max(14px, env(safe-area-inset-bottom, 0px));
+  padding-left: max(14px, env(safe-area-inset-left, 0px));
+  padding-right: max(14px, env(safe-area-inset-right, 0px));
+}
+/* Fixed layers set their own edges, so each needs its own inset. */
+.toasts { margin-bottom: env(safe-area-inset-bottom, 0px); }
+.dash-full-bar { padding-top: max(10px, env(safe-area-inset-top, 0px)); }
+.dash-full-body {
+  padding-bottom: max(24px, env(safe-area-inset-bottom, 0px));
+  padding-left: max(28px, env(safe-area-inset-left, 0px));
+  padding-right: max(28px, env(safe-area-inset-right, 0px));
+}
+
+@media (max-width: 640px) {
+  /* The drawer comes out of the left edge, which in landscape is the notch. */
+  .sidebar {
+    padding-top: max(18px, env(safe-area-inset-top, 0px));
+    padding-bottom: max(18px, env(safe-area-inset-bottom, 0px));
+    padding-left: max(12px, env(safe-area-inset-left, 0px));
+  }
+  /* The sheet sits on the bottom edge, so its content stops above the home
+     indicator rather than under it. */
+  .trace-panel { padding-bottom: env(safe-area-inset-bottom, 0px); }
+  /* Restated here because the safe-area rules above are outside any query and
+     later in the file, so without this they win and hand a 390px screen the
+     desktop's 20px gutters back. */
+  .composer { padding-inline: max(12px, env(safe-area-inset-left, 0px)) max(12px, env(safe-area-inset-right, 0px)); }
+  .statusbar { padding-inline: max(12px, env(safe-area-inset-left, 0px)) max(12px, env(safe-area-inset-right, 0px)); }
 }

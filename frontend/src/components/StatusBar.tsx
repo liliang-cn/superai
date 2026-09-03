@@ -25,8 +25,9 @@ export default function StatusBar({
   onAccent: (a: Accent) => void;
   petOpen: boolean;
   onTogglePet: () => void;
-  /** Opens the sidebar. Only reachable on a narrow screen, where the sidebar is
-   *  a drawer and has taken its own toggle off the screen with it. */
+  /** Opens or closes the sidebar. Only reachable on a narrow screen, where the
+   *  sidebar is a drawer and has taken its own toggle off the screen with it.
+   *  A toggle, not an open: a button that can only open is half a control. */
   onOpenNav: () => void;
 }) {
   let dotClass = "unknown";

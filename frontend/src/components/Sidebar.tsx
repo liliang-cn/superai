@@ -51,7 +51,14 @@ export default function Sidebar({
   // Collapsed keeps the icons rather than hiding the nav outright — navigation
   // stays one click away, it just stops spending width on labels.
   return (
-    <aside className={`sidebar${open ? "" : " collapsed"}`}>
+    <>
+      {/* The scrim behind the drawer. A real element rather than the sidebar's
+          own ::before, because a pseudo-element cannot take a click — made that
+          way it looks dismissable and is not, and the only way out of the
+          drawer is a small button at the bottom of it. Display:none above the
+          drawer breakpoint. */}
+      {open && <div className="sidebar-scrim" onClick={onToggle} aria-hidden="true" />}
+      <aside className={`sidebar${open ? "" : " collapsed"}`}>
       <div className="brand">
         <div className="brand-logo">S</div>
         {open && (
@@ -98,6 +105,7 @@ export default function Sidebar({
           {open ? <PanelLeftCloseIcon className="size-4" /> : <PanelLeftOpenIcon className="size-4" />}
         </button>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }
