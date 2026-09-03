@@ -484,7 +484,11 @@ func (s *Service) Stream(ctx context.Context, sessionID, message string, imagePa
 		}
 	}()
 
-	ch, err := s.svc.RunStreamWithOptions(ctx, message, opts...)
+	// The conversation this turn belongs to, carried down to the tools. A tool
+	// asked to "save this" has to be able to reach the reply that is already on
+	// screen, and agent-go keeps the session on the context under an unexported
+	// key. This is the same fact under a key of ours.
+	ch, err := s.svc.RunStreamWithOptions(withSessionID(ctx, sessionID), message, opts...)
 	if err != nil {
 		return "", err
 	}

@@ -2318,3 +2318,28 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
   .rc-title { flex-wrap: wrap; row-gap: 8px; }
   .rc-title .sched-name { flex: 1 1 100%; }
 }
+
+/* Naming a dashboard, in the app's own dialog rather than window.prompt —
+   which in the desktop build introduced itself as "127.0.0.1:43521 says". */
+.nd-modal { width: min(440px, calc(100vw - 32px)); }
+.nd-body { padding: 16px 18px; display: flex; flex-direction: column; gap: 8px; }
+.nd-label { font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.6px; }
+.nd-label + .nd-label, .nd-body .input + .nd-label { margin-top: 8px; }
+.nd-prompt {
+  font-size: 12.5px; color: var(--text-2); line-height: 1.5;
+  padding: 8px 10px; border-radius: var(--radius-sm);
+  background: var(--bg-2); border: 1px solid var(--border);
+  max-height: 96px; overflow-y: auto;
+}
+.nd-note { font-size: 12px; color: var(--text-3); line-height: 1.5; }
+.nd-foot {
+  display: flex; justify-content: flex-end; gap: 8px;
+  padding: 12px 18px; border-top: 1px solid var(--border);
+}
+/* A failed save, where the alert used to be. */
+.nd-error {
+  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 90;
+  padding: 10px 14px; border-radius: var(--radius);
+  background: rgba(240, 85, 107, 0.12); border: 1px solid rgba(240, 85, 107, 0.4);
+  color: var(--red); font-size: 13px;
+}

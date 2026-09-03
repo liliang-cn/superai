@@ -46,8 +46,16 @@ export function hasRenderableBlock(text: string): boolean {
 export function suggestName(prompt: string): string {
   const line = (prompt || "").trim().split("\n")[0].trim();
   if (!line) return "Dashboard";
-  const cut = line.length > 40 ? line.slice(0, 40).trimEnd() + "…" : line;
-  return cut;
+  // A question is usually an instruction with the subject buried in it —
+  // "用一个 bigscreen 块做一个今日日程看板，标题「今日日程」。先查我今天的日程和提醒".
+  // Taking its first forty characters put the instruction in the name box.
+  // A quoted title is the model being told what to call it, so it wins; a
+  // clause boundary is the next best guess at where the subject ends.
+  const quoted = line.match(/[「“"']([^」”"']{1,24})[」”"']/);
+  if (quoted) return quoted[1];
+  const clause = line.split(/[，,。.；;：:!?！？\n]/).map((c) => c.trim()).filter(Boolean);
+  const pick = clause.find((c) => c.length <= 24) ?? clause[0] ?? line;
+  return pick.length > 24 ? pick.slice(0, 24).trimEnd() + "…" : pick;
 }
 
 /** The App methods answer {ok, data}; a rejection has to become a throw or a

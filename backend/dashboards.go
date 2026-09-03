@@ -210,7 +210,13 @@ func (s *Service) SaveDashboard(name, source, prompt string) (Dashboard, error) 
 	}
 	now := time.Now()
 	d := Dashboard{
-		ID:        short(uuid.NewString()),
+		// A whole UUID, not a short prefix of one. Eight hex characters is 32
+		// bits, and 32 bits collide at about one chance in a hundred by three
+		// hundred rows — which for a store that appends without checking would
+		// have meant two dashboards under one id, and update and delete finding
+		// whichever came first. The UI is free to show a prefix; the file keeps
+		// the whole thing.
+		ID:        uuid.NewString(),
 		Name:      name,
 		Source:    source,
 		Prompt:    strings.TrimSpace(prompt),
@@ -219,10 +225,17 @@ func (s *Service) SaveDashboard(name, source, prompt string) (Dashboard, error) 
 		RefreshedAt: now,
 	}
 	s.dashboards.mu.Lock()
+	defer s.dashboards.mu.Unlock()
+	// Belt to the UUID's braces: an id that already exists is a bug somewhere
+	// upstream, and appending anyway would hide it behind two rows that look
+	// identical and cannot both be deleted.
+	for _, existing := range s.dashboards.items {
+		if existing.ID == d.ID {
+			return Dashboard{}, fmt.Errorf("dashboard id %s already exists", d.ID)
+		}
+	}
 	s.dashboards.items = append(s.dashboards.items, d)
-	err := s.dashboards.save()
-	s.dashboards.mu.Unlock()
-	return d, err
+	return d, s.dashboards.save()
 }
 
 // RenameDashboard changes the label only.

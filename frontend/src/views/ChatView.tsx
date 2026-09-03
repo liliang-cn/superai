@@ -35,6 +35,7 @@ import SidePanel from "../components/SidePanel";
 import PromptPreviewPanel from "../components/PromptPreviewPanel";
 import DeliverablesBar from "../components/DeliverablesBar";
 import ContextBlock from "../components/ContextBlock";
+import NameDashboardModal from "../components/NameDashboardModal";
 import { dashboards, hasRenderableBlock, suggestName } from "../lib/dashboards";
 import AgentProgress from "../components/AgentProgress";
 
@@ -63,6 +64,9 @@ export default function ChatView({
   const [preview, setPreview] = useState<string | null>(null);
   // The message index whose save just landed, for a moment of green.
   const [saved, setSaved] = useState(-1);
+  // The reply waiting to be named. Null when the dialog is closed.
+  const [naming, setNaming] = useState<{ index: number; content: string; prompt: string } | null>(null);
+  const [saveError, setSaveError] = useState("");
 
   // Loading it here rather than in App keeps the transcript the only thing that
   // owns a session id. Picking a run's conversation is the same act as picking
@@ -122,16 +126,20 @@ export default function ChatView({
    * and a reply with no ask above it (a scheduled run opened from Records, say)
    * still saves, it just cannot refresh itself, which the panel says.
    */
-  const saveDashboard = async (index: number, content: string) => {
-    const prompt = askBehind(index);
-    const name = window.prompt("Name this dashboard", suggestName(prompt));
-    if (name === null) return;
+  const saveDashboard = (index: number, content: string) =>
+    setNaming({ index, content, prompt: askBehind(index) });
+
+  const commitDashboard = async (name: string) => {
+    if (!naming) return;
+    const { index, content, prompt } = naming;
+    setNaming(null);
     try {
-      await dashboards.save(name.trim(), content, prompt);
+      await dashboards.save(name, content, prompt);
       setSaved(index);
       setTimeout(() => setSaved(-1), 1600);
     } catch (e: any) {
-      window.alert(String(e?.message || e));
+      setSaveError(String(e?.message || e));
+      setTimeout(() => setSaveError(""), 4000);
     }
   };
 
@@ -383,6 +391,15 @@ export default function ChatView({
         </div>
         <SidePanel trace={chat.trace} asks={chat.asks} />
       </div>
+      {naming && (
+        <NameDashboardModal
+          suggested={suggestName(naming.prompt)}
+          prompt={naming.prompt}
+          onCancel={() => setNaming(null)}
+          onSave={commitDashboard}
+        />
+      )}
+      {saveError && <div className="nd-error">⚠ {saveError}</div>}
       {preview !== null && (
         <PromptPreviewPanel
           sessionId={chat.sessionId}

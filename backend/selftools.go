@@ -67,24 +67,33 @@ func (s *Service) registerSelfTools() {
 	// --- dashboard_save ---
 	svc.AddToolWithMetadata(
 		"dashboard_save",
-		"Keep a reply as a dashboard the user can reopen from the Dashboards panel. `source` is the reply text itself — the markdown with its ```bigscreen / ```chart / ```ui blocks, exactly as you would write it into the conversation. `prompt` is the question that produces it: a dashboard refreshes by asking that question again, so a dashboard saved without one can never update.",
+		"Keep a reply as a dashboard the user can reopen from the Dashboards panel. For \"save that as a dashboard\" — the usual case — pass only name and prompt: the reply already on screen is stored exactly as it was drawn. Do NOT retype the document; a rewrite is a second generation nobody has seen rendered, and it is how a working board becomes a broken one. `source` is only for a dashboard that has no reply behind it yet. `prompt` is the question that regenerates it — a dashboard saved without one can never refresh.",
 		map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
 				"name":   map[string]interface{}{"type": "string", "description": "Short label, e.g. 我的美股收益"},
-				"source": map[string]interface{}{"type": "string", "description": "The reply text, including its fenced blocks"},
 				"prompt": map[string]interface{}{"type": "string", "description": "The question that regenerates it; omit only if it genuinely cannot be re-asked"},
+				"source": map[string]interface{}{"type": "string", "description": "Leave this out to save the reply already on screen, which is almost always what is wanted. Only pass it for a dashboard with no reply behind it."},
 			},
-			"required": []string{"name", "source"},
+			"required": []string{"name"},
 		},
-		func(_ context.Context, a map[string]interface{}) (interface{}, error) {
-			d, err := s.SaveDashboard(argStr(a, "name"), argStr(a, "source"), argStr(a, "prompt"))
+		func(ctx context.Context, a map[string]interface{}) (interface{}, error) {
+			source, from := strings.TrimSpace(argStr(a, "source")), "the text you supplied"
+			if source == "" {
+				// The reply that is already on screen, byte for byte.
+				reply, ok := lastRenderableReply(s.SessionTurns(sessionIDFrom(ctx)))
+				if !ok {
+					return errResult("no reply in this conversation contains a block to save — draw the dashboard first, then save it"), nil
+				}
+				source, from = reply, "the reply already on screen"
+			}
+			d, err := s.SaveDashboard(argStr(a, "name"), source, argStr(a, "prompt"))
 			if err != nil {
 				return errResult(err.Error()), nil
 			}
-			note := ""
+			note := "Stored " + from + "."
 			if strings.TrimSpace(d.Prompt) == "" {
-				note = "Saved without a question, so it cannot refresh itself."
+				note += " Saved without a question, so it cannot refresh itself."
 			}
 			return okData(map[string]interface{}{"id": d.ID, "name": d.Name, "note": note}), nil
 		},
@@ -291,6 +300,77 @@ func toBool(v interface{}) bool {
 		return ok
 	case float64:
 		return b != 0
+	}
+	return false
+}
+
+// --- the conversation a tool call belongs to ---
+
+type sessionIDKey struct{}
+
+// withSessionID marks a context with the conversation whose turn is running.
+//
+// agent-go has this already — pkg/agent/context_session.go — but its accessor
+// and its key type are unexported, so a host cannot read it. Stream owns the
+// context it hands to the agent, and tools are called with a context derived
+// from it, so putting the id back under our own key costs one line and needs no
+// change upstream.
+func withSessionID(ctx context.Context, id string) context.Context {
+	if strings.TrimSpace(id) == "" {
+		return ctx
+	}
+	return context.WithValue(ctx, sessionIDKey{}, id)
+}
+
+func sessionIDFrom(ctx context.Context) string {
+	if ctx == nil {
+		return ""
+	}
+	id, _ := ctx.Value(sessionIDKey{}).(string)
+	return id
+}
+
+// lastRenderableReply returns the most recent assistant message in a session
+// that actually contains a block the transcript draws.
+//
+// This is what "save this one" means. Letting the model retype the document
+// into the tool call instead — which is what dashboard_save did at first —
+// makes saving a second generation: it wrote a `ui` document where the screen
+// held a `bigscreen` one, nobody had rendered the new text, and the failure
+// surfaced hours later when the panel was opened. What is on screen has been
+// drawn once already; storing those bytes is the only version with evidence
+// behind it.
+func lastRenderableReply(turns []ChatTurn) (string, bool) {
+	for i := len(turns) - 1; i >= 0; i-- {
+		t := turns[i]
+		if t.Role != "assistant" || t.Kind != "" {
+			continue
+		}
+		if hasRenderableFence(t.Content) {
+			return t.Content, true
+		}
+	}
+	return "", false
+}
+
+// renderableFences are the block names the transcript's plugins draw. Kept
+// beside the tool rather than imported from the frontend, which is where the
+// authoritative list lives — a name added there and not here only costs this
+// tool a fallback, never a wrong save.
+var renderableFences = map[string]bool{
+	"bigscreen": true, "ui": true, "chart": true,
+	"list": true, "mermaid": true, "sources": true, "table": true,
+}
+
+func hasRenderableFence(text string) bool {
+	for _, line := range strings.Split(text, "\n") {
+		rest, ok := strings.CutPrefix(strings.TrimSpace(line), "```")
+		if !ok {
+			continue
+		}
+		if renderableFences[strings.TrimSpace(strings.ToLower(rest))] {
+			return true
+		}
 	}
 	return false
 }
