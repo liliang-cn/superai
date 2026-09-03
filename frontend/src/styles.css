@@ -2224,3 +2224,50 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
   .composer { padding-inline: max(12px, env(safe-area-inset-left, 0px)) max(12px, env(safe-area-inset-right, 0px)); }
   .statusbar { padding-inline: max(12px, env(safe-area-inset-left, 0px)) max(12px, env(safe-area-inset-right, 0px)); }
 }
+
+/* ---------------- Touch, corrected ---------------- */
+/*
+ * The first pass at touch targets measured height and never width, so a column
+ * of things 44px tall and 22–36px wide passed and the theme picker still could
+ * not be hit with a thumb. Width is the axis these controls are short on:
+ * every one of them is an icon in a square.
+ */
+@media (max-width: 640px) {
+  .theme-toggle, .panel-toggle.inline, .composer button { min-width: 44px; }
+
+  /* The swatches were 22px dots in a row eight pixels apart — five of them
+     inside a 194px panel. Enlarging the dot would crowd the row, so the dot
+     stays 22px and the padding around it does the catching: the button is 44
+     square, the colour is drawn only in the content box. */
+  .tp-swatch {
+    width: 44px; height: 44px;
+    padding: 11px;
+    background-clip: content-box;
+    border: none;
+  }
+  .tp-swatch.on { box-shadow: inset 0 0 0 11px transparent, 0 0 0 2px var(--bg-1) inset; }
+  /* The ring has to follow the dot, not the button, so it is drawn on an inner
+     shadow sized to the padding rather than the element's own edge. */
+  .tp-swatch.on { box-shadow: 0 0 0 2px var(--bg-1), 0 0 0 4px var(--sw); }
+  .tp-swatches { gap: 0; margin-inline: -11px; }
+
+  /* iOS zooms the whole page when a field smaller than 16px takes focus, and
+     zooming is off, so the page just sits there magnified with no way back.
+     Sixteen is the threshold, not a preference. */
+  input, textarea, select { font-size: 16px; }
+
+  /* The light/dark pair inside the picker, the last row still built for a
+     cursor. */
+  .tp-seg-btn { min-height: 44px; }
+
+  /* No double-tap-to-zoom delay on anything that is meant to be tapped. */
+  button, a, [role="button"], [role="tab"] { touch-action: manipulation; }
+
+  /* The control room header laid its brand and its chips side by side and
+     never wrapped, so at 354px the eyebrow was clipped mid-word and the clock
+     landed on top of the model chip. Each part gets its own line. */
+  .cr-head { flex-wrap: wrap; }
+  .cr-brand { flex: 1 1 100%; }
+  .cr-chips { margin-left: 0; }
+  .cr-clock { margin-left: 0; }
+}

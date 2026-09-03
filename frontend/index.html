@@ -6,8 +6,14 @@
          other than zero on a notched phone. Without it iOS letterboxes the page
          inside the safe area and the insets are all 0; with it the page owns the
          whole screen and has to keep its own content clear of the notch and the
-         home indicator, which styles.css does. -->
-    <meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport"/>
+         home indicator, which styles.css does.
+
+         maximum-scale/user-scalable turn pinch-zoom off: this is an app shell,
+         not a document, and a pinch on it drags the layout out of shape rather
+         than magnifying anything worth magnifying. iOS ignores user-scalable
+         on its own, so the rule that actually stops the page lurching when a
+         field is focused is the 16px minimum on inputs in styles.css. -->
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
     <title>SuperAI</title>
 </head>
 <body>
