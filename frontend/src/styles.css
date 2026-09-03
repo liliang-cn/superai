@@ -1907,33 +1907,46 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
 .panel-tab:hover { color: var(--text-1); background: var(--bg-2); }
 .panel-tab.active { color: var(--text-0); background: var(--bg-2); border-color: var(--border); }
 
-.dash-card {
+/* The saved-dashboard card in the side panel.
+ *
+ * Named dcard, not dash-card: the Dashboard *page* has had a .dash-card since
+ * long before this panel existed, and it is a column. Two rules of equal
+ * specificity meant the older one's flex-direction leaked through everything
+ * this block did not restate — the card laid its parts out vertically and the
+ * action buttons, carrying panel-toggle's negative margins, hung outside the
+ * card's rounded edge. A collision that only shows up in the properties you
+ * did not think to override is not worth winning; the name changed instead. */
+.dcard {
   display: flex; align-items: stretch; gap: 4px;
   border: 1px solid var(--border); border-radius: var(--radius);
   background: var(--bg-1);
 }
-.dash-card:hover { border-color: var(--border-strong); }
-.dash-card-main {
+.dcard:hover { border-color: var(--border-strong); }
+.dcard-main {
   flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px;
   padding: 9px 11px; text-align: left;
   background: transparent; border: none; color: inherit; font: inherit;
 }
-.dash-card-name {
+.dcard-name {
   font-size: 13px; font-weight: 500; color: var(--text-0);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.dash-card-meta {
+.dcard-meta {
   display: flex; align-items: center; gap: 5px;
   font-size: 11.5px; color: var(--text-3);
 }
 .dash-cron { display: inline-flex; align-items: center; color: var(--accent); }
-.dash-card-err { font-size: 11.5px; color: var(--red); }
+.dcard-err { font-size: 11.5px; color: var(--red); }
 /* Refresh and delete side by side, not stacked. Two icons in a column beside a
    two-line card read as a scrollbar; in a row they read as what they are. */
-.dash-card-actions {
+.dcard-actions {
   display: flex; align-items: center; justify-content: flex-end; gap: 2px;
-  padding-right: 6px;
+  padding-right: 8px; flex: none;
 }
+/* panel-toggle.inline pulls itself outward by 4px so it can sit flush in a
+   panel header. Inside a card that is exactly how an icon ends up outside the
+   border. */
+.dcard-actions .panel-toggle.inline { margin: 0; }
 
 /* The name is editable in place: renaming is the only edit a dashboard has,
    and a field that looks like a heading is less machinery than a dialog. */

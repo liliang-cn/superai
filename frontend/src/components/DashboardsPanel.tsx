@@ -45,10 +45,10 @@ function Card({
   onDelete: () => void;
 }) {
   return (
-    <div className="dash-card">
-      <button className="dash-card-main" onClick={onOpen} title="Open">
-        <span className="dash-card-name">{d.name}</span>
-        <span className="dash-card-meta">
+    <div className="dcard">
+      <button className="dcard-main" onClick={onOpen} title="Open">
+        <span className="dcard-name">{d.name}</span>
+        <span className="dcard-meta">
           {d.refreshing ? (
             <>
               <span className="spinner" /> refreshing…
@@ -62,9 +62,9 @@ function Card({
             </span>
           )}
         </span>
-        {d.last_error && <span className="dash-card-err">⚠ {d.last_error}</span>}
+        {d.last_error && <span className="dcard-err">⚠ {d.last_error}</span>}
       </button>
-      <div className="dash-card-actions">
+      <div className="dcard-actions">
         <button
           className="panel-toggle inline"
           onClick={onRefresh}
