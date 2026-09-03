@@ -49,6 +49,12 @@ export default function App() {
   });
   useEffect(() => {
     try {
+      // Only a desktop writes this down. On a phone the same flag is a drawer
+      // being out, and closing a drawer — which navigating does on its own — is
+      // not a statement about how you like your sidebar. Sharing the key
+      // without this guard means one visit on a phone leaves the desktop
+      // sidebar collapsed for good.
+      if (window.matchMedia("(max-width: 640px)").matches) return;
       localStorage.setItem(NAV_OPEN_KEY, navOpen ? "1" : "0");
     } catch {
       // A private window. It simply opens on its default next time.
