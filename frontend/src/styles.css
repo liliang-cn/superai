@@ -2429,7 +2429,16 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
 @media (max-width: 1100px) { .cr-hero { grid-template-columns: 1fr; height: auto; } .cr-reactor { height: 60vh; } }
 .cr-reactor { padding: 0; overflow: hidden; background: #05070f; border: 0; border-radius: 0; display: flex; min-height: 0; animation: none; }
 .rx { position: relative; flex: 1; min-height: 0; overflow: hidden; background: #05070f; }
-.rx-canvas { position: absolute; inset: 0; display: block; mix-blend-mode: screen; pointer-events: none; }
+/* width/height, not inset. A canvas is a replaced element: for one that is
+   absolutely positioned, `width: auto` resolves to its intrinsic size — the
+   drawing buffer — and the over-constrained `right`/`bottom` are ignored. So
+   inset:0 alone laid a 2x-DPR canvas out at 2648x2080 inside a 1324x1040 box,
+   which with overflow hidden showed the top-left quarter of a double-size
+   scene: the ring's centre pushed off to the bottom right, while the DOM
+   labels beside it stayed correct. On a 1x display the buffer happened to
+   equal the box and it looked fine, which is why this only ever went wrong on
+   a Retina screen. */
+.rx-canvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; mix-blend-mode: screen; pointer-events: none; }
 /* The brain, masked to the hub. It sits under the canvas; screen blending lets
    the light pass over it without the canvas having to be transparent, which
    bloom cannot be. */

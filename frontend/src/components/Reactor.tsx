@@ -236,6 +236,7 @@ class Wheel {
   w = 0;
   h = 0;
   R = 300;
+  dpr = 0;
   reduce: boolean;
   seenSeq = 0;
   bandDrawnAt = 0;
@@ -340,9 +341,13 @@ class Wheel {
   }
 
   resize(w: number, h: number, dpr: number) {
-    if (w === this.w && h === this.h) return;
+    // dpr is compared too: dragging the window from a Retina screen to an
+    // external one changes it without changing the box, and a buffer left at
+    // the old ratio is a scene rendered at the wrong scale.
+    if (w === this.w && h === this.h && dpr === this.dpr) return;
     this.w = w;
     this.h = h;
+    this.dpr = dpr;
     this.R = geometry(w, h).R;
     this.renderer.setPixelRatio(dpr);
     this.renderer.setSize(w, h, false);
@@ -623,11 +628,12 @@ export default function Reactor({ snap, pillars, brain }: { snap: Snap; pillars:
       return; // no WebGL: the charts beside it still work
     }
     wheelRef.current = wheel;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const resize = () => {
       const w = host.clientWidth, h = host.clientHeight;
       if (w === 0 || h === 0) return;
-      wheel.resize(w, h, dpr);
+      // Read the ratio every time rather than once: a window dragged between
+      // displays changes it, and nothing else would notice.
+      wheel.resize(w, h, Math.min(window.devicePixelRatio || 1, 2));
       wheel.setPillars(pillarsRef.current);
       setBox({ w, h });
     };
