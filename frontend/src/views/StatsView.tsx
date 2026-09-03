@@ -1,13 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EventsOn } from "../../wailsjs/runtime";
 import {
-  Dashboard, GraphView as startGraphView, LongRunList, LongRunStart, LongRunState, LongRunStop,
+  Dashboard, GetStatus, GraphView as startGraphView, LongRunList, LongRunStart, LongRunState, LongRunStop,
 } from "../../wailsjs/go/main/App";
 import {
   Activity, AlertTriangle, Brain, Clock, Coins, Cpu, Database, Gauge, GitBranch, Grid3x3,
   ListChecks, Play, Radio, RotateCcw, ScrollText, Shield, Sparkles, Square, Terminal, Wrench, Zap,
 } from "lucide-react";
-import Reactor, { PulseTicker, ToolTable, usePulse } from "../components/Reactor";
+import Reactor, { Counters, Pillar, PulseTicker, usePulse } from "../components/Reactor";
+import { BurnArea, CacheRing, CallRing, LoadGauges, ToolColumns, TurnColumns } from "../components/ReactorCharts";
 import { hueFor } from "../lib/hues";
 import HealthCard from "../components/HealthCard";
 import RunTracePanel from "../components/RunTracePanel";
@@ -113,6 +114,22 @@ export default function StatsView() {
   // The live meter, polled once here and shared by the reactor, the columns
   // and the ticker below it.
   const pulse = usePulse();
+  // What the install has - skills, MCP servers and their tools - from the
+  // same call the status bar makes. Slow-moving, so every quarter minute.
+  const [inv, setInv] = useState<{ skills: number; mcp: number; mcpTools: number }>({ skills: 0, mcp: 0, mcpTools: 0 });
+  useEffect(() => {
+    let alive = true;
+    const load = async () => {
+      try {
+        const raw = (await GetStatus()) as Record<string, unknown>;
+        if (!alive) return;
+        setInv({ skills: Array.isArray(raw.skills) ? raw.skills.length : 0, mcp: Number(raw.mcp ?? 0), mcpTools: Number(raw.mcpTools ?? 0) });
+      } catch { /* the pillars keep their last figures */ }
+    };
+    load();
+    const t = window.setInterval(load, 15000);
+    return () => { alive = false; window.clearInterval(t); };
+  }, []);
   const ime = useImeGuard();
   const logRef = useRef<HTMLDivElement | null>(null);
 
@@ -171,6 +188,40 @@ export default function StatsView() {
 
   const days = dash?.usage?.days ?? [];
   const live = Boolean(st?.running) || (dash?.activeRuns?.length ?? 0) > 0;
+
+  // One pillar per figure. Order is the order round the ring, clockwise from
+  // twelve: what was burned, what was called, what the install has, and
+  // what the process is doing. Colours are families, not values.
+  const pillars = useMemo<Pillar[]>(() => {
+    const CY = "#5ee0ff", AM = "#ffb547", WH = "#ffffff", PK = "#ff73d9", TL = "#4dffdb", VI = "#b87aff", LI = "#9dff6a", RO = "#ff5c7a";
+    const list: Pillar[] = [
+      { key: "today", label: "tokens today", value: dash?.usage?.today ?? 0, color: CY },
+      { key: "all", label: "tokens all time", value: dash?.usage?.totalTokens ?? 0, color: CY },
+      { key: "proc", label: "tokens process", value: pulse.tokens, color: CY },
+    ];
+    if (st) list.push({ key: "task", label: "tokens task", value: st.totalTokens, color: CY });
+    list.push(
+      { key: "cached", label: "cached", value: pulse.cached, color: AM },
+      { key: "turns", label: "turns today", value: dash?.usage?.modelTurns ?? 0, color: CY },
+      { key: "calls", label: "tool calls", value: pulse.calls, color: WH },
+    );
+    if (st) list.push({ key: "taskcalls", label: "task calls", value: st.toolCalls, color: WH });
+    list.push(
+      { key: "mcpcalls", label: "mcp calls", value: pulse.mcp, color: PK },
+      { key: "memcalls", label: "memory calls", value: pulse.memory, color: TL },
+      { key: "fails", label: "failed", value: pulse.fails, color: pulse.fails ? RO : "#8a96b0" },
+      { key: "mcp", label: "mcp servers", value: inv.mcp, color: PK },
+      { key: "mcptools", label: "mcp tools", value: inv.mcpTools, color: PK },
+      { key: "skills", label: "skills", value: inv.skills, color: LI },
+      { key: "tasks", label: "tasks on record", value: dash?.tasks?.length ?? 0, color: LI },
+      { key: "nodes", label: "graph nodes", value: graph?.nodes ?? 0, color: VI },
+      { key: "edges", label: "graph edges", value: graph?.edges ?? 0, color: VI },
+      { key: "cpu", label: "cpu", value: pulse.cpu, color: VI, text: pulse.cpu.toFixed(0) + "%" },
+      { key: "heap", label: "heap", value: pulse.heap / 1048576, color: VI, text: (pulse.heap / 1048576).toFixed(0) + " MB" },
+      { key: "gor", label: "goroutines", value: pulse.goroutines, color: "#8a96b0" },
+    );
+    return list;
+  }, [dash, st, pulse.tokens, pulse.cached, pulse.calls, pulse.mcp, pulse.memory, pulse.fails, pulse.cpu, pulse.heap, pulse.goroutines, inv, graph]);
   const brainLabel = dash?.memoryMode?.startsWith("shared") ? "shared brain" : dash?.memoryMode || "local brain";
 
   return (
@@ -187,12 +238,50 @@ export default function StatsView() {
         <div className="cr-clock"><Clock size={13} />{hhmmss(clock)}<span className={`cr-tag ${live ? "cyan" : ""}`}>{live ? "LIVE" : "IDLE"}</span></div>
       </header>
 
-      {/* ── the reactor: the whole width, the brain in its hub ── */}
-      <section className="cr-panel cr-reactor">
-        {/* The live view's own switches, set from the URL: no control panels
-            (inside a disc this size they would cover the graph), orbiting from
-            the start, and the reactor's own black behind it. */}
-        <Reactor snap={pulse} brain={(GRAPH_SRC ?? graph?.url) ? `${GRAPH_SRC ?? graph?.url}?panels=0&spin=1&bg=05070f` : null} />
+      {/* ── left the wheel, right the figures ── */}
+      <section className="cr-hero">
+        <div className="cr-panel cr-reactor">
+          {/* The live view's own switches, set from the URL: no control panels
+              (inside a disc this size they would cover the graph), orbiting from
+              the start, and the reactor's own black behind it. */}
+          <Reactor snap={pulse} pillars={pillars} brain={(GRAPH_SRC ?? graph?.url) ? `${GRAPH_SRC ?? graph?.url}?panels=0&spin=4&bg=05070f` : null} />
+        </div>
+        <div className="cr-side">
+          <div className="cr-panel tight">
+            <div className="cr-panel-h"><Activity size={13} /><span className="cr-eyebrow">This process</span><span className={`cr-tag ${pulse.live ? "cyan" : ""}`}>{pulse.live ? "burning" : "idle"}</span></div>
+            <Counters snap={pulse} />
+          </div>
+          <div className="cr-panel tight">
+            <div className="cr-panel-h"><Sparkles size={13} /><span className="cr-eyebrow">Cache</span></div>
+            <CacheRing snap={pulse} />
+          </div>
+          <div className="cr-panel tight">
+            <div className="cr-panel-h"><Wrench size={13} /><span className="cr-eyebrow">Calls</span></div>
+            <CallRing snap={pulse} />
+          </div>
+          <div className="cr-panel tight">
+            <div className="cr-panel-h"><Activity size={13} /><span className="cr-eyebrow">Two minutes</span><span className="cr-tag cyan">tokens</span><span className="cr-tag lime">reasoning</span></div>
+            <BurnArea snap={pulse} />
+          </div>
+          <div className="cr-panel tight">
+            <div className="cr-panel-h"><Gauge size={13} /><span className="cr-eyebrow">Tokens per turn</span><span className="cr-tag">{pulse.rounds}</span></div>
+            <TurnColumns snap={pulse} />
+          </div>
+          <div className="cr-panel tight">
+            <div className="cr-panel-h"><Wrench size={13} /><span className="cr-eyebrow">Calls per tool</span><span className="cr-tag">{pulse.tools.length}</span></div>
+            <ToolColumns snap={pulse} />
+          </div>
+          <div className="cr-panel tight">
+            <div className="cr-panel-h"><Cpu size={13} /><span className="cr-eyebrow">Load</span><span className="cr-tag">{pulse.goroutines} goroutines</span></div>
+            <LoadGauges snap={pulse} />
+          </div>
+        </div>
+      </section>
+
+      {/* ── the stream ── */}
+      <section className="cr-panel rx-ticker">
+        <div className="cr-panel-h"><ScrollText size={13} /><span className="cr-eyebrow">Activity</span><span className="cr-tag">newest first</span></div>
+        <PulseTicker snap={pulse} />
       </section>
 
       {/* ── the system ── */}
@@ -203,26 +292,6 @@ export default function StatsView() {
         <Stat icon={<Coins size={14} />} label="Spend" value={!st ? <span className="cr-dim">—</span> : st.unpriced ? <span className="cr-dim">unpriced</span> : <Num v={st.costUsd} fmt={(n) => "$" + n.toFixed(3)} />} sub={!st ? "select or start a task" : st.unpriced ? "no rates for this model · set llm_price_* in settings" : `this task · ${st.segments.length} segments`} tone={!st ? undefined : st.unpriced ? "rose" : "amber"} />
         <Stat icon={<Activity size={14} />} label="Turns" value={<Num v={dash?.usage?.modelTurns ?? 0} />} sub={<>{dash?.tasks?.length ?? 0} tasks on record · {dash?.activeRuns?.length ?? 0} active</>} />
         <Stat icon={<Shield size={14} />} label="Lint gate" value={d ? <span className={d.rejected ? "rose" : "lime"}><Num v={d.rejected} /></span> : <span className="cr-dim">—</span>} sub={d ? `${pct(d.accepted, Math.max(1, d.rs.length))}% clean turns` : "select or start a task"} tone={!d ? undefined : d.rejected ? "rose" : "lime"} />
-      </section>
-
-      {/* ── the traffic the reactor is drawing ── */}
-      <section className="cr-live">
-        <div className="cr-panel rx-tools">
-          <div className="cr-panel-h">
-            <Wrench size={13} />
-            <span className="cr-eyebrow">Tools</span>
-            <span className="cr-tag">{pulse.tools.length}</span>
-          </div>
-          <ToolTable snap={pulse} />
-        </div>
-        <div className="cr-panel rx-ticker">
-          <div className="cr-panel-h">
-            <ScrollText size={13} />
-            <span className="cr-eyebrow">Activity</span>
-            <span className="cr-tag">newest first</span>
-          </div>
-          <PulseTicker snap={pulse} />
-        </div>
       </section>
 
       {/* ── health: is the install itself sound ── */}

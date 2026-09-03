@@ -175,6 +175,11 @@ func TestSendChatTagsEventsPerRequest(t *testing.T) {
 	terminals := map[string]string{}
 
 	for _, e := range events {
+		// The meter's pulse:frame is process-wide and untagged on purpose;
+		// only chat:* events belong to an ask.
+		if !strings.HasPrefix(e.name, "chat:") {
+			continue
+		}
 		id := e.requestID()
 		if id == "" {
 			t.Errorf("%s event carries no requestId: %v", e.name, e.payload)

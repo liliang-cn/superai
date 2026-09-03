@@ -2362,8 +2362,35 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
    additive light needs black behind it. WebGL draws the wheel; the DOM draws
    the numbers over it, because canvas text is soft at any device pixel ratio
    the browser did not pick and these are numbers someone is checking. */
-.cr-reactor { padding: 0; overflow: hidden; background: #05070f; border-color: #16203a; flex: none; }
-.rx { position: relative; height: clamp(360px, 46vh, 560px); overflow: hidden; background: #05070f; }
+/* One screen, one picture. The wheel on the left and the charts on the right
+   share a single black ground with no card edges between them, so the row
+   reads as one instrument rather than a dark panel beside some white ones. It
+   is always the cockpit, whatever the theme: additive light needs black. The
+   pair is sized to the viewport so nothing on this row is below the fold. */
+.cr-hero {
+  --cr-panel: #0a0f1d; --cr-panel-2: #0a0f1d; --cr-line: #141c30; --cr-line-2: #22304e;
+  --cr-text: #e6ebf7; --cr-dim: #6b7690; --cr-mute: #3c4762;
+  --cr-cyan: #5ee0ff; --cr-amber: #ffb547; --cr-rose: #ff5c7a; --cr-lime: #9dff6a;
+  --cr-cyan-rgb: 94,224,255; --cr-amber-rgb: 255,181,71; --cr-rose-rgb: 255,92,122; --cr-lime-rgb: 157,255,106;
+  display: grid; grid-template-columns: minmax(0, 7fr) minmax(280px, 3fr); gap: 0;
+  height: calc(100vh - 118px); min-height: 560px; flex: none;
+  background: #05070f; border: 1px solid #16203a; border-radius: 12px; overflow: hidden;
+  color: var(--cr-text);
+}
+/* One figure a row: the column is narrow and a chart wants the width. */
+.cr-side {
+  display: grid; grid-template-columns: 1fr; gap: 1px; min-width: 0; min-height: 0;
+  grid-template-rows: auto repeat(6, minmax(0, 1fr));
+  background: #10182b; border-left: 1px solid #10182b;
+}
+.cr-side .cr-panel { background: #05070f; border: 0; border-radius: 0; animation: none; }
+.cr-side .cr-panel.tight { padding: 8px 12px 6px; display: flex; flex-direction: column; min-height: 0; }
+.cr-side .cr-panel.tight .cr-panel-h { margin-bottom: 4px; }
+.cr-side .cr-panel.tight .rx-chart { flex: 1; min-height: 0; }
+.cr-side .cr-tag { border-color: #22304e; }
+@media (max-width: 1100px) { .cr-hero { grid-template-columns: 1fr; height: auto; } .cr-reactor { height: 60vh; } }
+.cr-reactor { padding: 0; overflow: hidden; background: #05070f; border: 0; border-radius: 0; display: flex; min-height: 0; animation: none; }
+.rx { position: relative; flex: 1; min-height: 0; overflow: hidden; background: #05070f; }
 .rx-canvas { position: absolute; inset: 0; display: block; mix-blend-mode: screen; pointer-events: none; }
 /* The brain, masked to the hub. It sits under the canvas; screen blending lets
    the light pass over it without the canvas having to be transparent, which
@@ -2372,6 +2399,15 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
   position: absolute; border: 0; border-radius: 50%; overflow: hidden;
   background: #05070f; box-shadow: 0 0 60px rgba(94,224,255,.18), inset 0 0 80px rgba(5,7,15,.9);
 }
+
+/* The figures at the pillars' ends. Positioned by the wheel each frame. */
+.rx-tips { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+.rx-tip {
+  position: absolute; left: 0; top: 0; width: 132px; text-align: center; will-change: transform;
+  font-family: var(--cr-mono); line-height: 1.05;
+}
+.rx-tip b { display: block; font-size: 17px; font-weight: 800; letter-spacing: .01em; font-variant-numeric: tabular-nums; text-shadow: 0 0 14px currentColor, 0 0 2px currentColor; }
+.rx-tip span { display: block; font-size: 8.5px; letter-spacing: .16em; text-transform: uppercase; color: #aab6cc; margin-top: 2px; }
 
 .rx-head {
   position: absolute; left: 14px; top: 10px; z-index: 2; pointer-events: none;
@@ -2406,28 +2442,17 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
   max-width: 46%; display: flex; align-items: baseline; gap: 8px;
   font-family: var(--cr-mono); font-size: 11px;
 }
+.rx-think.bottom { top: auto; bottom: 12px; max-width: 70%; }
 .rx-think-l { flex: none; font-size: 9px; letter-spacing: .18em; text-transform: uppercase; color: #9dff6a; text-shadow: 0 0 10px rgba(157,255,106,.5); }
 .rx-think-t { flex: 1; min-width: 0; color: #aab6cc; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; }
 
 /* Every counter, one strip along the floor. */
-/* A fade behind the strip, because the brightest part of the wheel is the
-   newest second, and the newest second is at the bottom. */
-.rx::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 64px; z-index: 1; pointer-events: none;
-  background: linear-gradient(180deg, rgba(5,7,15,0) 0%, rgba(5,7,15,.85) 100%); }
-.rx-strip {
-  position: absolute; left: 14px; right: 14px; bottom: 10px; z-index: 2; pointer-events: none;
-  display: flex; flex-wrap: wrap; gap: 4px 18px;
-  font-family: var(--cr-mono); font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; color: #6b7690;
-}
-.rx-strip span { display: inline-flex; align-items: baseline; gap: 6px; }
-.rx-strip b { font-size: 14px; letter-spacing: 0; font-variant-numeric: tabular-nums; color: #e6ebf7; }
-.rx-strip .c-cyan b { color: #7fe6ff; } .rx-strip .c-amber b { color: #ffb547; } .rx-strip .c-white b { color: #ffffff; }
-.rx-strip .c-pink b { color: #ff73d9; } .rx-strip .c-teal b { color: #4dffdb; } .rx-strip .c-rose b { color: #ff5c7a; }
-.rx-strip .c-violet b { color: #b87aff; } .rx-strip .c-dim b { color: #8a96b0; }
-
-/* Tools on the left, narration on the right. */
-.cr-live { display: grid; grid-template-columns: minmax(280px, 38%) 1fr; gap: 10px; align-items: stretch; }
-.rx-tools, .rx-ticker { display: flex; flex-direction: column; min-width: 0; }
+.rx-counters { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 3px 8px; font-family: var(--cr-mono); font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--cr-dim); }
+.rx-counters span { display: flex; flex-direction: column; gap: 2px; }
+.rx-counters b { font-size: 14px; letter-spacing: 0; font-variant-numeric: tabular-nums; color: var(--cr-text); }
+.rx-counters .c-cyan b { color: var(--cr-cyan); } .rx-counters .c-amber b { color: var(--cr-amber); }
+.rx-counters .c-pink b { color: #ff73d9; } .rx-counters .c-teal b { color: #2fd9b8; } .rx-counters .c-rose b { color: var(--cr-rose); }
+.rx-counters .c-violet b { color: #a476ff; } .rx-counters .c-dim b { color: var(--cr-dim); }
 
 /* Figures under the wheel. One table style for tools and turns. */
 .cr-table-wrap { flex: 1; overflow: auto; max-height: 260px; }

@@ -135,6 +135,12 @@ func TestTwoAsksAtOnceStaySeparate(t *testing.T) {
 	byID := map[string][]captured{}
 	types := map[string]map[string]int{}
 	for _, e := range events {
+		// Only a conversation's own events carry a request id. The meter's
+		// pulse:frame is about the whole process and goes to every listener,
+		// and tagging it with one ask would be a lie about the other.
+		if !strings.HasPrefix(e.name, "chat:") {
+			continue
+		}
 		id := e.reqID()
 		if id == "" {
 			t.Errorf("event %s carried no requestId: %v", e.name, e.payload)
