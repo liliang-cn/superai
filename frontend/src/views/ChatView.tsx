@@ -4,6 +4,8 @@ import { useAttachments } from "../lib/useAttachments";
 import { AppStatus } from "../lib/types";
 import { copyText } from "../lib/format";
 import AttachmentChips from "../components/AttachmentChips";
+import { AgentMenu, AddressedBanner } from "../components/AgentMenu";
+import { useAgentMentions } from "../lib/useAgentMentions";
 import {
   Conversation,
   ConversationContent,
@@ -56,6 +58,8 @@ export default function ChatView({
   // The composer is controlled so the send button can know whether there is
   // anything to send — which is what decides between "send" and "stop" below.
   const [draft, setDraft] = useState("");
+  // The @ menu, and whether this message is addressed to another agent.
+  const mentions = useAgentMentions(draft, setDraft);
   // The message index whose save just landed, for a moment of green.
   const [saved, setSaved] = useState(-1);
   // The reply waiting to be named. Null when the dialog is closed.
@@ -310,15 +314,45 @@ export default function ChatView({
 
           <div className="composer" data-pet-spot="composer" data-pet-label="the box you type a message into">
             <AttachmentChips paths={attach.paths} onRemove={attach.remove} />
+            <AddressedBanner agent={mentions.addressee} />
+            {/* Outside the form, not inside it: PromptInput is rounded and
+                carries overflow-hidden, which would clip a menu drawn above
+                the input to nothing. */}
+            <AgentMenu
+              matches={mentions.matches}
+              active={mentions.active}
+              onPick={(a) => {
+                const next = mentions.accept(a);
+                // Put the caret after the name it just inserted, or the next
+                // character typed lands wherever the browser left it.
+                if (next) {
+                  requestAnimationFrame(() => {
+                    const el = document.querySelector<HTMLTextAreaElement>("textarea[name=message]");
+                    el?.focus();
+                    el?.setSelectionRange(next.caret, next.caret);
+                  });
+                }
+              }}
+            />
             <PromptInput onSubmit={onSubmit}>
               <PromptInputTextarea
                 value={draft}
-                onChange={(e) => setDraft(e.target.value)}
+                onChange={(e) => {
+                  setDraft(e.target.value);
+                  mentions.update(e.target.value, e.target.selectionStart ?? e.target.value.length);
+                }}
+                // The menu gets the arrows and Enter first. It calls
+                // preventDefault on the ones it takes, which is what stops the
+                // textarea from also submitting — see prompt-input.tsx.
+                onKeyDown={mentions.onKeyDown}
+                onBlur={mentions.close}
                 onPaste={attach.paste}
                 placeholder={
                   notReady
                     ? "Configure LLM in Settings first…"
-                    : "Message SuperAI…  (drag files in, paste a screenshot, or 📎)"
+                    : mentions.agents.length > 0
+                      ? "Message SuperAI…  (@ to reach another agent, drag files in, paste a screenshot)"
+                      : "Message SuperAI…  (drag files in, paste a screenshot, or 📎)"
                 }
               />
               <PromptInputToolbar>

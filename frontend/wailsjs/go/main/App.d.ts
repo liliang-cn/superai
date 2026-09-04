@@ -92,6 +92,10 @@ export function OpenWorkspaceFileExternal(arg1:string):Promise<string>;
 
 export function PendingToolApprovals():Promise<Array<Record<string, any>>>;
 
+export function AskRemoteAgent(arg1:string,arg2:string):Promise<backend.RemoteResult>;
+
+export function RemoteAgentNames():Promise<Array<Record<string, string>>>;
+
 export function PetStage(arg1:string,arg2:Array<Record<string, string>>):Promise<void>;
 
 export function PickFiles():Promise<Array<string>>;

@@ -128,6 +128,13 @@ func TestDoctorWarnsRatherThanFailsWhenNoAgentCLIIsInstalled(t *testing.T) {
 		[]byte(`{"llm_base_url":"https://gw.example/v1","llm_key":"sk-test","llm_model":"test-model"}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
+	// The home argument steers the settings lookup but not the MCP one, which
+	// goes through DataDir() and so was still reading the person's own
+	// mcpServers.json. With PATH emptied above, any npx-launched server they
+	// happen to have installed reported "npx is not on PATH" and failed a test
+	// about agent CLIs. Pointing the whole data directory at the temp home is
+	// what makes this hermetic.
+	t.Setenv("SUPERAI_DESKTOP_HOME", home)
 	report := doctorReportFor(context.Background(), home)
 	if report.Fail != 0 || !report.Healthy {
 		t.Fatalf("no agent CLIs made the install unhealthy: fail=%d healthy=%v", report.Fail, report.Healthy)

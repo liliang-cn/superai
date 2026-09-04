@@ -27,6 +27,10 @@ type App struct {
 	avatar   backend.AvatarDriver
 	// What the window last said the character is standing on. See app_pet.go.
 	pet      petState
+	// Asking agents on other machines. Built on first use and dropped when the
+	// settings change; see app_remote.go.
+	remoteOnce sync.Once
+	remote     *backend.RemoteRunner
 	sse      *backend.SSEServer
 	proxy    *backend.CLIProxy
 
@@ -214,13 +218,17 @@ func (a *App) rebuild() {
 		_ = a.svc.Close()
 		a.svc = nil
 	}
-	svc, err := backend.NewService(a.effective())
+	cfg := a.effective()
+	svc, err := backend.NewService(cfg)
 	if err != nil {
 		a.buildErr = err.Error()
 		return
 	}
 	a.buildErr = ""
 	a.svc = svc
+	// A rebuild is what a settings save produces, so this is where a changed
+	// host list stops being ignored.
+	a.resetRemote()
 	// The run wall watches this service the way it watched the last one, and
 	// so does the meter beside it.
 	svc.Agent().RegisterObserver(a.runWall(), a.livePulse())
@@ -243,6 +251,10 @@ func (a *App) rebuild() {
 	// Also per rebuild: these are registered on the agent, and a new agent
 	// starts with none of them.
 	a.registerPetTools(svc)
+	// The agents on other machines, if the settings name any. Read from the
+	// same settings this Service was built from, so the tool's catalogue and
+	// the runner can never describe two different sets.
+	a.registerRemoteTools(svc, cfg.RemoteAgents)
 }
 
 // restartScheduler rebinds the timers to the current service. Callers must not
@@ -652,6 +664,15 @@ func (a *App) GraphView() map[string]any {
 // empty string means nothing was started (the error event carries the reason).
 func (a *App) SendChat(sessionID, message string, imagePaths []string) string {
 	requestID := uuid.NewString()
+
+	// A message addressed to another agent goes there instead, and this app's
+	// model never runs. Checked before the readiness gate below on purpose: an
+	// unconfigured LLM is no reason not to forward a question to a machine that
+	// has one.
+	if name, rest, ok := addressedTo(message, a.remoteRunner().Config().Has); ok {
+		a.routeToRemote(requestID, name, rest)
+		return requestID
+	}
 
 	a.mu.Lock()
 	svc := a.svc

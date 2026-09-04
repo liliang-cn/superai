@@ -63,11 +63,18 @@ export const PromptInputTextarea = ({
   // compositionend, and a half-typed sentence gets sent. See lib/ime.ts.
   const ime = useImeGuard();
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    // The caller goes first, and a preventDefault from it means the key was
+    // for something else. Enter is the send key and also the accept key of any
+    // menu drawn over the composer, so submitting before asking would send a
+    // half-typed message *and* apply the choice — which is exactly what the
+    // agent menu did on its first outing: "@he" went to the model while
+    // "@hermes " was inserted into the box it had just cleared.
+    onKeyDown?.(e);
+    if (e.defaultPrevented) return;
     if (e.key === "Enter" && !e.shiftKey && !ime.composing(e)) {
       e.preventDefault();
       e.currentTarget.form?.requestSubmit();
     }
-    onKeyDown?.(e);
   };
   return (
     <textarea

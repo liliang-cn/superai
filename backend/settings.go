@@ -171,6 +171,12 @@ type Settings struct {
 	// settings.json — and so nothing here can be reached by a settings key the
 	// agent is allowed to write (see settingsWritable in selftools.go).
 	ExternalAgents ExternalAgents `json:"external_agents"`
+
+	// RemoteAgents lets SuperAI ask an agent on another machine — see
+	// remoteagents.go. Separate from ExternalAgents because the two differ in
+	// what they can hurt: one spends a subscription on this laptop, the other
+	// runs commands on a cluster.
+	RemoteAgents RemoteAgents `json:"remote_agents"`
 }
 
 // ExternalAgents configures handing work to agent CLIs installed on this
@@ -459,6 +465,11 @@ func (s *Settings) backfill(def *Settings) {
 	// money — the same reasoning DisableToolApproval uses, from the other
 	// direction.
 	s.ExternalAgents.normalize()
+	// Remote agents get their catalogue backfilled but not their switch: a
+	// file written before this existed knows nothing about pi or hermes, and
+	// filling the list in costs nothing while Enabled stays false.
+	s.RemoteAgents.backfill()
+	s.RemoteAgents.normalize()
 }
 
 // Save writes the settings to ~/.superai-desktop/settings.json (creating the
@@ -486,6 +497,7 @@ func (s *Settings) Save() error {
 	// empty row the moment "Add a directory" is pressed, and a file full of
 	// blank roots is a file nobody can read to answer "where may it write".
 	s.ExternalAgents.normalize()
+	s.RemoteAgents.normalize()
 	raw, err := json.MarshalIndent(s, "", "  ")
 	if err != nil {
 		return err

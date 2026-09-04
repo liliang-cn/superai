@@ -178,6 +178,14 @@ export function PendingToolApprovals() {
   return window['go']['main']['App']['PendingToolApprovals']();
 }
 
+export function AskRemoteAgent(arg1, arg2) {
+  return window['go']['main']['App']['AskRemoteAgent'](arg1, arg2);
+}
+
+export function RemoteAgentNames() {
+  return window['go']['main']['App']['RemoteAgentNames']();
+}
+
 export function PetStage(arg1, arg2) {
   return window['go']['main']['App']['PetStage'](arg1, arg2);
 }

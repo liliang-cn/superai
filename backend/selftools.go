@@ -39,6 +39,10 @@ import (
 //     able to move a secret from a config file into a tool call.
 //   - llm_base_url and shared_memory_endpoint decide who SuperAI talks to. The
 //     brain and the memory are not somewhere a conversation gets to redirect.
+//   - remote_agents runs commands on other machines under a real account.
+//     Nothing about "the model may adjust its own settings" should extend to
+//     the cluster, so it is absent here for the same reason as the next line
+//     and with less room for argument.
 //   - external_agents is disable_tool_approval wearing another hat. Turning it
 //     on hands work to another agent CLI that writes files with its own
 //     approval prompt bypassed, spends someone's subscription, and — through
@@ -220,6 +224,7 @@ func (s *Service) settingsSnapshot() map[string]interface{} {
 		// and no more than that: the roots, the binaries and the unattended
 		// flag are policy about this machine, not something a reply needs.
 		"external_agents_enabled": cfg.ExternalAgents.Enabled,
+		"remote_agents_enabled":   cfg.RemoteAgents.Enabled,
 		"self_install_enabled":    !cfg.DisableSelfInstall,
 		"writable_from_this_tool": writable,
 	}

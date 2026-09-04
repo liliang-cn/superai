@@ -85,6 +85,28 @@ export namespace agent {
 
 export namespace backend {
 	
+	export class RemoteResult {
+	    agent: string;
+	    host: string;
+	    text: string;
+	    failed: boolean;
+	    reason?: string;
+	    ms: number;
+
+	    static createFrom(source: any = {}) {
+	        return new RemoteResult(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.agent = source["agent"];
+	        this.host = source["host"];
+	        this.text = source["text"];
+	        this.failed = source["failed"];
+	        this.reason = source["reason"];
+	        this.ms = source["ms"];
+	    }
+	}
 	export class CLIProxyAccount {
 	    file: string;
 	    provider: string;
