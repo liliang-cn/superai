@@ -1863,8 +1863,12 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
   pointer-events: none;
   overflow: hidden;
 }
+/* The actor is the thing that moves; the sprite inside it is the thing that
+   faces a direction. Two elements, because a speech bubble hanging off a
+   mirrored one would be written backwards. */
+.pet-actor { position: absolute; top: 0; left: 0; }
 .pet {
-  position: absolute; top: 0; left: 0;
+  position: relative;
   pointer-events: auto;
   cursor: pointer;
   background-repeat: no-repeat;
@@ -1896,8 +1900,26 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
 .pet.pet-waiting { filter: drop-shadow(0 0 6px var(--accent)); }
 .pet.pet-error { animation-play-state: paused; filter: drop-shadow(0 0 6px var(--red)); }
 
-/* Walking left is the same frames mirrored, and the mirror is written into the
-   same inline transform as the position — see Pet.tsx. */
+/* Walking left is the same frames mirrored. The class is toggled by the walk
+   loop rather than rendered, for the same reason the position is written to the
+   element: sixty React renders a second to turn one sprite around. */
+.pet.pet-left { transform: scaleX(-1); }
+
+/* What it says when it has been sent somewhere. Above the character and
+   clipped to a couple of lines: it is a bubble, not a message pane, and the
+   backend already cuts the text to a sentence. */
+.pet-bubble {
+  position: absolute; left: 50%; bottom: calc(100% + 6px); transform: translateX(-50%);
+  max-width: 240px; width: max-content;
+  padding: 5px 9px; border-radius: 9px;
+  background: var(--panel); color: var(--text);
+  border: 1px solid var(--border); box-shadow: 0 6px 18px rgba(0,0,0,.28);
+  font-size: 12px; line-height: 1.35; text-align: center;
+  pointer-events: none;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+  animation: pet-say .18s ease-out;
+}
+@keyframes pet-say { from { opacity: 0; transform: translate(-50%, 4px); } to { opacity: 1; transform: translate(-50%, 0); } }
 
 /* The pill that opens it, which is a button rather than a readout. */
 .pill-btn {

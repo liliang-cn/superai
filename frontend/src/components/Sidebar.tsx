@@ -78,6 +78,8 @@ export default function Sidebar({
                 <button
                   key={it.key}
                   className={`nav-item${current === it.key ? " active" : ""}`}
+                  data-pet-spot={`nav-${it.key}`}
+                  data-pet-label={`the ${it.label} link in the left sidebar`}
                   onClick={() => onNavigate(it.key)}
                   title={open ? undefined : it.label}
                 >

@@ -304,9 +304,11 @@ export default function ChatView({
             </Conversation>
           )}
 
-          <DeliverablesBar sessionId={chat.sessionId} refreshKey={filesKey} />
+          <div data-pet-spot="files" data-pet-label="the row of files this conversation produced">
+            <DeliverablesBar sessionId={chat.sessionId} refreshKey={filesKey} />
+          </div>
 
-          <div className="composer">
+          <div className="composer" data-pet-spot="composer" data-pet-label="the box you type a message into">
             <AttachmentChips paths={attach.paths} onRemove={attach.remove} />
             <PromptInput onSubmit={onSubmit}>
               <PromptInputTextarea
@@ -328,6 +330,8 @@ export default function ChatView({
                     className="text-muted-foreground"
                     onClick={attach.pick}
                     disabled={attach.importing}
+                    data-pet-spot="attach"
+                    data-pet-label="the paperclip that attaches a file"
                     title="Attach files (Word / Excel / PPT / PDF / image)"
                   >
                     <PaperclipIcon className="size-3.5" />
@@ -364,7 +368,7 @@ export default function ChatView({
                     <SquareIcon className="size-3.5 fill-current" />
                   </Button>
                 ) : (
-                  <PromptInputSubmit status="ready" />
+                  <PromptInputSubmit status="ready" data-pet-spot="send" data-pet-label="the send button" />
                 )}
               </PromptInputToolbar>
             </PromptInput>

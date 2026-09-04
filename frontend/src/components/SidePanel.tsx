@@ -184,7 +184,7 @@ export default function SidePanel({
   }
 
   return (
-    <div className="trace-panel" ref={panelRef} style={{ width }}>
+    <div className="trace-panel" ref={panelRef} style={{ width }} data-pet-spot="panel" data-pet-label="the panel down the right of the conversation">
       {/* The drag handle sits on the border, outside the scrolling content, so
           grabbing it never scrolls whatever is underneath. */}
       <div
@@ -208,6 +208,8 @@ export default function SidePanel({
             key={key}
             type="button"
             className={`panel-tab${tab === key ? " active" : ""}`}
+            data-pet-spot={`tab-${key}`}
+            data-pet-label={`the ${label.toLowerCase()} tab of the right-hand panel`}
             onClick={() => setTab(key)}
             title={label}
             aria-label={label}

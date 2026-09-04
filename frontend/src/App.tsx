@@ -192,7 +192,7 @@ export default function App() {
           clicks. Needs the avatar server for its sprites and its state, which
           is also the only condition under which the pill that opens it shows. */}
       {petOpen && status && status.avatarPort > 0 && (
-        <Pet port={status.avatarPort} onDismiss={() => setPetOpen(false)} />
+        <Pet port={status.avatarPort} view={view} onDismiss={() => setPetOpen(false)} />
       )}
       {/* Records lists the same runs, so a toast there would only repeat what
           is already on screen. */}

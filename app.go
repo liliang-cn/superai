@@ -25,6 +25,8 @@ type App struct {
 	svc      *backend.Service
 	settings *backend.Settings
 	avatar   backend.AvatarDriver
+	// What the window last said the character is standing on. See app_pet.go.
+	pet      petState
 	sse      *backend.SSEServer
 	proxy    *backend.CLIProxy
 
@@ -237,6 +239,10 @@ func (a *App) rebuild() {
 	// other. Registered under a name so a rebuild replaces it rather than
 	// stacking a second one that would draw every notification twice.
 	svc.Notices().Subscribe("banner", a.bannerSink)
+	// The character on the window, and the two calls that let a turn use it.
+	// Also per rebuild: these are registered on the agent, and a new agent
+	// starts with none of them.
+	a.registerPetTools(svc)
 }
 
 // restartScheduler rebinds the timers to the current service. Callers must not
@@ -1136,6 +1142,11 @@ func (a *App) ImportCSV(path, hint string) string {
 }
 
 // EmitAvatarTest pushes a test emotion + speech event for the avatar test button.
+//
+// It also walks the character to something that is actually on the screen in
+// front of you, which is the half of the protocol a static test event could
+// never show: a face and a line of text prove the stream is connected, and
+// only a walk proves the window is reporting where its landmarks are.
 func (a *App) EmitAvatarTest(emotion string) {
 	a.mu.Lock()
 	driver := a.avatar
@@ -1143,9 +1154,16 @@ func (a *App) EmitAvatarTest(emotion string) {
 	if emotion == "" {
 		emotion = "happy"
 	}
-	driver.Emit(backend.AvatarEvent{Type: "emotion", Emotion: emotion})
-	driver.Emit(backend.AvatarEvent{Type: "speech", Text: "这是一条头像测试事件 (" + emotion + ")"})
-	driver.Emit(backend.AvatarEvent{Type: "state", State: backend.AvatarStateSpeaking})
+	driver.Emit(backend.AvatarEvent{Type: backend.AvatarTypeEmotion, Emotion: emotion})
+	driver.Emit(backend.AvatarEvent{Type: backend.AvatarTypeSpeech, Text: "这是一条头像测试事件 (" + emotion + ")"})
+	driver.Emit(backend.AvatarEvent{Type: backend.AvatarTypeState, State: backend.AvatarStateSpeaking})
+	if stage, fresh := a.pet.current(); fresh && len(stage.Spots) > 0 {
+		driver.Emit(backend.AvatarEvent{
+			Type: backend.AvatarTypePoint,
+			Spot: stage.Spots[0].Name,
+			Text: "这里是 " + stage.Spots[0].Name,
+		})
+	}
 }
 
 // SetWindowTheme paints the window chrome to match the UI's theme.

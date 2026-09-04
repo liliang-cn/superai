@@ -178,6 +178,10 @@ export function PendingToolApprovals() {
   return window['go']['main']['App']['PendingToolApprovals']();
 }
 
+export function PetStage(arg1, arg2) {
+  return window['go']['main']['App']['PetStage'](arg1, arg2);
+}
+
 export function PickFiles() {
   return window['go']['main']['App']['PickFiles']();
 }

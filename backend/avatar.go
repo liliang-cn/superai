@@ -30,12 +30,19 @@ var avatarSprites embed.FS
 //   - "state"   — State is one of idle | thinking | working | speaking
 //   - "emotion" — Emotion is one of neutral|happy|sad|thinking|excited|...
 //   - "speech"  — Text carries the spoken/streamed text
+//   - "point"   — the character is sent somewhere. Spot names a landmark on
+//                 the surface it is drawn on ("composer", "send"…), or is
+//                 empty for anywhere; Text, if set, is said on arrival.
+//
+// A renderer that does not know about "point" keeps working: it is one more
+// message on a stream it already ignores unknown types on.
 type AvatarEvent struct {
 	Type    string `json:"type"`
 	State   string `json:"state,omitempty"`
 	Emotion string `json:"emotion,omitempty"`
 	Text    string `json:"text,omitempty"`
 	Tool    string `json:"tool,omitempty"`
+	Spot    string `json:"spot,omitempty"`
 	Ts      int64  `json:"ts"`
 }
 
@@ -53,6 +60,14 @@ const (
 	AvatarStateSpeaking = "speaking"
 	AvatarStateWaiting  = "waiting"
 	AvatarStateError    = "error"
+)
+
+// AvatarEvent.Type values that are not lifecycle states.
+const (
+	AvatarTypeState   = "state"
+	AvatarTypeEmotion = "emotion"
+	AvatarTypeSpeech  = "speech"
+	AvatarTypePoint   = "point"
 )
 
 // AvatarDriver receives avatar lifecycle/emotion events.

@@ -240,13 +240,13 @@ export default function StatsView() {
 
       {/* ── left the wheel, right the figures ── */}
       <section className="cr-hero">
-        <div className="cr-panel cr-reactor">
+        <div className="cr-panel cr-reactor" data-pet-spot="reactor" data-pet-label="the reactor: the ring of light pillars around the knowledge graph">
           {/* The live view's own switches, set from the URL: no control panels
               (inside a disc this size they would cover the graph), orbiting from
               the start, and the reactor's own black behind it. */}
           <Reactor snap={pulse} pillars={pillars} brain={(GRAPH_SRC ?? graph?.url) ? `${GRAPH_SRC ?? graph?.url}?panels=0&spin=4&bg=05070f` : null} />
         </div>
-        <div className="cr-side">
+        <div className="cr-side" data-pet-spot="charts" data-pet-label="the column of charts beside the reactor">
           <div className="cr-panel tight">
             <div className="cr-panel-h"><Activity size={13} /><span className="cr-eyebrow">This process</span><span className={`cr-tag ${pulse.live ? "cyan" : ""}`}>{pulse.live ? "burning" : "idle"}</span></div>
             <Counters snap={pulse} />
@@ -279,7 +279,7 @@ export default function StatsView() {
       </section>
 
       {/* ── the stream ── */}
-      <section className="cr-panel rx-ticker">
+      <section className="cr-panel rx-ticker" data-pet-spot="activity" data-pet-label="the live activity stream">
         <div className="cr-panel-h"><ScrollText size={13} /><span className="cr-eyebrow">Activity</span><span className="cr-tag">newest first</span></div>
         <PulseTicker snap={pulse} />
       </section>
