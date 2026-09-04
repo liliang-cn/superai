@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 	"unicode"
 	"unicode/utf8"
 
 	"github.com/liliang-cn/agent-go/v3/pkg/agent"
+	"github.com/liliang-cn/agent-go/v3/pkg/agent/cliagents"
 	"github.com/liliang-cn/superai-desktop/backend"
 )
 
@@ -28,6 +30,13 @@ import (
 //     routing rule that cannot express it.
 //
 // The routing half lives in SendChat; this file holds the parse and the tools.
+//
+// Both kinds of agent share the one @ namespace, because the difference
+// between them is a deployment detail. @pi is on a cluster and @claude is a
+// binary in /usr/local/bin, and a person typing an @ is choosing who to ask,
+// not choosing a transport. Remote names are checked first; a local CLI with
+// the same name as a configured remote one would be shadowed, which is the
+// right way round — the settings file is the more deliberate of the two.
 
 // remoteRunner builds the runner on first use, from the settings in force.
 func (a *App) remoteRunner() *backend.RemoteRunner {
@@ -91,16 +100,52 @@ func addressedTo(msg string, known func(string) bool) (agentName, rest string, o
 	return name, rest, true
 }
 
-// RemoteAgentNames is what the composer's @ menu offers. Empty when the
-// feature is off, so the menu simply never appears.
-func (a *App) RemoteAgentNames() []map[string]string {
-	cfg := a.remoteRunner().Config()
-	if !cfg.Enabled {
-		return []map[string]string{}
+// localAgentNames is the CLI agents installed on this machine, when the
+// external-agents setting is on. Discovery probes each binary, so the answer
+// is what can actually be started rather than what a list once claimed.
+func (a *App) localAgentNames() []cliagents.Agent {
+	a.mu.Lock()
+	s := a.settings
+	a.mu.Unlock()
+	if s == nil || !s.ExternalAgents.Enabled {
+		return nil
 	}
+	return cliagents.Discover(s.ExternalAgents.Binaries)
+}
+
+// addressable reports whether a name can be reached at all, either way.
+func (a *App) addressable(name string) bool {
+	if a.remoteRunner().Config().Has(name) {
+		return true
+	}
+	for _, c := range a.localAgentNames() {
+		if c.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+// RemoteAgentNames is what the composer's @ menu offers: the agents on other
+// machines and the CLIs on this one, in one list. Empty when both features are
+// off, so the menu simply never appears.
+func (a *App) RemoteAgentNames() []map[string]string {
 	out := []map[string]string{}
-	for _, name := range cfg.Names() {
-		out = append(out, map[string]string{"name": name, "about": cfg.Agents[name].About})
+	cfg := a.remoteRunner().Config()
+	if cfg.Enabled {
+		for _, name := range cfg.Names() {
+			out = append(out, map[string]string{"name": name, "about": cfg.Agents[name].About})
+		}
+	}
+	for _, c := range a.localAgentNames() {
+		if cfg.Has(c.Name) {
+			continue
+		}
+		about := c.Name + " — a coding agent installed on this machine"
+		if c.Version != "" {
+			about += " (" + c.Version + ")"
+		}
+		out = append(out, map[string]string{"name": c.Name, "about": about})
 	}
 	return out
 }
@@ -114,9 +159,87 @@ func (a *App) RemoteAgentNames() []map[string]string {
 // addressed to somebody else, and folding its answer into SuperAI's own
 // session would make the next turn read as if SuperAI had said it.
 func (a *App) AskRemoteAgent(name, prompt string) backend.RemoteResult {
-	res, err := a.remoteRunner().Run(context.Background(), name, prompt)
+	return a.askAgent(context.Background(), name, prompt)
+}
+
+// askAgent sends a question to whichever kind of agent the name belongs to.
+func (a *App) askAgent(ctx context.Context, name, prompt string) backend.RemoteResult {
+	name = strings.TrimSpace(name)
+	if a.remoteRunner().Config().Has(name) {
+		res, err := a.remoteRunner().Run(ctx, name, prompt)
+		if err != nil {
+			return backend.RemoteResult{Agent: name, Failed: true, Reason: err.Error()}
+		}
+		return res
+	}
+	return a.askLocalCLI(ctx, name, prompt)
+}
+
+// askLocalCLI forwards to the cli_agent_run tool, which is where the argv
+// dialects, the trust-directory bypasses and the usage accounting for the
+// locally installed CLIs already live. Re-implementing any of that here would
+// mean two places to fix when a CLI changes its flags.
+func (a *App) askLocalCLI(ctx context.Context, name, prompt string) backend.RemoteResult {
+	started := time.Now()
+	fail := func(reason string) backend.RemoteResult {
+		return backend.RemoteResult{
+			Agent: name, Host: "this machine", Failed: true,
+			Reason: reason, MS: time.Since(started).Milliseconds(),
+		}
+	}
+
+	a.mu.Lock()
+	svc := a.svc
+	a.mu.Unlock()
+	if svc == nil {
+		return fail("the backend is not ready")
+	}
+	reg := svc.Agent().GetToolRegistry()
+	if reg == nil || !reg.Has("cli_agent_run") {
+		return fail("agent CLIs are switched off in Settings (External agents)")
+	}
+
+	out, err := reg.Call(ctx, "cli_agent_run", map[string]any{"agent": name, "prompt": prompt})
 	if err != nil {
-		return backend.RemoteResult{Agent: name, Failed: true, Reason: err.Error()}
+		return fail(err.Error())
+	}
+
+	// The tool answers with a struct, not a string. Round-tripping it through
+	// JSON reads the fields without importing the type, and — more to the
+	// point — without fmt.Sprint, which renders it as Go map syntax and would
+	// put "map[agent:claude duration_ms:10058 …]" in front of a person.
+	var got struct {
+		Summary  string  `json:"summary"`
+		Failed   bool    `json:"failed"`
+		ExitCode int     `json:"exit_code"`
+		Error    string  `json:"error"`
+		CostUSD  float64 `json:"cost_usd"`
+	}
+	raw, merr := json.Marshal(out)
+	if merr != nil || json.Unmarshal(raw, &got) != nil {
+		return fail("could not read what the CLI returned")
+	}
+
+	res := backend.RemoteResult{
+		Agent: name, Host: "this machine",
+		Text: strings.TrimSpace(got.Summary),
+		MS:   time.Since(started).Milliseconds(),
+	}
+	// Failed is the only verdict. claude with a revoked token prints
+	// "Failed to authenticate" as its answer and exits 0, so a caller that
+	// trusted the exit code would relay an auth failure as a reply — which is
+	// the one failure mode of this whole feature that produces a confident,
+	// wrong-looking-like-right answer.
+	if got.Failed {
+		res.Failed = true
+		res.Reason = strings.TrimSpace(got.Error)
+		if res.Reason == "" {
+			res.Reason = fmt.Sprintf("the CLI reported a failure (exit %d)", got.ExitCode)
+		}
+		return res
+	}
+	if res.Text == "" {
+		res.Failed, res.Reason = true, "the CLI exited cleanly without saying anything"
 	}
 	return res
 }
@@ -212,7 +335,7 @@ func (a *App) registerRemoteTools(svc *backend.Service, cfg backend.RemoteAgents
 // already understands those. A fourth event kind would mean teaching all of it
 // about a case that differs only in who answered.
 func (a *App) routeToRemote(requestID, name, prompt string) {
-	ctx, cancel := context.WithTimeout(context.Background(), a.remoteRunner().Config().Timeout())
+	ctx, cancel := context.WithTimeout(context.Background(), a.routedTimeout(name))
 	a.trackRun(requestID, cancel)
 
 	go func() {
@@ -237,11 +360,7 @@ func (a *App) routeToRemote(requestID, name, prompt string) {
 			"content":   "asking " + name + "…",
 		})
 
-		res, err := a.remoteRunner().Run(ctx, name, prompt)
-		if err != nil {
-			a.emit("chat:error", map[string]any{"requestId": requestID, "error": err.Error()})
-			return
-		}
+		res := a.askAgent(ctx, name, prompt)
 		if a.runCancelled(requestID) || ctx.Err() != nil {
 			a.emit("chat:cancelled", map[string]any{"requestId": requestID, "final": res.Text})
 			return
@@ -261,4 +380,22 @@ func (a *App) routeToRemote(requestID, name, prompt string) {
 			"final": fmt.Sprintf("**@%s** · %s · %.1fs\n\n%s", res.Agent, res.Host, float64(res.MS)/1000, res.Text),
 		})
 	}()
+}
+
+// routedTimeout is how long an addressed message may take, which depends on
+// who it was addressed to: a question to a cluster agent is bounded by the
+// remote setting, a task handed to a local CLI by the far more generous
+// external-agents one. Taking the smaller of the two would cut off exactly the
+// runs that are worth delegating.
+func (a *App) routedTimeout(name string) time.Duration {
+	if a.remoteRunner().Config().Has(name) {
+		return a.remoteRunner().Config().Timeout()
+	}
+	a.mu.Lock()
+	s := a.settings
+	a.mu.Unlock()
+	if s == nil {
+		return backend.DefaultExternalAgentTimeout
+	}
+	return s.ExternalAgents.Timeout()
 }

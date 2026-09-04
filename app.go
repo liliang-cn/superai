@@ -669,7 +669,7 @@ func (a *App) SendChat(sessionID, message string, imagePaths []string) string {
 	// model never runs. Checked before the readiness gate below on purpose: an
 	// unconfigured LLM is no reason not to forward a question to a machine that
 	// has one.
-	if name, rest, ok := addressedTo(message, a.remoteRunner().Config().Has); ok {
+	if name, rest, ok := addressedTo(message, a.addressable); ok {
 		a.routeToRemote(requestID, name, rest)
 		return requestID
 	}
