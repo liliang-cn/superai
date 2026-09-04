@@ -399,3 +399,64 @@ func (a *App) routedTimeout(name string) time.Duration {
 	}
 	return s.ExternalAgents.Timeout()
 }
+
+// RemoteAgentStatus is what one agent looked like when it was last asked.
+type RemoteAgentStatus struct {
+	Name  string `json:"name"`
+	About string `json:"about"`
+	// Local separates a CLI on this machine from one on the network. They are
+	// the same to the person asking and very different to debug.
+	Local bool     `json:"local"`
+	Hosts []string `json:"hosts,omitempty"`
+	// Reachable is the answer to a real question, not to a lookup.
+	Reachable bool   `json:"reachable"`
+	Where     string `json:"where,omitempty"`
+	Detail    string `json:"detail,omitempty"`
+	MS        int64  `json:"ms"`
+}
+
+// CheckRemoteAgents asks every configured agent one trivial question and
+// reports who answered.
+//
+// A real question and not a probe of the binary, because the lesson this
+// feature keeps re-teaching is that installed is not usable: a CLI with a
+// revoked token, a node that no longer holds the volume and a model whose tier
+// was withdrawn all look perfectly healthy until something is actually asked.
+// It costs a token per agent, which is why it is a button rather than
+// something the settings page does on open.
+func (a *App) CheckRemoteAgents() []RemoteAgentStatus {
+	listed := a.RemoteAgentNames()
+	out := make([]RemoteAgentStatus, len(listed))
+	cfg := a.remoteRunner().Config()
+
+	var wg sync.WaitGroup
+	for i, entry := range listed {
+		name, about := entry["name"], entry["about"]
+		st := RemoteAgentStatus{Name: name, About: about, Local: !cfg.Has(name)}
+		if !st.Local {
+			st.Hosts = cfg.Agents[name].Hosts
+		}
+		out[i] = st
+
+		wg.Add(1)
+		go func(i int, name string) {
+			defer wg.Done()
+			// Bounded well under the run timeout: this is a health check and a
+			// person is watching it, so an agent that needs two minutes to say
+			// hello is failing the check by definition.
+			ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+			defer cancel()
+			res := a.askAgent(ctx, name, "Reply with exactly: ok")
+			out[i].MS = res.MS
+			out[i].Where = res.Host
+			out[i].Reachable = !res.Failed
+			if res.Failed {
+				out[i].Detail = res.Reason
+			} else {
+				out[i].Detail = strings.TrimSpace(res.Text)
+			}
+		}(i, name)
+	}
+	wg.Wait()
+	return out
+}

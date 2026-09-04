@@ -60,6 +60,34 @@ export default function ChatView({
   const [draft, setDraft] = useState("");
   // The @ menu, and whether this message is addressed to another agent.
   const mentions = useAgentMentions(draft, setDraft);
+
+  /**
+   * A name picked from the Agents panel.
+   *
+   * It goes to the front of the message rather than to the caret, because the
+   * front is the position that means something: that is what makes the message
+   * an address. Someone who wants a mid-sentence mention is already typing and
+   * has the @ menu under their fingers.
+   *
+   * An address already there is replaced, not stacked — picking a second name
+   * is changing your mind about who to ask, and "@pi @hermes what" is not
+   * something the parser or the person means.
+   */
+  const mentionFromPanel = useCallback((name: string) => {
+    setDraft((prev) => {
+      const body = prev.replace(/^[ \t]*@[\p{L}\p{N}._-]+(?:[ \t]*[:,：，][ \t]*|\s+|$)/u, "");
+      return `@${name} ${body}`;
+    });
+    requestAnimationFrame(() => {
+      const el = document.querySelector<HTMLTextAreaElement>("textarea[name=message]");
+      if (!el) return;
+      el.focus();
+      // After the name, before whatever was already written: the question is
+      // what gets typed next.
+      const at = name.length + 2;
+      el.setSelectionRange(at, at);
+    });
+  }, []);
   // The message index whose save just landed, for a moment of green.
   const [saved, setSaved] = useState(-1);
   // The reply waiting to be named. Null when the dialog is closed.
@@ -413,6 +441,7 @@ export default function ChatView({
           asks={chat.asks}
           sessionId={chat.sessionId}
           draft={draft}
+          onMention={mentionFromPanel}
         />
       </div>
       {naming && (

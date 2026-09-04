@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIcon,
+  AtSignIcon,
   LayoutDashboardIcon,
   PanelRightCloseIcon,
   ScanEyeIcon,
@@ -11,6 +12,7 @@ import { TraceBody } from "./TracePanel";
 import DashboardsPanel from "./DashboardsPanel";
 import { PromptPreviewBody } from "./PromptPreviewPanel";
 import { ActivityBody } from "./ActivityPanel";
+import { AgentsBody } from "./AgentsPanel";
 
 /**
  * The rail down the right of a conversation, and whichever panel it is showing.
@@ -25,7 +27,7 @@ import { ActivityBody } from "./ActivityPanel";
  * would make the trace icon sometimes mean dashboards.
  */
 
-type Tab = "trace" | "dashboards" | "preview" | "activity";
+type Tab = "trace" | "dashboards" | "preview" | "activity" | "agents";
 
 const OPEN_KEY = "superai-trace-open";
 const TAB_KEY = "superai-side-tab";
@@ -52,6 +54,9 @@ const TABS: { key: Tab; label: string; Icon: typeof WrenchIcon }[] = [
   // right now — comes up while a turn is running, which is when you are here
   // and not there.
   { key: "activity", label: "Activity", Icon: ActivityIcon },
+  // Who else can be asked. The @ menu in the composer only helps someone who
+  // already knows a name to type; this is where the names come from.
+  { key: "agents", label: "Agents", Icon: AtSignIcon },
 ];
 
 function read(key: string, fallback: string): string {
@@ -80,12 +85,16 @@ export default function SidePanel({
   asks = [],
   sessionId = "",
   draft = "",
+  onMention,
 }: {
   trace: TraceItem[];
   asks?: AskSummary[];
   /** The conversation and the message being written, for the preview tab. */
   sessionId?: string;
   draft?: string;
+  /** Put an agent's name in the composer. The panel picks who; the person
+   *  still writes what and presses send. */
+  onMention?: (name: string) => void;
 }) {
   // The key is the one the trace panel has always used, so an existing install
   // opens the way it was left rather than resetting because the code moved.
@@ -236,6 +245,7 @@ export default function SidePanel({
       {tab === "preview" && <PromptPreviewBody sessionId={sessionId} goal={settledDraft} />}
       {/* Same rule: the meter is subscribed to only while it is being read. */}
       {tab === "activity" && <ActivityBody />}
+      {tab === "agents" && <AgentsBody onMention={onMention} />}
     </div>
   );
 }

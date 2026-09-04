@@ -12,12 +12,13 @@ import {
   ExternalAgentsStatus,
   GetSettings,
   OpenInBrowser,
+  CheckRemoteAgents,
   SaveSettings,
   TestWebhook,
   ToolApprovalInfo,
 } from "../../wailsjs/go/main/App";
 import { BrowserOpenURL, EventsOff, EventsOn } from "../../wailsjs/runtime/runtime";
-import { backend } from "../../wailsjs/go/models";
+import { backend, main } from "../../wailsjs/go/models";
 import { toast } from "../lib/toasts";
 
 type ProxyStatus = {
@@ -240,12 +241,15 @@ function ExternalAgentsCard({
   ea,
   onChange,
   statuses,
+  reached,
   probing,
   onRecheck,
 }: {
   ea: backend.ExternalAgents;
   onChange: (patch: Partial<backend.ExternalAgents>) => void;
   statuses: backend.ExternalAgentStatus[];
+  /** What each CLI said when it was last actually asked something, if ever. */
+  reached: main.RemoteAgentStatus[];
   probing: boolean;
   onRecheck: () => void;
 }) {
@@ -253,6 +257,7 @@ function ExternalAgentsCard({
   const binaries = ea.binaries ?? {};
   const models = ea.models ?? {};
   const found = (name: string) => statuses.find((st) => st.name === name);
+  const answered = (name: string) => reached.find((st) => st.name === name);
 
   const setRoot = (i: number, v: string) => {
     const next = [...roots];
@@ -296,6 +301,19 @@ function ExternalAgentsCard({
                   </span>
                 </div>
                 {st?.installed && <div className="ea-agent-path" title={st.path}>{st.path}</div>}
+                {/* The other half of "installed". A CLI whose token was
+                    revoked prints its refusal as an answer and exits 0, so
+                    only having asked it something tells you anything — and
+                    when it refuses, its own words name the cause. */}
+                {(() => {
+                  const ans = answered(cli.name);
+                  if (!ans) return null;
+                  return ans.reachable ? (
+                    <span className="hint">answered in {(ans.ms / 1000).toFixed(1)}s</span>
+                  ) : (
+                    <span className="hint ea-bad">did not answer — {ans.detail}</span>
+                  );
+                })()}
                 {ea.enabled && (
                   <div className="ea-agent-overrides">
                     <input
@@ -321,9 +339,10 @@ function ExternalAgentsCard({
           })}
         </div>
         <span className="hint">
-          Whether each one is signed in is not checked here — that would cost a real request to
-          the provider on every page load. A CLI that works in your terminal but reads as
-          missing usually has a path this app never inherited; type it in above.
+          Installed is not the same as usable, and only the first is checked on this page — a
+          real request costs a token, so asking is a button, on the card below. A CLI that
+          works in your terminal but reads as missing usually has a path this app never
+          inherited; type it in above.
         </span>
         <div className="row" style={{ marginTop: 8 }}>
           <button className="btn ghost sm" onClick={onRecheck} disabled={probing}>
@@ -409,6 +428,106 @@ function ExternalAgentsCard({
   );
 }
 
+
+/**
+ * The agents on other machines, and one button that finds out whether any of
+ * them actually answers.
+ *
+ * The check asks a real question rather than looking for a binary or a port,
+ * because everything this feature has taught so far is that reachable and
+ * usable are different: a CLI with a revoked token, a node that no longer
+ * holds the volume and a model whose tier was withdrawn all look healthy right
+ * up until something is asked. It costs a token per agent, so it is a button.
+ */
+function RemoteAgentsCard({
+  ra,
+  onChange,
+  statuses,
+  checking,
+  onCheck,
+}: {
+  ra: backend.RemoteAgents;
+  onChange: (patch: Partial<backend.RemoteAgents>) => void;
+  statuses: main.RemoteAgentStatus[];
+  checking: boolean;
+  onCheck: () => void;
+}) {
+  const configured = Object.entries(ra.agents ?? {});
+  const stateOf = (name: string) => statuses.find((st) => st.name === name);
+
+  return (
+    <div className="card">
+      <div className="card-title">Agents on other machines</div>
+      <div className="card-desc">
+        Ask an agent that is not on this laptop — pi, hermes and openclaw on the cluster.
+        They are reached over SSH as the account that already has a key on those nodes, so
+        turning this on lets SuperAI run commands there. Off until you say otherwise.
+      </div>
+
+      <div className="field">
+        <label>Reach agents over the network</label>
+        <div className="toggle" onClick={() => onChange({ enabled: !ra.enabled })} style={{ cursor: "pointer", marginTop: 2 }}>
+          <div className={`switch${ra.enabled ? " on" : ""}`}><div className="knob" /></div>
+          <span style={{ fontSize: 13, color: "var(--text-1)" }}>
+            {ra.enabled ? "On — @pi and the rest resolve, here and in chat" : "Off — only the CLIs on this machine"}
+          </span>
+        </div>
+      </div>
+
+      {configured.length > 0 && (
+        <div className="field">
+          <label>Configured</label>
+          <div className="ea-agents">
+            {configured.map(([name, a]) => {
+              const st = stateOf(name);
+              return (
+                <div key={name} className={`ea-agent${st && !st.reachable ? " missing" : ""}`}>
+                  <div className="ea-agent-head">
+                    <span className="ea-agent-name">@{name}</span>
+                    <span className="ea-agent-state">
+                      {checking && !st
+                        ? "asking…"
+                        : st
+                          ? st.reachable
+                            ? `answered from ${st.where} in ${(st.ms / 1000).toFixed(1)}s`
+                            : "no answer"
+                          : "not checked"}
+                    </span>
+                  </div>
+                  <div className="hint ra-about">{a.about}</div>
+                  {/* The reason, verbatim. Every failure this has produced so
+                      far named its own cause — a revoked token, a withdrawn
+                      tier, a config read from the wrong directory — and
+                      summarising them would have thrown that away. */}
+                  {st && !st.reachable && st.detail && <span className="hint ea-bad">{st.detail}</span>}
+                  {/* The nodes it may be on, in the order they are tried.
+                      Monospaced because half of them are ssh options. */}
+                  <div className="ea-agent-path">{(a.hosts ?? []).join("   ·   ")}</div>
+                </div>
+              );
+            })}
+          </div>
+          <span className="hint">
+            The hosts are tried in order and the one currently holding the agent wins, because
+            the cluster moves it between nodes. Edit them, or add an agent of your own, under
+            <code> remote_agents </code> in <code>~/.superai-desktop/settings.json</code>.
+          </span>
+        </div>
+      )}
+
+      <div className="row" style={{ marginTop: 8 }}>
+        <button className="btn ghost sm" onClick={onCheck} disabled={checking}>
+          {checking ? "Asking every agent…" : "Save and ask each one"}
+        </button>
+        <span className="hint" style={{ marginLeft: 10 }}>
+          Asks every agent — including the CLIs on this machine — one trivial question. That is
+          a real request against each subscription.
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export default function SettingsView({
   onSaved,
   status,
@@ -458,6 +577,10 @@ export default function SettingsView({
   const [approval, setApproval] = useState<ApprovalInfo | null>(null);
   const [agentCLIs, setAgentCLIs] = useState<backend.ExternalAgentStatus[]>([]);
   const [probing, setProbing] = useState(false);
+  // Kept apart from the CLI probe above: that one looks for a binary and takes
+  // milliseconds, this one asks every agent a question and takes seconds.
+  const [reachable, setReachable] = useState<main.RemoteAgentStatus[]>([]);
+  const [checking, setChecking] = useState(false);
 
   const refreshAgentCLIs = () => {
     setProbing(true);
@@ -481,6 +604,27 @@ export default function SettingsView({
       toast.error(String(e?.message || e));
     }
     refreshAgentCLIs();
+  }
+
+  /**
+   * Save, then actually ask every agent something.
+   *
+   * Saving first is the point: the check is only worth anything against the
+   * settings that will be in force, and a toggle flipped but not saved would
+   * have the button report on the old configuration.
+   */
+  async function checkReachable() {
+    if (!s) return;
+    setChecking(true);
+    setReachable([]);
+    try {
+      await SaveSettings(s);
+      setReachable((await CheckRemoteAgents()) as main.RemoteAgentStatus[]);
+    } catch (e: any) {
+      toast.error(String(e?.message || e));
+    } finally {
+      setChecking(false);
+    }
   }
 
   const refreshApproval = () => {
@@ -525,6 +669,16 @@ export default function SettingsView({
   // External agents is the one nested object in Settings, so it patches rather
   // than replaces: the card edits one field at a time and must not drop the
   // rest of the section on the way.
+  const setRA = (patch: Partial<backend.RemoteAgents>) => {
+    setS((prev) =>
+      prev
+        ? Object.assign(new backend.Settings(prev), {
+            remote_agents: Object.assign(new backend.RemoteAgents(prev.remote_agents), patch),
+          })
+        : prev,
+    );
+  };
+
   const setEA = (patch: Partial<backend.ExternalAgents>) => {
     setS((prev) =>
       prev
@@ -897,7 +1051,18 @@ export default function SettingsView({
               onChange={setEA}
               statuses={agentCLIs}
               probing={probing}
+              reached={reachable}
               onRecheck={recheckAgentCLIs}
+            />
+          )}
+
+          {section === "agents" && (
+            <RemoteAgentsCard
+              ra={s.remote_agents ?? new backend.RemoteAgents()}
+              onChange={setRA}
+              statuses={reachable}
+              checking={checking}
+              onCheck={checkReachable}
             />
           )}
 

@@ -2629,3 +2629,32 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
   background: var(--accent-soft); border: 1px solid var(--accent-border);
   color: var(--accent-hover); font-size: 12px;
 }
+
+/* The Agents tab in the chat rail: who else can be asked.
+ *
+ * A list of buttons rather than of rows, because every entry does something —
+ * it puts that name in the message box. */
+.agents-panel { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px 12px; overflow-y: auto; }
+.agents-lede { font-size: 11.5px; line-height: 1.5; color: var(--text-2); padding-bottom: 8px; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
+.agents-row {
+  display: flex; flex-direction: column; gap: 3px; width: 100%; text-align: left;
+  font: inherit; padding: 8px 9px; border: 1px solid transparent; border-radius: 9px;
+  background: transparent; color: var(--text); cursor: pointer;
+}
+.agents-row:hover { background: var(--accent-soft); border-color: var(--accent-border); }
+.agents-head { display: flex; align-items: center; gap: 6px; }
+.agents-name { font-family: var(--cr-mono, ui-monospace, Menlo, monospace); font-size: 12.5px; font-weight: 600; color: var(--accent-hover); }
+.agents-where { margin-left: auto; font-size: 10px; letter-spacing: .04em; text-transform: uppercase; color: var(--text-2); }
+.agents-about { font-size: 11.5px; line-height: 1.45; color: var(--text-2); }
+.agents-foot { display: flex; align-items: center; gap: 5px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); font-size: 10.5px; color: var(--text-2); }
+.agents-empty { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 32px 8px; text-align: center; color: var(--text-2); font-size: 12.5px; line-height: 1.6; }
+.agents-empty p { margin: 0; }
+.agents-empty code { font-family: var(--cr-mono, ui-monospace, Menlo, monospace); font-size: 11px; }
+.agents-dim { color: var(--text-2); opacity: .85; font-size: 11.5px; }
+/* Why an agent did not answer. Its own colour because the sentence is the
+   difference between "the token was revoked" and "the node moved", and those
+   are the two things worth reading in this card. */
+.hint.ea-bad { color: var(--red); display: block; margin-top: 4px; overflow-wrap: anywhere; }
+/* Two hints in a row are two inline spans, which ran the agent's description
+   straight into the host list beside it. */
+.ra-about { display: block; margin-top: 4px; }
