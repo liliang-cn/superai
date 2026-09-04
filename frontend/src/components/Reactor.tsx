@@ -673,6 +673,9 @@ export default function Reactor({ snap, pillars, brain }: { snap: Snap; pillars:
     <div className="rx" ref={hostRef}>
       {brain && disc && (
         <iframe className="rx-brain" src={brain} title="knowledge graph"
+          data-pet-spot="brain"
+          data-pet-label="the knowledge graph at the centre of the reactor — a sphere the character can walk on"
+          data-pet-surface="sphere"
           style={{ left: disc.left, top: disc.top, width: disc.size, height: disc.size }} />
       )}
       <canvas ref={canvasRef} className="rx-canvas" />

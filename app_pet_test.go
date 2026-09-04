@@ -83,6 +83,18 @@ func TestTheAvatarTestWalksItSomewhereReal(t *testing.T) {
 		t.Errorf("sent to %q, which is not on the reported page", point.Spot)
 	}
 
+	// A round thing wins, wherever it sits in the list: circling it shows the
+	// walk following a live rectangle, which standing beside a button cannot.
+	a3, d3 := petTestApp()
+	a3.PetStage("stats", []map[string]string{
+		{"name": "activity", "label": "the stream"},
+		{"name": "brain", "label": "the graph", "surface": "sphere"},
+	})
+	a3.EmitAvatarTest("happy")
+	if ev, _ := d3.last(backend.AvatarTypePoint); ev.Spot != "brain" {
+		t.Errorf("the test walked to %q rather than the sphere", ev.Spot)
+	}
+
 	// And with no window reporting, it must not invent a destination.
 	a2, d2 := petTestApp()
 	a2.EmitAvatarTest("happy")

@@ -1909,7 +1909,11 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
    clipped to a couple of lines: it is a bubble, not a message pane, and the
    backend already cuts the text to a sentence. */
 .pet-bubble {
-  position: absolute; left: 50%; bottom: calc(100% + 6px); transform: translateX(-50%);
+  position: absolute; left: 50%; bottom: calc(100% + 6px);
+  /* Undo whatever the character is doing with its own up-vector: on the
+     sphere the body turns with the surface, and a bubble that turned with it
+     would end up upside down on the far side. */
+  transform: translateX(-50%) rotate(calc(-1 * var(--pet-spin, 0deg)));
   max-width: 240px; width: max-content;
   padding: 5px 9px; border-radius: 9px;
   background: var(--panel); color: var(--text);
@@ -1919,7 +1923,10 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
   display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
   animation: pet-say .18s ease-out;
 }
-@keyframes pet-say { from { opacity: 0; transform: translate(-50%, 4px); } to { opacity: 1; transform: translate(-50%, 0); } }
+@keyframes pet-say {
+  from { opacity: 0; transform: translate(-50%, 4px) rotate(calc(-1 * var(--pet-spin, 0deg))); }
+  to   { opacity: 1; transform: translateX(-50%) rotate(calc(-1 * var(--pet-spin, 0deg))); }
+}
 
 /* The pill that opens it, which is a button rather than a readout. */
 .pill-btn {

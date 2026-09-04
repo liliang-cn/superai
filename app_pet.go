@@ -41,9 +41,14 @@ import (
 const petStageTTL = 90 * time.Second
 
 // petSpot is one landmark the character can be sent to.
+//
+// Surface, when set, says the shape is something it can walk *on* rather than
+// stand beside — "sphere" is the reactor's knowledge graph, which it circles
+// the way an ant circles a marble.
 type petSpot struct {
-	Name  string `json:"name"`
-	Label string `json:"label"`
+	Name    string `json:"name"`
+	Label   string `json:"label"`
+	Surface string `json:"surface,omitempty"`
 }
 
 // petStage is what the window last said was on it.
@@ -85,7 +90,11 @@ func (a *App) PetStage(view string, spots []map[string]string) {
 			continue
 		}
 		seen[name] = true
-		list = append(list, petSpot{Name: name, Label: strings.TrimSpace(s["label"])})
+		list = append(list, petSpot{
+			Name:    name,
+			Label:   strings.TrimSpace(s["label"]),
+			Surface: strings.TrimSpace(s["surface"]),
+		})
 	}
 	sort.Slice(list, func(i, j int) bool { return list[i].Name < list[j].Name })
 	a.pet.set(strings.TrimSpace(view), list)
@@ -157,6 +166,22 @@ func (a *App) registerPetTools(svc *backend.Service) {
 		func(ctx context.Context, args map[string]any) (any, error) {
 			return a.petGo(str(args["spot"]), str(args["say"]), str(args["emotion"])), nil
 		}, act)
+}
+
+// showpiece is the spot the avatar test button sends it to: something round if
+// the page has one, because circling a sphere shows the whole mechanism —
+// stream, stage report, and a walk that follows a live rectangle — where
+// standing beside a button only shows the first two.
+func (st petStage) showpiece() (petSpot, bool) {
+	for _, s := range st.Spots {
+		if s.Surface != "" {
+			return s, true
+		}
+	}
+	if len(st.Spots) > 0 {
+		return st.Spots[0], true
+	}
+	return petSpot{}, false
 }
 
 // petGo is pet_go's body, and what EmitAvatarTest and the tests reach for.

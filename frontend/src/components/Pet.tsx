@@ -67,6 +67,22 @@ const REST_MAX = 3600;
  *  enough that a forgotten instruction does not park it there for good. */
 const POINT_HOLD = 20000;
 
+/** Once it is on a sphere it keeps going round rather than crossing and
+ *  leaving: a lap is the point. How long a lap-and-a-bit lasts when it walked
+ *  on by itself, and how long an instruction keeps it there. */
+const ORBIT_MIN = 16000;
+const ORBIT_MAX = 42000;
+const ORBIT_HOLD = 90000;
+
+/** How fast it goes round a sphere, in pixels along the surface per second.
+ *  Slower than a march across the window: it is sightseeing, not commuting. */
+const ORBIT_SPEED = 46;
+
+/** How often a wander picks the sphere instead of a random point, when there
+ *  is one on the page. Often enough to happen on its own while you are looking
+ *  at the reactor, rare enough that it still wanders the rest of the window. */
+const ORBIT_CHANCE = 0.45;
+
 /** How long a speech bubble stays up. */
 const SAY_MS = 7000;
 
@@ -121,13 +137,15 @@ function inside(p: Pos): Pos {
   };
 }
 
-/** Everything on the page that has a name, in DOM order. */
-function readSpots(): { name: string; label: string }[] {
+/** Everything on the page that has a name, in DOM order. A surface is a shape
+ *  it walks on rather than stands beside. */
+function readSpots(): { name: string; label: string; surface: string }[] {
   return Array.from(document.querySelectorAll<HTMLElement>("[data-pet-spot]"))
     .filter((el) => el.offsetParent !== null || el.getClientRects().length > 0)
     .map((el) => ({
       name: el.dataset.petSpot ?? "",
       label: el.dataset.petLabel ?? el.dataset.petSpot ?? "",
+      surface: el.dataset.petSurface ?? "",
     }))
     .filter((s) => s.name !== "");
 }
@@ -148,6 +166,44 @@ function beside(name: string): Pos | null {
   const y = r.top + r.height / 2 - FRAME_H / 2;
   const left = r.left - FRAME_W - 6;
   return inside({ x: left > MARGIN ? left : r.right + 6, y });
+}
+
+/**
+ * A round thing the character can walk on.
+ *
+ * The reactor's knowledge graph is a disc on screen and reads as a ball, so
+ * the character treats it as one: it walks the circumference with its feet on
+ * the surface and its head pointing away from the centre, the way an ant walks
+ * a marble. Everything is read from the live rectangle each frame, because the
+ * disc is sized from the panel and the panel is sized from the window.
+ */
+type Ball = { cx: number; cy: number; r: number };
+
+function ballOf(el: HTMLElement | null): Ball | null {
+  if (!el) return null;
+  const r = el.getBoundingClientRect();
+  // Too small to walk on is not a planet, it is a dot.
+  if (r.width < 80 || r.height < 80) return null;
+  return { cx: r.left + r.width / 2, cy: r.top + r.height / 2, r: Math.min(r.width, r.height) / 2 };
+}
+
+/** The sphere with this name, or any sphere on the page. */
+function sphere(name?: string): HTMLElement | null {
+  const sel = name
+    ? `[data-pet-spot="${CSS.escape(name)}"][data-pet-surface="sphere"]`
+    : "[data-pet-surface=\"sphere\"]";
+  const el = document.querySelector<HTMLElement>(sel);
+  return el && ballOf(el) ? el : null;
+}
+
+/** Standing on the surface at this angle: the sprite's centre sits half a body
+ *  outside the rim, so its feet are on it. */
+function onRim(b: Ball, theta: number): Pos {
+  const walk = b.r + FRAME_H / 2;
+  return {
+    x: b.cx + walk * Math.cos(theta) - FRAME_W / 2,
+    y: b.cy + walk * Math.sin(theta) - FRAME_H / 2,
+  };
 }
 
 /**
@@ -185,9 +241,42 @@ function useWander(
     // Which instruction the current target came from, so a new one is picked
     // up and the same one is not re-resolved every frame.
     let aimed: Aim | null = null;
+    // The sphere it is on or heading for, the angle it stands at, which way
+    // round it is going, and when it gets off.
+    let ball: HTMLElement | null = null;
+    let theta = 0;
+    let spinDir = 1;
+    let landed = false;
+    let orbitUntil = 0;
 
+    const leaveBall = (now: number) => {
+      ball = null;
+      landed = false;
+      spin = 0;
+      target = randomPoint();
+      restUntil = now + REST_MIN;
+    };
+
+    /** Somewhere to go next: the sphere, sometimes, if there is one. */
+    const wanderTarget = (now: number) => {
+      const s = Math.random() < ORBIT_CHANCE ? sphere() : null;
+      if (s) {
+        ball = s;
+        landed = false;
+        spinDir = Math.random() < 0.5 ? 1 : -1;
+        orbitUntil = now + ORBIT_MIN + Math.random() * (ORBIT_MAX - ORBIT_MIN);
+        return;
+      }
+      target = randomPoint();
+    };
+
+    // The spin is the character's own up-vector: zero everywhere except on a
+    // sphere, where it turns with the surface. Published as a variable too, so
+    // the speech bubble can take it back off and stay readable.
+    let spin = 0;
     const place = () => {
-      el.style.transform = `translate3d(${pos.x}px, ${pos.y}px, 0)`;
+      el.style.transform = `translate3d(${pos.x}px, ${pos.y}px, 0) rotate(${spin}deg)`;
+      el.style.setProperty("--pet-spin", `${spin}deg`);
     };
     const face = (leftward: boolean) => {
       if (leftward === facingLeft) return;
@@ -204,15 +293,67 @@ function useWander(
       const aim = aimRef.current;
       const held = aim && now < aim.until;
       if (held && aim !== aimed) {
-        const at = beside(aim.spot);
         aimed = aim;
-        if (at) {
-          target = at;
+        const s = sphere(aim.spot);
+        if (s) {
+          // Told to go to something round: walk on it rather than beside it.
+          ball = s;
+          landed = false;
+          spinDir = Math.random() < 0.5 ? 1 : -1;
+          orbitUntil = aim.until + ORBIT_HOLD;
           restUntil = 0;
+        } else {
+          const at = beside(aim.spot);
+          if (at) {
+            leaveBall(now);
+            target = at;
+            restUntil = 0;
+          }
         }
       } else if (!held && aimed) {
         aimed = null;
-        target = randomPoint();
+        if (!ball) target = randomPoint();
+      }
+
+      // On a sphere the whole walk is different: the position comes from an
+      // angle rather than from chasing a point, and the body turns with it.
+      if (ball) {
+        const b = ballOf(ball);
+        if (!b || now > orbitUntil) {
+          // The reactor is not on this page any more, or the lap is over.
+          leaveBall(now);
+        } else if (!landed) {
+          // Climb on at whichever point of the rim is nearest.
+          theta = Math.atan2(pos.y + FRAME_H / 2 - b.cy, pos.x + FRAME_W / 2 - b.cx);
+          const foot = onRim(b, theta);
+          const dx = foot.x - pos.x, dy = foot.y - pos.y;
+          const dist = Math.hypot(dx, dy);
+          if (dist < 3) {
+            landed = true;
+          } else {
+            if (!moving) { moving = true; onMoving(true); }
+            const travel = Math.min(POINT_SPEED * dt, dist);
+            pos = { x: pos.x + (dx / dist) * travel, y: pos.y + (dy / dist) * travel };
+            if (Math.abs(dx) > 4) face(dx < 0);
+            place();
+          }
+          frame = requestAnimationFrame(step);
+          return;
+        } else {
+          // Walking the surface. The arc it covers per second is fixed, so the
+          // angle it turns through depends on how big the ball is.
+          const walk = b.r + FRAME_H / 2;
+          theta += spinDir * (ORBIT_SPEED / walk) * dt;
+          pos = onRim(b, theta);
+          // Up points away from the centre. At the top of the circle that is
+          // no rotation at all, which is where the +90 comes from.
+          spin = (theta * 180) / Math.PI + 90;
+          face(spinDir < 0);
+          if (!moving) { moving = true; onMoving(true); }
+          place();
+          frame = requestAnimationFrame(step);
+          return;
+        }
       }
 
       const speed = held ? POINT_SPEED : SPEED[stateRef.current] ?? SPEED.idle;
@@ -234,7 +375,7 @@ function useWander(
             restUntil = aim!.until;
           } else {
             restUntil = now + REST_MIN + Math.random() * (REST_MAX - REST_MIN);
-            target = randomPoint();
+            wanderTarget(restUntil);
           }
         } else {
           if (!moving) {
@@ -259,6 +400,9 @@ function useWander(
     // to has probably moved too, so its target is re-resolved rather than
     // abandoned.
     const onResize = () => {
+      // On a sphere there is nothing to fix: the rim is re-measured every
+      // frame, so the character rides the disc as the panel resizes it.
+      if (ball) return;
       pos = inside(pos);
       const aim = aimRef.current;
       const at = aim && performance.now() < aim.until ? beside(aim.spot) : null;
@@ -330,27 +474,55 @@ function useAvatarStream(port: number, onPoint: (spot: string, say: string) => v
 function useStageReport(view: string) {
   useEffect(() => {
     let alive = true;
+    // What was last reported, so the observer below only speaks when the
+    // answer changed. Without this every keystroke in the composer would post
+    // an identical list.
+    let last = "";
     const send = () => {
       if (!alive) return;
-      // A page that has just changed has not finished laying out; one frame is
-      // enough for the panels that were about to mount to be findable.
-      requestAnimationFrame(() => {
-        if (alive) PetStage(view, readSpots()).catch(() => {});
-      });
+      const spots = readSpots();
+      const key = spots.map((s) => s.name + s.surface).join("|");
+      if (key === last && key !== "") return;
+      last = key;
+      PetStage(view, spots).catch(() => {});
     };
-    send();
-    const beat = setInterval(send, STAGE_EVERY);
+
+    // Not once on mount: a view that has just opened has not finished
+    // mounting, and the most interesting thing on it is usually the slowest to
+    // arrive. The reactor's graph is sized from a ResizeObserver, so on the
+    // frame after the page changes there is no sphere on it yet, and a stage
+    // taken then would tell the model the page has no sphere — which is how a
+    // "walk on the ball" ends up walking to a panel instead. So the report
+    // also follows the DOM: anything appearing, moving or being renamed
+    // re-reports, debounced so a busy page does not chatter.
     let settle: number | undefined;
-    const onResize = () => {
+    const soon = () => {
       window.clearTimeout(settle);
-      settle = window.setTimeout(send, 400);
+      settle = window.setTimeout(send, 350);
     };
-    window.addEventListener("resize", onResize);
+    soon();
+
+    const mo = new MutationObserver(soon);
+    mo.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["data-pet-spot", "data-pet-surface"],
+    });
+
+    const beat = setInterval(() => {
+      // The heartbeat is what keeps an idle window from looking closed, so it
+      // reports whether or not anything changed.
+      last = "";
+      send();
+    }, STAGE_EVERY);
+    window.addEventListener("resize", soon);
     return () => {
       alive = false;
+      mo.disconnect();
       clearInterval(beat);
       window.clearTimeout(settle);
-      window.removeEventListener("resize", onResize);
+      window.removeEventListener("resize", soon);
     };
   }, [view]);
 }

@@ -1157,12 +1157,14 @@ func (a *App) EmitAvatarTest(emotion string) {
 	driver.Emit(backend.AvatarEvent{Type: backend.AvatarTypeEmotion, Emotion: emotion})
 	driver.Emit(backend.AvatarEvent{Type: backend.AvatarTypeSpeech, Text: "这是一条头像测试事件 (" + emotion + ")"})
 	driver.Emit(backend.AvatarEvent{Type: backend.AvatarTypeState, State: backend.AvatarStateSpeaking})
-	if stage, fresh := a.pet.current(); fresh && len(stage.Spots) > 0 {
-		driver.Emit(backend.AvatarEvent{
-			Type: backend.AvatarTypePoint,
-			Spot: stage.Spots[0].Name,
-			Text: "这里是 " + stage.Spots[0].Name,
-		})
+	if stage, fresh := a.pet.current(); fresh {
+		if spot, ok := stage.showpiece(); ok {
+			driver.Emit(backend.AvatarEvent{
+				Type: backend.AvatarTypePoint,
+				Spot: spot.Name,
+				Text: "这里是 " + spot.Name,
+			})
+		}
 	}
 }
 
