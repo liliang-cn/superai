@@ -312,10 +312,11 @@ export default function ChatView({
               <PromptInputTextarea
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
+                onPaste={attach.paste}
                 placeholder={
                   notReady
                     ? "Configure LLM in Settings first…"
-                    : "Message SuperAI…  (drag files in, or 📎, then ask)"
+                    : "Message SuperAI…  (drag files in, paste a screenshot, or 📎)"
                 }
               />
               <PromptInputToolbar>

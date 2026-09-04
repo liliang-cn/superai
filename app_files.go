@@ -1,11 +1,15 @@
 package main
 
 import (
+	"encoding/base64"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
+	"time"
 
 	"github.com/liliang-cn/superai-desktop/backend"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -72,6 +76,121 @@ func (a *App) ImportFiles(paths []string) ([]string, error) {
 	return rels, nil
 }
 
+// maxPastedBytes caps one pasted file.
+//
+// A paste travels as base64 inside the JSON-RPC argument, and the serve-mode
+// dispatcher reads at most 32MB of a request body. Base64 costs a third on
+// top, so the decoded ceiling has to sit well under that — otherwise an
+// oversized paste arrives as a truncated body and fails as a parse error
+// instead of as a size one, which is a much worse thing to read.
+const maxPastedBytes = 16 << 20
+
+// ImportPastedFile writes one clipboard file into <workspace>/uploads and
+// returns its workspace-relative path, the same shape ImportFiles returns.
+//
+// A drop and a file picker both hand over a path on this machine. A paste
+// never does: the clipboard holds bytes, and in serve mode those bytes are on
+// a laptop the server cannot see. So they come in-band, base64 in the
+// argument, and this is the one import that writes a file it was handed
+// rather than copying one it was pointed at.
+func (a *App) ImportPastedFile(name string, data string) (string, error) {
+	// A browser's FileReader produces a data URL ("data:image/png;base64,…").
+	// Take it whole rather than making every caller strip the prefix.
+	if strings.HasPrefix(data, "data:") {
+		if i := strings.Index(data, ","); i >= 0 {
+			data = data[i+1:]
+		}
+	}
+	raw, err := base64.StdEncoding.DecodeString(strings.TrimSpace(data))
+	if err != nil {
+		return "", fmt.Errorf("pasted data is not base64: %w", err)
+	}
+	if len(raw) == 0 {
+		return "", fmt.Errorf("the pasted file is empty")
+	}
+	if len(raw) > maxPastedBytes {
+		return "", fmt.Errorf("the pasted file is %dMB; the limit is %dMB", len(raw)>>20, maxPastedBytes>>20)
+	}
+
+	ws := a.workspaceDir()
+	if ws == "" {
+		return "", fmt.Errorf("workspace not configured")
+	}
+	dstDir := filepath.Join(ws, uploadsSubdir)
+	if err := os.MkdirAll(dstDir, 0o755); err != nil {
+		return "", fmt.Errorf("create uploads dir: %w", err)
+	}
+	target, err := writeNew(filepath.Join(dstDir, pastedName(name, raw)), raw)
+	if err != nil {
+		return "", fmt.Errorf("write the pasted file: %w", err)
+	}
+
+	rel := target
+	if r, rerr := filepath.Rel(ws, target); rerr == nil {
+		rel = filepath.ToSlash(r)
+	}
+	a.mu.Lock()
+	svc := a.svc
+	a.mu.Unlock()
+	if svc != nil {
+		svc.NoteImported([]string{rel})
+	}
+	return rel, nil
+}
+
+// pastedName picks the filename a pasted file lands under.
+//
+// Two things it has to get right. The extension is decided by the bytes and
+// not by the name, because the attachment list sends anything with an image
+// extension to the vision model and a mislabelled file would arrive there as
+// noise. And a screenshot has no name worth keeping — every browser calls it
+// "image.png", so a morning of pasting would read "image (1)", "image (2)" —
+// which a timestamp replaces with something that says when it came from.
+func pastedName(name string, data []byte) string {
+	base := safeUploadName(name)
+	switch strings.ToLower(base) {
+	case "upload.dat", "image.png", "image.jpeg", "image.jpg", "image", "clipboard.png", "pasted.png":
+		base = "pasted-" + time.Now().Format("20060102-150405")
+	}
+	ext := filepath.Ext(base)
+	if sniffed := sniffExt(data); sniffed != "" {
+		return strings.TrimSuffix(base, ext) + sniffed
+	}
+	// The bytes are of a kind we do not recognise, so the name may keep
+	// speaking for them — except when what it claims is a picture, which is
+	// the one claim the attachment list acts on.
+	if ext == "" || imageExtRE.MatchString(ext) {
+		return strings.TrimSuffix(base, ext) + ".bin"
+	}
+	return base
+}
+
+// imageExtRE is the frontend's IMAGE_RE in useAttachments.ts: the extensions
+// that decide a file is sent to the model as a picture rather than named to it
+// as a document. Keep the two in step.
+var imageExtRE = regexp.MustCompile(`(?i)^\.(png|jpe?g|gif|webp|bmp|tiff?)$`)
+
+// sniffExt returns the extension the content itself asks for, or "" when the
+// bytes are of a kind the name may keep speaking for.
+func sniffExt(data []byte) string {
+	ct, _, _ := strings.Cut(http.DetectContentType(data), ";")
+	switch ct {
+	case "image/png":
+		return ".png"
+	case "image/jpeg":
+		return ".jpg"
+	case "image/gif":
+		return ".gif"
+	case "image/webp":
+		return ".webp"
+	case "image/bmp":
+		return ".bmp"
+	case "application/pdf":
+		return ".pdf"
+	}
+	return ""
+}
+
 // PickFiles opens a native file picker and imports the chosen files into the
 // workspace, returning their workspace-relative paths.
 func (a *App) PickFiles() ([]string, error) {
@@ -89,6 +208,43 @@ func (a *App) PickFiles() ([]string, error) {
 		return nil, nil
 	}
 	return a.ImportFiles(sel)
+}
+
+// writeNew writes data to p, or to the first free " (n)" variant of it, and
+// returns where it landed.
+//
+// uniquePath then Create would do the same in two steps, and two pastes made
+// in the same second — which is what Promise.all does with a multi-file paste
+// — would agree on a free name and one would land on top of the other. The
+// exclusive create is what makes the name a claim rather than an observation.
+func writeNew(p string, data []byte) (string, error) {
+	ext := filepath.Ext(p)
+	stem := strings.TrimSuffix(p, ext)
+	for i := 0; ; i++ {
+		cand := p
+		if i > 0 {
+			cand = fmt.Sprintf("%s (%d)%s", stem, i, ext)
+		}
+		f, err := os.OpenFile(cand, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+		if os.IsExist(err) {
+			continue
+		}
+		if err != nil {
+			return "", err
+		}
+		_, werr := f.Write(data)
+		cerr := f.Close()
+		if werr != nil || cerr != nil {
+			// A half-written image would reach the vision model as a broken
+			// file rather than as a failure to attach one.
+			_ = os.Remove(cand)
+			if werr != nil {
+				return "", werr
+			}
+			return "", cerr
+		}
+		return cand, nil
+	}
 }
 
 // uniquePath returns p if free, else inserts " (n)" before the extension.

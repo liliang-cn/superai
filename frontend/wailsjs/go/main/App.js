@@ -118,6 +118,10 @@ export function ImportFiles(arg1) {
   return window['go']['main']['App']['ImportFiles'](arg1);
 }
 
+export function ImportPastedFile(arg1, arg2) {
+  return window['go']['main']['App']['ImportPastedFile'](arg1, arg2);
+}
+
 export function InstallMCPServer(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['InstallMCPServer'](arg1, arg2, arg3, arg4);
 }

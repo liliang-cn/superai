@@ -62,6 +62,8 @@ export function ImportCSV(arg1:string,arg2:string):Promise<string>;
 
 export function ImportFiles(arg1:Array<string>):Promise<Array<string>>;
 
+export function ImportPastedFile(arg1:string,arg2:string):Promise<string>;
+
 export function InstallMCPServer(arg1:string,arg2:string,arg3:Array<string>,arg4:Record<string, string>):Promise<string>;
 
 export function InstallSkill(arg1:string,arg2:string):Promise<string>;
