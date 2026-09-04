@@ -1338,24 +1338,32 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
    colours in both: one for what is alive, amber for what costs, rose for
    what was refused, lime for what got through. Every glow and tint is
    derived from the -rgb triplets so both themes stay consistent. */
-.cr {
+/* `.cr` is the Stats page itself; `.cr-scope` is for anything that borrows one
+   of its pieces somewhere else — the chat rail's activity feed reuses the
+   ticker and the counters, and every colour in them is one of these tokens. */
+.cr, .cr-scope {
   --cr-bg: #f2f4f9; --cr-panel: #ffffff; --cr-panel-2: #fbfcfe; --cr-line: #e1e6f0; --cr-line-2: #c8d1e2;
   --cr-text: #0f1729; --cr-dim: #5b6578; --cr-mute: #9aa4b8;
   --cr-cyan: #1f5eff; --cr-amber: #b86e00; --cr-rose: #d6335a; --cr-lime: #1f9d55;
   --cr-cyan-rgb: 31,94,255; --cr-amber-rgb: 184,110,0; --cr-rose-rgb: 214,51,90; --cr-lime-rgb: 31,157,85;
   --cr-on-accent: #ffffff; --cr-glow: .25;
   --cr-mono: "SF Mono", "JetBrains Mono", ui-monospace, Menlo, monospace;
+  color: var(--cr-text);
+}
+.cr {
   flex: 1; overflow-y: auto; padding: 14px 18px 36px; display: flex; flex-direction: column; gap: 10px;
   background: radial-gradient(1200px 600px at 20% -10%, rgba(var(--cr-cyan-rgb), .07) 0%, var(--cr-bg) 55%), var(--cr-bg);
-  color: var(--cr-text); position: relative;
+  position: relative;
 }
 [data-theme="dark"] .cr::before { opacity: .18; }
-[data-theme="dark"] .cr {
+[data-theme="dark"] .cr, [data-theme="dark"] .cr-scope {
   --cr-bg: #070a12; --cr-panel: #0c1120; --cr-panel-2: #0f1628; --cr-line: #1a2340; --cr-line-2: #26314f;
   --cr-text: #e6ebf7; --cr-dim: #6b7690; --cr-mute: #3c4762;
   --cr-cyan: #5ee0ff; --cr-amber: #ffb547; --cr-rose: #ff5c7a; --cr-lime: #9dff6a;
   --cr-cyan-rgb: 94,224,255; --cr-amber-rgb: 255,181,71; --cr-rose-rgb: 255,92,122; --cr-lime-rgb: 157,255,106;
   --cr-on-accent: #04121a; --cr-glow: .45;
+}
+[data-theme="dark"] .cr {
   background: radial-gradient(1200px 600px at 20% -10%, #0e1a33 0%, var(--cr-bg) 55%), var(--cr-bg);
 }
 .cr::before { content: ""; position: absolute; inset: 0; pointer-events: none;
@@ -2543,3 +2551,18 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
 
 .rx-line.think .rx-name { color: var(--cr-lime); }
 .rx-line.think .rx-text { color: var(--cr-text); opacity: .85; }
+
+/* The activity stream in the chat rail.
+ *
+ * It borrows .rx-counters and .rx-lines from the reactor, so it carries
+ * .cr-scope for their palette. The one difference from the Stats page is
+ * height: there the stream is a band under the reactor with a ceiling on it,
+ * here it is a column and should use whatever the rail gives it. */
+.side-activity { display: flex; flex-direction: column; min-height: 0; flex: 1; gap: 8px; padding: 10px 12px 12px; overflow: hidden; }
+.side-activity-h { display: flex; align-items: center; gap: 6px; color: var(--cr-dim); }
+.side-activity-h .cr-tag { margin-left: auto; }
+.side-activity .rx-lines { max-height: none; }
+/* Four columns, not five: the rail is 330px by default and the kind is
+   already told by the colour of the name. at · name · text · tokens. */
+.side-activity .rx-line { grid-template-columns: 54px minmax(0, 88px) minmax(0, 1fr) auto; gap: 8px; }
+.side-activity .rx-kind { display: none; }

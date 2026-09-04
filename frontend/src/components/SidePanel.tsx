@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
+  ActivityIcon,
   LayoutDashboardIcon,
   PanelRightCloseIcon,
   ScanEyeIcon,
@@ -9,6 +10,7 @@ import { AskSummary, TraceItem } from "../lib/types";
 import { TraceBody } from "./TracePanel";
 import DashboardsPanel from "./DashboardsPanel";
 import { PromptPreviewBody } from "./PromptPreviewPanel";
+import { ActivityBody } from "./ActivityPanel";
 
 /**
  * The rail down the right of a conversation, and whichever panel it is showing.
@@ -23,7 +25,7 @@ import { PromptPreviewBody } from "./PromptPreviewPanel";
  * would make the trace icon sometimes mean dashboards.
  */
 
-type Tab = "trace" | "dashboards" | "preview";
+type Tab = "trace" | "dashboards" | "preview" | "activity";
 
 const OPEN_KEY = "superai-trace-open";
 const TAB_KEY = "superai-side-tab";
@@ -46,6 +48,10 @@ const TABS: { key: Tab; label: string; Icon: typeof WrenchIcon }[] = [
   // which covers the message you are editing — the one thing you want in front
   // of you while reading the turn it produces.
   { key: "preview", label: "Prompt preview", Icon: ScanEyeIcon },
+  // The Stats page's live stream. The question it answers — what is it doing
+  // right now — comes up while a turn is running, which is when you are here
+  // and not there.
+  { key: "activity", label: "Activity", Icon: ActivityIcon },
 ];
 
 function read(key: string, fallback: string): string {
@@ -84,9 +90,13 @@ export default function SidePanel({
   // The key is the one the trace panel has always used, so an existing install
   // opens the way it was left rather than resetting because the code moved.
   const [open, setOpen] = useState(() => read(OPEN_KEY, "1") !== "0");
-  const [tab, setTab] = useState<Tab>(() =>
-    read(TAB_KEY, "trace") === "dashboards" ? "dashboards" : "trace",
-  );
+  // Every tab reopens where it was left except the preview, which assembles a
+  // whole turn — persona, recalled memory, the tool catalogue — the moment it
+  // mounts. That is a thing to ask for, not a thing to walk back into.
+  const [tab, setTab] = useState<Tab>(() => {
+    const saved = read(TAB_KEY, "trace") as Tab;
+    return saved !== "preview" && TABS.some((t) => t.key === saved) ? saved : "trace";
+  });
   const [width, setWidth] = useState(() => {
     const saved = Number(read(WIDTH_KEY, ""));
     return saved >= MIN_WIDTH && saved <= MAX_WIDTH ? saved : DEFAULT_WIDTH;
@@ -222,6 +232,8 @@ export default function SidePanel({
       {/* Mounted only while it is the visible tab, so nothing is assembled when
           nobody is looking at it. */}
       {tab === "preview" && <PromptPreviewBody sessionId={sessionId} goal={settledDraft} />}
+      {/* Same rule: the meter is subscribed to only while it is being read. */}
+      {tab === "activity" && <ActivityBody />}
     </div>
   );
 }

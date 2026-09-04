@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -67,6 +68,51 @@ func TestRPCStructResult(t *testing.T) {
 	}
 	if got.LLMModel != "test-model" {
 		t.Fatalf("LLMModel = %q, want test-model", got.LLMModel)
+	}
+}
+
+// A method that returns (T, error) has to answer with T when the error is nil.
+//
+// It did not. reflect gives a nil error back as an `any` with no dynamic type,
+// so the "is this the error return?" assertion said no, and the nil went on to
+// overwrite the result — every such method answered `null` in the browser and
+// worked in the desktop window, where Wails does its own dispatch. A pasted
+// screenshot came back as a null path and the composer crashed drawing it.
+func TestRPCReturnsTheResultBesideANilError(t *testing.T) {
+	app, _, srv := serveTestApp(t)
+	app.settings = &backend.Settings{WorkspaceDir: t.TempDir()}
+
+	body := `["note.txt","` + base64.StdEncoding.EncodeToString([]byte("hello")) + `"]`
+	resp, err := http.Post(srv.URL+"/api/rpc/ImportPastedFile", "application/json", strings.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d", resp.StatusCode)
+	}
+	var got any
+	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+		t.Fatal(err)
+	}
+	path, ok := got.(string)
+	if !ok || path == "" {
+		t.Fatalf("got %#v, want the path the file landed at", got)
+	}
+}
+
+// And with a non-nil error it has to be a failure, not a 200 carrying one.
+func TestRPCRejectsOnANonNilError(t *testing.T) {
+	app, _, srv := serveTestApp(t)
+	app.settings = &backend.Settings{WorkspaceDir: t.TempDir()}
+
+	resp, err := http.Post(srv.URL+"/api/rpc/ImportPastedFile", "application/json", strings.NewReader(`["x.png","not base64"]`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500", resp.StatusCode)
 	}
 }
 

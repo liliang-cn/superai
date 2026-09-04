@@ -124,6 +124,10 @@ func (h *eventHub) serveSSE(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// errorType is the `error` interface, for telling a method's error return from
+// its result by signature.
+var errorType = reflect.TypeOf((*error)(nil)).Elem()
+
 // rpcCall dispatches one POST /api/rpc/<Method> onto the App by reflection —
 // the same shape Wails derives from the same struct, so the browser gets
 // exactly the binding surface the window gets, no hand-maintained route table
@@ -175,10 +179,17 @@ func rpcCall(app *App, w http.ResponseWriter, r *http.Request) {
 
 	// Wails semantics: a trailing error return rejects the promise; everything
 	// before it resolves it. Mirror that as 500-with-message vs 200-with-JSON.
+	//
+	// Which return is the error is decided by the method's signature and not by
+	// the value in it. Asking the value — `o.Interface().(error)` — gets it
+	// wrong in exactly the case that matters: a nil error reflects to an `any`
+	// with no dynamic type at all, the assertion says "not an error", and the
+	// nil then overwrites the result. Every method returning (T, error) was
+	// answering `null` on success.
 	var result any
-	for _, o := range out {
-		if err, isErr := o.Interface().(error); isErr {
-			if err != nil {
+	for i, o := range out {
+		if mt.Out(i) == errorType {
+			if err, _ := o.Interface().(error); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
