@@ -2658,3 +2658,30 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
 /* Two hints in a row are two inline spans, which ran the agent's description
    straight into the host list beside it. */
 .ra-about { display: block; margin-top: 4px; }
+
+/* The side panel in a window too narrow to give it a column.
+ *
+ * It floats over the conversation instead of beside it. The alternative was
+ * what shipped: at 860px the sidebar kept 232px and the panel 330, leaving the
+ * conversation about 300 — "New chat" wrapped onto two lines and the message
+ * box was narrower than the placeholder inside it. A panel that covers the
+ * transcript for as long as you are reading it is the better trade, and it is
+ * the same answer the sidebar already gives on a phone. */
+.trace-panel.floating {
+  position: absolute; top: 0; right: 0; bottom: 0; z-index: 40;
+  max-width: min(400px, 92vw);
+  box-shadow: -18px 0 40px rgba(0, 0, 0, .32);
+  border-left: 1px solid var(--border-strong);
+}
+/* The panel is positioned against the conversation column, not the window. */
+.main { position: relative; }
+/* Nothing to drag when the width is not the panel's to choose. */
+.trace-panel.floating .panel-resizer { display: none; }
+
+/* Stats at desktop-narrow. The tag sits at the end of a header row and was
+   pushed past the panel edge by a long model name beside it; it may wrap under
+   rather than run off. */
+@media (max-width: 1100px) {
+  .cr-panel-h { flex-wrap: wrap; row-gap: 4px; }
+  .cr-tag { margin-left: auto; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+}

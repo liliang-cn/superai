@@ -55,6 +55,13 @@ interface Frame {
   errors: number; heap: number; cpu: number; goroutines: number;
 }
 
+/** The narrowest panel that still has room outside the ring for tip labels. */
+const tipsNeedRoom = 560;
+
+/** Keeps a coordinate inside a range, for labels that would otherwise be drawn
+ *  past the edge of the panel that owns them. */
+const clamp = (v: number, lo: number, hi: number) => (v < lo ? lo : v > hi ? hi : v);
+
 /** One standing pillar: a figure, its name, and the colour of its family.
  *  text overrides the formatted value when a unit belongs on the tip. */
 export interface Pillar { key: string; label: string; value: number; color: string; text?: string }
@@ -510,8 +517,25 @@ class Wheel {
       inst++;
       // The label sits just past the tip, in CSS pixels from the panel's
       // centre; world y is up and CSS y is down.
+      //
+      // Clamped to the panel, because a ring drawn in a narrow window puts its
+      // outermost labels past the edge: at 520px the leftmost tips sat 391px
+      // outside and simply were not there. Half a label of margin, so a
+      // centred one is fully inside rather than half cut.
       const [lx, ly] = this.rim(post.theta, R + 4 + post.len + 12);
-      post.el.style.transform = `translate(${this.w / 2 + lx}px, ${this.h / 2 - ly}px) translate(-50%, -50%)`;
+      // Below this there is no room outside the ring for a label, and clamping
+      // one to the edge only turns "off the panel" into "on top of the
+      // graph". The pillars still say which figure grew; the numbers are in
+      // the counters beside them either way.
+      if (this.w < tipsNeedRoom) {
+        post.el.style.display = "none";
+        continue;
+      }
+      post.el.style.display = "";
+      const pad = 34;
+      const tipX = clamp(this.w / 2 + lx, pad, Math.max(pad, this.w - pad));
+      const tipY = clamp(this.h / 2 - ly, 12, Math.max(12, this.h - 12));
+      post.el.style.transform = `translate(${tipX}px, ${tipY}px) translate(-50%, -50%)`;
     }
     this.dummy.scale.set(0.001, 0.001, 1);
     this.dummy.position.set(0, 0, -10);

@@ -12,6 +12,7 @@ import { TraceBody } from "./TracePanel";
 import DashboardsPanel from "./DashboardsPanel";
 import { PromptPreviewBody } from "./PromptPreviewPanel";
 import { ActivityBody } from "./ActivityPanel";
+import { useRoom } from "../lib/useViewport";
 import { AgentsBody } from "./AgentsPanel";
 
 /**
@@ -99,6 +100,15 @@ export default function SidePanel({
   // The key is the one the trace panel has always used, so an existing install
   // opens the way it was left rather than resetting because the code moved.
   const [open, setOpen] = useState(() => read(OPEN_KEY, "1") !== "0");
+  // In a narrow window the panel cannot have a column of its own: 232px of
+  // sidebar plus 330 of panel left the conversation about 300 wide, with the
+  // message box narrower than its own placeholder. So it starts on its rail
+  // and, if opened, floats over the conversation rather than beside it —
+  // which is the same answer the sidebar already gives on a phone.
+  const room = useRoom();
+  const floats = room !== "wide";
+  const [peeked, setPeeked] = useState(false);
+  const shown = floats ? peeked : open;
   // Every tab reopens where it was left except the preview, which assembles a
   // whole turn — persona, recalled memory, the tool catalogue — the moment it
   // mounts. That is a thing to ask for, not a thing to walk back into.
@@ -163,7 +173,13 @@ export default function SidePanel({
     write(WIDTH_KEY, String(next));
   };
 
-  if (!open) {
+  // Room came back while it was floating: hand it its column again and forget
+  // the peek, or it would sit over a conversation that now has space for both.
+  useEffect(() => {
+    if (!floats) setPeeked(false);
+  }, [floats]);
+
+  if (!shown) {
     return (
       <div className="trace-panel collapsed">
         <div className="panel-rail">
@@ -174,7 +190,11 @@ export default function SidePanel({
               className="panel-toggle"
               onClick={() => {
                 setTab(key);
-                setOpen(true);
+                // A window too narrow for a column still opens on request; it
+                // just floats. Not written to the preference, so dragging the
+                // window wide again restores whatever was there before.
+                if (floats) setPeeked(true);
+                else setOpen(true);
               }}
               title={`Show ${label.toLowerCase()}`}
               aria-label={`Show ${label.toLowerCase()}`}
@@ -193,7 +213,7 @@ export default function SidePanel({
   }
 
   return (
-    <div className="trace-panel" ref={panelRef} style={{ width }} data-pet-spot="panel" data-pet-label="the panel down the right of the conversation">
+    <div className={`trace-panel${floats ? " floating" : ""}`} ref={panelRef} style={{ width }} data-pet-spot="panel" data-pet-label="the panel down the right of the conversation">
       {/* The drag handle sits on the border, outside the scrolling content, so
           grabbing it never scrolls whatever is underneath. */}
       <div
@@ -231,7 +251,7 @@ export default function SidePanel({
         <button
           type="button"
           className="panel-toggle inline"
-          onClick={() => setOpen(false)}
+          onClick={() => (floats ? setPeeked(false) : setOpen(false))}
           title="Hide panel"
           aria-label="Hide panel"
         >

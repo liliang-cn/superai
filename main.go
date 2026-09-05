@@ -61,8 +61,16 @@ func main() {
 	// Create application with options
 	err := wails.Run(&options.App{
 		Title:  "SuperAI",
-		Width:  1024,
-		Height: 768,
+		Width:  1280,
+		Height: 860,
+		// A floor, because there was none: the window could be dragged to any
+		// size at all, including ones no layout has an answer for. The frontend
+		// handles a phone-shaped viewport — the browser build is used from
+		// one — so the floor is that shape rather than a desktop one, and the
+		// layout collapses to the icon rail and a floating panel on the way
+		// down. Below this the reactor's own labels start leaving the disc.
+		MinWidth:  480,
+		MinHeight: 600,
 		AssetServer: &assetserver.Options{
 			Assets:     assets,
 			Middleware: noCache,

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import Sidebar from "./components/Sidebar";
 import Pet from "./components/Pet";
+import { useRoom } from "./lib/useViewport";
 import StatusBar from "./components/StatusBar";
 import ChatView from "./views/ChatView";
 import StatsView from "./views/StatsView";
@@ -39,6 +40,10 @@ export default function App() {
   // The sidebar: expanded on a desktop, a drawer on a phone. It starts closed
   // on a narrow screen whatever was stored, because a drawer covering the app
   // on arrival is not a navigation aid.
+  // How much room there is. Narrow puts the sidebar into its icon rail and the
+  // side panel over the conversation instead of beside it — applied on top of
+  // what the person chose, never written back over it.
+  const room = useRoom();
   const [navOpen, setNavOpen] = useState(() => {
     try {
       if (window.matchMedia("(max-width: 640px)").matches) return false;
@@ -154,7 +159,7 @@ export default function App() {
             if (window.matchMedia("(max-width: 640px)").matches) setNavOpen(false);
           }}
           badges={{ records: runs.unseen }}
-          open={navOpen}
+          open={navOpen && room !== "narrow"}
           onToggle={() => setNavOpen((v) => !v)}
         />
         <div className="main">
