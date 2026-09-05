@@ -116,3 +116,11 @@ func (s *Service) NotifyScheduledRun(ctx context.Context, run agent.PromptRun) {
 	}
 	s.Notices().Raise(ctx, notice)
 }
+
+// Inbox is the notification centre's store. Nil-safe by way of its own methods.
+func (s *Service) Inbox() *Inbox {
+	if s == nil {
+		return nil
+	}
+	return s.inbox
+}

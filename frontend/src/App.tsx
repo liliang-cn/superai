@@ -173,6 +173,7 @@ export default function App() {
             petOpen={petOpen}
             onTogglePet={() => setPetOpen((open) => !open)}
             onOpenNav={() => setNavOpen((v) => !v)}
+            onOpenConversation={openConversation}
           />
           <div className="content">
             {view === "chat" && (

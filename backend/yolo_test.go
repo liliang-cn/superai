@@ -24,7 +24,7 @@ func (c *fakeClock) add(d time.Duration) { c.at = c.at.Add(d) }
 func TestYoloAllowsWithoutAsking(t *testing.T) {
 	g, _ := yoloGate(t)
 	// No approver at all — without YOLO this denies immediately.
-	g.StartYolo(30 * time.Minute)
+	g.StartYolo()
 
 	resp, err := g.decide(context.Background(), bashReq("rm -rf /tmp/x"))
 	if err != nil {
@@ -35,42 +35,13 @@ func TestYoloAllowsWithoutAsking(t *testing.T) {
 	}
 }
 
-// The one that matters. A YOLO that does not end is not a mode, it is a new
-// default — and it would undo the gate entirely.
-func TestYoloExpiresOnItsOwn(t *testing.T) {
-	g, clk := yoloGate(t)
-	g.StartYolo(30 * time.Minute)
-
-	clk.add(29 * time.Minute)
-	if resp, _ := g.decide(context.Background(), bashReq("rm -rf /tmp/x")); !resp.Allowed {
-		t.Fatal("YOLO ended early")
-	}
-
-	clk.add(2 * time.Minute) // now past the window
-	resp, _ := g.decide(context.Background(), bashReq("rm -rf /tmp/x"))
-	if resp.Allowed {
-		t.Fatal("YOLO outlived its window — the gate is off for good")
-	}
-}
-
 // It must be possible to stop it before the clock does.
 func TestYoloCanBeStopped(t *testing.T) {
 	g, _ := yoloGate(t)
-	g.StartYolo(time.Hour)
+	g.StartYolo()
 	g.StopYolo()
 	if resp, _ := g.decide(context.Background(), bashReq("rm -rf /tmp/x")); resp.Allowed {
 		t.Fatal("StopYolo did not end it")
-	}
-}
-
-// An unbounded window is the whole failure mode, so it cannot be asked for.
-func TestYoloRefusesAnUnboundedWindow(t *testing.T) {
-	g, _ := yoloGate(t)
-	for _, d := range []time.Duration{0, -time.Minute, 999 * time.Hour} {
-		got := g.StartYolo(d)
-		if got <= 0 || got > MaxYoloWindow {
-			t.Errorf("StartYolo(%v) gave a window of %v, want it clamped into (0, %v]", d, got, MaxYoloWindow)
-		}
 	}
 }
 
@@ -78,7 +49,7 @@ func TestYoloRefusesAnUnboundedWindow(t *testing.T) {
 // reason to keep one is answering "what ran while I was not looking".
 func TestYoloIsStillAudited(t *testing.T) {
 	g, _ := yoloGate(t)
-	g.StartYolo(time.Hour)
+	g.StartYolo()
 	if _, err := g.decide(context.Background(), bashReq("rm -rf /tmp/x")); err != nil {
 		t.Fatalf("decide: %v", err)
 	}
@@ -96,22 +67,30 @@ func TestYoloIsStillAudited(t *testing.T) {
 }
 
 // Status is what the UI shows. A mode you cannot see is on is a mode you forget
-// is on.
-func TestYoloStatusReportsTheRemainingTime(t *testing.T) {
+// is on, and this one has no deadline to end it.
+func TestYoloStatusStaysOnUntilStopped(t *testing.T) {
 	g, clk := yoloGate(t)
-	g.StartYolo(30 * time.Minute)
+	g.StartYolo()
 
-	on, until := g.YoloStatus()
+	on, since := g.YoloStatus()
 	if !on {
 		t.Fatal("status says off right after starting")
 	}
-	if got := until.Sub(clk.at); got != 30*time.Minute {
-		t.Errorf("remaining = %v, want 30m", got)
+	if !since.Equal(clk.at) {
+		t.Errorf("since = %v, want %v", since, clk.at)
 	}
 
-	clk.add(31 * time.Minute)
+	clk.add(9 * time.Hour)
+	if on, _ := g.YoloStatus(); !on {
+		t.Error("status went off on its own — YOLO ends when it is stopped, not when a clock says so")
+	}
+	if resp, _ := g.decide(context.Background(), bashReq("rm -rf /tmp/x")); !resp.Allowed {
+		t.Error("the gate started asking again on its own")
+	}
+
+	g.StopYolo()
 	if on, _ := g.YoloStatus(); on {
-		t.Error("status still says on after the window passed")
+		t.Error("status still says on after being stopped")
 	}
 }
 
@@ -119,7 +98,7 @@ func TestYoloStatusReportsTheRemainingTime(t *testing.T) {
 // there is nothing for YOLO to relax.
 func TestYoloIsIrrelevantWhenTheGateIsOff(t *testing.T) {
 	g := NewToolGate(false, "")
-	g.StartYolo(time.Hour)
+	g.StartYolo()
 	resp, _ := g.decide(context.Background(), bashReq("rm -rf /tmp/x"))
 	if !resp.Allowed {
 		t.Fatal("a disabled gate denied")

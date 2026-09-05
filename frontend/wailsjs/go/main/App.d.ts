@@ -37,6 +37,8 @@ export function ChatSessions():Promise<Array<backend.ChatSessionInfo>>;
 
 export function CheckRemoteAgents():Promise<Array<main.RemoteAgentStatus>>;
 
+export function ClearNotifications():Promise<Record<string, any>>;
+
 export function Dashboard():Promise<Record<string, any>>;
 
 export function Dashboards():Promise<Array<backend.Dashboard>>;
@@ -85,9 +87,13 @@ export function LongRunStop(arg1:string):Promise<boolean>;
 
 export function MCP():Promise<Array<mcp.ServerStatus>>;
 
+export function MarkNotificationsRead(arg1:Array<string>):Promise<Record<string, any>>;
+
 export function MemoryRecall(arg1:string):Promise<string>;
 
 export function MemorySkills():Promise<Array<string>>;
+
+export function Notifications():Promise<Array<backend.Notification>>;
 
 export function Notify(arg1:string,arg2:string,arg3:string):Promise<string>;
 
@@ -149,7 +155,7 @@ export function SetWindowTheme(arg1:boolean):Promise<void>;
 
 export function Skills():Promise<Array<backend.SkillInfo>>;
 
-export function StartYoloMode(arg1:number):Promise<Record<string, any>>;
+export function StartYoloMode():Promise<Record<string, any>>;
 
 export function StopYoloMode():Promise<Record<string, any>>;
 
@@ -158,3 +164,5 @@ export function TestWebhook():Promise<string>;
 export function ToolApprovalInfo(arg1:number):Promise<Record<string, any>>;
 
 export function TraceLines(arg1:string,arg2:number):Promise<Array<string>>;
+
+export function UnreadNotifications():Promise<number>;

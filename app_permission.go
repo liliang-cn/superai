@@ -150,12 +150,11 @@ func (a *App) ToolApprovalInfo(limit int) map[string]any {
 	if gate != nil {
 		// Included so a page that loads mid-window sees the banner. Events
 		// alone would leave a reloaded tab believing prompts are still coming.
-		yoloOn, yoloUntil := gate.YoloStatus()
+		yoloOn, yoloSince := gate.YoloStatus()
 		info["yolo"] = yoloOn
 		if yoloOn {
-			info["yoloUntil"] = yoloUntil.Format(time.RFC3339)
+			info["yoloSince"] = yoloSince.Format(time.RFC3339)
 		}
-		info["yoloMaxMins"] = int(backend.MaxYoloWindow / time.Minute)
 	}
 	if gate == nil {
 		return info
@@ -171,31 +170,29 @@ func (a *App) ToolApprovalInfo(limit int) map[string]any {
 	return info
 }
 
-// StartYoloMode approves every gated call for a while, and reports when it
-// ends. minutes of zero takes the default; anything longer than the cap is
-// clamped to it.
+// StartYoloMode approves every gated call until it is switched off.
 //
 // Bound so the approval modal can offer it at the moment it is wanted: the
 // prompt a user is about to click through for the twentieth time is exactly
-// where "stop asking for a bit" belongs, and burying it in Settings is how
-// people end up turning the gate off permanently instead.
-func (a *App) StartYoloMode(minutes int) map[string]any {
+// where "stop asking" belongs, and burying it in Settings is how people end up
+// turning the gate off permanently instead — which is the same thing, minus the
+// banner that keeps saying so.
+func (a *App) StartYoloMode() map[string]any {
 	a.mu.Lock()
 	svc := a.svc
 	a.mu.Unlock()
 	if svc == nil || svc.ToolGate() == nil {
 		return map[string]any{"error": "the approval gate is not running"}
 	}
-	granted := svc.ToolGate().StartYolo(time.Duration(minutes) * time.Minute)
-	on, until := svc.ToolGate().YoloStatus()
+	svc.ToolGate().StartYolo()
+	on, since := svc.ToolGate().YoloStatus()
 
 	// Announced rather than left to be noticed. Every surface that could be
 	// showing an approval card needs to know they are about to stop appearing,
 	// and a user who left the tab open needs to see the banner without asking.
 	a.emit("tool:yolo", map[string]any{
-		"active":      on,
-		"until":       until.Format(time.RFC3339),
-		"grantedMins": int(granted / time.Minute),
+		"active": on,
+		"since":  since.Format(time.RFC3339),
 	})
 
 	// Answer whatever is already on screen, or those cards sit there waiting
@@ -210,12 +207,7 @@ func (a *App) StartYoloMode(minutes int) map[string]any {
 		_ = a.ResolveToolApproval(id, true)
 	}
 
-	return map[string]any{
-		"active":      on,
-		"until":       until.Format(time.RFC3339),
-		"grantedMins": int(granted / time.Minute),
-		"maxMins":     int(backend.MaxYoloWindow / time.Minute),
-	}
+	return map[string]any{"active": on, "since": since.Format(time.RFC3339)}
 }
 
 // StopYoloMode ends it now.

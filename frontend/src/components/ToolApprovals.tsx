@@ -3,12 +3,6 @@ import { ShieldAlertIcon } from "lucide-react";
 import { ToolApproval } from "../lib/useToolApprovals";
 import { StartYoloMode } from "../../wailsjs/go/main/App";
 
-// How long "Allow all" lasts. Deliberately a fixed, visible, short number
-// rather than a picker: the decision worth making here is "stop asking while I
-// watch this run", and offering to choose the length invites choosing a long
-// one. Settings has the permanent switch for anyone who means that instead.
-const YOLO_MINUTES = 15;
-
 /**
  * Asking before the agent runs a shell command.
  *
@@ -98,15 +92,15 @@ function ApprovalCard({
           {/* The pressure valve. It belongs here rather than in Settings
               because here is where it is wanted: this is the prompt someone is
               about to click through for the twentieth time in one run, and if
-              the only way to stop that is a permanent switch buried elsewhere,
-              the permanent switch is what they will flip. The window is short
-              and shown on the button, so choosing it is choosing an end. */}
+              the only way to stop that is a switch buried elsewhere, that is the
+              switch they will flip. It stays on until it is turned off — the
+              banner is what keeps saying so. */}
           <button
             className="btn ghost approval-yolo"
-            title={"Approve everything for " + YOLO_MINUTES + " minutes, then go back to asking"}
-            onClick={() => { void StartYoloMode(YOLO_MINUTES); }}
+            title="Approve everything from now on, until you switch it off"
+            onClick={() => { void StartYoloMode(); }}
           >
-            Allow all for {YOLO_MINUTES}m
+            Allow all
           </button>
         </div>
       </div>

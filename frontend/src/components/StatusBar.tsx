@@ -2,6 +2,7 @@ import React from "react";
 import { LogOutIcon, MenuIcon } from "lucide-react";
 import { Accent, AppStatus, Theme } from "../lib/types";
 import ThemePicker from "./ThemePicker";
+import NotificationCenter from "./NotificationCenter";
 
 // Only the served build has a session to end; the desktop window has no door.
 const served = Boolean((window as unknown as Record<string, unknown>).superaiServed);
@@ -16,6 +17,7 @@ export default function StatusBar({
   petOpen,
   onTogglePet,
   onOpenNav,
+  onOpenConversation,
 }: {
   status: AppStatus | null;
   loading: boolean;
@@ -29,6 +31,8 @@ export default function StatusBar({
    *  sidebar is a drawer and has taken its own toggle off the screen with it.
    *  A toggle, not an open: a button that can only open is half a control. */
   onOpenNav: () => void;
+  /** Where a notification that names a conversation goes when it is clicked. */
+  onOpenConversation?: (session: string) => void;
 }) {
   let dotClass = "unknown";
   let label = "Connecting…";
@@ -89,6 +93,10 @@ export default function StatusBar({
             )}
           </>
         )}
+        {/* Here rather than in a view of its own: this strip is the only thing
+            on screen in every view, and a centre you have to navigate to is one
+            you check after you already found out the hard way. */}
+        <NotificationCenter onOpenConversation={onOpenConversation} />
         <ThemePicker theme={theme} onTheme={onTheme} accent={accent} onAccent={onAccent} />
         {served && (
           <button

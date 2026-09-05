@@ -98,6 +98,9 @@ type Service struct {
 	// by anything else that has something to say. See notice.go.
 	notices *Notices
 
+	// inbox keeps every notice, so there is somewhere to look afterwards.
+	inbox *Inbox
+
 	// SuppressedMCPServers names the MCP servers that were left unmounted
 	// because they route to the same store the memory backend already owns.
 	SuppressedMCPServers []string
@@ -340,6 +343,10 @@ func NewService(s *Settings) (*Service, error) {
 	svc.RegisterObserver(out.traces)
 	out.notifier = NewNotifier(s)
 	out.notices = NewNotices(out.notifier)
+	// The notification centre: the one subscriber that keeps what it is given,
+	// so a run that finished at three in the morning is still there at nine.
+	out.inbox = NewInbox(cfg.DataDir())
+	out.notices.Subscribe("inbox", out.inbox.Sink())
 
 	// --- Built-in framework tools. ---
 	agent.RegisterDateTimeTool(svc)

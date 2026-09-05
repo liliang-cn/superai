@@ -97,10 +97,11 @@ type ToolGate struct {
 	wait     time.Duration
 	audit    *approvalAudit
 
-	// yoloUntil is when YOLO mode stops approving everything. Zero means off.
-	// A deadline rather than a bool: see yolo.go for why it expires by
-	// comparing clocks instead of by a timer someone has to remember to fire.
-	yoloUntil time.Time
+	// yolo is YOLO mode: every gated call approved without asking, until it is
+	// switched off. yoloSince is when it was turned on, which is what the
+	// banner shows — see yolo.go for why there is no deadline.
+	yolo      bool
+	yoloSince time.Time
 
 	// unattended holds the session ids of runs nobody is watching — a long
 	// task the supervisor is driving segment by segment. A tool call from one

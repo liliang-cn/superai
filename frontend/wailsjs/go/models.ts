@@ -349,6 +349,32 @@ export namespace backend {
 	        this.text = source["text"];
 	    }
 	}
+	export class Notification {
+	    id: string;
+	    level: string;
+	    title?: string;
+	    message: string;
+	    source?: string;
+	    session?: string;
+	    at: string;
+	    read: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new Notification(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.level = source["level"];
+	        this.title = source["title"];
+	        this.message = source["message"];
+	        this.source = source["source"];
+	        this.session = source["session"];
+	        this.at = source["at"];
+	        this.read = source["read"];
+	    }
+	}
 	export class PreviewMessage {
 	    role: string;
 	    content: string;

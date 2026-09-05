@@ -2752,3 +2752,71 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
   transition: background .12s, color .12s;
 }
 .conv-jump-btn:hover { background: var(--bg-hover); color: var(--text-0); }
+
+/* ---------------- Notification centre ---------------- */
+/* The bell in the status bar and what it opens. A toast says what just
+   happened; this says what happened while nobody was watching, which is the
+   only reason the app keeps any of it. */
+.notif { position: relative; display: inline-flex; }
+.notif-bell { padding: 3px 8px; position: relative; }
+.notif-badge {
+  position: absolute; top: -5px; right: -5px;
+  min-width: 15px; height: 15px; padding: 0 4px;
+  display: grid; place-items: center;
+  font-size: 9.5px; font-weight: 700; line-height: 1;
+  color: var(--on-accent); background: var(--accent);
+  border: 1px solid var(--bg-0); border-radius: 999px;
+}
+/* Fixed and placed from the bell's own rect (NotificationCenter.tsx): the
+   status bar wraps to two rows when the pills do not fit, and the bell is not
+   the rightmost thing in it, so neither the drop nor the right edge can be
+   written down here. */
+.notif-panel {
+  position: fixed; z-index: 60;
+  background: var(--bg-2); color: var(--text-0);
+  border: 1px solid var(--border-strong); border-radius: var(--radius);
+  box-shadow: var(--shadow); overflow: hidden;
+}
+.notif-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 9px 11px; border-bottom: 1px solid var(--border);
+}
+.notif-title { font-size: 12px; font-weight: 700; letter-spacing: 0.2px; }
+.notif-action {
+  font: inherit; font-size: 11px; color: var(--text-2);
+  background: transparent; border: 0; padding: 2px 4px; cursor: pointer;
+}
+.notif-action:hover { color: var(--text-0); }
+/* Capped and scrolled: a centre is a recent history, and a popover that grows
+   past the window is one you cannot reach the bottom of. */
+.notif-list { max-height: min(420px, 60vh); overflow-y: auto; }
+.notif-empty { padding: 22px 12px; text-align: center; color: var(--text-3); font-size: 12px; }
+.notif-row {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 9px 11px; border-bottom: 1px solid var(--border);
+  border-left: 2px solid transparent;
+}
+.notif-row:last-child { border-bottom: 0; }
+.notif-clickable { cursor: pointer; }
+.notif-clickable:hover { background: var(--bg-hover); }
+/* Unread when the panel was opened. Kept for as long as it stays open, because
+   opening it marks everything read and would otherwise erase the one thing the
+   badge sent you here to find. */
+.notif-new { background: var(--accent-soft); border-left-color: var(--accent); }
+.notif-icon { flex: none; margin-top: 1px; color: var(--text-3); }
+.notif-success .notif-icon { color: var(--green, #3fb950); }
+.notif-warn .notif-icon { color: var(--amber, #d29922); }
+.notif-error .notif-icon { color: var(--red); }
+.notif-text { min-width: 0; flex: 1; }
+.notif-row-title { font-size: 12px; font-weight: 600; color: var(--text-0); }
+.notif-message {
+  font-size: 12px; color: var(--text-1); line-height: 1.4;
+  overflow-wrap: anywhere; white-space: pre-wrap;
+}
+.notif-meta {
+  display: flex; align-items: center; gap: 8px;
+  margin-top: 3px; font-size: 10.5px; color: var(--text-3);
+}
+.notif-source { display: inline-flex; align-items: center; gap: 3px; min-width: 0; }
+.notif-source { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.notif-time { margin-left: auto; flex: none; }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { EventsOff, EventsOn } from "../../wailsjs/runtime/runtime";
+import { noticeArrived } from "./notifications";
 
 /**
  * Toasts, fed by the backend.
@@ -184,6 +185,11 @@ export function useBackendToasts(): void {
       // A notice with nothing to say is a bug somewhere upstream, and an empty
       // toast in the corner is the least useful way to report it.
       if (!message) return;
+      // The centre keeps what this is about to let fade. It is told from here
+      // rather than subscribing itself because EventsOff removes every handler
+      // for a name, so two subscribers to "notice" is one unmount away from no
+      // subscribers at all.
+      noticeArrived();
       show({
         level: payload.level ?? "info",
         title: payload.title,

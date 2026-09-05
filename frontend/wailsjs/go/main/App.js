@@ -66,6 +66,10 @@ export function CheckRemoteAgents() {
   return window['go']['main']['App']['CheckRemoteAgents']();
 }
 
+export function ClearNotifications() {
+  return window['go']['main']['App']['ClearNotifications']();
+}
+
 export function Dashboard() {
   return window['go']['main']['App']['Dashboard']();
 }
@@ -162,12 +166,20 @@ export function MCP() {
   return window['go']['main']['App']['MCP']();
 }
 
+export function MarkNotificationsRead(arg1) {
+  return window['go']['main']['App']['MarkNotificationsRead'](arg1);
+}
+
 export function MemoryRecall(arg1) {
   return window['go']['main']['App']['MemoryRecall'](arg1);
 }
 
 export function MemorySkills() {
   return window['go']['main']['App']['MemorySkills']();
+}
+
+export function Notifications() {
+  return window['go']['main']['App']['Notifications']();
 }
 
 export function Notify(arg1, arg2, arg3) {
@@ -290,8 +302,8 @@ export function Skills() {
   return window['go']['main']['App']['Skills']();
 }
 
-export function StartYoloMode(arg1) {
-  return window['go']['main']['App']['StartYoloMode'](arg1);
+export function StartYoloMode() {
+  return window['go']['main']['App']['StartYoloMode']();
 }
 
 export function StopYoloMode() {
@@ -308,4 +320,8 @@ export function ToolApprovalInfo(arg1) {
 
 export function TraceLines(arg1, arg2) {
   return window['go']['main']['App']['TraceLines'](arg1, arg2);
+}
+
+export function UnreadNotifications() {
+  return window['go']['main']['App']['UnreadNotifications']();
 }
