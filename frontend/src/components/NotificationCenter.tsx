@@ -115,7 +115,7 @@ export default function NotificationCenter({
     <div className="notif" ref={wrap}>
       <button
         type="button"
-        className={`pill-btn notif-bell${open ? " on" : ""}`}
+        className={`pill-btn icon-only notif-bell${open ? " on" : ""}`}
         onClick={() => setOpen((v) => !v)}
         title={unread > 0 ? `${unread} unread` : "Notifications"}
         aria-label="Notifications"

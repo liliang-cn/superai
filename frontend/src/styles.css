@@ -2443,10 +2443,17 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
   box-sizing: border-box;
 }
 .statusbar .theme-toggle { width: 26px; height: 26px; padding: 0; }
+/* A pill with nothing but an icon in it is a circle, and every icon control in
+   this strip is the same circle — the bell, the avatar, the theme swatch. */
+.statusbar .pill-btn.icon-only {
+  width: 26px; height: 26px; padding: 0;
+  display: grid; place-items: center;
+}
 
 @media (max-width: 640px) {
   /* Touch sizing keeps the shape: bigger circles, not rounded rectangles. */
   .statusbar .pill-btn { min-height: 44px; }
+  .statusbar .pill-btn.icon-only { width: 44px; height: 44px; }
   .statusbar .theme-toggle { width: 44px; height: 44px; min-height: 44px; }
 }
 
@@ -2758,7 +2765,7 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
    happened; this says what happened while nobody was watching, which is the
    only reason the app keeps any of it. */
 .notif { position: relative; display: inline-flex; }
-.notif-bell { padding: 3px 8px; position: relative; }
+.notif-bell { position: relative; }
 .notif-badge {
   position: absolute; top: -5px; right: -5px;
   min-width: 15px; height: 15px; padding: 0 4px;

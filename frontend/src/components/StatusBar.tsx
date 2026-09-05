@@ -1,5 +1,5 @@
 import React from "react";
-import { LogOutIcon, MenuIcon } from "lucide-react";
+import { LogOutIcon, MenuIcon, PawPrintIcon } from "lucide-react";
 import { Accent, AppStatus, Theme } from "../lib/types";
 import ThemePicker from "./ThemePicker";
 import NotificationCenter from "./NotificationCenter";
@@ -67,31 +67,21 @@ export default function StatusBar({
         )}
       </div>
       <div className="status-pills">
-        {status && (
-          <>
-            <span className="pill">memory <b>{status.memoryMode || "—"}</b></span>
-            <span className="pill">skills <b>{status.skills.length}</b></span>
-            {/* What the agent can reach that is not built in. It replaced a
-                `browser on/off` pill that had been hardcoded to off ever since
-                agent-go dropped its own browser — browsing now arrives as an
-                MCP server like everything else, so this is where it shows. */}
-            <span className="pill" title={`${status.mcpTools} tools`}>
-              MCP <b>{status.mcp}</b>
-            </span>
-            {/* Not a readout: the avatar port was only ever interesting as a
-                place to go, and now there is somewhere to go without leaving
-                the window. */}
-            {status.avatarPort > 0 && (
-              <button
-                className={`pill-btn${petOpen ? " on" : ""}`}
-                onClick={onTogglePet}
-                title={petOpen ? "Send the avatar away" : "Let the avatar out into the window"}
-                aria-pressed={petOpen}
-              >
-                avatar <b>{petOpen ? "out" : ":" + status.avatarPort}</b>
-              </button>
-            )}
-          </>
+        {/* The memory / skills / MCP readouts used to sit here. They were three
+            numbers that never changed while you looked at them, in the one strip
+            that is on screen in every view — and each already has a page of its
+            own that says the same thing with the detail to act on. What is left
+            here is only what is a control. */}
+        {status && status.avatarPort > 0 && (
+          <button
+            className={`pill-btn icon-only${petOpen ? " on" : ""}`}
+            onClick={onTogglePet}
+            title={petOpen ? "Send the avatar away" : "Let the avatar out into the window"}
+            aria-label="Avatar"
+            aria-pressed={petOpen}
+          >
+            <PawPrintIcon className="size-4" />
+          </button>
         )}
         {/* Here rather than in a view of its own: this strip is the only thing
             on screen in every view, and a centre you have to navigate to is one
