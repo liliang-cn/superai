@@ -48,7 +48,7 @@ export default function StatusBar({
   }
 
   return (
-    <div className="statusbar">
+    <div className={`statusbar${!loading && status?.ready ? " ok" : ""}`}>
       <div className="status-main">
         <button
           type="button"
@@ -60,7 +60,11 @@ export default function StatusBar({
           <MenuIcon className="size-4" />
         </button>
         <span className={`status-dot ${dotClass}`} />
-        {label}
+        {/* A real element, not a bare text node: text-overflow needs something
+            to hang on, and an anonymous flex item is not it — squeezed, the
+            word was cut through its last letter with no ellipsis and the
+            remainder sat under the first button. */}
+        <span className="status-label">{label}</span>
         {status && !status.ready && status.error && (
           <span className="status-err" title={status.error}>
             — {status.error.length > 60 ? status.error.slice(0, 57) + "…" : status.error}

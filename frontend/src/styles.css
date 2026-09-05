@@ -550,6 +550,30 @@ input, textarea, select { font-family: inherit; }
 }
 .pill b { color: var(--text-0); font-weight: 600; }
 .status-err { color: var(--red); font-size: 12px; }
+/* The status text and the row of controls share one line, and when they cannot
+   both have it the text is the one that gives — the controls are 44px targets
+   on a phone and shrinking them is what put them below a fingertip in the
+   first place.
+   But a flex item defaults to min-width: auto, which refuses to shrink below
+   its own longest word, and with overflow visible the surplus is not clipped,
+   it is painted: a backend error in the bar came out as three wrapped lines of
+   red text lying across the bell and the avatar. It gets one line and an
+   ellipsis instead. Nothing is lost — the full message is already the title of
+   that span, and the page it is about says it in full. */
+.status-main { min-width: 0; overflow: hidden; white-space: nowrap; }
+.status-err { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* And the cluster itself has to be as unshrinkable as the buttons in it.
+   Pinning only the buttons was half an answer: .status-pills kept flex-shrink:
+   1, so a long error squeezed the container down to 126px while its five 44px
+   children refused to follow — they overflowed it leftward and were drawn
+   across the very text that had pushed them. Measured: buttons 120..378 inside
+   a box of 252..378, with the error underneath them. */
+.status-pills { flex: none; }
+/* The state word does not shrink; the error beside it does. Both were elastic
+   and the shorter one lost first, so the row read "Not ... — dial tcp …" —
+   the two words that say what happened, truncated to make room for the detail
+   about it. */
+.status-label { flex: none; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 
 /* ---------------- Content ---------------- */
 .content { flex: 1; min-height: 0; display: flex; }
@@ -2224,6 +2248,20 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
      page. They are on the Settings page in full; the header keeps the things
      you can actually press. */
   .status-pills { flex-wrap: nowrap; }
+  /* The drawer handle and five 44px controls leave about sixty pixels for the
+     status, and "Connecting…" alone is eighty-five. So on a phone the word
+     gives way to the dot — green is the same sentence in less room — but only
+     while everything is fine. "Not ready" is news and keeps its words, and so
+     does the error beside it, which is the whole reason to look up here. */
+  .statusbar.ok .status-label { display: none; }
+  /* And when something is wrong there is a sentence to read, which sixty pixels
+     beside five buttons is not a place for: squeezed, "Not ready — dial tcp
+     …refused" came out as a red sliver one character wide. The bar was built to
+     grow — min-height, not height, and its own comment says so — so the status
+     takes a line and the controls keep theirs. Only when there is something to
+     say: the ready state stays one row, which is nearly always. */
+  .statusbar { flex-wrap: wrap; }
+  .statusbar:not(.ok) .status-main { flex: 1 1 100%; }
   /* Tab strips scroll sideways rather than wrap. Wrapped, Settings' five tabs
      put "Runtime" alone on a second row, which reads as a separate thing
      rather than the last of five. A strip that scrolls keeps them one rank,
