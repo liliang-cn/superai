@@ -3,6 +3,7 @@ import { LogOutIcon, MenuIcon, PawPrintIcon } from "lucide-react";
 import { Accent, AppStatus, Theme } from "../lib/types";
 import ThemePicker from "./ThemePicker";
 import NotificationCenter from "./NotificationCenter";
+import YoloToggle from "./YoloToggle";
 
 // Only the served build has a session to end; the desktop window has no door.
 const served = Boolean((window as unknown as Record<string, unknown>).superaiServed);
@@ -83,6 +84,11 @@ export default function StatusBar({
             <PawPrintIcon className="size-4" />
           </button>
         )}
+        {/* Lit when every tool call is being approved without asking. It is
+            here, and not a banner over the page, because this strip is what is
+            on screen in every view — and the thing that must not be forgotten
+            belongs next to the other controls, not floating over the work. */}
+        <YoloToggle />
         {/* Here rather than in a view of its own: this strip is the only thing
             on screen in every view, and a centre you have to navigate to is one
             you check after you already found out the hard way. */}

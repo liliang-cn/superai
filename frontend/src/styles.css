@@ -1234,16 +1234,14 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
 .approval-yolo:hover { border-color: var(--amber, #fbbf24); }
 /* The banner while it lasts. A mode you cannot see is on is a mode you forget
    is on, and this one turns every prompt into a yes. */
-.yolo-banner {
-  position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 120;
-  display: flex; align-items: center; gap: 10px;
-  padding: 6px 14px; border-radius: 20px; font-size: 12px;
-  background: rgba(251, 191, 36, .14); border: 1px solid rgba(251, 191, 36, .45);
+/* YOLO, on. Amber rather than the accent: this is the one control in the strip
+   that is saying something is not normal, and it has to be legible as that at a
+   glance from across the room — it is the only warning left now that the banner
+   is gone. Off, it is an ordinary icon like its neighbours. */
+.statusbar .yolo-toggle.on {
   color: var(--amber, #fbbf24);
-}
-.yolo-banner button {
-  background: none; border: none; color: inherit; cursor: pointer;
-  text-decoration: underline; font-size: 12px; padding: 0;
+  border-color: rgba(251, 191, 36, .55);
+  background: rgba(251, 191, 36, .14);
 }
 
 /* The recall bar above the scene. It is one row and stays one row: the graph is

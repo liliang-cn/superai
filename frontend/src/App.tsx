@@ -15,7 +15,6 @@ import { Toaster } from "./components/Toaster";
 import { useBackendToasts } from "./lib/toasts";
 import { EventsOff, EventsOn } from "../wailsjs/runtime/runtime";
 import ToolApprovals from "./components/ToolApprovals";
-import YoloBanner from "./components/YoloBanner";
 import { Accent, AppStatus, Theme, ViewKey, normalizeStatus } from "./lib/types";
 import { useScheduleRuns } from "./lib/useScheduleRuns";
 import { useToolApprovals } from "./lib/useToolApprovals";
@@ -207,7 +206,6 @@ export default function App() {
       )}
       {/* Everything the backend publishes, whatever raised it. */}
       <Toaster onOpenConversation={openConversation} />
-      <YoloBanner />
       <ToolApprovals
         pending={approvals.pending}
         note={approvals.note}
