@@ -242,6 +242,18 @@ func copySkillDir(src, dst string) error {
 	})
 }
 
+// argBool reads a boolean argument that arrived as JSON, where a model may
+// have sent the word rather than the value.
+func argBool(a map[string]interface{}, k string) bool {
+	switch v := a[k].(type) {
+	case bool:
+		return v
+	case string:
+		return strings.EqualFold(strings.TrimSpace(v), "true")
+	}
+	return false
+}
+
 func argStrSlice(a map[string]interface{}, k string) []string {
 	switch v := a[k].(type) {
 	case []string:

@@ -9,6 +9,8 @@ export function AddRecord(arg1:string,arg2:string,arg3:string,arg4:Array<string>
 
 export function AddSchedule(arg1:string,arg2:string,arg3:string,arg4:Array<string>):Promise<Record<string, any>>;
 
+export function AskRemoteAgent(arg1:string,arg2:string):Promise<backend.RemoteResult>;
+
 export function CLIProxyAccounts():Promise<Array<backend.CLIProxyAccount>>;
 
 export function CLIProxyLogin(arg1:string,arg2:string):Promise<string>;
@@ -32,6 +34,8 @@ export function CancelScheduledRun(arg1:string):Promise<string>;
 export function ChatHistory(arg1:string):Promise<Array<backend.ChatTurn>>;
 
 export function ChatSessions():Promise<Array<backend.ChatSessionInfo>>;
+
+export function CheckRemoteAgents():Promise<Array<main.RemoteAgentStatus>>;
 
 export function Dashboard():Promise<Record<string, any>>;
 
@@ -93,12 +97,6 @@ export function OpenWorkspaceFileExternal(arg1:string):Promise<string>;
 
 export function PendingToolApprovals():Promise<Array<Record<string, any>>>;
 
-export function CheckRemoteAgents():Promise<Array<main.RemoteAgentStatus>>;
-
-export function AskRemoteAgent(arg1:string,arg2:string):Promise<backend.RemoteResult>;
-
-export function RemoteAgentNames():Promise<Array<Record<string, string>>>;
-
 export function PetStage(arg1:string,arg2:Array<Record<string, string>>):Promise<void>;
 
 export function PickFiles():Promise<Array<string>>;
@@ -112,6 +110,8 @@ export function ReadWorkspaceFile(arg1:string):Promise<string>;
 export function ReadWorkspaceFileDataURL(arg1:string):Promise<string>;
 
 export function RefreshDashboard(arg1:string):Promise<Record<string, any>>;
+
+export function RemoteAgentNames():Promise<Array<Record<string, string>>>;
 
 export function RemoveMCPServer(arg1:string):Promise<string>;
 

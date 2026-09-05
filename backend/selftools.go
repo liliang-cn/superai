@@ -78,13 +78,15 @@ func (s *Service) registerSelfTools() {
 	// --- dashboard_save ---
 	svc.AddToolWithMetadata(
 		"dashboard_save",
-		"Keep a reply as a dashboard the user can reopen from the Dashboards panel. For \"save that as a dashboard\" — the usual case — pass only name and prompt: the reply already on screen is stored exactly as it was drawn. Do NOT retype the document; a rewrite is a second generation nobody has seen rendered, and it is how a working board becomes a broken one. `source` is only for a dashboard that has no reply behind it yet. `prompt` is the question that regenerates it — a dashboard saved without one can never refresh.",
+		"Keep a reply as a dashboard the user can reopen from the Dashboards panel. For \"save that as a dashboard\" — the usual case — pass only name and prompt: the reply already on screen is stored exactly as it was drawn. Do NOT retype the document; a rewrite is a second generation nobody has seen rendered, and it is how a working board becomes a broken one. `source` is only for a dashboard that has no reply behind it yet. `prompt` is the question that regenerates it — a dashboard saved without one can never refresh.\n\nImproving a board the user already has is a save onto that board, not a new one: reuse its name, or pass its `id` from dashboard_list. A saved name that already exists is replaced. Pass `new` only when the user genuinely wants a second board beside the first.",
 		map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
 				"name":   map[string]interface{}{"type": "string", "description": "Short label, e.g. 我的美股收益"},
 				"prompt": map[string]interface{}{"type": "string", "description": "The question that regenerates it; omit only if it genuinely cannot be re-asked"},
 				"source": map[string]interface{}{"type": "string", "description": "Leave this out to save the reply already on screen, which is almost always what is wanted. Only pass it for a dashboard with no reply behind it."},
+				"id":     map[string]interface{}{"type": "string", "description": "id from dashboard_list, to overwrite that board. Use it when the user is changing a board they already have."},
+				"new":    map[string]interface{}{"type": "boolean", "description": "Force a second board even though one of this name exists. Only when the user asked for another one."},
 			},
 			"required": []string{"name"},
 		},
@@ -98,11 +100,27 @@ func (s *Service) registerSelfTools() {
 				}
 				source, from = reply, "the reply already on screen"
 			}
-			d, err := s.SaveDashboard(argStr(a, "name"), source, argStr(a, "prompt"))
+			name, prompt := argStr(a, "name"), argStr(a, "prompt")
+
+			target, replacing, why := s.dashboardTarget(name, argStr(a, "id"), argBool(a, "new"))
+			if why != "" {
+				return errResult(why), nil
+			}
+
+			var d Dashboard
+			var err error
+			if target != "" {
+				d, err = s.ReplaceDashboard(target, name, source, prompt)
+			} else {
+				d, err = s.SaveDashboard(name, source, prompt)
+			}
 			if err != nil {
 				return errResult(err.Error()), nil
 			}
 			note := "Stored " + from + "."
+			if replacing != "" {
+				note += " " + replacing
+			}
 			if strings.TrimSpace(d.Prompt) == "" {
 				note += " Saved without a question, so it cannot refresh itself."
 			}

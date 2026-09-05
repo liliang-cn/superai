@@ -10,6 +10,10 @@ export function AddSchedule(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['AddSchedule'](arg1, arg2, arg3, arg4);
 }
 
+export function AskRemoteAgent(arg1, arg2) {
+  return window['go']['main']['App']['AskRemoteAgent'](arg1, arg2);
+}
+
 export function CLIProxyAccounts() {
   return window['go']['main']['App']['CLIProxyAccounts']();
 }
@@ -56,6 +60,10 @@ export function ChatHistory(arg1) {
 
 export function ChatSessions() {
   return window['go']['main']['App']['ChatSessions']();
+}
+
+export function CheckRemoteAgents() {
+  return window['go']['main']['App']['CheckRemoteAgents']();
 }
 
 export function Dashboard() {
@@ -178,18 +186,6 @@ export function PendingToolApprovals() {
   return window['go']['main']['App']['PendingToolApprovals']();
 }
 
-export function CheckRemoteAgents() {
-  return window['go']['main']['App']['CheckRemoteAgents']();
-}
-
-export function AskRemoteAgent(arg1, arg2) {
-  return window['go']['main']['App']['AskRemoteAgent'](arg1, arg2);
-}
-
-export function RemoteAgentNames() {
-  return window['go']['main']['App']['RemoteAgentNames']();
-}
-
 export function PetStage(arg1, arg2) {
   return window['go']['main']['App']['PetStage'](arg1, arg2);
 }
@@ -216,6 +212,10 @@ export function ReadWorkspaceFileDataURL(arg1) {
 
 export function RefreshDashboard(arg1) {
   return window['go']['main']['App']['RefreshDashboard'](arg1);
+}
+
+export function RemoteAgentNames() {
+  return window['go']['main']['App']['RemoteAgentNames']();
 }
 
 export function RemoveMCPServer(arg1) {

@@ -238,6 +238,98 @@ func (s *Service) SaveDashboard(name, source, prompt string) (Dashboard, error) 
 	return d, s.dashboards.save()
 }
 
+// ReplaceDashboard overwrites a dashboard's contents in place.
+//
+// The board keeps its id, the day it was made, and its schedule — everything
+// about it that other things point at. Only what it shows and the question
+// behind it change.
+//
+// This exists because "改一下这个看板" was, until it did, a save: dashboard_save
+// could only append, so every round of improving a board left the last version
+// beside it. Three rows called 资产管理 with three slightly different prompts is
+// not a history, it is a mess with no way to tell which one is current.
+func (s *Service) ReplaceDashboard(id, name, source, prompt string) (Dashboard, error) {
+	if s == nil || s.dashboards == nil {
+		return Dashboard{}, errors.New("dashboard store is unavailable")
+	}
+	source = strings.TrimSpace(source)
+	if source == "" {
+		return Dashboard{}, errors.New("nothing to save")
+	}
+	name, prompt = strings.TrimSpace(name), strings.TrimSpace(prompt)
+	return s.dashboards.update(id, func(d *Dashboard) {
+		if name != "" {
+			d.Name = name
+		}
+		d.Source = source
+		// An empty prompt does not erase the one that is there. A save that
+		// forgot to repeat the question would otherwise turn a board that
+		// refreshes itself into one that never can again.
+		if prompt != "" {
+			d.Prompt = prompt
+		}
+		d.RefreshedAt = time.Now()
+		d.LastError = ""
+	})
+}
+
+// DashboardsNamed returns every dashboard carrying a name, case-insensitively.
+//
+// More than one is possible — the store has never stopped it — so this answers
+// with all of them and lets the caller decide. One match is a board being
+// updated; several is an existing mess that must not be silently picked from.
+func (s *Service) DashboardsNamed(name string) []Dashboard {
+	name = strings.ToLower(strings.TrimSpace(name))
+	if s == nil || s.dashboards == nil || name == "" {
+		return nil
+	}
+	var out []Dashboard
+	for _, d := range s.dashboards.list() {
+		if strings.ToLower(strings.TrimSpace(d.Name)) == name {
+			out = append(out, d)
+		}
+	}
+	return out
+}
+
+// dashboardTarget decides which board a save is aimed at.
+//
+// An id is the explicit answer. A name that already exists is the implicit
+// one, and taking it is the whole point: a board is what the user calls it, so
+// asking twice to save 资产管理 means one board that changed, not two that are
+// almost the same. Before this, dashboard_save could only append, and every
+// round of "改一下这个看板" left the previous version sitting beside it.
+//
+// Returns the id to overwrite (empty to create), a sentence for the model
+// about what it did, and a refusal when the answer is genuinely ambiguous.
+func (s *Service) dashboardTarget(name, id string, forceNew bool) (target, note, refuse string) {
+	if id = strings.TrimSpace(id); id != "" {
+		if _, ok := s.Dashboard(id); !ok {
+			return "", "", "no dashboard " + id + "; call dashboard_list for the ids"
+		}
+		return id, "Replaced the board with that id.", ""
+	}
+	if forceNew {
+		return "", "", ""
+	}
+	same := s.DashboardsNamed(name)
+	switch len(same) {
+	case 0:
+		return "", "", ""
+	case 1:
+		return same[0].ID,
+			"A board called " + same[0].Name + " already existed, so this replaced it rather than adding a second.",
+			""
+	default:
+		// Several already share the name. Picking one would be a guess, and
+		// adding another would make the pile worse.
+		return "", "", fmt.Sprintf(
+			"there are already %d dashboards called %q, so it is not clear which to update — "+
+				"pass the id of the one you mean (dashboard_list), or new:true for another",
+			len(same), name)
+	}
+}
+
 // RenameDashboard changes the label only.
 func (s *Service) RenameDashboard(id, name string) error {
 	if s == nil || s.dashboards == nil {
