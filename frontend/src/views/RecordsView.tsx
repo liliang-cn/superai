@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Life } from "../../wailsjs/go/main/App";
 import { backend } from "../../wailsjs/go/models";
 import { AppStatus } from "../lib/types";
@@ -116,6 +116,24 @@ export default function RecordsView({
   // schedules field too, but it is a second answer to the same question and the
   // two drift.
   const [scheduleCount, setScheduleCount] = useState(0);
+  const stripRef = useRef<HTMLDivElement | null>(null);
+  // Whether the strip is scrolled to its right end, which is what takes the
+  // edge fade off. Settings' strip answers the same question the same way; two
+  // strips that scroll should not disagree about how they say so.
+  const [stripAtEnd, setStripAtEnd] = useState(false);
+
+  const syncStripFade = useCallback(() => {
+    const el = stripRef.current;
+    if (!el) return;
+    // Sub-pixel widths make the exact equality unreachable at some zoom levels.
+    setStripAtEnd(el.scrollLeft + el.clientWidth >= el.scrollWidth - 1);
+  }, []);
+
+  useEffect(() => {
+    syncStripFade();
+    window.addEventListener("resize", syncStripFade);
+    return () => window.removeEventListener("resize", syncStripFade);
+  }, [syncStripFade]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -133,6 +151,25 @@ export default function RecordsView({
   useEffect(() => {
     load();
   }, [load]);
+
+  // Four tabs carrying count badges measure about 570px; a phone window is 390.
+  // The strip scrolls sideways rather than wrapping (see styles.css), which
+  // means the active tab can be sitting off the right edge — on first paint, or
+  // after anything that changes the tab without a tap. Scrolled by hand rather
+  // than with scrollIntoView: that walks up to *every* scrollable ancestor, so
+  // bringing a tab into view would also drag the run list underneath it.
+  useEffect(() => {
+    const strip = stripRef.current;
+    const active = strip?.querySelector<HTMLElement>(".tab.active");
+    if (!strip || !active) return;
+    const box = strip.getBoundingClientRect();
+    const it = active.getBoundingClientRect();
+    // 24px so the tab lands clear of the strip's own inset rather than flush
+    // against it, which reads as clipped.
+    if (it.left < box.left) strip.scrollLeft -= box.left - it.left + 24;
+    else if (it.right > box.right) strip.scrollLeft += it.right - box.right + 24;
+    syncStripFade();
+  }, [tab, syncStripFade]);
 
   const schedules = Array.isArray(data?.schedules) ? data!.schedules : [];
   const records = Array.isArray(data?.records) ? data!.records : [];
@@ -177,9 +214,20 @@ export default function RecordsView({
         )}
       </div>
 
-      <div className="tabs">
+      <div
+        className={`tabs${stripAtEnd ? " at-end" : ""}`}
+        ref={stripRef}
+        role="tablist"
+        onScroll={syncStripFade}
+      >
         {TABS.map((t) => (
-          <button key={t.key} className={`tab${tab === t.key ? " active" : ""}`} onClick={() => setTab(t.key)}>
+          <button
+            key={t.key}
+            role="tab"
+            aria-selected={tab === t.key}
+            className={`tab${tab === t.key ? " active" : ""}`}
+            onClick={() => setTab(t.key)}
+          >
             {t.icon} {t.label}
             <span className="tab-count">{count[t.key]}</span>
           </button>

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import AvatarSection from "./AvatarSection";
 import { AppStatus } from "../lib/types";
 import {
@@ -548,6 +548,41 @@ export default function SettingsView({
   const [login, setLogin] = useState<{ status: string; provider: string; message: string } | null>(null);
   const [pasted, setPasted] = useState("");
 
+  /**
+   * The tab strip scrolls sideways on a phone — six labels are 518px wide and
+   * the screen is 390. Two things follow from that, and neither is CSS.
+   *
+   * The strip is faded at its right edge to say there is more, and the fade has
+   * to go away at the end of the scroll: a permanent one is decoration, and
+   * decoration that looks like an affordance is worse than none. And a tab
+   * picked from elsewhere — or the one that is active on arrival — has to be
+   * scrolled to, or the strip shows a selection the reader cannot see.
+   */
+  const tabsRef = useRef<HTMLDivElement | null>(null);
+  const activeTabRef = useRef<HTMLButtonElement | null>(null);
+  const [tabsAtEnd, setTabsAtEnd] = useState(false);
+
+  const syncTabsFade = useCallback(() => {
+    const el = tabsRef.current;
+    if (!el) return;
+    // Sub-pixel widths make the exact equality unreachable on some zoom levels.
+    setTabsAtEnd(el.scrollLeft + el.clientWidth >= el.scrollWidth - 1);
+  }, []);
+
+  useEffect(() => {
+    syncTabsFade();
+    window.addEventListener("resize", syncTabsFade);
+    return () => window.removeEventListener("resize", syncTabsFade);
+  }, [syncTabsFade]);
+
+  useEffect(() => {
+    // "nearest" on both axes is a no-op when the tab is already in view, so
+    // this never yanks the page on mount or on a screen wide enough to fit all
+    // six.
+    activeTabRef.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    syncTabsFade();
+  }, [section, syncTabsFade]);
+
   const [webhookTesting, setWebhookTesting] = useState(false);
   const [webhookResult, setWebhookResult] = useState("");
 
@@ -724,12 +759,18 @@ export default function SettingsView({
         <div className="view-title">Settings</div>
         <div className="view-desc">Configure providers and runtime. Saving persists and rebuilds the backend.</div>
       </div>
-      <div className="settings-tabs" role="tablist">
+      <div
+        className={`settings-tabs${tabsAtEnd ? " at-end" : ""}`}
+        role="tablist"
+        ref={tabsRef}
+        onScroll={syncTabsFade}
+      >
         {SECTIONS.map((t) => (
           <button
             key={t.id}
             role="tab"
             aria-selected={section === t.id}
+            ref={section === t.id ? activeTabRef : undefined}
             className={`settings-tab${section === t.id ? " active" : ""}`}
             onClick={() => setSection(t.id)}
           >

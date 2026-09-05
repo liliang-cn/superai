@@ -49,7 +49,13 @@ function RunMeta({ run }: { run: ScheduleRun }) {
     <span className="run-meta">
       {started ? formatStamp(started) : run.startedAt || "just now"}
       {run.durationMs > 0 ? ` · took ${formatDuration(run.durationMs)}` : ""}
-      {run.session !== "" ? ` · ${run.session}` : ""}
+      {/* The session id is the third of three things on a line that has about
+          300px on a phone, and it is the one nobody reads: it is a handle for
+          "Open conversation", which is a button right above it. Marked so the
+          narrow breakpoint can drop it and keep the time and the duration —
+          the two parts that answer "did it run, and did it hang" — on one
+          line instead of wrapping them into a block. */}
+      {run.session !== "" ? <span className="run-session"> · {run.session}</span> : ""}
     </span>
   );
 }

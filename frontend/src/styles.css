@@ -2263,6 +2263,13 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
 .sidebar-scrim { display: none; }
 @media (max-width: 640px) {
   .nav-open { display: grid; margin-right: 2px; }
+  /* The scrim comes back with the handle. It is turned on further up, inside
+     the phone block that shapes the drawer — and then turned off again by the
+     unconditional rule two lines above this one, which is later in the file
+     and wins. The handle was restated here and the scrim was not, so the
+     drawer opened with nothing behind it: no dimming, and no way to close it
+     by tapping the page, because tapping the page is what the scrim is. */
+  .sidebar-scrim { display: block; }
 }
 
 /* ---------------- Safe area ---------------- */
@@ -2825,3 +2832,321 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
 .notif-source { display: inline-flex; align-items: center; gap: 3px; min-width: 0; }
 .notif-source { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .notif-time { margin-left: auto; flex: none; }
+
+/* ---------------- Settings on a phone ---------------- */
+/*
+ * Measured at 390x844. The page missed in three separate places, and none of
+ * them was visible on a desktop window narrowed by hand, because two of the
+ * three are about a thumb rather than about width.
+ *
+ * This block is last in the file on purpose: every rule here restates one that
+ * exists further up, and source order is what settles it.
+ */
+@media (max-width: 640px) {
+  /* The strip was already told to scroll sideways rather than wrap. What it
+     was never given is a reason to believe that: a scroll container with the
+     scrollbar hidden, whose last visible label ends flush against the screen
+     edge, is indistinguishable from a strip that has simply been cut off — and
+     six tabs are 518px against a 390px screen, so two of them are always past
+     the edge. The fade is the difference between a cut and a scroll.
+
+     It is taken off at the end of the travel from a class the view sets. A
+     fade that never goes away is decoration, and decoration shaped like an
+     affordance is worse than none: it would promise a seventh tab forever. */
+  .settings-tabs {
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
+    /* A tab parked under the fade is a tab that cannot be read, so the strip
+       keeps an empty lane past the last one. scroll-padding is the same
+       reservation for scrollIntoView, which the view calls when the section
+       changes from somewhere other than a tap on the strip. */
+    padding-right: 32px;
+    scroll-padding-inline: 18px 32px;
+  }
+  .settings-tabs.at-end {
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+  /* "External agents" is two words, and a tab allowed to break between them
+     puts a second line inside the strip — which is the wrapped, three-rank
+     strip the scrolling was meant to avoid, arrived at from the other side. */
+  .settings-tab {
+    flex: none;
+    white-space: nowrap;
+  }
+
+  /* 44px is the size this file settled on everywhere else, and the fields were
+     the family it never reached: .input is 40px — 16px of text, the size iOS
+     needs to not zoom, inside 9px of padding built for a cursor. Four pixels
+     short is enough to miss, and these are the controls the page exists for.
+
+     Scoped to the settings scroller rather than to .input: the same class is
+     the dashboard's taskbar and the reactor's knobs, which are laid out to
+     their own grid and are not this page's to resize. */
+  .settings-scroll .input,
+  .settings-scroll select,
+  .settings-scroll textarea {
+    min-height: 44px;
+  }
+  /* The reveal button is 44px tall and at least 44 wide now, and 44px of
+     button does not fit the 42px lane the field was reserving for it — the
+     value would run underneath it. 72px is the widest that lane ever has to
+     be: "submit", the label this button wears while finishing a sign-in. */
+  .settings-scroll .input-pw .input { padding-right: 72px; }
+  .settings-scroll .pw-toggle { min-height: 44px; min-width: 44px; }
+
+  /* Save sat at the foot of a form six cards long. The page exists to change
+     something and save it, so every use of it ended in scrolling back down
+     past everything just changed to find the one button that commits it. It
+     rides the bottom of the scroller instead — sticky, not fixed, so on a
+     short section it stays where it belongs in the flow instead of floating
+     over a half-empty screen. */
+  .settings-actions {
+    position: sticky;
+    bottom: 0;
+    flex-wrap: wrap;
+    /* The scroller's own 24px gutters, handed back, so the bar reaches both
+       edges. A bar that stops short shows page through the gap and reads as a
+       floating card rather than the floor of the screen. */
+    margin-inline: -24px;
+    padding: 12px 24px;
+    padding-inline: max(24px, env(safe-area-inset-left, 0px)) max(24px, env(safe-area-inset-right, 0px));
+    padding-bottom: max(12px, env(safe-area-inset-bottom, 0px));
+    /* Opaque: cards pass underneath it, and --bg-0 is what the scroller sits
+       on, so the bar reads as the page ending rather than as a panel. */
+    background: var(--bg-0);
+    border-top: 1px solid var(--border);
+  }
+  /* The bar supplies the bottom spacing now. Left in place, the scroller's own
+     40px would strand the pinned bar 40px above the end of the travel, with a
+     band of empty page below it that nothing can be scrolled into. */
+  .settings-scroll { padding-bottom: 0; }
+  /* One bar, one button, one thumb — and at 390px there is no second thing to
+     put beside it. */
+  .settings-actions .btn { flex: 1 1 auto; }
+
+  /* Runtime's Max Rounds and Avatar Port are the same two-up that External
+     agents' overrides already lost: two number fields sharing 290px of card
+     leave each one about six digits wide, and both hold ports and counts that
+     are four or five. Stacked, each is a full-width 44px target. */
+  .row2 { grid-template-columns: 1fr; }
+
+  /* One audit line is four columns of monospace on a single unbreakable row.
+     The command is allowed to ellipsise and does, but the tool name and the
+     decider are not, so a long tool name pushes the decider off the card
+     instead. Let the row take a second line rather than lose its right end. */
+  .audit-row { flex-wrap: wrap; }
+}
+
+/* ---------------- Records at 390px ---------------- */
+/*
+ * Measured on a 390x844 window, tab strip and cards.
+ *
+ * The tab strip was never broken. The rule that looks like it failed —
+ * `.vh-actions, .tabs { flex-wrap: wrap }` — is overridden further down,
+ * inside `@media (max-width: 640px)`, by `.settings-tabs, .tabs {
+ * flex-wrap: nowrap; overflow-x: auto }`. That was deliberate and it stays:
+ * four tabs carrying count badges measure about 573px, and wrapped they put
+ * "Reminders" alone on a second row, which reads as a separate thing rather
+ * than the last of four. So a tab whose right edge reads 549 in a 390px window
+ * is a tab inside a scroller nobody has scrolled — not a page that overflows.
+ *
+ * `.tabs` and `.tab` are Records' alone; Settings has its own `.settings-tab*`
+ * pair. Nothing below reaches another page.
+ *
+ * What was actually missing is everything that makes such a strip usable, and
+ * then the record cards underneath it.
+ */
+@media (max-width: 640px) {
+  /* WebKit — the whole of the Wails build on macOS, and Safari on the phone —
+     leaves a scroll container's end padding out of the scrollable area, so the
+     last tab ends flush against the right edge and reads as clipped rather
+     than as the end of the list. A zero-content flex item is padding that
+     every engine agrees is content. The container's own right padding goes, or
+     Chrome pays for the inset twice. */
+  .tabs { padding-right: 0; }
+  .tabs::after { content: ""; flex: none; width: 24px; }
+  /* And the same fade Settings' strip gets, for the same reason: with the
+     scrollbar hidden, a label that ends flush against the screen edge is
+     indistinguishable from one that has been cut off. Four tabs are ~570px
+     against 390, so the last is always past the edge. Off at the end of the
+     travel, from a class the view sets — a fade that never goes away promises
+     a fifth tab forever. */
+  .tabs {
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
+  }
+  .tabs.at-end {
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+
+  /* A swipe that runs off the end of the strip must not become a swipe on the
+     page behind it — on iOS that is the back gesture, and losing the page
+     because you flicked a tab strip too hard is not a thing to debug twice. */
+  .tabs { overscroll-behavior-x: contain; }
+
+  /* Each tab is one line. `flex: none` already sizes a button to its content,
+     so this never fires today — it is here so that a two-word tab, or a count
+     that reaches three digits, cannot quietly turn one row into two inside a
+     strip whose whole design is that it has exactly one row. */
+  .tab, .tab .tab-count { white-space: nowrap; }
+
+  /* --- Record cards --- */
+
+  /* A labelled row is 86px of label plus an 8px gap against a card 308px wide,
+     which leaves 214px for the value — and these values are timestamps with a
+     relative reading after them ("Fri, Sep 5, 08:00 AM · in 14 hours", 205px
+     at 12.5px), so every one of them landed a word short and broke in two,
+     with the second half indented under nothing. Stacked, the label is a
+     heading and the value gets the whole card. Rows that hold a single span —
+     a run's meta line, a run's error — are one column either way, so they are
+     untouched by this. */
+  .record-card .rc-row { flex-direction: column; gap: 2px; }
+  .record-card .rc-key { min-width: 0; }
+
+  /* A run's title row is the schedule row's title row under a different label
+     class: `.sched-name` there, `.rt-prompt` here. The rule that gives the
+     name a line of its own only ever knew the first name, so a run's prompt
+     kept sharing a nowrap row with "Open conversation" and "Details" and lost
+     it — about 80px of ellipsis against 216px of buttons.
+
+     And once it has the line, it may as well say something: truncated to 80
+     characters the prompt is still ~500px of text, so at 308px a single line
+     showed roughly half of it. Two lines shows all of it, and a run you cannot
+     identify from its card is a run you have to open to identify. Clamped the
+     same way `.rt-body` below it already is. The toast's own `.rt-prompt` is
+     not inside an `.rc-title`, so it keeps its single ellipsised line. */
+  .rc-title .rt-prompt {
+    flex: 1 1 100%;
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* Once the buttons have a line to themselves they still have to fit on it.
+     Three of them do — Run now / Pause / Delete is 262px inside a 308px card —
+     right up until Delete is armed and relabels itself "Click again to
+     delete". That row is 340px, and `flex: none` means it does not shrink, it
+     overflows the card. Allowed to wrap, kept right-aligned so it still reads
+     as the card's action corner rather than a second list. */
+  .rc-title .sched-actions {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    margin-left: 0;
+    row-gap: 6px;
+  }
+
+  /* The meta line reads "Fri, Sep 5, 02:31 PM · took 3.2s · 20260905-143120" —
+     about 265px at 11px, in a card that has 308. It fits, and then a session
+     id one character longer wraps the whole line so that the second row says
+     nothing but the id. The id is the part to drop: it is a handle for the
+     "Open conversation" button directly above it, and "Details" prints it in
+     full. What is left is the time and the duration — the two halves of "did
+     it run, and did it hang" — on one line. */
+  .run-session { display: none; }
+
+  /* The Details modal is opened from a run card and is the last thing in this
+     flow still built for a cursor. Its head does not wrap, so at a 310px modal
+     the title and the Copy / Open conversation / × group fight over 274px and
+     the title, being the one that can ellipsise, loses all of it. The title
+     takes the first line; the buttons take the second. */
+  .modal-head { flex-wrap: wrap; row-gap: 8px; }
+  .modal-title { flex: 1 1 100%; }
+  /* 26px tall, and the one control here a thumb has to hit precisely. */
+  .modal-close { min-width: 44px; min-height: 44px; }
+
+  /* 40px of overlay down each side is a fifth of a 390px window spent on
+     nothing. Every modal in this app is read-and-dismiss, so it gets the room
+     instead. .nd-modal caps itself at 100vw - 32px and still fits inside. */
+  .modal-overlay { padding: 12px; }
+  .modal { max-height: 88vh; }
+}
+
+/* The meta line is a flex child of `.rc-row`, and a flex child with no floor
+   sets the row's minimum from its own content: one session id without a hyphen
+   in it and the card is wider than the panel. `anywhere` rather than
+   `break-all` for the same reason as the control room's stat text — break-all
+   splits a token that has perfectly good break points of its own, and
+   "20260905-143120" is exactly such a token. Not inside the media query: a
+   card is narrow whenever the window is, not only on a phone. */
+.run-meta { min-width: 0; overflow-wrap: anywhere; }
+
+/* ---------------- Touch, corrected: the status strip and the task bar ------ */
+/*
+ * The "Touch, corrected" pass added `min-width: 44px` to .theme-toggle,
+ * .panel-toggle.inline and .composer button, and stopped there. The status
+ * bar's own icon pills — the avatar, YOLO, the bell — are the same shape and
+ * were left out, so they kept only `width: 44px`.
+ *
+ * `width` on a flex item is a basis, not a floor. .status-pills is a flex row
+ * and nothing in it declares flex-shrink, so on a 390px screen — where
+ * .status-main can carry a 60-character error string beside the drawer handle
+ * — the browser compresses those pills toward their min-content. Measured:
+ * 37.86px wide, 44 tall, because height is the cross axis and is not squeezed.
+ * .theme-toggle survived at 44 for the single reason that min-width is a floor
+ * shrinking cannot cross. So the pills get the same floor.
+ *
+ * .notif is a second stage of the same thing: it wraps the bell in its own
+ * inline-flex, and a wrapper is only as wide as its min-content, so the bell
+ * shrinking dragged the wrapper down with it. Pinning the bell fixes both, but
+ * the wrapper says flex: none too, so a future control added beside it cannot
+ * reintroduce the bug.
+ */
+@media (max-width: 640px) {
+  .statusbar .pill-btn.icon-only { min-width: 44px; flex: none; }
+  .statusbar .notif, .statusbar .theme-picker { flex: none; }
+
+  /* ---- Stats: the task bar ----
+   * Every control in .cr-taskbar is styled through a two-class selector
+   * (.cr-taskbar .input, .cr-knob input), which outranks the blanket phone
+   * rules on bare `input`/`select` no matter how late those come in the file.
+   * That is why this row alone stayed at cursor size after the sweep: the goal
+   * field measured 296x34, the three number knobs 56x32, and the unattended
+   * checkbox 14x14 — a third of a fingertip.
+   *
+   * The 16px font is not a preference either. Anything under it makes iOS zoom
+   * the page on focus, and zooming is disabled here, so the page just stays
+   * magnified with no way back. The 12px monospace was inheriting that bug
+   * through the same specificity.
+   */
+  .cr-taskbar .input, .cr-taskbar select, .cr-knob input[type="number"] {
+    min-height: 44px;
+    font-size: 16px;
+    box-sizing: border-box;
+  }
+  /* A number field that shrinks is a number field you cannot hit. 64px rather
+     than the desktop's 56: the digits are 16px now, not 12. Typed to the
+     number fields: .cr-knob also wraps the unattended checkbox, and a 64px
+     floor on that one stretches the box instead of enlarging the target. */
+  .cr-knob input[type="number"] { width: 64px; min-width: 64px; flex: none; }
+  /* The goal field is the point of the row, so it keeps the full width and the
+     knobs wrap under it rather than squeezing it. */
+  .cr-taskbar .input { flex: 1 1 100%; min-width: 0; }
+  .cr-taskbar select { max-width: 100%; }
+
+  /* The checkbox was 14px square — a third of a fingertip. The .tp-swatch
+     method does not transfer to it: that one is a button, and this is a native
+     control with appearance: auto, which makes the engine drop padding and
+     box-sizing on the floor. Setting 44px square on the input itself does not
+     enlarge a target, it stretches a checkbox — measured 64x44, a rectangle
+     with a tick in it.
+
+     The label is the target. It already toggles the box (the input is its
+     child), so giving the label the height and the room costs nothing and the
+     box keeps looking like a box. 18px rather than 14 because the label is now
+     44 tall and a 14px box floating in it reads as unrelated to its own
+     words. */
+  .cr-check {
+    min-height: 44px;
+    gap: 8px;
+    padding-inline: 4px;
+  }
+  .cr-check input[type="checkbox"] {
+    width: 18px; height: 18px;
+    flex: none;
+  }
+}
