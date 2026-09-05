@@ -146,10 +146,20 @@ func NewService(s *Settings) (*Service, error) {
 
 	// --- Config / home layout. ---
 	cfg := &config.Config{Home: DataDir()}
-	// The whole catalogue goes straight into the schema, superleo-style: no
-	// discovery layer, no search tool. Burning rounds on tool search cost more
-	// benchmark tasks than a large schema ever did.
-	cfg.Tooling.DisableToolSearch = true
+	// Discovery, now that being deferred no longer means being invisible.
+	//
+	// This used to be off — the whole catalogue went straight into the schema —
+	// because tool search cost more benchmark tasks than a large schema ever
+	// did. That was true of a search the model had to guess at: nothing told it
+	// what was behind the search tool, so it either shopped blindly or reported
+	// a capability as missing. agent-go now carries a one-line index of
+	// everything held back, so looking a tool up is reading a list rather than
+	// guessing, and the old objection no longer applies.
+	//
+	// What it buys: measured on this install, the schema was 124KB of which
+	// 94KB was the knowledge and graph surface — about 23k tokens on every
+	// turn, for tools an ordinary conversation never calls.
+	cfg.Tooling.DeferTools = deferredToolPatterns
 	// Memory backend: local by default, or the shared CortexDB brain when the
 	// user picked it and an endpoint is known. The shared backend is a remote
 	// store, so the local embedder plays no part in it — the server owns the
@@ -1134,4 +1144,35 @@ func (s *Service) Plan(ctx context.Context, taskID string) []agent.PlanItem {
 		return nil
 	}
 	return items
+}
+
+// deferredToolPatterns are the tools this app keeps behind the index rather
+// than in every turn's schema.
+//
+// The rule is how often a conversation actually calls one. Saving a memory or
+// searching for one happens in ordinary chat, so those four stay in the
+// schema. Rebuilding an ontology, validating SHACL, resolving an object set or
+// repairing a vector dimension does not — those are things the user asks for
+// by name, at which point one search makes them callable for the rest of the
+// conversation.
+//
+// Prefix patterns, so "knowledge_graph_*" holds back the graph surface while
+// knowledge_search and knowledge_save stay where they are.
+var deferredToolPatterns = []string{
+	// The knowledge graph, its ontology, and everything that reasons over it.
+	"knowledge_graph_*", "knowledge_memory_*", "ontology_*", "side_graph_*",
+	"apply_inference", "build_context", "expand_graph", "extract_conversation",
+	"fact_provenance", "uncited_facts", "object_set_resolve", "vector_dimension_repair",
+	"upsert_entities", "upsert_relations", "delete_entities", "delete_document_graph",
+	"ingest_document", "get_chunks", "get_nodes", "find_nodes", "graph_list_all",
+	"render_graph_html", "serve_graph_3d",
+	// Retrieval variants. The plain search stays; the specialised ones are
+	// asked for by name.
+	"cortex_query", "search_graphrag_*", "search_chunks_*", "search_text",
+	// The rarely used half of the two stores. Kept eager: memory_search,
+	// memory_save, knowledge_search, knowledge_save.
+	"knowledge_update", "knowledge_delete", "knowledge_get",
+	"memory_update", "memory_delete", "memory_get", "memory_list_all",
+	// Only live during an import, which is a thing the user starts.
+	"importflow_*", "connector_*",
 }
