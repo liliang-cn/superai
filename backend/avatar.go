@@ -31,8 +31,8 @@ var avatarSprites embed.FS
 //   - "emotion" — Emotion is one of neutral|happy|sad|thinking|excited|...
 //   - "speech"  — Text carries the spoken/streamed text
 //   - "point"   — the character is sent somewhere. Spot names a landmark on
-//                 the surface it is drawn on ("composer", "send"…), or is
-//                 empty for anywhere; Text, if set, is said on arrival.
+//     the surface it is drawn on ("composer", "send"…), or is
+//     empty for anywhere; Text, if set, is said on arrival.
 //
 // A renderer that does not know about "point" keeps working: it is one more
 // message on a stream it already ignores unknown types on.

@@ -26,13 +26,13 @@ type App struct {
 	settings *backend.Settings
 	avatar   backend.AvatarDriver
 	// What the window last said the character is standing on. See app_pet.go.
-	pet      petState
+	pet petState
 	// Asking agents on other machines. Built on first use and dropped when the
 	// settings change; see app_remote.go.
 	remoteOnce sync.Once
 	remote     *backend.RemoteRunner
-	sse      *backend.SSEServer
-	proxy    *backend.CLIProxy
+	sse        *backend.SSEServer
+	proxy      *backend.CLIProxy
 
 	// loginCh is non-nil while a provider login is waiting for the user; it
 	// carries the manually pasted callback URL.

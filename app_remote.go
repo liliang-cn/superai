@@ -11,7 +11,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/liliang-cn/agent-go/v3/pkg/agent"
-	"github.com/liliang-cn/agent-go/v3/pkg/agent/cliagents"
+	"github.com/liliang-cn/agentexec"
 	"github.com/liliang-cn/superai-desktop/backend"
 )
 
@@ -103,14 +103,14 @@ func addressedTo(msg string, known func(string) bool) (agentName, rest string, o
 // localAgentNames is the CLI agents installed on this machine, when the
 // external-agents setting is on. Discovery probes each binary, so the answer
 // is what can actually be started rather than what a list once claimed.
-func (a *App) localAgentNames() []cliagents.Agent {
+func (a *App) localAgentNames() []agentexec.Installed {
 	a.mu.Lock()
 	s := a.settings
 	a.mu.Unlock()
 	if s == nil || !s.ExternalAgents.Enabled {
 		return nil
 	}
-	return cliagents.Discover(s.ExternalAgents.Binaries)
+	return agentexec.Discover(s.ExternalAgents.Binaries)
 }
 
 // addressable reports whether a name can be reached at all, either way.
