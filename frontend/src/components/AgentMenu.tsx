@@ -50,14 +50,22 @@ export function AgentMenu({
   );
 }
 
-/** Shown when the message would be routed rather than answered here. */
+/**
+ * Shown when the message would be routed rather than answered here.
+ *
+ * It used to say SuperAI would never see the exchange, which was true and is
+ * not any more: the question and the answer are filed in this conversation, so
+ * a later turn can refer to what the other agent said. What is still true — and
+ * the only thing worth warning about before Enter — is that this turn skips
+ * SuperAI's own model entirely.
+ */
 export function AddressedBanner({ agent }: { agent: string }) {
   if (!agent) return null;
   return (
     <div className="agent-addressed">
       <SendHorizontalIcon className="size-3.5" />
       <span>
-        going straight to <b>@{agent}</b> — SuperAI will not see this one
+        going straight to <b>@{agent}</b> — SuperAI does not answer this one, but keeps it
       </span>
     </div>
   );

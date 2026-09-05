@@ -670,7 +670,7 @@ func (a *App) SendChat(sessionID, message string, imagePaths []string) string {
 	// unconfigured LLM is no reason not to forward a question to a machine that
 	// has one.
 	if name, rest, ok := addressedTo(message, a.addressable); ok {
-		a.routeToRemote(requestID, name, rest)
+		a.routeToRemote(requestID, sessionID, name, rest)
 		return requestID
 	}
 

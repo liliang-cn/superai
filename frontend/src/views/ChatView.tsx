@@ -221,6 +221,10 @@ export default function ChatView({
                   autoScrollKey={messages
                     .map((m) => `${m.content}#${m.progress?.length ?? 0}`)
                     .join("|")}
+                  // Opening a different conversation is an arrival, not a
+                  // message arriving: land at the bottom rather than gliding
+                  // there from the top.
+                  jumpKey={chat.sessionId}
                 >
                   {messages.map((m, mi) =>
                     m.kind === "context" ? (

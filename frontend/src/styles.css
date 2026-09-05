@@ -752,6 +752,11 @@ input, textarea, select { font-family: inherit; }
 .btn.ghost { background: var(--bg-3); color: var(--text-0); border: 1px solid var(--border-strong); }
 .btn.ghost:hover:not(:disabled) { background: var(--bg-hover); }
 .btn.sm { padding: 6px 12px; font-size: 12.5px; }
+/* The button on the destructive side of a confirmation. Filled rather than
+   outlined: it is the one being asked about, and a pair where neither is the
+   answer makes the reader work out which is which. */
+.btn.danger { background: var(--red); color: #fff; }
+.btn.danger:hover:not(:disabled) { filter: brightness(1.08); }
 
 /* An icon standing in for a control that used to hold a whole row. Square, so
    a row of them reads as a toolbar rather than as buttons of assorted widths;
@@ -996,9 +1001,6 @@ input, textarea, select { font-family: inherit; }
 }
 .history-title { font-size: 13px; font-weight: 500; }
 .history-meta { font-size: 11px; color: var(--text-3); }
-.history-row { display: flex; align-items: stretch; gap: 6px; }
-.history-row .history-item { flex: 1; }
-.history-delete { align-self: center; flex: none; }
 
 /* A history row is the conversation button plus its delete affordance. */
 .history-row {
@@ -1014,8 +1016,24 @@ input, textarea, select { font-family: inherit; }
   padding: 10px 12px; border-radius: var(--radius-sm);
 }
 .history-row .history-title { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.history-del { align-self: center; margin-right: 6px; opacity: 0; }
-.history-row:hover .history-del { opacity: 1; }
+/* The delete button used to be an icon with a 6px margin and nothing else, so
+   it sat against the card's right edge — and `.panel-toggle.inline`, which it
+   also carries, pulls it 4px further with a negative margin: measured, its
+   right edge was 3px *outside* the row. Two classes here, because that is what
+   it takes to outrank `.panel-toggle.inline`; a single `.history-del` loses on
+   specificity and the negative margin survives.
+
+   It now sits at the item's own 12px inset and is a 32px square, so it reads
+   as part of the row and is worth aiming at. */
+.history-row .history-del {
+  align-self: center; flex: none;
+  width: 32px; height: 32px; margin: 0 10px 0 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: var(--radius-sm);
+  opacity: 0;
+}
+.history-row:hover .history-del, .history-row .history-del:focus-visible { opacity: 1; }
+.history-row .history-del:hover { background: var(--bg-2); }
 
 /* ---------------- Files a conversation produced ---------------- */
 .deliv-bar {
@@ -1916,7 +1934,7 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
   transform: translateX(-50%) rotate(calc(-1 * var(--pet-spin, 0deg)));
   max-width: 240px; width: max-content;
   padding: 5px 9px; border-radius: 9px;
-  background: var(--panel); color: var(--text);
+  background: var(--bg-2); color: var(--text-0);
   border: 1px solid var(--border); box-shadow: 0 6px 18px rgba(0,0,0,.28);
   font-size: 12px; line-height: 1.35; text-align: center;
   pointer-events: none;
@@ -2604,13 +2622,13 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
 .agent-menu {
   position: absolute; left: 24px; right: 24px; bottom: 100%;
   z-index: 30; max-height: 260px; overflow-y: auto;
-  background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  background: var(--bg-2); border: 1px solid var(--border); border-radius: 10px;
   box-shadow: 0 12px 32px rgba(0, 0, 0, .28); padding: 4px;
 }
 .agent-opt {
   display: grid; grid-template-columns: auto 1fr; align-items: baseline; gap: 8px;
   width: 100%; text-align: left; font: inherit; padding: 6px 8px; border: 0;
-  border-radius: 7px; background: transparent; color: var(--text); cursor: pointer;
+  border-radius: 7px; background: transparent; color: var(--text-0); cursor: pointer;
 }
 .agent-opt:hover, .agent-opt.active { background: var(--accent-soft); }
 .agent-name { font-family: var(--cr-mono, ui-monospace, Menlo, monospace); font-size: 12.5px; font-weight: 600; color: var(--accent-hover); }
@@ -2639,7 +2657,7 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
 .agents-row {
   display: flex; flex-direction: column; gap: 3px; width: 100%; text-align: left;
   font: inherit; padding: 8px 9px; border: 1px solid transparent; border-radius: 9px;
-  background: transparent; color: var(--text); cursor: pointer;
+  background: transparent; color: var(--text-0); cursor: pointer;
 }
 .agents-row:hover { background: var(--accent-soft); border-color: var(--accent-border); }
 .agents-head { display: flex; align-items: center; gap: 6px; }
@@ -2685,3 +2703,52 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
   .cr-panel-h { flex-wrap: wrap; row-gap: 4px; }
   .cr-tag { margin-left: auto; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 }
+
+/* The delete confirmation, anchored to the row it is about.
+ *
+ * A popover rather than the second click the row used to take: that asked for
+ * confirmation only in a tooltip and a colour change, which is to say it asked
+ * nobody. Anchored to the row rather than centred on the window because in a
+ * list of near-identical titles, which one is about to go is the whole
+ * question. */
+.history-row { position: relative; }
+.history-confirm {
+  position: absolute; right: 8px; top: calc(100% - 4px); z-index: 50;
+  min-width: 244px; max-width: min(320px, calc(100vw - 48px));
+  padding: 12px 14px 10px;
+  background: var(--bg-2); border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm); box-shadow: 0 14px 34px rgba(0, 0, 0, .3);
+  text-align: left; cursor: default;
+  animation: history-confirm-in .12s ease-out;
+}
+@keyframes history-confirm-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+.history-confirm-q { font-size: 13px; font-weight: 600; color: var(--text-0); }
+/* The title is why this popover is anchored; it must not be the thing that
+   makes it a different width from the last one. */
+.history-confirm-t {
+  margin-top: 3px; font-size: 11.5px; color: var(--text-2);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.history-confirm-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+
+/* The transcript, plus the two jumps laid over it.
+ *
+ * The buttons cannot live inside the scrolling element — they would scroll
+ * away with the content — so the scroll box gets a wrapper and they sit on
+ * top of it. */
+.conv-wrap { position: relative; flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.conv-jump {
+  position: absolute; right: 20px; bottom: 18px; z-index: 20;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.conv-jump-btn {
+  width: 34px; height: 34px; display: grid; place-items: center;
+  border-radius: 10px; border: 1px solid var(--border-strong);
+  background: var(--bg-2); color: var(--text-1);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .22);
+  transition: background .12s, color .12s;
+}
+.conv-jump-btn:hover { background: var(--bg-hover); color: var(--text-0); }

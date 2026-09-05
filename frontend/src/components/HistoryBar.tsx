@@ -9,6 +9,7 @@ import {
 import { ChatSessions, DeleteChatSession } from "../../wailsjs/go/main/App";
 import { backend } from "../../wailsjs/go/models";
 import { copyText } from "../lib/format";
+import { toast } from "../lib/toasts";
 
 export interface HistoryController {
   /** Non-null while the list is open (null = transcript is showing). */
@@ -127,8 +128,48 @@ export function HistoryList({
   onPick: (id: string) => void;
 }) {
   const { sessions, loading } = history;
-  // Deleting is permanent, so it takes a second click on the same row.
+  // Deleting is permanent, so it is asked about. The row being asked about,
+  // and the one whose delete is in flight — separate, because the answer to
+  // "are you sure" and "is it gone yet" are two different things to draw.
   const [confirming, setConfirming] = useState("");
+  const [deleting, setDeleting] = useState("");
+
+  // Escape backs out, and so does a click anywhere that is not the popconfirm.
+  // A confirmation the pointer has wandered away from should not still be
+  // armed when it comes back — the next click could be meant for the row
+  // underneath it.
+  useEffect(() => {
+    if (!confirming) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setConfirming("");
+    };
+    const onDown = (e: MouseEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (!el?.closest(".history-confirm, .history-del")) setConfirming("");
+    };
+    window.addEventListener("keydown", onKey);
+    // Capture, so a click that lands on some other handler still closes this.
+    window.addEventListener("mousedown", onDown, true);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("mousedown", onDown, true);
+    };
+  }, [confirming]);
+
+  const remove = (h: backend.ChatSessionInfo) => {
+    setConfirming("");
+    setDeleting(h.id);
+    DeleteChatSession(h.id)
+      .then(() => {
+        history.refresh();
+        // Named, because a list of near-identical rows gives no other way to
+        // tell which one went.
+        toast.success(`Deleted “${h.title}”`);
+      })
+      .catch((e: unknown) => toast.error(`Could not delete it: ${String(e)}`))
+      .finally(() => setDeleting(""));
+  };
+
   if (!sessions) return null;
   return (
     <div className="history-list">
@@ -162,19 +203,13 @@ export function HistoryList({
             </button>
             <button
               className="panel-toggle inline history-del"
-              title={
-                confirming === h.id
-                  ? "Click again to delete"
-                  : "Delete this conversation"
-              }
+              title="Delete this conversation"
+              aria-haspopup="dialog"
+              aria-expanded={confirming === h.id}
+              disabled={deleting === h.id}
               onClick={(e) => {
                 e.stopPropagation();
-                if (confirming !== h.id) {
-                  setConfirming(h.id);
-                  return;
-                }
-                setConfirming("");
-                DeleteChatSession(h.id).then(() => history.refresh());
+                setConfirming((prev) => (prev === h.id ? "" : h.id));
               }}
             >
               <Trash2Icon
@@ -183,6 +218,28 @@ export function HistoryList({
                 }
               />
             </button>
+            {confirming === h.id && (
+              <div
+                className="history-confirm"
+                role="dialog"
+                aria-label="Delete this conversation?"
+                // The row underneath is a button that opens the conversation;
+                // a click meant for Cancel must not also open what it was
+                // about to delete.
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="history-confirm-q">Delete this conversation?</div>
+                <div className="history-confirm-t">{h.title}</div>
+                <div className="history-confirm-actions">
+                  <button className="btn ghost sm" onClick={() => setConfirming("")}>
+                    Cancel
+                  </button>
+                  <button className="btn danger sm" autoFocus onClick={() => remove(h)}>
+                    Delete
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         ))
       )}

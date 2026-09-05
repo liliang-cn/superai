@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"strings"
 	"sync"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/liliang-cn/agent-go/v3/pkg/agent"
+	"github.com/liliang-cn/agent-go/v3/pkg/domain"
 	"github.com/liliang-cn/agentexec"
 	"github.com/liliang-cn/superai-desktop/backend"
 )
@@ -334,7 +336,15 @@ func (a *App) registerRemoteTools(svc *backend.Service, cfg backend.RemoteAgents
 // history, the toast on failure, the request-id plumbing that lets Stop work)
 // already understands those. A fourth event kind would mean teaching all of it
 // about a case that differs only in who answered.
-func (a *App) routeToRemote(requestID, name, prompt string) {
+//
+// The exchange is then written into the conversation. It first was not, on the
+// reasoning that another agent's words should not be filed under SuperAI's
+// name — but the reply carries its own attribution, and leaving it out meant
+// the answer existed on screen and nowhere else: the next turn could not refer
+// to what @hermes had just said, and reopening the conversation showed a gap
+// where the question had been. Being addressed to someone else is not the same
+// as not having happened.
+func (a *App) routeToRemote(requestID, sessionID, name, prompt string) {
 	ctx, cancel := context.WithTimeout(context.Background(), a.routedTimeout(name))
 	a.trackRun(requestID, cancel)
 
@@ -372,14 +382,46 @@ func (a *App) routeToRemote(requestID, name, prompt string) {
 			})
 			return
 		}
-		a.emit("chat:done", map[string]any{
-			"requestId": requestID,
-			// Attributed in the reply itself. The answer is not this app's and
-			// a transcript that presented it unmarked would be putting another
-			// agent's words in SuperAI's mouth.
-			"final": fmt.Sprintf("**@%s** · %s · %.1fs\n\n%s", res.Agent, res.Host, float64(res.MS)/1000, res.Text),
-		})
+		// Attributed in the reply itself. The answer is not this app's and a
+		// transcript that presented it unmarked would be putting another
+		// agent's words in SuperAI's mouth.
+		reply := fmt.Sprintf("**@%s** · %s · %.1fs\n\n%s", res.Agent, res.Host, float64(res.MS)/1000, res.Text)
+		a.recordRoutedExchange(sessionID, name, prompt, reply)
+		a.emit("chat:done", map[string]any{"requestId": requestID, "final": reply})
 	}()
+}
+
+// recordRoutedExchange files an addressed question and its answer in the
+// conversation they happened in.
+//
+// The question goes in as the person typed it, @ and all: a later turn reading
+// the history has to be able to tell that this was addressed elsewhere, and
+// the name is the only thing that says so. The answer keeps the attribution
+// line it was shown with, for the same reason.
+//
+// Best effort. A conversation that could not be written to is worth a log line
+// and nothing more — the answer is already on screen, and failing the turn
+// over its bookkeeping would take away the thing that did work.
+func (a *App) recordRoutedExchange(sessionID, name, prompt, reply string) {
+	if strings.TrimSpace(sessionID) == "" {
+		return
+	}
+	a.mu.Lock()
+	svc := a.svc
+	a.mu.Unlock()
+	if svc == nil {
+		return
+	}
+	inner := svc.Agent()
+	if inner == nil {
+		return
+	}
+	if err := inner.AppendSessionMessages(sessionID,
+		domain.Message{Role: "user", Content: "@" + name + " " + prompt},
+		domain.Message{Role: "assistant", Content: reply},
+	); err != nil {
+		log.Printf("superai: could not record the @%s exchange in %s: %v", name, sessionID, err)
+	}
 }
 
 // routedTimeout is how long an addressed message may take, which depends on
