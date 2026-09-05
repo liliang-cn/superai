@@ -93,11 +93,23 @@ ssh "$HOST" "
 "
 
 say "verify"
-sleep 3
 ssh "$HOST" "systemctl is-active $UNITS"
-code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$HEALTH_URL" || echo 000)
+
+# Wait for the port, do not guess how long the service takes. This was
+# `sleep 3` and one curl, and the service needs about four seconds to get from
+# "Started" to "serving on 127.0.0.1:43117" — it opens its store, its scheduler
+# and its MCP children first. So a deployment that worked reported "service did
+# not come back healthy" and exited 1, which is the kind of false alarm that
+# teaches people to stop reading the check.
+deadline=$(( $(date +%s) + 60 ))
+code=000
+while [ "$(date +%s)" -lt "$deadline" ]; do
+  code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$HEALTH_URL" || echo 000)
+  [ "$code" = "200" ] && break
+  sleep 2
+done
 echo "GET $HEALTH_URL -> $code"
-[ "$code" = "200" ] || { echo "service did not come back healthy"; exit 1; }
+[ "$code" = "200" ] || { echo "service did not come back healthy within 60s"; exit 1; }
 
 # A start that logs a configuration problem is not a successful deploy, even
 # though the port answers.
