@@ -234,7 +234,10 @@ func (a *App) askLocalCLI(ctx context.Context, name, prompt string) backend.Remo
 	// wrong-looking-like-right answer.
 	if got.Failed {
 		res.Failed = true
-		res.Reason = strings.TrimSpace(got.Error)
+		// Condensed for the same reason the SSH path condenses: a CLI that
+		// fails on an API error prints the whole body, and the transcript is
+		// not the place for a page of JSON.
+		res.Reason = backend.CondenseAgentFailure(got.Error)
 		if res.Reason == "" {
 			res.Reason = fmt.Sprintf("the CLI reported a failure (exit %d)", got.ExitCode)
 		}

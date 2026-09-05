@@ -5,7 +5,9 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -313,13 +315,27 @@ func (r *RemoteRunner) Run(ctx context.Context, name, prompt string) (res Remote
 	runCtx, cancel := context.WithTimeout(ctx, r.cfg.Timeout())
 	defer cancel()
 	out, runErr := sshRun(runCtx, host, script, r.cfg.Timeout())
+	// A rate limit that names its own delay is worth waiting out once. These
+	// agents sit behind shared upstream quotas, and a question that failed
+	// because somebody else asked one fifteen seconds ago should not come back
+	// as "did not answer" when the API said, in the same breath, when to try
+	// again. Once only, and only for a delay short enough to hold a turn for.
+	if runErr != nil {
+		if wait := RetryAfter(runErr.Error()); wait > 0 {
+			select {
+			case <-time.After(wait):
+				out, runErr = sshRun(runCtx, host, script, r.cfg.Timeout())
+			case <-runCtx.Done():
+			}
+		}
+	}
 	res.Text = strings.TrimSpace(out)
 	if runErr != nil {
 		res.Failed = true
 		// The output is the useful half of a failure — a CLI that wants a
-		// login says so on stderr and exits non-zero — so it is kept and the
-		// exit status is only the label.
-		res.Reason = runErr.Error()
+		// login says so on stderr and exits non-zero — so it is kept, condensed
+		// to the sentence worth reading; the exit status is only the label.
+		res.Reason = CondenseAgentFailure(runErr.Error())
 		// A host that has stopped holding the agent must not stay cached, or
 		// every call until the TTL expires goes to the wrong machine.
 		r.forget(name)
@@ -465,7 +481,7 @@ func sshRun(ctx context.Context, host, script string, deadline time.Duration) (s
 			return text, fmt.Errorf("gave up after %s", deadline)
 		}
 		if stderr != "" {
-			return text, fmt.Errorf("%v: %s", err, firstLines(stderr, 3))
+			return text, fmt.Errorf("%v: %s", err, firstLines(stderr, 40))
 		}
 		return text, err
 	}
@@ -494,12 +510,116 @@ func hostLabel(host string) string {
 	return fields[len(fields)-1]
 }
 
-// firstLines trims a wall of stderr down to the part that says what happened.
+// firstLines carries a failed run's output out of the process.
+//
+// Both dimensions are bounded, because either alone lets something through: a
+// stack trace is many short lines, an API error is one enormous one. But the
+// bound here is generous, and deliberately so — this is not what anybody
+// reads. CondenseAgentFailure is, and it needs the whole body to work with:
+// the sentence worth quoting and the retry delay worth obeying are both near
+// the end of a Gemini 429, and a first pass that cut to display length threw
+// away both. Trim once, at the point of display.
 func firstLines(s string, n int) string {
 	lines := strings.Split(s, "\n")
+	trimmed := false
 	if len(lines) > n {
-		lines = lines[:n]
-		return strings.Join(lines, " / ") + " …"
+		lines, trimmed = lines[:n], true
 	}
-	return strings.Join(lines, " / ")
+	out := strings.Join(lines, " / ")
+	if r := []rune(out); len(r) > rawFailureRunes {
+		out, trimmed = strings.TrimSpace(string(r[:rawFailureRunes])), true
+	}
+	if trimmed {
+		out += " …"
+	}
+	return out
 }
+
+// rawFailureRunes bounds what is carried out of a failed run: enough for a
+// whole API error body, short of anything that would be a memory problem.
+const rawFailureRunes = 4000
+
+// failureDetailRunes bounds the quoted part of a failure once it is shown.
+//
+// Long enough for the sentence an API actually wrote, short enough that it
+// stays a line in a transcript rather than a wall. The rest is not lost — it is
+// in the agent's own output, which the caller still has.
+const failureDetailRunes = 200
+
+// jsonMessage pulls the human sentence out of an API error body.
+//
+// Every one of these services buries the readable part in a "message" field
+// surrounded by codes, quota metrics and documentation links. Taking that field
+// turns a paragraph of JSON into the one line worth reading. A body without it
+// is left alone rather than guessed at.
+var jsonMessage = regexp.MustCompile(`"message"\s*:\s*"((?:[^"\\]|\\.)*)"`)
+
+// retryHint finds the delay an API asked to be waited, in its own words.
+var retryHint = regexp.MustCompile(`(?i)retry(?:Delay|\s+in)"?[:\s]+"?(\d+(?:\.\d+)?)\s*s`)
+
+// CondenseAgentFailure turns whatever a delegated agent printed on its way out
+// into one line a person can act on.
+//
+// The classification is deliberately coarse: what a reader needs first is
+// whether to wait, sign in, or give up, and those three cover almost every
+// failure these CLIs produce. The agent's own words follow, because they are
+// the part that says which account, which model, which quota — and a message
+// that replaced them with a category would be less useful, not more.
+func CondenseAgentFailure(raw string) string {
+	detail := strings.TrimSpace(raw)
+	if m := jsonMessage.FindStringSubmatch(detail); len(m) == 2 {
+		// Unescape the pieces that matter for reading; a stray \uXXXX is left
+		// as written rather than risking a decode of something that is not JSON.
+		unescaped := strings.NewReplacer(`\n`, " ", `\t`, " ", `\"`, `"`, `\\`, `\`).Replace(m[1])
+		if strings.TrimSpace(unescaped) != "" {
+			detail = unescaped
+		}
+	}
+	detail = strings.Join(strings.Fields(detail), " ")
+	if r := []rune(detail); len(r) > failureDetailRunes {
+		detail = strings.TrimSpace(string(r[:failureDetailRunes])) + " …"
+	}
+
+	lead := ""
+	low := strings.ToLower(raw)
+	switch {
+	case strings.Contains(low, "resource_exhausted") || strings.Contains(low, "rate limit") ||
+		strings.Contains(low, "quota") || strings.Contains(low, "429"):
+		lead = "rate-limited or out of quota"
+		if d := RetryAfter(raw); d > 0 {
+			lead += fmt.Sprintf(" (it asks for %s)", d.Round(time.Second))
+		}
+	case strings.Contains(low, "ineligibletier"):
+		lead = "this account is not eligible for the model it asked for"
+	case strings.Contains(low, "authenticat") || strings.Contains(low, "unauthorized") ||
+		strings.Contains(low, "api key") || strings.Contains(low, "401") ||
+		strings.Contains(low, "please run") && strings.Contains(low, "login"):
+		lead = "not signed in"
+	}
+	if lead == "" {
+		return detail
+	}
+	if detail == "" {
+		return lead
+	}
+	return lead + " — " + detail
+}
+
+// RetryAfter is how long a failure asked to be waited, or zero when it did not
+// say. Only a delay short enough to be worth holding a person's turn for is
+// reported: a quota that resets tomorrow is not something to sleep through.
+func RetryAfter(raw string) time.Duration {
+	m := retryHint.FindStringSubmatch(raw)
+	if len(m) != 2 {
+		return 0
+	}
+	secs, err := strconv.ParseFloat(m[1], 64)
+	if err != nil || secs <= 0 || secs > maxRetryWait.Seconds() {
+		return 0
+	}
+	return time.Duration(secs * float64(time.Second))
+}
+
+// maxRetryWait bounds an automatic retry. Beyond this the honest thing is to
+// report the failure and let the person decide, rather than hold a spinner.
+const maxRetryWait = 30 * time.Second

@@ -3,6 +3,7 @@ package backend
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 // The prompt is a person's question and it ends up inside a shell command on
@@ -197,5 +198,99 @@ func TestTheModelCannotTurnRemoteAgentsOn(t *testing.T) {
 		if _, ok := settingsWritable[key]; ok {
 			t.Errorf("%q is writable by the agent", key)
 		}
+	}
+}
+
+// The exact 429 a delegated pi produced. It arrived as one enormous line of
+// JSON and was shown to the user in full — eight lines of quota metrics and
+// documentation URLs in the middle of a conversation.
+const gemini429 = `exit status 1: 429: {"code":429,"message":"You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-3.8-flash\nPlease retry in 15.081681758s.","status":"RESOURCE_EXHAUSTED","details":[{"@type":"type.googleapis.com/google.rpc.Help","links":[{"description":"Learn more about Gemini API quotas","url":"https://ai.google.dev/gemini-api/docs/rate-limits"}]},{"@type":"type.googleapis.com/google.rpc.RetryInfo","retryDelay":"15s"}]}`
+
+func TestAFailureIsCondensedToWhatIsWorthReading(t *testing.T) {
+	got := CondenseAgentFailure(gemini429)
+	if n := len([]rune(got)); n > 300 {
+		t.Errorf("a %d-rune failure went into the transcript:\n%s", n, got)
+	}
+	// What to do about it comes first.
+	if !strings.HasPrefix(got, "rate-limited or out of quota") {
+		t.Errorf("the reader is not told what kind of failure this is: %q", got)
+	}
+	// And the API's own sentence survives, because it names the account, the
+	// model and the quota — a category alone would be less useful.
+	if !strings.Contains(got, "You exceeded your current quota") {
+		t.Errorf("the agent's own words were dropped: %q", got)
+	}
+	// The machinery around it does not.
+	for _, noise := range []string{"@type", "RetryInfo", "quotaDimensions", "google.rpc"} {
+		if strings.Contains(got, noise) {
+			t.Errorf("%q survived into the message: %s", noise, got)
+		}
+	}
+	if strings.Contains(got, "\n") {
+		t.Errorf("the message spans lines: %q", got)
+	}
+}
+
+func TestFailuresAreClassifiedByWhatToDoAboutThem(t *testing.T) {
+	cases := []struct{ raw, want string }{
+		{gemini429, "rate-limited"},
+		{`cursor-agent failed: Error: Authentication required. Please run 'agent login' first, or set CURSOR_API_KEY`, "not signed in"},
+		{`gemini failed: Error authenticating: IneligibleTierError: This client is no longer supported`, "not eligible"},
+	}
+	for _, c := range cases {
+		if got := CondenseAgentFailure(c.raw); !strings.Contains(got, c.want) {
+			t.Errorf("%.40q\n  got  %q\n  want it to contain %q", c.raw, got, c.want)
+		}
+	}
+	// Something with no recognisable shape is passed through, tidied but not
+	// relabelled: inventing a category for an unknown failure is worse than
+	// showing it.
+	plain := "the launcher could not find its venv"
+	if got := CondenseAgentFailure(plain); got != plain {
+		t.Errorf("an unclassifiable failure was rewritten: %q", got)
+	}
+}
+
+// The API says when to try again; that is worth acting on, but only for a wait
+// short enough to hold somebody's turn open.
+func TestRetryAfterOnlyReportsAWaitWorthHolding(t *testing.T) {
+	if got := RetryAfter(gemini429); got < 15*time.Second || got > 16*time.Second {
+		t.Errorf("RetryAfter = %v, want the 15s the error asked for", got)
+	}
+	if got := RetryAfter(`{"retryDelay":"3600s"}`); got != 0 {
+		t.Errorf("an hour-long wait was reported as retryable: %v", got)
+	}
+	if got := RetryAfter("just a plain failure"); got != 0 {
+		t.Errorf("a delay was invented for a failure that named none: %v", got)
+	}
+}
+
+// A single line of JSON is still a wall. The cap has to be on length, not just
+// on how many newlines it happens to contain — at both stages.
+func TestOneEnormousLineIsStillTrimmed(t *testing.T) {
+	got := firstLines(strings.Repeat("x", 40000), 3)
+	if n := len([]rune(got)); n > rawFailureRunes+4 {
+		t.Errorf("a 40,000-character single line came back as %d runes", n)
+	}
+	if !strings.HasSuffix(got, "…") {
+		t.Error("nothing said it had been cut")
+	}
+	// And what is shown is far shorter than what is carried.
+	if n := len([]rune(CondenseAgentFailure(got))); n > failureDetailRunes+4 {
+		t.Errorf("the displayed form is %d runes", n)
+	}
+}
+
+// The trim must not happen before the condense: the sentence worth quoting and
+// the retry delay worth obeying both sit near the end of a Gemini 429, and a
+// first pass at display length threw away both — which is how a failure that
+// said "retry in 15s" came back in 5 seconds having never retried.
+func TestTheRetryHintSurvivesTheWayOut(t *testing.T) {
+	carried := firstLines(gemini429, 40)
+	if RetryAfter(carried) == 0 {
+		t.Error("the retry delay did not survive being carried out of the run")
+	}
+	if !strings.Contains(CondenseAgentFailure(carried), "You exceeded your current quota") {
+		t.Errorf("the API's own sentence did not survive: %q", CondenseAgentFailure(carried))
 	}
 }
