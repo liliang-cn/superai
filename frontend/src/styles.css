@@ -908,7 +908,16 @@ input, textarea, select { font-family: inherit; }
 .panel-grid { max-width: 820px; display: flex; flex-direction: column; gap: 20px; }
 
 .view-header.with-action { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
-.view-header.with-action .vh-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; padding-top: 2px; }
+/* The row of buttons belongs to the class, not to where it is mounted. All of
+   this used to hang off the descendant selector below, and the one .vh-actions
+   that is not in a view header — the schedules toolbar, which Records renders
+   inside its tab body — got none of it. Not even the flex, so its buttons were
+   inline-blocks with JSX's whitespace stripped between them: three of them edge
+   to edge, wrapping onto a second line that touched the first. */
+.vh-actions { display: flex; align-items: center; gap: 10px; }
+/* In a header it also refuses to shrink, and drops 2px to sit on the title's
+   baseline rather than its box. */
+.view-header.with-action .vh-actions { flex-shrink: 0; padding-top: 2px; }
 
 /* tabs */
 .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); padding: 0 24px; margin-top: 16px; }
