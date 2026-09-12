@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useChat } from "../lib/useChat";
 import { useAttachments } from "../lib/useAttachments";
-import { AppStatus } from "../lib/types";
+import { AppStatus, ChatMessage } from "../lib/types";
 import { copyText } from "../lib/format";
 import AttachmentChips from "../components/AttachmentChips";
 import { AgentMenu, AddressedBanner } from "../components/AgentMenu";
@@ -11,7 +11,11 @@ import {
   ConversationContent,
   ConversationEmptyState,
 } from "@/components/ai-elements/conversation";
-import { Message, MessageContent } from "@/components/ai-elements/message";
+import {
+  Message,
+  MessageByline,
+  MessageContent,
+} from "@/components/ai-elements/message";
 import { Response } from "@/components/ai-elements/response";
 import { Actions, Action } from "@/components/ai-elements/actions";
 import {
@@ -38,6 +42,27 @@ import ContextBlock from "../components/ContextBlock";
 import NameDashboardModal from "../components/NameDashboardModal";
 import { dashboards, hasRenderableBlock, suggestName } from "../lib/dashboards";
 import AgentProgress from "../components/AgentProgress";
+
+/**
+ * What a finished answer cost, for the line under its name: "34s · 6 tools".
+ *
+ * Only the finished shape is written here. While an answer streams, the
+ * progress block directly beneath the byline is already counting — a second
+ * live clock would be the same number twice, a frame out of step. And a
+ * conversation restored from history has the steps but never had the clock, so
+ * the duration is left out rather than printed as a zero.
+ */
+function bylineMeta(m: ChatMessage): string {
+  if (m.streaming) return "";
+  const bits: string[] = [];
+  if (m.startedAt && m.finishedAt && m.finishedAt > m.startedAt) {
+    const s = Math.max(1, Math.round((m.finishedAt - m.startedAt) / 1000));
+    bits.push(s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`);
+  }
+  const tools = m.progress?.filter((p) => p.kind === "tool").length ?? 0;
+  if (tools) bits.push(`${tools} tool${tools === 1 ? "" : "s"}`);
+  return bits.join(" · ");
+}
 
 export default function ChatView({
   status,
@@ -218,6 +243,10 @@ export default function ChatView({
                 </ConversationEmptyState>
               ) : (
                 <ConversationContent
+                  // The column the whole conversation is set in: centred, one
+                  // measure wide, with the messages spaced by whitespace rather
+                  // than by bubble borders.
+                  className="conv-stream"
                   autoScrollKey={messages
                     .map((m) => `${m.content}#${m.progress?.length ?? 0}`)
                     .join("|")}
@@ -230,11 +259,21 @@ export default function ChatView({
                     m.kind === "context" ? (
                       <ContextBlock key={m.id} content={m.content} />
                     ) : (
-                      <div key={m.id}>
+                      <div
+                        key={m.id}
+                        className={`msg-turn ${m.role === "user" ? "is-user" : "is-assistant"}`}
+                      >
                         <Message from={m.role}>
-                          <MessageContent variant="flat">
+                          <MessageContent>
                             {m.role === "assistant" ? (
                               <>
+                                {/* The copper rule says "not you"; the name
+                                    says who. It goes above the progress block
+                                    so the turn is signed before it reports. */}
+                                <MessageByline
+                                  name="SuperAI"
+                                  meta={bylineMeta(m)}
+                                />
                                 {m.progress && m.progress.length > 0 && (
                                   <AgentProgress
                                     steps={m.progress}

@@ -1,14 +1,39 @@
-import React from "react";
-import { PanelLeftCloseIcon, PanelLeftOpenIcon } from "lucide-react";
+import React, { useEffect } from "react";
+import {
+  BrainIcon,
+  ChartColumnIcon,
+  MessageSquareIcon,
+  NotebookTabsIcon,
+  PanelLeftCloseIcon,
+  PanelLeftOpenIcon,
+  PlugIcon,
+  PuzzleIcon,
+  SettingsIcon,
+} from "lucide-react";
 import { ViewKey } from "../lib/types";
 import { useRoom } from "../lib/useViewport";
 
-const NAV: { section: string; items: { key: ViewKey; label: string; icon: string }[] }[] = [
+// The nav used to carry one emoji per row (💬📊🧠🧩🔌🗂️⚙️). On the old slate
+// ground they passed for icons; on warm paper they are seven colour stickers
+// stuck to a sheet of card, each drawn by a different hand at a different
+// weight, and none of them the copper the rest of the room is finished in.
+// Lucide is one hand, one weight, and inherits `color` — so a row's icon goes
+// copper when the row is active instead of staying a coloured decal on top of
+// it.
+//
+// `shortcut` is the key that reaches this view with ⌘ held. It lives on the
+// item rather than in a second table beside the handler, because the hint that
+// is painted and the key that is bound drifting apart is the one bug a
+// shortcut hint can have that is worse than having no hint at all.
+const NAV: {
+  section: string;
+  items: { key: ViewKey; label: string; Icon: typeof MessageSquareIcon; shortcut?: string }[];
+}[] = [
   {
     section: "Workspace",
     items: [
-      { key: "chat", label: "Chat", icon: "💬" },
-      { key: "stats", label: "Stats", icon: "📊" },
+      { key: "chat", label: "Chat", Icon: MessageSquareIcon, shortcut: "1" },
+      { key: "stats", label: "Stats", Icon: ChartColumnIcon, shortcut: "2" },
     ],
   },
   {
@@ -16,19 +41,26 @@ const NAV: { section: string; items: { key: ViewKey; label: string; icon: string
     items: [
       // Next to Memory on purpose: it is the same store, seen whole instead of
       // one recall at a time.
-      { key: "knowledge", label: "Knowledge", icon: "🧠" },
-      { key: "skills", label: "Skills", icon: "🧩" },
-      { key: "mcp", label: "MCP", icon: "🔌" },
-      { key: "records", label: "Records", icon: "🗂️" },
+      { key: "knowledge", label: "Knowledge", Icon: BrainIcon },
+      { key: "skills", label: "Skills", Icon: PuzzleIcon },
+      { key: "mcp", label: "MCP", Icon: PlugIcon },
+      { key: "records", label: "Records", Icon: NotebookTabsIcon, shortcut: "3" },
     ],
   },
   {
     section: "System",
     items: [
-      { key: "settings", label: "Settings", icon: "⚙️" },
+      { key: "settings", label: "Settings", Icon: SettingsIcon, shortcut: "," },
     ],
   },
 ];
+
+/** Every bound key, flattened once at module load rather than per keystroke. */
+const BY_SHORTCUT = new Map<string, ViewKey>(
+  NAV.flatMap((g) => g.items)
+    .filter((it) => it.shortcut)
+    .map((it) => [it.shortcut as string, it.key]),
+);
 
 export default function Sidebar({
   current,
@@ -60,6 +92,41 @@ export default function Sidebar({
   const room = useRoom();
   const labels = open || room === "phone";
 
+  // ⌘1 / ⌘2 / ⌘3 / ⌘, — the hints in the rows, made real.
+  //
+  // Three things this deliberately does not do:
+  //
+  // 1. It does not refuse to fire while a text field has focus. The whole
+  //    point is leaving the composer mid-sentence to check Stats, and a
+  //    shortcut that stops working exactly where you spend your time is a
+  //    shortcut nobody learns. It is safe here because every binding requires
+  //    ⌘: with Command held, none of "1" "2" "3" "," puts a character into an
+  //    input, so there is no keystroke left to swallow.
+  // 2. It does not fire mid-composition. A Chinese IME uses the digit row to
+  //    pick candidates, and while WKWebView is reordering composition events
+  //    (see lib/ime.ts) a stray modifier read could turn "选第 2 个候选" into
+  //    "go to Stats". isComposing plus the legacy 229 keyCode is the same
+  //    guard the composer uses.
+  // 3. It does not bind outside the desktop window. In a browser tab ⌘1–⌘3
+  //    switch the browser's own tabs, and preventDefault on that is taking
+  //    something away from the user that was never ours. The body class is the
+  //    same switch the hint's CSS keys on — read at keystroke time, because
+  //    main.tsx sets it in an effect that runs after this one.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!document.body.classList.contains("desktop-shell")) return;
+      if (!e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+      if (e.repeat || e.defaultPrevented) return;
+      if (e.isComposing || e.keyCode === 229) return;
+      const view = BY_SHORTCUT.get(e.key);
+      if (!view) return;
+      e.preventDefault();
+      onNavigate(view);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onNavigate]);
+
   return (
     <>
       {/* The scrim behind the drawer. A real element rather than the sidebar's
@@ -69,6 +136,9 @@ export default function Sidebar({
           drawer breakpoint. */}
       {open && <div className="sidebar-scrim" onClick={onToggle} aria-hidden="true" />}
       <aside className={`sidebar${open ? "" : " collapsed"}`}>
+      {/* The traffic lights are drawn over this strip by the OS, and it is what
+          the window is dragged by — see .sidebar-drag. */}
+      <div className="sidebar-drag" />
       <div className="brand">
         <div className="brand-logo">S</div>
         {labels && (
@@ -84,6 +154,7 @@ export default function Sidebar({
             {labels && <div className="nav-section">{group.section}</div>}
             {group.items.map((it) => {
               const badge = badges?.[it.key] ?? 0;
+              const Icon = it.Icon;
               return (
                 <button
                   key={it.key}
@@ -93,8 +164,19 @@ export default function Sidebar({
                   onClick={() => onNavigate(it.key)}
                   title={labels ? undefined : it.label}
                 >
-                  <span className="ic">{it.icon}</span>
-                  {labels && it.label}
+                  <span className="ic">
+                    <Icon className="size-4" />
+                  </span>
+                  {/* The label is an element rather than a bare text node so it
+                      can be the row's elastic middle. Everything to its right
+                      used to reach the right edge with margin-left:auto, which
+                      works for exactly one such thing — two of them split the
+                      free space and both end up floating in the middle. */}
+                  {labels && <span className="nav-label">{it.label}</span>}
+                  {/* A desktop app should show its own breathing. Hidden off
+                      the desktop build by CSS, not here: in a browser tab
+                      these keys belong to the browser. */}
+                  {labels && it.shortcut && <span className="nav-key">⌘{it.shortcut}</span>}
                   {/* Collapsed there is no room for a count, but "something
                       happened" still has to be visible. */}
                   {badge > 0 && (

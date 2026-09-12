@@ -10,6 +10,7 @@ import (
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
+	"github.com/wailsapp/wails/v2/pkg/options/mac"
 )
 
 //go:embed all:frontend/dist
@@ -75,9 +76,30 @@ func main() {
 			Assets:     assets,
 			Middleware: noCache,
 		},
-		BackgroundColour: &options.RGBA{R: 14, G: 17, B: 22, A: 1},
-		OnStartup:        app.startup,
-		OnShutdown:       app.shutdown,
+		// The paper this app is printed on, so a cold frame never flashes behind
+		// the page while the webview is still coming up.
+		BackgroundColour: &options.RGBA{R: 244, G: 241, B: 234, A: 1},
+		// The window is part of the design, not a frame the OS wraps around it.
+		// A stock title bar spends 28px of every screen on the word "SuperAI",
+		// which the sidebar already says, in a strip that cannot hold anything
+		// else. Hidden-inset keeps the traffic lights where every Mac user
+		// reaches for them and gives the app the rest of the bar; the sidebar
+		// reserves a 38px lane for them and marks it draggable
+		// (--wails-draggable: drag) so the window still moves by its top edge.
+		Mac: &mac.Options{
+			TitleBar: mac.TitleBarHiddenInset(),
+			// Appearance is deliberately unset: SetWindowTheme flips the
+			// window between light and dark from the theme picker, and a value
+			// here would pin the chrome to one of them for the whole run.
+			WebviewIsTransparent: false,
+			WindowIsTranslucent:  false,
+			About: &mac.AboutInfo{
+				Title:   "SuperAI",
+				Message: "Your own agent, on your own machine.",
+			},
+		},
+		OnStartup:  app.startup,
+		OnShutdown: app.shutdown,
 		DragAndDrop: &options.DragAndDrop{
 			EnableFileDrop: true, // native OS file drop -> runtime.OnFileDrop (host paths)
 		},

@@ -1205,12 +1205,14 @@ func (a *App) SetWindowTheme(dark bool) {
 		return
 	}
 	// The same two colours the stylesheet uses for --bg-0, so the seam between
-	// the page and the chrome around it does not show.
+	// the page and the chrome around it does not show. They moved when the
+	// palette did — warm dark #141210 and warm paper #f4f1ea — and this is the
+	// one place outside the stylesheet that has to be told.
 	if dark {
-		runtime.WindowSetBackgroundColour(a.ctx, 14, 17, 22, 255)
+		runtime.WindowSetBackgroundColour(a.ctx, 20, 18, 16, 255)
 		runtime.WindowSetDarkTheme(a.ctx)
 		return
 	}
-	runtime.WindowSetBackgroundColour(a.ctx, 250, 250, 251, 255)
+	runtime.WindowSetBackgroundColour(a.ctx, 244, 241, 234, 255)
 	runtime.WindowSetLightTheme(a.ctx)
 }

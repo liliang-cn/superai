@@ -65,13 +65,23 @@ const mdComponents = {
   },
 };
 
+/**
+ * One turn, in the same two shapes the chat view uses: what the user typed is a
+ * block pinned to the right, what the assistant wrote is a document under a
+ * copper rule. No avatars — the rule and the alignment already say who spoke,
+ * and two gradient squares per turn said it a second time.
+ */
 function Bubble({ msg }: { msg: ChatMessage }) {
   const isUser = msg.role === "user";
   return (
-    <div className={`msg ${msg.role}`}>
-      <div className="msg-avatar">{isUser ? "U" : "AI"}</div>
-      <div style={{ minWidth: 0 }}>
-        <div className="msg-body">
+    <div className={`msg-turn ${isUser ? "is-user" : "is-assistant"}`}>
+      <div className={`msg-row ${isUser ? "is-user" : "is-assistant"}`}>
+        <div className="msg-content">
+          {!isUser && (
+            <div className="msg-byline">
+              <span className="msg-byline-name">SuperAI</span>
+            </div>
+          )}
           {isUser ? (
             <span style={{ whiteSpace: "pre-wrap" }}>{msg.content}</span>
           ) : msg.content ? (
@@ -87,10 +97,12 @@ function Bubble({ msg }: { msg: ChatMessage }) {
           )}
           {msg.streaming && <span className="msg-cursor" />}
         </div>
-        {msg.emotion && !msg.streaming && (
-          <div className="emotion-chip">🎭 {msg.emotion}</div>
-        )}
       </div>
+      {msg.emotion && !msg.streaming && (
+        <div className="msg-footer">
+          <div className="emotion-chip">🎭 {msg.emotion}</div>
+        </div>
+      )}
     </div>
   );
 }

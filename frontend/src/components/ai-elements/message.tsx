@@ -1,5 +1,20 @@
 import { cn } from "@/lib/utils";
-import type { ComponentProps, HTMLAttributes } from "react";
+import type { HTMLAttributes } from "react";
+
+/**
+ * One turn in the transcript, and the two very different shapes a turn takes.
+ *
+ * The sides are deliberately not symmetrical. What a person typed is a block:
+ * short, addressed to someone, pinned to the right. What the assistant wrote is
+ * a document — prose, code blocks, tables, whole dashboards — and a document
+ * put inside a speech bubble is a document in a box too small for it. So the
+ * reply gets no bubble at all: a copper rule down its left edge says who is
+ * speaking, and the text sits straight on the paper.
+ *
+ * The Tailwind that used to draw both bubbles here is gone, along with the
+ * avatars. Layout and colour live in styles.css (.msg-row / .msg-content),
+ * where the rest of the transcript already is; this file only names the parts.
+ */
 
 export type MessageProps = HTMLAttributes<HTMLDivElement> & {
   from: "user" | "assistant" | "system";
@@ -7,63 +22,38 @@ export type MessageProps = HTMLAttributes<HTMLDivElement> & {
 
 export const Message = ({ className, from, ...props }: MessageProps) => (
   <div
-    className={cn(
-      "group flex w-full items-end justify-end gap-2 py-1",
-      from === "user" ? "is-user" : "is-assistant flex-row-reverse justify-end",
-      "[&>div]:max-w-[80%]",
-      className,
-    )}
+    className={cn("msg-row", from === "user" ? "is-user" : "is-assistant", className)}
     data-from={from}
     {...props}
   />
 );
 
-export type MessageContentProps = HTMLAttributes<HTMLDivElement> & {
-  variant?: "contained" | "flat";
-};
+export type MessageContentProps = HTMLAttributes<HTMLDivElement>;
 
-export const MessageContent = ({
-  children,
-  className,
-  variant = "contained",
-  ...props
-}: MessageContentProps) => (
-  <div
-    className={cn(
-      "flex flex-col gap-2 overflow-hidden text-sm",
-      variant === "contained" && [
-        "rounded-lg px-4 py-3",
-        "group-[.is-user]:bg-primary group-[.is-user]:text-primary-foreground",
-        "group-[.is-assistant]:bg-secondary group-[.is-assistant]:text-foreground",
-      ],
-      variant === "flat" && [
-        "group-[.is-user]:max-w-[80%] group-[.is-user]:rounded-lg group-[.is-user]:bg-secondary group-[.is-user]:px-4 group-[.is-user]:py-3 group-[.is-user]:text-foreground",
-        "group-[.is-assistant]:text-foreground",
-      ],
-      className,
-    )}
-    {...props}
-  >
+export const MessageContent = ({ className, children, ...props }: MessageContentProps) => (
+  <div className={cn("msg-content", className)} {...props}>
     {children}
   </div>
 );
 
-export type MessageAvatarProps = ComponentProps<"div"> & {
-  name?: string;
+export type MessageBylineProps = {
+  /** Who wrote this. Set in the display serif, in copper. */
+  name: string;
+  /** What the turn cost — "34s · 6 tools". Left off when nothing is known. */
+  meta?: string;
 };
 
-export const MessageAvatar = ({
-  name,
-  className,
-  ...props
-}: MessageAvatarProps) => (
-  <div
-    className={cn(
-      "flex size-8 shrink-0 select-none items-center justify-center rounded-full bg-muted text-muted-foreground text-xs font-semibold",
-      className,
-    )}
-    {...props}
-  >
-    {name}
+/**
+ * The signature above an answer.
+ *
+ * Without a bubble there is nothing in the shape of the block that says who is
+ * talking, and the copper rule alone only says "not you". The name does the
+ * rest, and the meta beside it is the one thing worth knowing about a reply
+ * that has already finished: how long it took and how much work it was.
+ */
+export const MessageByline = ({ name, meta }: MessageBylineProps) => (
+  <div className="msg-byline">
+    <span className="msg-byline-name">{name}</span>
+    {meta && <span className="msg-byline-meta">{meta}</span>}
   </div>
 );

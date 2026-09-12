@@ -23,6 +23,13 @@ import Gate from './components/Gate'
  */
 function Root() {
     const served = Boolean((window as unknown as Record<string, unknown>).superaiServed)
+    // The desktop window draws its own title bar (main.go asks for
+    // TitleBarHiddenInset), which means the sidebar has to leave a lane clear
+    // for the traffic lights and mark it draggable. A browser tab has neither,
+    // so the flag is set once here rather than guessed at in CSS.
+    useEffect(() => {
+        document.body.classList.toggle('desktop-shell', !served)
+    }, [served])
     // null = still asking. Rendering the gate first and taking it away would
     // flash a password box at someone who is already signed in.
     const [authed, setAuthed] = useState<boolean | null>(served ? null : true)

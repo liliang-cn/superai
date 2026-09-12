@@ -40,29 +40,38 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
-/* shadcn CSS-variable theme — LIGHT (default + explicit). Brand accent is
-   our indigo/violet (#6d6cf0). Note: token names that would collide with the
-   hand-written app palette below are suffixed (-color / accent-color). */
+/* shadcn CSS-variable theme — LIGHT (default + explicit).
+ *
+ * These are what the imported components paint with — the composer, the empty
+ * state, every dialog out of ai-elements — so they are the second half of the
+ * palette, not a footnote to it. The comment above them used to name an
+ * indigo/violet brand that had already been replaced by copper, and the values
+ * were still screen-white and slate: a warm page with a #ffffff message box
+ * sitting in it, and an #ececfd indigo chip nobody chose. Each one now points
+ * at its opposite number in the hand-written palette below.
+ *
+ * Note: token names that would collide with that palette are suffixed
+ * (-color / accent-color). */
 :root,
 [data-theme="light"] {
-  --background: #ffffff;
-  --foreground: #161a22;
-  --card: #ffffff;
-  --card-foreground: #161a22;
-  --popover: #ffffff;
-  --popover-foreground: #161a22;
+  --background: #fdfcf9;
+  --foreground: #1c1917;
+  --card: #fdfcf9;
+  --card-foreground: #1c1917;
+  --popover: #fdfcf9;
+  --popover-foreground: #1c1917;
   --primary: var(--accent);
   --primary-foreground: var(--on-accent);
-  --secondary: #f4f6fa;
-  --secondary-foreground: #161a22;
-  --muted: #f4f6fa;
-  --muted-foreground: #69728a;
-  --accent-color: #ececfd;
-  --accent-foreground: #2e2db0;
-  --destructive: #e23a52;
-  --destructive-foreground: #ffffff;
-  --border-color: #dde2ec;
-  --input: #dde2ec;
+  --secondary: #f0ece3;
+  --secondary-foreground: #1c1917;
+  --muted: #f0ece3;
+  --muted-foreground: #7a746b;
+  --accent-color: #f0e6d8;
+  --accent-foreground: #7b420a;
+  --destructive: #c9364f;
+  --destructive-foreground: #fdfcf9;
+  --border-color: #e4dfd4;
+  --input: #e4dfd4;
   --ring: var(--accent);
   --radius: 0.625rem;
 }
@@ -70,41 +79,44 @@
 /* shadcn CSS-variable theme — DARK, applied under [data-theme="dark"] so the
    existing toggle drives it. */
 [data-theme="dark"] {
-  --background: #11141b;
-  --foreground: #f1f3f8;
-  --card: #161a23;
-  --card-foreground: #f1f3f8;
-  --popover: #1c212c;
-  --popover-foreground: #f1f3f8;
+  --background: #1a1714;
+  --foreground: #ece7dd;
+  --card: #1f1b18;
+  --card-foreground: #ece7dd;
+  --popover: #252019;
+  --popover-foreground: #ece7dd;
   --primary: var(--accent);
   --primary-foreground: var(--on-accent);
-  --secondary: #1c212c;
-  --secondary-foreground: #f1f3f8;
-  --muted: #1c212c;
-  --muted-foreground: #8b93a7;
-  --accent-color: #222836;
-  --accent-foreground: #c7c7fb;
-  --destructive: #f0556b;
-  --destructive-foreground: #ffffff;
-  --border-color: #262c39;
-  --input: #2a3140;
+  --secondary: #252019;
+  --secondary-foreground: #ece7dd;
+  --muted: #252019;
+  --muted-foreground: #8f887c;
+  --accent-color: #2a2520;
+  --accent-foreground: #e2a86a;
+  --destructive: #ef6a76;
+  --destructive-foreground: #fdfcf9;
+  --border-color: #2e2925;
+  --input: #332c26;
   --ring: var(--accent);
 }
 
 :root {
-  /* color system — deep slate + indigo/violet accent */
-  --bg-0: #0b0d12;
-  --bg-1: #11141b;
-  --bg-2: #161a23;
-  --bg-3: #1c212c;
-  --bg-hover: #222836;
-  --border: #262c39;
-  --border-strong: #323a4a;
+  /* Colour system — warm dark, copper finish.
+     The same room as the light theme with the lights off: dark wood rather
+     than slate, so the reactor's black stage stops reading as a foreign object
+     dropped into a blue page. */
+  --bg-0: #141210;
+  --bg-1: #1a1714;
+  --bg-2: #1f1b18;
+  --bg-3: #252019;
+  --bg-hover: #2a2520;
+  --border: #2e2925;
+  --border-strong: #3a3530;
 
-  --text-0: #f1f3f8;
-  --text-1: #c2c8d6;
-  --text-2: #8b93a7;
-  --text-3: #5c6478;
+  --text-0: #ece7dd;
+  --text-1: #c4bdb1;
+  --text-2: #8f887c;
+  --text-3: #6b6459;
 
   /* Accent = the finish on the chassis. Copper by default; the picker swaps
      it via [data-accent] below. Dark mode gets a bright finish with dark
@@ -118,10 +130,10 @@
   --accent-border: rgba(210, 121, 63, 0.42);
   --accent-glow: rgba(210, 121, 63, 0.35);
 
-  --green: #3ecf8e;
-  --red: #f0556b;
-  --amber: #f5b14c;
-  --cyan: #4cc7e6;
+  --green: #5ec48f;
+  --red: #ef6a76;
+  --amber: #e0a64f;
+  --cyan: #6fb9cc;
 
   --radius-sm: 6px;
   --radius: 10px;
@@ -131,38 +143,81 @@
 
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
   --font-mono: "SF Mono", "JetBrains Mono", "Fira Code", ui-monospace, Menlo, Consolas, monospace;
+  /* The display face. It names things — the app, a section, a conversation, a
+     page — and never sets a sentence: at 13px this is a worse typeface than
+     the system one, and the whole point of having a second face is that the
+     two are not asked to do the same job.
+     Georgia first in the fallback because its metrics are the closest thing
+     every machine already has; the stack matters for the half second before
+     the file is decoded and for a build where it is missing. */
+  --font-display: "Instrument Serif", Georgia, "Times New Roman", serif;
+}
+
+/* Self-hosted rather than pulled from Google Fonts: this is a desktop app that
+   opens without a network, and a title that arrives a second late — or not at
+   all on a plane — is a title that was never designed. Two files, 15 KB each,
+   latin only; anything outside that range falls through to Georgia, which is
+   also what the CJK in this app renders in either way. */
+@font-face {
+  font-family: "Instrument Serif";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./assets/fonts/instrument-serif-latin.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Instrument Serif";
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./assets/fonts/instrument-serif-latin-italic.woff2") format("woff2");
 }
 
 /* Light theme — same accent, inverted neutrals. Applied via data-theme="light"
    on <html>; default (no attr / "dark") keeps the :root values above. */
+/* Light is paper, not screen.
+ *
+ * It used to be cold slate — #eef1f6 ground, #161a22 ink, everything tuned
+ * blue — with a copper accent laid on top, and the two spent every screen
+ * arguing. Copper is the one thing here that was chosen on purpose (the finish
+ * picker, 2026-09-01), so the room moves to meet it instead: a warm paper
+ * ground, warm black ink, and copper as the only metal on the desk.
+ *
+ * The status colours move with it. A blue-green #1fae73 on warm paper reads as
+ * a different material from everything around it; these three are the same
+ * hues pulled toward the paper's warmth, and they stay the only non-copper
+ * colours in the light theme — green means ok and red means look, on every
+ * finish. */
 [data-theme="light"] {
-  --bg-0: #eef1f6;
-  --bg-1: #ffffff;
-  --bg-2: #f4f6fa;
-  --bg-3: #e9edf4;
-  --bg-hover: #e2e7f0;
-  --border: #dde2ec;
-  --border-strong: #c6cdda;
+  --bg-0: #f4f1ea;
+  --bg-1: #fdfcf9;
+  --bg-2: #f0ece3;
+  --bg-3: #e9e4d9;
+  --bg-hover: #e4dfd4;
+  --border: #e4dfd4;
+  --border-strong: #cfc8b9;
 
-  --text-0: #161a22;
-  --text-1: #3a4253;
-  --text-2: #69728a;
-  --text-3: #99a1b3;
+  --text-0: #1c1917;
+  --text-1: #4a4540;
+  --text-2: #7a746b;
+  --text-3: #a8a196;
 
   --accent: #94510f;
   --accent-hover: #7b420a;
   --accent-alt: #a8481f;
-  --on-accent: #ffffff;
-  --accent-soft: rgba(148, 81, 15, 0.10);
-  --accent-border: rgba(148, 81, 15, 0.34);
-  --accent-glow: rgba(148, 81, 15, 0.30);
+  --on-accent: #fdfcf9;
+  --accent-soft: rgba(148, 81, 15, 0.08);
+  --accent-border: rgba(148, 81, 15, 0.22);
+  --accent-glow: rgba(148, 81, 15, 0.28);
 
-  --green: #1fae73;
-  --red: #e23a52;
-  --amber: #d6920f;
-  --cyan: #1f9fc4;
+  --green: #2f9e6a;
+  --red: #c9364f;
+  --amber: #b07a1c;
+  --cyan: #2f7d94;
 
-  --shadow: 0 10px 34px rgba(30, 42, 76, 0.12);
+  /* The shadow a sheet of paper casts on a desk: warm, and cast by something
+     that is only a few millimetres above the surface. */
+  --shadow: 0 10px 30px rgba(28, 25, 23, 0.08);
 }
 
 
@@ -466,6 +521,25 @@ input, textarea, select { font-family: inherit; }
 }
 
 /* ---------------- Sidebar ---------------- */
+/* The lane the traffic lights sit in.
+ *
+ * TitleBarHiddenInset (main.go) puts the close/minimise/zoom buttons inside
+ * the page's own top-left corner and hands the app the rest of the bar. So the
+ * sidebar opens with 38px of nothing — the buttons are drawn over it by the
+ * OS — and that strip is what the window is dragged by, since there is no
+ * title bar left to grab. The whole strip, not a handle inside it: a 4px seam
+ * between draggable and not is a window that sometimes moves.
+ *
+ * Off the desktop build entirely. In a browser tab there are no traffic
+ * lights, and 38px of blank sidebar would be 38px of nothing at all. */
+.sidebar-drag {
+  height: 38px; flex: none;
+  --wails-draggable: drag;
+}
+body:not(.desktop-shell) .sidebar-drag { display: none; }
+/* Dragging by the strip must not also select the text beside it. */
+.sidebar-drag * { --wails-draggable: no-drag; }
+
 .sidebar {
   width: 232px;
   background: var(--bg-1);
@@ -475,6 +549,9 @@ input, textarea, select { font-family: inherit; }
   padding: 18px 12px;
   transition: width 0.16s ease, padding 0.16s ease;
 }
+/* The drag lane already holds the top margin, and 18 + 38 is a gap the brand
+   falls out of the top of. */
+body.desktop-shell .sidebar { padding-top: 6px; }
 .sidebar.collapsed { width: 60px; padding: 18px 8px; }
 .sidebar.collapsed .brand { flex-direction: column; gap: 8px; padding: 0 0 14px; }
 .sidebar.collapsed .nav-item { justify-content: center; padding: 9px 0; }
@@ -496,11 +573,16 @@ input, textarea, select { font-family: inherit; }
   font-weight: 800; font-size: 16px; color: var(--on-accent);
   box-shadow: 0 4px 14px var(--accent-glow);
 }
-.brand-name { font-weight: 700; font-size: 16px; letter-spacing: -0.2px; }
-.brand-sub { font-size: 11px; color: var(--text-3); margin-top: -2px; }
+/* The display face earns its keep on the things that are names rather than
+   text: the app, the sections of the nav, a page title, a conversation. */
+.brand-name { font-family: var(--font-display); font-weight: 400; font-size: 23px; letter-spacing: -0.2px; line-height: 1.1; }
+.brand-sub { font-size: 11px; color: var(--text-3); margin-top: 1px; }
 
 .nav { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
-.nav-section { font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-3); padding: 14px 10px 6px; font-weight: 600; }
+/* Was 10px uppercase letterspaced — the standard way to whisper a heading, and
+   the reason these three read as system chrome rather than as the shelves the
+   nav is divided into. Set in the display face they are labels on a cabinet. */
+.nav-section { font-family: var(--font-display); font-style: italic; font-size: 14px; text-transform: none; letter-spacing: 0; color: var(--text-3); padding: 16px 10px 5px; font-weight: 400; }
 .nav-item {
   display: flex; align-items: center; gap: 11px;
   padding: 9px 10px;
@@ -580,7 +662,7 @@ input, textarea, select { font-family: inherit; }
 .view { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 
 .view-header { padding: 20px 24px 0; }
-.view-title { font-size: 19px; font-weight: 700; letter-spacing: -0.3px; }
+.view-title { font-family: var(--font-display); font-size: 27px; font-weight: 400; letter-spacing: -0.3px; line-height: 1.15; }
 .view-desc { color: var(--text-2); font-size: 13px; margin-top: 3px; }
 
 /* ---------------- Chat ---------------- */
@@ -591,20 +673,10 @@ input, textarea, select { font-family: inherit; }
 
 .transcript { flex: 1; overflow-y: auto; padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; }
 
-.msg { display: flex; gap: 12px; max-width: 760px; }
-.msg.user { align-self: flex-end; flex-direction: row-reverse; }
-.msg-avatar {
-  width: 28px; height: 28px; border-radius: 8px; flex-shrink: 0;
-  display: grid; place-items: center; font-size: 13px; font-weight: 700;
-}
-.msg.user .msg-avatar { background: var(--bg-3); color: var(--text-1); }
-.msg.assistant .msg-avatar { background: linear-gradient(135deg, var(--accent), var(--accent-alt)); color: var(--on-accent); }
-.msg-body {
-  background: var(--bg-2); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 11px 14px;
-  font-size: 14px; white-space: pre-wrap; word-break: break-word;
-}
-.msg.user .msg-body { background: var(--accent-soft); border-color: var(--accent-border); }
+/* The bubbles that used to live here — .msg, .msg-avatar, .msg-body and the
+   gradient square that marked the assistant — are gone with the symmetry they
+   drew. See "Conversation: one table, two voices" at the end of this file for
+   what replaced them; nothing renders these class names any more. */
 .msg-cursor { display: inline-block; width: 7px; height: 15px; background: var(--accent); margin-left: 2px; vertical-align: text-bottom; animation: blink 1s steps(2) infinite; border-radius: 1px; }
 @keyframes blink { 0%, 50% { opacity: 1; } 50.01%, 100% { opacity: 0; } }
 
@@ -646,7 +718,7 @@ input, textarea, select { font-family: inherit; }
 
 .empty-state { margin: auto; text-align: center; color: var(--text-2); max-width: 420px; }
 .empty-state .big { font-size: 38px; margin-bottom: 12px; }
-.empty-state h3 { color: var(--text-0); font-size: 18px; margin-bottom: 6px; }
+.empty-state h3 { font-family: var(--font-display); color: var(--text-0); font-size: 26px; font-weight: 400; margin-bottom: 6px; line-height: 1.2; }
 .empty-hint { color: var(--amber); font-size: 13px; margin-top: 14px; background: rgba(245,177,76,0.08); border: 1px solid rgba(245,177,76,0.25); padding: 8px 12px; border-radius: var(--radius-sm); }
 
 /* composer */
@@ -807,7 +879,7 @@ input, textarea, select { font-family: inherit; }
   background: var(--bg-1); border: 1px solid var(--border); border-radius: var(--radius-lg);
   padding: 18px 20px;
 }
-.card-title { font-size: 14px; font-weight: 700; margin-bottom: 3px; }
+.card-title { font-family: var(--font-display); font-size: 19px; font-weight: 400; line-height: 1.2; margin-bottom: 4px; }
 .card-desc { font-size: 12px; color: var(--text-2); margin-bottom: 16px; }
 .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
 .field:last-child { margin-bottom: 0; }
@@ -1391,10 +1463,15 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
    of its pieces somewhere else — the chat rail's activity feed reuses the
    ticker and the counters, and every colour in them is one of these tokens. */
 .cr, .cr-scope {
-  --cr-bg: #f2f4f9; --cr-panel: #ffffff; --cr-panel-2: #fbfcfe; --cr-line: #e1e6f0; --cr-line-2: #c8d1e2;
-  --cr-text: #0f1729; --cr-dim: #5b6578; --cr-mute: #9aa4b8;
-  --cr-cyan: #1f5eff; --cr-amber: #b86e00; --cr-rose: #d6335a; --cr-lime: #1f9d55;
-  --cr-cyan-rgb: 31,94,255; --cr-amber-rgb: 184,110,0; --cr-rose-rgb: 214,51,90; --cr-lime-rgb: 31,157,85;
+  /* The daylight instrument panel, on paper rather than on screen-white. The
+     four signal hues are now the app's own four — teal, amber, red, green —
+     instead of a private set: a control room that borrows the building's
+     colours still reads as instruments, and a #1f5eff blue on warm paper was
+     the one thing in here that looked printed by a different machine. */
+  --cr-bg: #f0ece3; --cr-panel: #fdfcf9; --cr-panel-2: #f8f5ef; --cr-line: #e4dfd4; --cr-line-2: #cfc8b9;
+  --cr-text: #1c1917; --cr-dim: #7a746b; --cr-mute: #a8a196;
+  --cr-cyan: #2f7d94; --cr-amber: #b07a1c; --cr-rose: #c9364f; --cr-lime: #2f9e6a;
+  --cr-cyan-rgb: 47,125,148; --cr-amber-rgb: 176,122,28; --cr-rose-rgb: 201,54,79; --cr-lime-rgb: 47,158,106;
   --cr-on-accent: #ffffff; --cr-glow: .25;
   --cr-mono: "SF Mono", "JetBrains Mono", ui-monospace, Menlo, monospace;
   color: var(--cr-text);
@@ -1406,14 +1483,17 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
 }
 [data-theme="dark"] .cr::before { opacity: .18; }
 [data-theme="dark"] .cr, [data-theme="dark"] .cr-scope {
-  --cr-bg: #070a12; --cr-panel: #0c1120; --cr-panel-2: #0f1628; --cr-line: #1a2340; --cr-line-2: #26314f;
+  /* Night in the same room: a warm black, not a blue one. The signal colours
+     stay bright and stay cold-bright — they are additive light on a dark
+     stage, which is the one place in this app where that is the point. */
+  --cr-bg: #0f0d0b; --cr-panel: #191512; --cr-panel-2: #1e1916; --cr-line: #2b2521; --cr-line-2: #3a322c;
   --cr-text: #e6ebf7; --cr-dim: #6b7690; --cr-mute: #3c4762;
   --cr-cyan: #5ee0ff; --cr-amber: #ffb547; --cr-rose: #ff5c7a; --cr-lime: #9dff6a;
   --cr-cyan-rgb: 94,224,255; --cr-amber-rgb: 255,181,71; --cr-rose-rgb: 255,92,122; --cr-lime-rgb: 157,255,106;
   --cr-on-accent: #04121a; --cr-glow: .45;
 }
 [data-theme="dark"] .cr {
-  background: radial-gradient(1200px 600px at 20% -10%, #0e1a33 0%, var(--cr-bg) 55%), var(--cr-bg);
+  background: radial-gradient(1200px 600px at 20% -10%, #241a12 0%, var(--cr-bg) 55%), var(--cr-bg);
 }
 .cr::before { content: ""; position: absolute; inset: 0; pointer-events: none;
   background-image: linear-gradient(var(--cr-line) 1px, transparent 1px), linear-gradient(90deg, var(--cr-line) 1px, transparent 1px);
@@ -2520,13 +2600,13 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
    is always the cockpit, whatever the theme: additive light needs black. The
    pair is sized to the viewport so nothing on this row is below the fold. */
 .cr-hero {
-  --cr-panel: #0a0f1d; --cr-panel-2: #0a0f1d; --cr-line: #141c30; --cr-line-2: #22304e;
+  --cr-panel: #16120f; --cr-panel-2: #16120f; --cr-line: #241e19; --cr-line-2: #3a302a;
   --cr-text: #e6ebf7; --cr-dim: #6b7690; --cr-mute: #3c4762;
   --cr-cyan: #5ee0ff; --cr-amber: #ffb547; --cr-rose: #ff5c7a; --cr-lime: #9dff6a;
   --cr-cyan-rgb: 94,224,255; --cr-amber-rgb: 255,181,71; --cr-rose-rgb: 255,92,122; --cr-lime-rgb: 157,255,106;
   display: grid; grid-template-columns: minmax(0, 7fr) minmax(280px, 3fr); gap: 0;
   height: calc(100vh - 118px); min-height: 560px; flex: none;
-  background: #05070f; border: 1px solid #16203a; border-radius: 12px; overflow: hidden;
+  background: #0b0908; border: 1px solid #241e19; border-radius: 12px; overflow: hidden;
   color: var(--cr-text);
 }
 /* One figure a row: the column is narrow and a chart wants the width. */
@@ -3196,4 +3276,295 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
     width: 18px; height: 18px;
     flex: none;
   }
+}
+
+/* ---------------- Sidebar, redrawn ---------------- */
+/*
+ * The icon slot, now that what sits in it is an SVG and not a character.
+ *
+ * It was a 17px text box: a width, a text-align and a font-size, which are the
+ * three properties an emoji needs and the three an SVG ignores. A 16px lucide
+ * square dropped into an inline text box sits on the baseline — half a pixel
+ * high, and different by a hair per row — so the column of icons reads as
+ * hand-placed. A flex box with a fixed square centres it once and every row
+ * agrees.
+ *
+ * The 0.9 opacity goes too. That was there because emoji arrive at full
+ * saturation in colours nobody chose and had to be knocked back; a line icon
+ * is already whatever colour the row is, and fading it only makes a 1.5px
+ * stroke muddy against warm paper.
+ */
+.nav-item .ic {
+  width: 17px; height: 17px; flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  opacity: 1;
+}
+
+/*
+ * The label is the row's elastic middle.
+ *
+ * It used to be a bare text node, and everything that had to reach the right
+ * edge got there with margin-left:auto. That works for exactly one such thing.
+ * Records now has two — a ⌘3 hint and an unseen-count badge — and two auto
+ * margins split the leftover width between them, which parks both somewhere in
+ * the middle of the row. Give the label the leftover width instead and the
+ * tail items simply end up at the end, with the existing auto margin resolving
+ * to nothing rather than fighting.
+ */
+.nav-label {
+  flex: 1 1 auto; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/*
+ * The shortcut hint. ⌘1 ⌘2 ⌘3 ⌘,
+ *
+ * Desktop only, and decided here rather than in the component: in a browser tab
+ * ⌘1–⌘3 are the browser's own tab switcher, so printing them beside our views
+ * would be telling the reader something the page is not allowed to make true.
+ * body.desktop-shell is set once in main.tsx and is the same switch
+ * .sidebar-drag keys on.
+ *
+ * Tabular figures because these stack into a column down the right edge, and
+ * proportional digits give ⌘1 and ⌘2 different widths — a ragged edge on four
+ * characters is more noticeable than it sounds.
+ */
+.nav-key {
+  display: none;
+  flex: none;
+  font-size: 11px;
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  color: var(--text-3);
+  transition: color 0.12s, opacity 0.12s;
+}
+body.desktop-shell .nav-item .nav-key { display: inline-block; }
+/* In the 60px rail the label is gone, and a hint with nothing left to hint at
+   is just a loose number. (The component does not render it there either; this
+   is the guard for the half-second of a collapse animation.) */
+body.desktop-shell .sidebar.collapsed .nav-key { display: none; }
+/* Deliberately quiet: the hint is for the eye that goes looking for it, not for
+   the eye reading the nav. It comes up on the row under the pointer, and on the
+   active row it borrows the row's own copper rather than sitting inside a
+   copper pill as the one grey thing in it. */
+.nav-item:hover .nav-key { color: var(--text-2); }
+.nav-item.active .nav-key { color: currentColor; opacity: 0.62; }
+
+/*
+ * Two labels that were set in the dimmest ink in the palette.
+ *
+ * --text-3 on --bg-1 measures 2.50:1 in the light theme. That is the right
+ * weight for a hint sitting beside the word it belongs to, and the wrong weight
+ * for anything read on its own — and both of these are read on their own:
+ * "Desktop" says which build this is, and the section heads are the only labels
+ * on the shelves the nav is divided into. They were picked when the ground was
+ * cold slate, which gave the ink more room underneath it than warm paper does,
+ * and the display face made it worse rather than better — an italic serif is
+ * thinner than the sans it replaced at the same size. --text-2 is 4.51:1.
+ */
+.brand-sub { color: var(--text-2); }
+.nav-section { color: var(--text-2); }
+
+/*
+ * The last two colours in the sidebar that were still mixed for a blue room.
+ *
+ * A flat black scrim and a flat black shadow are what you reach for on slate,
+ * where the page underneath is already cold. On paper they read as a hole cut
+ * in the desk rather than as a sheet lifted a few millimetres off it. Same
+ * values, pulled to the ink colour each theme actually uses — declared as
+ * tokens so the drawer and the scrim cannot drift apart later.
+ */
+:root {
+  --drawer-shadow: rgba(0, 0, 0, 0.45);
+  --scrim: rgba(10, 9, 8, 0.58);
+}
+[data-theme="light"] {
+  --drawer-shadow: rgba(28, 25, 23, 0.16);
+  --scrim: rgba(28, 25, 23, 0.34);
+}
+.sidebar-scrim { background: var(--scrim); }
+@media (max-width: 640px) {
+  /* Thrown sideways, because the edge this sheet has to lift off is its right
+     one. The original was a symmetric 40px blur at offset 0, which puts as much
+     shadow off the left of the screen as on the page. */
+  .sidebar { box-shadow: 10px 0 34px var(--drawer-shadow); }
+}
+
+/* Not the sidebar, but the same regression and it runs down the side of every
+   scrolling pane in the app: the thumb's hover state was a hard-coded #3f4859,
+   the one slate blue left in a room finished in copper. --text-3 is darker than
+   the track in light and lighter in dark, so the thumb gains contrast on hover
+   in both. */
+::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
+
+/* ---------------- Conversation: one table, two voices ----------------
+ *
+ * The transcript used to be bubble against bubble — same border, same radius,
+ * same box, mirrored. That is the right drawing for two people texting and the
+ * wrong one here, because the two sides are not doing the same thing. A person
+ * types a sentence. The assistant writes a document: prose, code blocks,
+ * tables, whole dashboards. Putting a document in a speech bubble is putting a
+ * document in a box too small for it.
+ *
+ * So the symmetry is broken on purpose. What you said stays a block, pinned
+ * right, lighter than before. What it wrote is set straight on the paper with
+ * a copper rule down the left edge and nothing else — no background, no
+ * border, no corners.
+ *
+ * These rules are unlayered, which is how they outrank the Tailwind the AI
+ * Elements components used to carry (utilities live in @layer utilities).
+--------------------------------------------------------------------- */
+
+/* The column everything is set in. 780px centred rather than 760 flush left:
+   on a 1440 window the transcript pane is 1208 wide, and a left-aligned column
+   left 448px of empty paper on the right that the eye kept reading as a
+   missing panel. The gutters come from .transcript's own padding, so this is
+   exactly one measure wide. */
+.conv-stream {
+  width: 100%;
+  max-width: 780px;
+  margin-inline: auto;
+  padding: 0;
+  /* 30px, not 16. Bubbles separated themselves with their own borders; a
+     document flow has nothing but the whitespace around it, so the whitespace
+     has to be enough to read as a break between turns. */
+  gap: 30px;
+}
+
+/* One turn: the message, and the action row that belongs to it. */
+.msg-turn {
+  /* The distance from the copper rule to the first letter. Named because the
+     footer under the reply has to line up with the text, not with the rule. */
+  --msg-rule-gap: 18px;
+  min-width: 0;
+}
+
+.msg-row { min-width: 0; }
+
+/* --- The assistant side: a document, not a bubble --- */
+
+.msg-row.is-assistant {
+  position: relative;
+  padding-left: var(--msg-rule-gap);
+}
+/* Drawn as a pseudo-element rather than border-left because a border cannot be
+   given rounded ends — border-radius on the box rounds corners that are not
+   there. This is a 2px pillar with 2px caps, which is the whole avatar now. */
+.msg-row.is-assistant::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 2px;
+  bottom: 2px;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+.msg-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* 15.5/1.7 rather than 14/1.6: this is the only text on the page anyone reads
+   a paragraph of, and it was set at the size of a button label. */
+.msg-row.is-assistant .msg-content {
+  font-size: 15.5px;
+  line-height: 1.7;
+  color: var(--text-0);
+}
+/* .md sets its own 1.6, and it is the element the markdown actually lands in,
+   so the measure has to be restated where it can win. */
+.msg-row.is-assistant .md { line-height: 1.7; }
+
+/* The signature above an answer. Display serif, italic, copper — the same
+   voice the nav sections and card titles speak in, so the reply is signed by
+   the app rather than labelled by it. */
+.msg-byline {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+.msg-byline-name {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 400;
+  font-size: 15.5px;
+  line-height: 1.2;
+  color: var(--accent);
+}
+/* "34s · 6 tools" — what the turn cost, in the quietest ink there is. Tabular
+   figures so a ticking number does not shuffle the line beside it. */
+.msg-byline-meta {
+  font-size: 11.5px;
+  line-height: 1.2;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Both of these carry their own top margin for the days they stood alone in a
+   bubble. Inside the flex column that margin is added to the gap, which put a
+   stopped answer twice as far from the text it stopped in the middle of. */
+.msg-content > .msg-error,
+.msg-content > .msg-stopped { margin-top: 0; }
+
+/* --- The user side: still a block, but a lighter one --- */
+
+.msg-row.is-user {
+  display: flex;
+  justify-content: flex-end;
+}
+.msg-row.is-user .msg-content {
+  max-width: 620px;
+  padding: 10px 14px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-border);
+  /* Three soft corners and one tight one. The 4px sits bottom-right, pointing
+     back at the person who typed it — the only thing left saying which side
+     this came from now that the avatars are gone. */
+  border-radius: 12px 12px 4px 12px;
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: var(--text-0);
+  overflow-wrap: anywhere;
+}
+
+/* --- The row under a reply --- */
+
+/* Indented to the text, not to the rule: the copy and regenerate buttons are
+   about what was written, so they start where the writing starts. */
+.msg-turn.is-assistant .msg-footer { margin: 10px 0 0 var(--msg-rule-gap); }
+.msg-turn.is-user .msg-footer { margin: 8px 0 0; justify-content: flex-end; }
+
+/* --- The composer follows the column --- */
+
+/* The border-top stays the full width of the pane — it is the edge of the
+   page, not of the input — so the centring happens on the children. The @ menu
+   is positioned against .composer and is excluded: it is already solved from
+   left/right, and giving it a width would over-constrain it off the edge. A
+   max-width with auto margins centres it without touching either. */
+.composer > *:not(.agent-menu) {
+  width: 100%;
+  max-width: 780px;
+  margin-inline: auto;
+}
+.agent-menu {
+  max-width: 780px;
+  margin-inline: auto;
+}
+
+/* --- Phone --- */
+@media (max-width: 640px) {
+  /* 18px of indent is a fifth of a 390px screen. The rule still reads at 14,
+     and the reply gets the width back. */
+  .msg-turn { --msg-rule-gap: 14px; }
+  .msg-row.is-assistant .msg-content { font-size: 15px; }
+  .msg-byline-name { font-size: 15px; }
 }
