@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Life } from "../../wailsjs/go/main/App";
+import { Life } from "../../wailsjs/go/app/App";
 import { backend } from "../../wailsjs/go/models";
 import { AppStatus } from "../lib/types";
 import { ScheduleRunLog } from "../lib/useScheduleRuns";

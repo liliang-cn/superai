@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { InstallMCPServer, MCP, RemoveMCPServer, SearchMCPServers } from "../../wailsjs/go/main/App";
+import { InstallMCPServer, MCP, RemoveMCPServer, SearchMCPServers } from "../../wailsjs/go/app/App";
 import { mcp } from "../../wailsjs/go/models";
 import { useImeGuard } from "@/lib/ime";
 import { toast } from "../lib/toasts";

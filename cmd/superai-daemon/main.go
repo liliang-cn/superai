@@ -36,7 +36,7 @@ import (
 	"time"
 
 	"github.com/liliang-cn/agent-go/v3/pkg/agent"
-	"github.com/liliang-cn/superai-desktop/backend"
+	"github.com/liliang-cn/superai-desktop/internal/backend"
 )
 
 func main() {

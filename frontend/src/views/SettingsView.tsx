@@ -16,9 +16,9 @@ import {
   SaveSettings,
   TestWebhook,
   ToolApprovalInfo,
-} from "../../wailsjs/go/main/App";
+} from "../../wailsjs/go/app/App";
 import { BrowserOpenURL, EventsOff, EventsOn } from "../../wailsjs/runtime/runtime";
-import { backend, main } from "../../wailsjs/go/models";
+import { app, backend } from "../../wailsjs/go/models";
 import { toast } from "../lib/toasts";
 
 type ProxyStatus = {
@@ -249,7 +249,7 @@ function ExternalAgentsCard({
   onChange: (patch: Partial<backend.ExternalAgents>) => void;
   statuses: backend.ExternalAgentStatus[];
   /** What each CLI said when it was last actually asked something, if ever. */
-  reached: main.RemoteAgentStatus[];
+  reached: app.RemoteAgentStatus[];
   probing: boolean;
   onRecheck: () => void;
 }) {
@@ -448,7 +448,7 @@ function RemoteAgentsCard({
 }: {
   ra: backend.RemoteAgents;
   onChange: (patch: Partial<backend.RemoteAgents>) => void;
-  statuses: main.RemoteAgentStatus[];
+  statuses: app.RemoteAgentStatus[];
   checking: boolean;
   onCheck: () => void;
 }) {
@@ -614,7 +614,7 @@ export default function SettingsView({
   const [probing, setProbing] = useState(false);
   // Kept apart from the CLI probe above: that one looks for a binary and takes
   // milliseconds, this one asks every agent a question and takes seconds.
-  const [reachable, setReachable] = useState<main.RemoteAgentStatus[]>([]);
+  const [reachable, setReachable] = useState<app.RemoteAgentStatus[]>([]);
   const [checking, setChecking] = useState(false);
 
   const refreshAgentCLIs = () => {
@@ -654,7 +654,7 @@ export default function SettingsView({
     setReachable([]);
     try {
       await SaveSettings(s);
-      setReachable((await CheckRemoteAgents()) as main.RemoteAgentStatus[]);
+      setReachable((await CheckRemoteAgents()) as app.RemoteAgentStatus[]);
     } catch (e: any) {
       toast.error(String(e?.message || e));
     } finally {

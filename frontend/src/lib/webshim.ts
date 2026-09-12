@@ -6,7 +6,7 @@
 // the `!window.go` gate below never fires there. In a plain browser tab —
 // served by `superai-desktop serve` — this shim takes their place:
 //
-//   window.go.main.App.<Method>(...)  ->  POST /api/rpc/<Method>  (JSON array in,
+//   window.go.app.App.<Method>(...)  ->  POST /api/rpc/<Method>  (JSON array in,
 //                                         JSON out, non-2xx rejects the promise
 //                                         with the response text — the same
 //                                         resolve/reject shape Wails produces)
@@ -130,7 +130,11 @@ function installWebShim() {
   };
 
   const w = window as unknown as Record<string, unknown>;
-  w.go = { main: { App: appProxy } };
+  // Keyed by the Go package the bindings are generated from — internal/app,
+  // so `app`. It was `main` until the Go sources moved out of the repo root;
+  // this object and frontend/wailsjs/go/app/App.js have to agree on the name
+  // or every call in the browser build resolves to undefined.
+  w.go = { app: { App: appProxy } };
   w.runtime = runtimeShim;
   // Served over HTTP, which is the only mode with a door on it. The desktop
   // window never sets this, and so never asks for a password.

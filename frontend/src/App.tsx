@@ -19,7 +19,7 @@ import { Accent, AppStatus, Theme, ViewKey, normalizeStatus } from "./lib/types"
 import { useScheduleRuns } from "./lib/useScheduleRuns";
 import { useToolApprovals } from "./lib/useToolApprovals";
 import { uiRules } from "./lib/aigui";
-import { GetStatus, SetUIRules, SetWindowTheme } from "../wailsjs/go/main/App";
+import { GetStatus, SetUIRules, SetWindowTheme } from "../wailsjs/go/app/App";
 
 /** Where the sidebar remembers being expanded. Shared with the drawer on a
  *  phone, which is the same state seen through a different layout. */

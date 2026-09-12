@@ -15,7 +15,7 @@ import { citation } from "@ai-gui/plugin-citation";
 import { bigscreen } from "@ai-gui/plugin-bigscreen";
 import { ui } from "@ai-gui/plugin-ui";
 import { CodeBlock } from "@/components/ai-elements/code-block";
-import { AddRecord, AddSchedule } from "../../wailsjs/go/main/App";
+import { AddRecord, AddSchedule } from "../../wailsjs/go/app/App";
 
 /**
  * The language SuperAI speaks. The persona answers in Chinese, so the block

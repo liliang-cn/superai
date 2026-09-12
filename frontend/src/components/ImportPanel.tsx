@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, useState } from "react";
-import { ImportCSV } from "../../wailsjs/go/main/App";
+import { ImportCSV } from "../../wailsjs/go/app/App";
 
 /**
  * Feeding the brain, on the page that shows it.

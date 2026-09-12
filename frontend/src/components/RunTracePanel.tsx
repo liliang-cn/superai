@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { TraceLines } from "../../wailsjs/go/main/App";
+import { TraceLines } from "../../wailsjs/go/app/App";
 import { useImeGuard } from "@/lib/ime";
 import { RotateCw, ScrollText, X } from "lucide-react";
 

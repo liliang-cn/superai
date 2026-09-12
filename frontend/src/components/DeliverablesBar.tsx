@@ -11,7 +11,7 @@ import {
   OpenWorkspaceFileExternal,
   ReadWorkspaceFile,
   ReadWorkspaceFileDataURL,
-} from "../../wailsjs/go/main/App";
+} from "../../wailsjs/go/app/App";
 import { agent } from "../../wailsjs/go/models";
 import { Response } from "@/components/ai-elements/response";
 

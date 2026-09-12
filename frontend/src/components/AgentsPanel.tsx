@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { AtSignIcon, CircleSlashIcon, RadioIcon, ServerIcon } from "lucide-react";
-import { RemoteAgentNames } from "../../wailsjs/go/main/App";
+import { RemoteAgentNames } from "../../wailsjs/go/app/App";
 import { AgentInfo } from "../lib/useAgentMentions";
 
 /**

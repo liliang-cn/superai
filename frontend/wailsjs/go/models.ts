@@ -83,6 +83,37 @@ export namespace agent {
 
 }
 
+export namespace app {
+	
+	export class RemoteAgentStatus {
+	    name: string;
+	    about: string;
+	    local: boolean;
+	    hosts?: string[];
+	    reachable: boolean;
+	    where?: string;
+	    detail?: string;
+	    ms: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new RemoteAgentStatus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.about = source["about"];
+	        this.local = source["local"];
+	        this.hosts = source["hosts"];
+	        this.reachable = source["reachable"];
+	        this.where = source["where"];
+	        this.detail = source["detail"];
+	        this.ms = source["ms"];
+	    }
+	}
+
+}
+
 export namespace backend {
 	
 	export class CLIProxyAccount {
@@ -1038,37 +1069,6 @@ export namespace backend {
 	        this.planDone = source["planDone"];
 	        this.planTotal = source["planTotal"];
 	        this.spark = source["spark"];
-	    }
-	}
-
-}
-
-export namespace main {
-	
-	export class RemoteAgentStatus {
-	    name: string;
-	    about: string;
-	    local: boolean;
-	    hosts?: string[];
-	    reachable: boolean;
-	    where?: string;
-	    detail?: string;
-	    ms: number;
-	
-	    static createFrom(source: any = {}) {
-	        return new RemoteAgentStatus(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.name = source["name"];
-	        this.about = source["about"];
-	        this.local = source["local"];
-	        this.hosts = source["hosts"];
-	        this.reachable = source["reachable"];
-	        this.where = source["where"];
-	        this.detail = source["detail"];
-	        this.ms = source["ms"];
 	    }
 	}
 

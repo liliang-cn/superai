@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { PreviewPrompt } from "../../wailsjs/go/main/App";
+import { PreviewPrompt } from "../../wailsjs/go/app/App";
 import { backend } from "../../wailsjs/go/models";
 import { ChevronDown, ChevronRight } from "lucide-react";
 

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { ClipboardSetText } from "../../wailsjs/runtime";
-import { EmitAvatarTest } from "../../wailsjs/go/main/App";
+import { EmitAvatarTest } from "../../wailsjs/go/app/App";
 import { AppStatus } from "../lib/types";
 import { openExternal } from "../lib/openExternal";
 

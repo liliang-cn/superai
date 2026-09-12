@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { EventsOn } from "../../wailsjs/runtime";
 import {
   Dashboard, GetStatus, GraphView as startGraphView, LongRunList, LongRunStart, LongRunState, LongRunStop,
-} from "../../wailsjs/go/main/App";
+} from "../../wailsjs/go/app/App";
 import {
   Activity, AlertTriangle, Brain, Clock, Coins, Cpu, Database, Gauge, GitBranch, Grid3x3,
   ListChecks, Play, Radio, RotateCcw, ScrollText, Shield, Sparkles, Square, Terminal, Wrench, Zap,

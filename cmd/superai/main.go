@@ -31,7 +31,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/liliang-cn/agent-go/v3/pkg/agent"
-	"github.com/liliang-cn/superai-desktop/backend"
+	"github.com/liliang-cn/superai-desktop/internal/backend"
 )
 
 // result is the --json shape. Deliberately small and stable: a harness reads

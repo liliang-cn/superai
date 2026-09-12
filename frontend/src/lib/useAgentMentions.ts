@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { RemoteAgentNames } from "../../wailsjs/go/main/App";
+import { RemoteAgentNames } from "../../wailsjs/go/app/App";
 
 /**
  * The @ menu in the composer.

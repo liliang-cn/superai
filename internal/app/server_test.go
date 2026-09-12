@@ -1,0 +1,317 @@
+package app
+
+import (
+	"bufio"
+	"context"
+	"encoding/base64"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/liliang-cn/superai-desktop/internal/backend"
+)
+
+// serveTestApp returns an App that has never been through startup: no Service,
+// no scheduler, no Wails context. Every method the tests call must be safe in
+// that state — that is itself part of the contract, since an RPC can arrive
+// before the backend finishes building.
+func serveTestApp(t *testing.T) (*App, *eventHub, *httptest.Server) {
+	t.Helper()
+	hub := newEventHub()
+	app := NewApp()
+	app.emitFn = hub.broadcast
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/rpc/", func(w http.ResponseWriter, r *http.Request) { rpcCall(app, w, r) })
+	mux.HandleFunc("/api/events", hub.serveSSE)
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+	return app, hub, srv
+}
+
+func TestRPCDispatchesArgsAndResult(t *testing.T) {
+	_, _, srv := serveTestApp(t)
+
+	// CancelChat exercises one string arg in, one string out, and is safe with
+	// no runs in flight.
+	resp, err := http.Post(srv.URL+"/api/rpc/CancelChat", "application/json", strings.NewReader(`["nope"]`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d", resp.StatusCode)
+	}
+	var got string
+	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(got, "not running") {
+		t.Fatalf("CancelChat(nope) = %q, want the not-running message", got)
+	}
+}
+
+func TestRPCStructResult(t *testing.T) {
+	app, _, srv := serveTestApp(t)
+	app.settings = &backend.Settings{LLMModel: "test-model"}
+
+	resp, err := http.Post(srv.URL+"/api/rpc/GetSettings", "application/json", strings.NewReader(`[]`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	var got backend.Settings
+	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+		t.Fatal(err)
+	}
+	if got.LLMModel != "test-model" {
+		t.Fatalf("LLMModel = %q, want test-model", got.LLMModel)
+	}
+}
+
+// A method that returns (T, error) has to answer with T when the error is nil.
+//
+// It did not. reflect gives a nil error back as an `any` with no dynamic type,
+// so the "is this the error return?" assertion said no, and the nil went on to
+// overwrite the result — every such method answered `null` in the browser and
+// worked in the desktop window, where Wails does its own dispatch. A pasted
+// screenshot came back as a null path and the composer crashed drawing it.
+func TestRPCReturnsTheResultBesideANilError(t *testing.T) {
+	app, _, srv := serveTestApp(t)
+	app.settings = &backend.Settings{WorkspaceDir: t.TempDir()}
+
+	body := `["note.txt","` + base64.StdEncoding.EncodeToString([]byte("hello")) + `"]`
+	resp, err := http.Post(srv.URL+"/api/rpc/ImportPastedFile", "application/json", strings.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d", resp.StatusCode)
+	}
+	var got any
+	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+		t.Fatal(err)
+	}
+	path, ok := got.(string)
+	if !ok || path == "" {
+		t.Fatalf("got %#v, want the path the file landed at", got)
+	}
+}
+
+// And with a non-nil error it has to be a failure, not a 200 carrying one.
+func TestRPCRejectsOnANonNilError(t *testing.T) {
+	app, _, srv := serveTestApp(t)
+	app.settings = &backend.Settings{WorkspaceDir: t.TempDir()}
+
+	resp, err := http.Post(srv.URL+"/api/rpc/ImportPastedFile", "application/json", strings.NewReader(`["x.png","not base64"]`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500", resp.StatusCode)
+	}
+}
+
+func TestRPCRejectsBadCalls(t *testing.T) {
+	_, _, srv := serveTestApp(t)
+
+	cases := []struct {
+		name   string
+		method string
+		path   string
+		body   string
+		want   int
+	}{
+		{"unknown method", http.MethodPost, "/api/rpc/NoSuchMethod", `[]`, http.StatusNotFound},
+		{"denied dialog method", http.MethodPost, "/api/rpc/PickFiles", `[]`, http.StatusNotFound},
+		{"unexported is invisible", http.MethodPost, "/api/rpc/emit", `["x",{}]`, http.StatusNotFound},
+		{"wrong arity", http.MethodPost, "/api/rpc/CancelChat", `[]`, http.StatusBadRequest},
+		{"not an array", http.MethodPost, "/api/rpc/CancelChat", `{"id":"x"}`, http.StatusBadRequest},
+		{"GET refused", http.MethodGet, "/api/rpc/GetSettings", ``, http.StatusMethodNotAllowed},
+	}
+	for _, tc := range cases {
+		req, _ := http.NewRequest(tc.method, srv.URL+tc.path, strings.NewReader(tc.body))
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("%s: %v", tc.name, err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != tc.want {
+			t.Errorf("%s: status = %d, want %d", tc.name, resp.StatusCode, tc.want)
+		}
+	}
+}
+
+func TestSSEDeliversBroadcasts(t *testing.T) {
+	_, hub, srv := serveTestApp(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, srv.URL+"/api/events", nil)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if ct := resp.Header.Get("Content-Type"); ct != "text/event-stream" {
+		t.Fatalf("Content-Type = %q", ct)
+	}
+
+	r := bufio.NewReader(resp.Body)
+	// First frame is the ": connected" comment.
+	if line, err := r.ReadString('\n'); err != nil || !strings.HasPrefix(line, ":") {
+		t.Fatalf("opening frame = %q, %v", line, err)
+	}
+
+	// The subscription exists as soon as the handler is running; broadcast
+	// after the opening frame has been read so we know it is.
+	hub.broadcast("chat:event", map[string]any{"type": "tool_call", "tool": "fetch_url"})
+
+	deadline := time.After(3 * time.Second)
+	got := make(chan string, 1)
+	go func() {
+		for {
+			line, err := r.ReadString('\n')
+			if err != nil {
+				return
+			}
+			if strings.HasPrefix(line, "data: ") {
+				got <- strings.TrimSpace(strings.TrimPrefix(line, "data: "))
+				return
+			}
+		}
+	}()
+	select {
+	case data := <-got:
+		var env struct {
+			Name    string         `json:"name"`
+			Payload map[string]any `json:"payload"`
+		}
+		if err := json.Unmarshal([]byte(data), &env); err != nil {
+			t.Fatalf("bad envelope %q: %v", data, err)
+		}
+		if env.Name != "chat:event" || env.Payload["tool"] != "fetch_url" {
+			t.Fatalf("envelope = %+v", env)
+		}
+	case <-deadline:
+		t.Fatal("no event arrived over SSE")
+	}
+}
+
+// The approval gate has to work in serve mode as well as in the window, and
+// nothing about it was written twice to make that true: the prompt rides the
+// same SSE stream as every other event, and the answer goes back through the
+// reflection bridge like any other bound method. This test is what keeps that
+// claim honest — if ResolveToolApproval ever stopped being an exported method
+// on App, or the payload stopped carrying the command, the desktop build would
+// keep working and the browser one would quietly start timing out.
+func TestApprovalRoundTripOverHTTPAndSSE(t *testing.T) {
+	app, _, srv := serveTestApp(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, srv.URL+"/api/events", nil)
+	stream, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stream.Body.Close()
+	r := bufio.NewReader(stream.Body)
+	if line, err := r.ReadString('\n'); err != nil || !strings.HasPrefix(line, ":") {
+		t.Fatalf("opening frame = %q, %v", line, err)
+	}
+
+	answered := make(chan backend.ApprovalDecision, 1)
+	go func() {
+		dec, _ := app.askToolApproval(context.Background(), backend.ApprovalRequest{
+			ID: "rpc-1", Tool: "bash", Command: "rm -rf /tmp/x",
+			AskedAt: time.Now(), ExpiresAt: time.Now().Add(time.Minute),
+		})
+		answered <- dec
+	}()
+
+	// The browser learns about the prompt the same way it learns about a
+	// streamed token.
+	envelope := make(chan map[string]any, 1)
+	go func() {
+		for {
+			line, err := r.ReadString('\n')
+			if err != nil {
+				return
+			}
+			if !strings.HasPrefix(line, "data: ") {
+				continue
+			}
+			var env struct {
+				Name    string         `json:"name"`
+				Payload map[string]any `json:"payload"`
+			}
+			if json.Unmarshal([]byte(strings.TrimPrefix(strings.TrimSpace(line), "data: ")), &env) != nil {
+				continue
+			}
+			if env.Name == "tool:approval" {
+				envelope <- env.Payload
+				return
+			}
+		}
+	}()
+
+	select {
+	case payload := <-envelope:
+		if payload["command"] != "rm -rf /tmp/x" {
+			t.Fatalf("SSE payload = %v, want the command the user has to judge", payload)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("the approval prompt never reached the browser surface")
+	}
+
+	resp, err := http.Post(srv.URL+"/api/rpc/ResolveToolApproval", "application/json",
+		strings.NewReader(`["rpc-1", true]`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("ResolveToolApproval over RPC: status = %d", resp.StatusCode)
+	}
+	var reply string
+	if err := json.NewDecoder(resp.Body).Decode(&reply); err != nil {
+		t.Fatal(err)
+	}
+	if reply != "ok" {
+		t.Fatalf("ResolveToolApproval = %q, want ok", reply)
+	}
+
+	select {
+	case dec := <-answered:
+		if !dec.Allowed {
+			t.Fatal("an approval sent over RPC did not reach the waiting tool call")
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("the waiting tool call never woke up")
+	}
+}
+
+func TestHubDropsSlowSubscriberWithoutBlocking(t *testing.T) {
+	hub := newEventHub()
+	ch, off := hub.subscribe()
+	defer off()
+	_ = ch // never read: the subscriber is maximally slow
+
+	done := make(chan struct{})
+	go func() {
+		for i := 0; i < 1000; i++ { // more than the channel buffer
+			hub.broadcast("chat:event", map[string]any{"i": i})
+		}
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatal("broadcast blocked on a subscriber that never reads")
+	}
+}

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { EventsOn } from "../../wailsjs/runtime";
-import { PendingToolApprovals, ResolveToolApproval } from "../../wailsjs/go/main/App";
+import { PendingToolApprovals, ResolveToolApproval } from "../../wailsjs/go/app/App";
 
 /** One tool call waiting for a human, as the backend describes it. */
 export interface ToolApproval {

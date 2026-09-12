@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { InstallSkill, RemoveSkill, SearchSkills, Skills } from "../../wailsjs/go/main/App";
+import { InstallSkill, RemoveSkill, SearchSkills, Skills } from "../../wailsjs/go/app/App";
 import { backend } from "../../wailsjs/go/models";
 import { toast } from "../lib/toasts";
 

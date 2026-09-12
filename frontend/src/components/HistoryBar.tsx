@@ -6,7 +6,7 @@ import {
   PlusIcon,
   Trash2Icon,
 } from "lucide-react";
-import { ChatSessions, DeleteChatSession } from "../../wailsjs/go/main/App";
+import { ChatSessions, DeleteChatSession } from "../../wailsjs/go/app/App";
 import { backend } from "../../wailsjs/go/models";
 import { copyText } from "../lib/format";
 import { toast } from "../lib/toasts";

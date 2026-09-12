@@ -4,7 +4,7 @@ import {
   MarkNotificationsRead,
   Notifications,
   UnreadNotifications,
-} from "../../wailsjs/go/main/App";
+} from "../../wailsjs/go/app/App";
 
 /**
  * The notification centre, from the frontend's side.

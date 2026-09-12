@@ -1,6 +1,6 @@
 import { ClipboardEvent, useCallback, useEffect, useState } from "react";
 import { OnFileDrop, OnFileDropOff } from "../../wailsjs/runtime";
-import { ImportFiles, ImportPastedFile, PickFiles } from "../../wailsjs/go/main/App";
+import { ImportFiles, ImportPastedFile, PickFiles } from "../../wailsjs/go/app/App";
 import { toast } from "./toasts";
 
 const IMAGE_RE = /\.(png|jpe?g|gif|webp|bmp|tiff?)$/i;

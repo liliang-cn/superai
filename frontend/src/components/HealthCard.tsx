@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Doctor } from "../../wailsjs/go/main/App";
+import { Doctor } from "../../wailsjs/go/app/App";
 import { backend } from "../../wailsjs/go/models";
 import { HeartPulse, RotateCw, ChevronDown, ChevronRight } from "lucide-react";
 

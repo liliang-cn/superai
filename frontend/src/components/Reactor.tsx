@@ -4,7 +4,7 @@ import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 import { EventsOn } from "../../wailsjs/runtime";
-import { Pulse as readPulse } from "../../wailsjs/go/main/App";
+import { Pulse as readPulse } from "../../wailsjs/go/app/App";
 import { useTween } from "../lib/useTween";
 
 /**

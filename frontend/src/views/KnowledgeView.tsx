@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ClipboardSetText } from "../../wailsjs/runtime";
-import { GraphView as startGraphView, MemoryRecall } from "../../wailsjs/go/main/App";
+import { GraphView as startGraphView, MemoryRecall } from "../../wailsjs/go/app/App";
 import { openExternal } from "../lib/openExternal";
 import ImportPanel from "../components/ImportPanel";
 import { SearchIcon, UploadIcon } from "lucide-react";

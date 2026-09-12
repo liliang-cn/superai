@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { PetStage } from "../../wailsjs/go/main/App";
+import { PetStage } from "../../wailsjs/go/app/App";
 
 /**
  * The pixel character, loose in the window.

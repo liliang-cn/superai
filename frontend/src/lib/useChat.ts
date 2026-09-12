@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EventsOn } from "../../wailsjs/runtime";
-import { CancelChat, ChatHistory, SendChat } from "../../wailsjs/go/main/App";
+import { CancelChat, ChatHistory, SendChat } from "../../wailsjs/go/app/App";
 import {
   AskSummary,
   ChatCancelled,

@@ -12,3 +12,9 @@ frontend/dist
 # scratch from driving the app under Playwright
 /.playwright-mcp/
 build/linux/
+
+# screenshots and scratch from driving the app under a browser
+*.png
+!build/appicon.png
+!frontend/public/appicon.png
+!internal/backend/avatars/*.png

@@ -7,7 +7,7 @@ import {
   ScheduleFromText,
   ScheduledPrompts,
   SetScheduledPromptEnabled,
-} from "../../wailsjs/go/main/App";
+} from "../../wailsjs/go/app/App";
 import { agent } from "../../wailsjs/go/models";
 import { AppStatus } from "../lib/types";
 import { describeCron } from "../lib/cron";

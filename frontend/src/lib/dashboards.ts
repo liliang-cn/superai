@@ -1,4 +1,4 @@
-import { Dashboards, DeleteDashboard, RefreshDashboard, RenameDashboard, SaveDashboard, SetDashboardCron } from "../../wailsjs/go/main/App";
+import { Dashboards, DeleteDashboard, RefreshDashboard, RenameDashboard, SaveDashboard, SetDashboardCron } from "../../wailsjs/go/app/App";
 import { backend } from "../../wailsjs/go/models";
 
 /**

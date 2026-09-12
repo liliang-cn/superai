@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { ZapIcon } from "lucide-react";
-import { StartYoloMode, StopYoloMode, ToolApprovalInfo } from "../../wailsjs/go/main/App";
+import { StartYoloMode, StopYoloMode, ToolApprovalInfo } from "../../wailsjs/go/app/App";
 import { EventsOn } from "../../wailsjs/runtime";
 
 /**

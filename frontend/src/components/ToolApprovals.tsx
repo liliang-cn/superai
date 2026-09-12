@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { ShieldAlertIcon } from "lucide-react";
 import { ToolApproval } from "../lib/useToolApprovals";
-import { StartYoloMode } from "../../wailsjs/go/main/App";
+import { StartYoloMode } from "../../wailsjs/go/app/App";
 
 /**
  * Asking before the agent runs a shell command.
