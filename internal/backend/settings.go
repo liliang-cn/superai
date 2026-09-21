@@ -165,6 +165,22 @@ type Settings struct {
 	// will actually implement.
 	WebhookSecret string `json:"webhook_secret"`
 
+	// TelegramBotToken turns on the inbound Telegram bridge (telegram.go): the
+	// bot is long-polled and every message from an allowed chat runs a turn,
+	// with the answer sent back. Empty disables it, which is the default.
+	//
+	// This is the one per-service integration in the app, and the comment on
+	// WebhookURL above explains why the outbound side is not: a notice is one
+	// message with no state, a conversation is not.
+	TelegramBotToken string `json:"telegram_bot_token"`
+
+	// TelegramAllowedChats is who may talk to it — Telegram chat ids, which for
+	// a private chat are the person's own user id. There is no wildcard and no
+	// default: a bot's username is public and searchable, and this agent runs
+	// shell commands, so an empty list refuses to start the poller rather than
+	// starting it open to whoever finds the bot.
+	TelegramAllowedChats []int64 `json:"telegram_allowed_chats"`
+
 	// ExternalAgents lets SuperAI hand a task to an agent CLI installed on
 	// this machine. Nested rather than flattened into a dozen top-level keys
 	// so the whole feature is one object a person can read, delete or diff in

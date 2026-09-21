@@ -832,6 +832,8 @@ export namespace backend {
 	    shared_memory_namespace: string;
 	    webhook_url: string;
 	    webhook_secret: string;
+	    telegram_bot_token: string;
+	    telegram_allowed_chats: number[];
 	    external_agents: ExternalAgents;
 	    remote_agents: RemoteAgents;
 	
@@ -871,6 +873,8 @@ export namespace backend {
 	        this.shared_memory_namespace = source["shared_memory_namespace"];
 	        this.webhook_url = source["webhook_url"];
 	        this.webhook_secret = source["webhook_secret"];
+	        this.telegram_bot_token = source["telegram_bot_token"];
+	        this.telegram_allowed_chats = source["telegram_allowed_chats"];
 	        this.external_agents = this.convertValues(source["external_agents"], ExternalAgents);
 	        this.remote_agents = this.convertValues(source["remote_agents"], RemoteAgents);
 	    }

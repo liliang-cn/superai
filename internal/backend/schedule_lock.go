@@ -1,12 +1,9 @@
 package backend
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
-	"sync"
-	"syscall"
 )
 
 // Who owns the timers.
@@ -31,54 +28,15 @@ import (
 // scheduleLockName is the lock file inside the data directory.
 const scheduleLockName = "scheduler.lock"
 
-// ScheduleLock is a held claim on running the timers.
-type ScheduleLock struct {
-	mu   sync.Mutex
-	file *os.File
-}
+// ScheduleLock is a held claim on running the timers. It is a FileLock under
+// the name below; the alias keeps the callers reading as what they are about.
+type ScheduleLock = FileLock
 
 // AcquireScheduleLock tries to claim the timers for this process. It returns
 // (nil, nil) when another process already holds them — that is the ordinary
 // case, not an error, and the caller should carry on without a cron loop.
 func AcquireScheduleLock() (*ScheduleLock, error) {
-	if err := os.MkdirAll(DataDir(), 0o755); err != nil {
-		return nil, fmt.Errorf("data dir: %w", err)
-	}
-	path := filepath.Join(DataDir(), scheduleLockName)
-
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o644)
-	if err != nil {
-		return nil, fmt.Errorf("open %s: %w", scheduleLockName, err)
-	}
-
-	// Non-blocking: the point is to find out whether someone else has it, not to
-	// wait for them to quit.
-	if err := syscall.Flock(int(file.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
-		_ = file.Close()
-		return nil, nil
-	}
-
-	// The pid is for a human reading the file during diagnosis; the lock itself
-	// is what enforces anything.
-	_ = file.Truncate(0)
-	_, _ = file.WriteAt([]byte(strconv.Itoa(os.Getpid())+"\n"), 0)
-
-	return &ScheduleLock{file: file}, nil
-}
-
-// Release gives up the claim. Safe to call more than once.
-func (l *ScheduleLock) Release() {
-	if l == nil {
-		return
-	}
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	if l.file == nil {
-		return
-	}
-	_ = syscall.Flock(int(l.file.Fd()), syscall.LOCK_UN)
-	_ = l.file.Close()
-	l.file = nil
+	return AcquireFileLock(scheduleLockName)
 }
 
 // ScheduleLockHolder reports the pid recorded in the lock file, for telling the

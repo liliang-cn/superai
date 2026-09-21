@@ -64,6 +64,12 @@ type App struct {
 	// service, since a run is an agent turn against the current settings.
 	scheduler    *agent.PromptScheduler
 	schedulerErr string
+
+	// telegram is the inbound Telegram bridge, when one is configured. Like the
+	// scheduler it is rebuilt with the service and may be idle rather than
+	// polling, because only one process gets the bot.
+	telegram    *backend.TelegramBridge
+	telegramErr string
 	// scheduleLock is held while this process owns firing schedules; nil means
 	// another process (the daemon) owns them and this one only manages.
 	scheduleLock *backend.ScheduleLock
@@ -146,6 +152,7 @@ func (a *App) boot() {
 	// schedule.
 	a.initNotifications()
 	a.startScheduler()
+	a.startTelegram()
 }
 
 // syncProxy brings the embedded CLIProxyAPI in line with the current settings:
@@ -185,7 +192,9 @@ func (a *App) syncProxy() {
 // shutdown releases backend resources.
 func (a *App) Shutdown(ctx context.Context) {
 	// Before the lock: stopping the cron loop must not race the service it runs
-	// its turns against.
+	// its turns against. The Telegram poller is stopped first and for exactly
+	// the same reason — it may be in the middle of a turn.
+	a.stopTelegram()
 	a.stopScheduler()
 	// Also before the lock, and both for the same reason as the scheduler: each
 	// takes a lock that is not a.mu — the view waits for its HTTP server to
@@ -298,8 +307,11 @@ func (a *App) SaveSettings(s backend.Settings) error {
 	a.mu.Unlock()
 	a.syncProxy()
 	a.rebuild()
-	// The scheduler runs turns against the service that was just replaced.
+	// The scheduler runs turns against the service that was just replaced, and
+	// so does the Telegram bridge. Restarting the bridge here is also what
+	// makes turning Telegram on a settings change rather than a restart.
 	a.restartScheduler()
+	a.startTelegram()
 	return nil
 }
 
@@ -568,6 +580,8 @@ func (a *App) GetStatus() map[string]any {
 		"cliproxyError":  a.proxyErr,
 		"scheduler":      a.scheduler != nil,
 		"schedulerError": a.schedulerErr,
+		"telegram":       a.telegram != nil,
+		"telegramError":  a.telegramErr,
 		"notifications":  a.notifyOK,
 	}
 	if a.settings != nil {

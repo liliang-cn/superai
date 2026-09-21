@@ -1086,6 +1086,38 @@ export default function SettingsView({
             </div>
           </div>
 
+          <div className="card" hidden={section !== "notifications"}>
+            <div className="card-title">Telegram</div>
+            <div className="card-desc">
+              The way back in: messages sent to the bot run a turn and the answer comes back.
+              Conversations are shared with this page — a chat started on the phone is in
+              History here, and the reverse.
+            </div>
+            <PasswordField
+              label="Bot Token"
+              value={s.telegram_bot_token}
+              onChange={(v) => set("telegram_bot_token", v)}
+            />
+            <span className="hint">
+              From @BotFather. Empty turns the bridge off.
+            </span>
+            <TextField
+              label="Allowed Chat IDs"
+              value={(s.telegram_allowed_chats ?? []).join(", ")}
+              onChange={(v) =>
+                set(
+                  "telegram_allowed_chats",
+                  v
+                    .split(",")
+                    .map((x) => Number(x.trim()))
+                    .filter((n) => Number.isFinite(n) && n !== 0),
+                )
+              }
+              placeholder="1669479669"
+              hint="Who may talk to it, comma separated. For a private chat this is your own Telegram user id. There is no wildcard: a bot's username is public, and this agent runs shell commands, so an empty list leaves the bridge off rather than open."
+            />
+          </div>
+
           {section === "agents" && (
             <ExternalAgentsCard
               ea={s.external_agents ?? new backend.ExternalAgents()}
