@@ -711,7 +711,13 @@ func (a *App) SendChat(sessionID, message string, imagePaths []string) string {
 	// Registered here rather than inside the goroutine: SendChat returns the id
 	// to the frontend, and a stop pressed before the goroutine got scheduled
 	// would otherwise be told the run does not exist.
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	// No deadline. A turn ends when the model stops, when the user presses
+	// stop, or when the app shuts down — not when a clock says so. The ten
+	// minutes that used to be here came in with the first commit and were
+	// never a decision about this app: they cut off real work mid-sentence and
+	// reported it as a turn the user had cancelled, which is a lie the
+	// transcript then kept.
+	ctx, cancel := context.WithCancel(context.Background())
 	a.trackRun(requestID, cancel)
 
 	go func() {
@@ -746,11 +752,11 @@ func (a *App) SendChat(sessionID, message string, imagePaths []string) string {
 		// transcript can say "you stopped this" and keep whatever was already
 		// streamed, instead of painting a red error over a half-written answer.
 		//
-		// ctx.Err() is in the test as well as the stop flag: the ten-minute
-		// deadline above ends the turn the same way the button does, and the
-		// agent loop reports both as an ordinary workflow_cancelled event with
-		// a nil error — so without it, a timed-out turn would settle as a
-		// successful answer with nothing in it.
+		// ctx.Err() is in the test as well as the stop flag: shutdown cancels
+		// the same context the button does, and the agent loop reports both as
+		// an ordinary workflow_cancelled event with a nil error — so without
+		// it, a turn cut short would settle as a successful answer with
+		// nothing in it.
 		if a.runCancelled(requestID) || errors.Is(err, context.Canceled) || ctx.Err() != nil {
 			driver.Emit(backend.AvatarEvent{Type: "state", State: backend.AvatarStateIdle})
 			partial, _ := backend.SplitEmotion(final)

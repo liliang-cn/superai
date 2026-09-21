@@ -26,6 +26,11 @@ import (
 //     writable set is a whitelist of preferences, and the fields that decide
 //     what SuperAI is allowed to do are not in it. See settingsWritable.
 
+// selfMaxRoundsCeiling bounds what the agent may set its own round budget to.
+// Wide enough for the long-horizon work that needs hundreds of rounds, and
+// still a number rather than no number.
+const selfMaxRoundsCeiling = 2000
+
 // settingsWritable is every setting the agent may change about itself.
 //
 // The list is what it does not contain that matters:
@@ -270,8 +275,15 @@ func (s *Service) applySetting(key string, raw interface{}) (interface{}, error)
 		cfg.WebhookURL = toStr(raw)
 	case "max_rounds":
 		n := toInt(raw)
-		if n < 1 || n > 200 {
-			return nil, errBadRange("max_rounds", 1, 200, n)
+		// Unlimited is deliberately not reachable from here, though it is a
+		// valid setting a person may write. This list is what the agent may
+		// change about itself, and "run as many tool rounds as I like" is the
+		// model removing the last thing that stops it looping — there is no
+		// deadline on a turn and the spend ceilings are inert without prices.
+		// Raising the ceiling is a preference; removing it is the kind of
+		// decision the rest of this file keeps out of the model's hands.
+		if n < 1 || n > selfMaxRoundsCeiling {
+			return nil, errBadRange("max_rounds", 1, selfMaxRoundsCeiling, n)
 		}
 		cfg.MaxRounds = n
 	case "avatar_port":

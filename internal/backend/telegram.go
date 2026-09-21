@@ -62,11 +62,6 @@ const (
 	// splitting is the normal path, not an edge case.
 	telegramMessageLimit = 4096
 
-	// telegramTurnTimeout bounds one answer. The same ten minutes the UI gives
-	// a turn: long enough for a real piece of work, short enough that a wedged
-	// run does not hold the poller's session forever.
-	telegramTurnTimeout = 10 * time.Minute
-
 	// telegramTypingRefresh is how often "typing…" is re-sent. Telegram clears
 	// the indicator after five seconds, so a turn that thinks for a minute
 	// looks dead without this.
@@ -169,8 +164,10 @@ func (b *TelegramBridge) Stop() {
 		stop()
 	}
 	if done != nil {
-		// Bounded: a turn in flight holds the loop, and shutdown must not wait
-		// ten minutes for a model to finish talking.
+		// Bounded: a turn in flight holds the loop, and with no deadline on a
+		// turn that wait is unbounded — shutdown must not hang on a model
+		// still talking. Cancelling ctx above is what actually ends it; this
+		// only decides how long to be polite about it.
 		select {
 		case <-done:
 		case <-time.After(5 * time.Second):
@@ -310,7 +307,17 @@ func (b *TelegramBridge) handle(ctx context.Context, u telegramUpdate) {
 		return
 	}
 
-	turnCtx, cancel := context.WithTimeout(ctx, telegramTurnTimeout)
+	// No deadline, the same as the UI. A turn that takes twenty minutes is a
+	// turn that was worth twenty minutes; cutting it off would send "that turn
+	// failed: context deadline exceeded" to someone who was waiting for the
+	// answer, and throw the work away.
+	//
+	// The cost is that this loop answers one message at a time, so a genuinely
+	// wedged provider call now blocks the bot until the process restarts,
+	// where before it cleared itself after ten minutes. That is the trade the
+	// deadline was making, and it is the caller's to make: shutdown still cuts
+	// through it, because ctx is the poller's.
+	turnCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	stopTyping := b.keepTyping(turnCtx, chat)

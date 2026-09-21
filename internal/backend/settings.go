@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/liliang-cn/agent-go/v3/pkg/agent"
 	"github.com/liliang-cn/agent-go/v3/pkg/pool"
 )
 
@@ -74,6 +75,12 @@ type Settings struct {
 	WorkspaceDir string `json:"workspace_dir"`
 
 	// Autonomy / runtime.
+	//
+	// MaxRounds is the tool-call round budget for one turn. agent.UnlimitedRounds
+	// (-1) removes the budget entirely, which also removes the only thing that
+	// stops a model looping on a failing tool — there is no wall-clock deadline
+	// on a turn and the spend ceilings are inert until llm_price_* are set, so
+	// unlimited means the stop button is the backstop.
 	MaxRounds int  `json:"max_rounds"`
 	Headless  bool `json:"headless"`
 
@@ -454,7 +461,9 @@ func (s *Settings) backfill(def *Settings) {
 	if strings.TrimSpace(s.WorkspaceDir) == "" {
 		s.WorkspaceDir = def.WorkspaceDir
 	}
-	if s.MaxRounds <= 0 {
+	// -1 is agent.UnlimitedRounds and is a choice; 0 is an unset field and
+	// anything below -1 is a typo. Only the last two fall back.
+	if s.MaxRounds == 0 || s.MaxRounds < agent.UnlimitedRounds {
 		s.MaxRounds = def.MaxRounds
 	}
 	if s.AvatarPort <= 0 {
