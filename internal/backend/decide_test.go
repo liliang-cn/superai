@@ -134,3 +134,33 @@ func TestGatePolicyUsesTheDeciderOnceSet(t *testing.T) {
 		t.Error("clearing the decider must restore the name rules")
 	}
 }
+
+func TestDeciderIsOffByDefault(t *testing.T) {
+	// The zero value must be today's behaviour: an upgrade cannot quietly put
+	// a model in front of every tool call, and a settings.json that predates
+	// the field gets the same gate it had yesterday.
+	var s Settings
+	if s.ToolApprovalDeciderURL != "" {
+		t.Error("no decider URL by default")
+	}
+	if d := s.toolApprovalDecider(); d != nil {
+		t.Error("an empty URL must yield no decider")
+	}
+}
+
+func TestDeciderThresholdFallsBackToTheMeasuredDefault(t *testing.T) {
+	s := Settings{ToolApprovalDeciderURL: "http://127.0.0.1:43711"}
+	d, ok := s.toolApprovalDecider().(*layaDecider)
+	if !ok {
+		t.Fatal("expected a laya decider")
+	}
+	if d.threshold != DefaultDeciderThreshold {
+		t.Errorf("threshold = %v, want the measured default %v", d.threshold, DefaultDeciderThreshold)
+	}
+
+	s.ToolApprovalDeciderThreshold = 0.42
+	d2 := s.toolApprovalDecider().(*layaDecider)
+	if d2.threshold != 0.42 {
+		t.Errorf("an explicit threshold must win, got %v", d2.threshold)
+	}
+}

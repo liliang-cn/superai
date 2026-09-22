@@ -217,6 +217,9 @@ func NewService(s *Settings) (*Service, error) {
 	// Default ON — see Settings.DisableToolApproval for why the setting is
 	// phrased as a disable.
 	gate := NewToolGate(!s.DisableToolApproval, AuditLogPath())
+	// Off unless a URL is configured, in which case the gate also judges a
+	// call's arguments. See Settings.ToolApprovalDeciderURL.
+	gate.SetDecider(s.toolApprovalDecider())
 
 	// --- Plan persistence. ---
 	//

@@ -817,6 +817,8 @@ export namespace backend {
 	    searxng_url: string;
 	    disable_self_install: boolean;
 	    disable_tool_approval: boolean;
+	    tool_approval_decider_url?: string;
+	    tool_approval_decider_threshold?: number;
 	    workspace_dir: string;
 	    max_rounds: number;
 	    headless: boolean;
@@ -858,6 +860,8 @@ export namespace backend {
 	        this.searxng_url = source["searxng_url"];
 	        this.disable_self_install = source["disable_self_install"];
 	        this.disable_tool_approval = source["disable_tool_approval"];
+	        this.tool_approval_decider_url = source["tool_approval_decider_url"];
+	        this.tool_approval_decider_threshold = source["tool_approval_decider_threshold"];
 	        this.workspace_dir = source["workspace_dir"];
 	        this.max_rounds = source["max_rounds"];
 	        this.headless = source["headless"];
