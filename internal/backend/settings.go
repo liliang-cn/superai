@@ -35,6 +35,22 @@ type Settings struct {
 	EmbedKey     string `json:"embed_key"`
 	EmbedModel   string `json:"embed_model"`
 
+	// Speech (optional). An OpenAI-compatible /v1/audio/speech endpoint, used
+	// to read an answer aloud in a real voice rather than the browser's own
+	// synthesiser.
+	//
+	// The base URL and key fall back to the embedding endpoint's when left
+	// empty, because on this install they are the same gateway and asking for
+	// the same two secrets twice is how one of them ends up stale. TTSModel
+	// has no default: a wrong model id there fails every request with a 404
+	// that says nothing, so it is better to be plainly unconfigured.
+	TTSBaseURL string `json:"tts_base_url"`
+	TTSKey     string `json:"tts_key"`
+	TTSModel   string `json:"tts_model"`
+	// TTSVoice is the provider's voice name. Empty sends none, which the
+	// providers that have no voices require and the ones that do accept.
+	TTSVoice string `json:"tts_voice"`
+
 	// Web search. The built-in web_search tool asks a search-capable,
 	// OpenAI-compatible chat endpoint for a grounded answer. Left empty, these
 	// fall back to the brain's own endpoint — a gateway that serves a
@@ -566,6 +582,29 @@ func (s *Settings) WebSearch() (baseURL, key, model string) {
 
 // UseEmbeddings reports whether an embedder should be built (graph memory) or
 // SuperAI should fall back to file memory.
+// Speech reports the endpoint, key and model to synthesise with, and whether
+// there is one at all. A missing model means no: see the field comment.
+func (s *Settings) Speech() (baseURL, key, model, voice string, ok bool) {
+	if s == nil {
+		return "", "", "", "", false
+	}
+	model = strings.TrimSpace(s.TTSModel)
+	if model == "" {
+		return "", "", "", "", false
+	}
+	baseURL = firstNonEmpty(s.TTSBaseURL, s.EmbedBaseURL)
+	key = firstNonEmpty(s.TTSKey, s.EmbedKey)
+	if baseURL == "" {
+		return "", "", "", "", false
+	}
+	// "none" is how EmbedKey says "no embeddings"; inheriting it as a literal
+	// bearer token would send the word none as a credential.
+	if strings.TrimSpace(key) == "none" {
+		key = ""
+	}
+	return baseURL, key, model, strings.TrimSpace(s.TTSVoice), true
+}
+
 func (s *Settings) UseEmbeddings() bool {
 	k := strings.TrimSpace(s.EmbedKey)
 	return k != "" && k != "none"
