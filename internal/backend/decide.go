@@ -182,3 +182,13 @@ func (d *layaDecider) destructive(ctx context.Context, text string) (bool, error
 	}
 	return *a.Noul >= d.threshold, nil
 }
+
+// toolApprovalDecider builds the decider these settings ask for, or nil when
+// the feature is off.
+func (s Settings) toolApprovalDecider() decider {
+	threshold := s.ToolApprovalDeciderThreshold
+	if threshold <= 0 {
+		threshold = DefaultDeciderThreshold
+	}
+	return newLayaDecider(s.ToolApprovalDeciderURL, threshold, deciderBudget)
+}

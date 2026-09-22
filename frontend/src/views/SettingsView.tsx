@@ -993,6 +993,45 @@ export default function SettingsView({
                 </span>
               )}
             </div>
+            <div className="field">
+              <label>Also judge what a command does</label>
+              <TextField
+                label=""
+                value={s.tool_approval_decider_url ?? ""}
+                onChange={(v) => set("tool_approval_decider_url", v)}
+                placeholder="http://127.0.0.1:43711  (empty = off)"
+              />
+              <span className="hint">
+                The rules above match on a tool's <em>name</em>, so <code>shell</code> asks about{" "}
+                <code>ls</code> while a tool called <code>write_file</code> can write{" "}
+                <code>~/.ssh/authorized_keys</code> without asking. Point this at a laya-serve
+                instance and the gate reads the arguments too. It can only ever add a prompt —
+                never skip one — and if the service is unreachable the gate behaves exactly as it
+                does with this empty.
+              </span>
+            </div>
+            {(s.tool_approval_decider_url ?? "") !== "" && (
+              <div className="field">
+                <label>Sensitivity</label>
+                <input
+                  type="number"
+                  step="0.05"
+                  min="0.01"
+                  max="0.99"
+                  value={s.tool_approval_decider_threshold || 0.15}
+                  onChange={(e) =>
+                    set("tool_approval_decider_threshold", parseFloat(e.target.value) || 0)
+                  }
+                />
+                <span className="hint">
+                  Probability at or above which a call is treated as needing approval. Lower asks
+                  more often. The default of 0.15 looks low because this model's probabilities are
+                  — 0.5 reads as "confident" and lets a write to authorized_keys through. It was
+                  chosen on fifteen labelled calls; measure against your own audit log before
+                  raising it.
+                </span>
+              </div>
+            )}
             <AuditTail info={approval} />
           </div>
 

@@ -71,6 +71,25 @@ type Settings struct {
 	// setting where getting the default backwards actually costs something.
 	DisableToolApproval bool `json:"disable_tool_approval"`
 
+	// ToolApprovalDeciderURL points at a laya-serve instance that judges a
+	// call's arguments, not just its name. Empty is off, which is the gate
+	// exactly as it was: the name rules alone.
+	//
+	// It can only add an ask. The model is fast and is confidently wrong on
+	// negated text, so it is never allowed to wave a call through, and an
+	// unreachable service leaves today's behaviour rather than opening or
+	// closing the gate wholesale.
+	ToolApprovalDeciderURL string `json:"tool_approval_decider_url,omitempty"`
+
+	// ToolApprovalDeciderThreshold is the probability at or above which a call
+	// is treated as needing approval. Zero means DefaultDeciderThreshold.
+	//
+	// Worth re-measuring against your own audit log before changing: the
+	// default was chosen on fifteen labelled calls, and the checkpoint's
+	// probabilities sit low enough that a value that reads as "confident"
+	// lets a write to ~/.ssh/authorized_keys through.
+	ToolApprovalDeciderThreshold float64 `json:"tool_approval_decider_threshold,omitempty"`
+
 	// Agent workspace (sandbox root).
 	WorkspaceDir string `json:"workspace_dir"`
 
