@@ -234,6 +234,11 @@ func newAPIMux(app *App, hub *eventHub, creds *credentials, handoff *handoffStor
 	handoffRoute(mux, creds, handoff)
 	mux.HandleFunc("/api/rpc/", func(w http.ResponseWriter, r *http.Request) { rpcCall(app, w, r) })
 	mux.HandleFunc("/api/events", hub.serveSSE)
+	// Speech. One sentence in, mp3 out. It is a route rather than an RPC
+	// method because the answer is bytes: the RPC surface marshals results as
+	// JSON, and base64 inside JSON would cost a third of the size and all of
+	// the streaming.
+	mux.HandleFunc("/api/tts", app.handleSpeak)
 	// Uploading a file to import. It writes to this machine, so it is gated
 	// like everything else under /api — see gatedPath.
 	mux.HandleFunc(uploadPath, app.handleUpload)
