@@ -180,10 +180,26 @@ export default function SidePanel({
   }, [floats]);
 
   if (!shown) {
+    // One button on a phone, five on a desktop.
+    //
+    // The rail floats over the conversation, because the collapsed panel is
+    // nought pixels wide. On a desktop it parks in the margin and costs
+    // nothing; at 390px five stacked 44px targets are a 244px column down the
+    // right edge, sitting on top of the conversation and covering the last
+    // 28px of the toolbar's session id.
+    //
+    // Five choices are redundant here anyway: opening the panel shows
+    // .panel-tabs, which is the same five. So the phone gets a single button
+    // carrying the current tab's icon — it opens the panel, and the choice of
+    // which one happens in there, where there is room for it.
+    const [{ label: soleLabel, Icon: SoleIcon }] = TABS.filter((t) => t.key === tab);
+    const rail = floats
+      ? [{ key: tab, label: soleLabel, Icon: SoleIcon }]
+      : TABS;
     return (
       <div className="trace-panel collapsed">
-        <div className="panel-rail">
-          {TABS.map(({ key, label, Icon }) => (
+        <div className={`panel-rail${floats ? " sole" : ""}`}>
+          {rail.map(({ key, label, Icon }) => (
             <button
               key={key}
               type="button"
@@ -196,13 +212,15 @@ export default function SidePanel({
                 if (floats) setPeeked(true);
                 else setOpen(true);
               }}
-              title={`Show ${label.toLowerCase()}`}
-              aria-label={`Show ${label.toLowerCase()}`}
+              title={floats ? "Show panel" : `Show ${label.toLowerCase()}`}
+              aria-label={floats ? `Show panel (${label.toLowerCase()})` : `Show ${label.toLowerCase()}`}
             >
               <Icon className="size-4" />
               {/* The count keeps activity from being silent while hidden. Only
-                the trace has one worth watching go up mid-turn. */}
-              {key === "trace" && trace.length > 0 && (
+                the trace has one worth watching go up mid-turn — and on a
+                phone the one button has to carry it whatever tab it shows, or
+                a running turn is silent behind a closed panel. */}
+              {(key === "trace" || floats) && trace.length > 0 && (
                 <span className="panel-badge">{trace.length}</span>
               )}
             </button>

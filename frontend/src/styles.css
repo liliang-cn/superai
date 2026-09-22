@@ -3568,3 +3568,41 @@ body.desktop-shell .sidebar.collapsed .nav-key { display: none; }
   .msg-row.is-assistant .msg-content { font-size: 15px; }
   .msg-byline-name { font-size: 15px; }
 }
+
+/* The collapsed panel's button, on a phone.
+   ------------------------------------------------------------------
+   The rail is positioned rather than laid out, because the panel it belongs
+   to is nought pixels wide when collapsed — so nothing in the toolbar knows
+   it is there, and at 390px the toolbar is already exactly full: History 92
+   + New chat 104 + the session id 128 + gaps is 340 of the 342 between the
+   gutters. The id therefore ran its last 28px underneath the button.
+
+   Reserving the lane is better than hiding the id. The id is quiet, not
+   useless — it is what you copy when you go looking for a conversation — and
+   a rule that hides it is one more thing that is true only below 640px. */
+@media (max-width: 640px) {
+  /* 44 for the button, 10 for its offset from the edge, 8 to keep the id from
+     touching it. The toolbar's own 24px right padding is replaced, not added
+     to, so the lane is measured from the same edge the button is. */
+  .chat-toolbar { padding-right: 62px; }
+
+  /* One target, so nothing stacks and nothing needs a column. Still 44px:
+     it is the only way into five panels now. */
+  .panel-rail.sole { gap: 0; }
+
+  /* The lane has to come out of something, and it must not come out of the
+     buttons' line height: 38px less room made "New chat" wrap to two lines and
+     the row grew to 52px, which is the same crowding this was meant to fix.
+     The labels hold their line and the id gives up the width instead — it is
+     already an abbreviation, so losing a few more characters to an ellipsis
+     costs the least of anything in this row. */
+  .chat-toolbar .btn { white-space: nowrap; flex: none; }
+  .chat-toolbar .session-id { min-width: 0; flex: 0 1 auto; overflow: hidden; }
+  /* On .session-id-text rather than the button: the button is a flex
+     container, and ellipsis has nothing to attach to there. */
+  .chat-toolbar .session-id-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
