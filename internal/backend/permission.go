@@ -96,6 +96,9 @@ type ToolGate struct {
 	approver Approver
 	wait     time.Duration
 	audit    *approvalAudit
+	// decider widens the gate by judging a call's arguments. Nil is the name
+	// rules alone; it can only ever add an ask, never remove one.
+	decider decider
 
 	// yolo is YOLO mode: every gated call approved without asking, until it is
 	// switched off. yoloSince is when it was turned on, which is what the
@@ -238,7 +241,17 @@ func (g *ToolGate) AuditPath() string {
 // Everything else is either read-only or confined to the workspace, and shows
 // up in the tool trace and the deliverables bar where the user can see it.
 func (g *ToolGate) Policy() agent.PermissionPolicy {
-	return toolNeedsApproval
+	g.mu.RLock()
+	d := g.decider
+	g.mu.RUnlock()
+	return policyWith(d)
+}
+
+// SetDecider installs (or with nil, removes) the argument-judging pass.
+func (g *ToolGate) SetDecider(d decider) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.decider = d
 }
 
 // Handler is the agent-go PermissionHandler.
