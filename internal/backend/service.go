@@ -411,7 +411,17 @@ func NewService(s *Settings) (*Service, error) {
 		if _, e := cortexbridge.RegisterImportFlow(svc, cortexbridge.NewImporter(db, brain)); e != nil {
 			log.Printf("superai: import flow tools skipped: %v", e)
 		}
-		if _, e := cortexbridge.Register(svc, db); e != nil {
+		// Memory is agent-go's on both backends (WithMemory above), and its
+		// memory_save reconciles, scopes itself and writes to the configured
+		// store. CortexDB's same-named tools bypassed all of that — a save
+		// skipped reconciliation, failed on a user scope with no user_id, and
+		// landed in this local file even with the shared brain configured —
+		// so they are not offered. user_id fills the remaining CortexDB tools
+		// that take one: this is a single-user app.
+		if _, e := cortexbridge.Register(svc, db,
+			cortexbridge.WithDeny(cortexbridge.MemoryTools...),
+			cortexbridge.WithArgDefaults(map[string]interface{}{"user_id": singleUserID}),
+		); e != nil {
 			log.Printf("superai: graphrag tools skipped: %v", e)
 		}
 		if _, e := connectorbridge.Register(svc, db, connector.ToolboxOptions{}); e != nil {
@@ -1156,6 +1166,11 @@ func (s *Service) Plan(ctx context.Context, taskID string) []agent.PlanItem {
 	return items
 }
 
+// singleUserID is the user_id CortexDB tools receive when they need one. The
+// app has exactly one user, so any stable value is correct; it only has to
+// stay the same across runs.
+const singleUserID = "owner"
+
 // deferredToolPatterns are the tools this app keeps behind the index rather
 // than in every turn's schema.
 //
@@ -1179,10 +1194,9 @@ var deferredToolPatterns = []string{
 	// Retrieval variants. The plain search stays; the specialised ones are
 	// asked for by name.
 	"cortex_query", "search_graphrag_*", "search_chunks_*", "search_text",
-	// The rarely used half of the two stores. Kept eager: memory_search,
-	// memory_save, knowledge_search, knowledge_save.
+	// The rarely used half of the knowledge store. Kept eager:
+	// knowledge_search, knowledge_save. Memory tools are agent-go's.
 	"knowledge_update", "knowledge_delete", "knowledge_get",
-	"memory_update", "memory_delete", "memory_get", "memory_list_all",
 	// Only live during an import, which is a thing the user starts.
 	"importflow_*", "connector_*",
 }
