@@ -129,6 +129,15 @@ func (s *GraphPlanStore) SavePlan(ctx context.Context, key string, items []agent
 				"note":  it.Note,
 			},
 		}
+		// A plan with dependencies (agent-go v3.35 PlanItem.ID / After) must
+		// come back with them, or the plan tools lose the graph and the
+		// ready-step lint has nothing to read.
+		if it.ID != "" {
+			node.Properties["step_id"] = it.ID
+		}
+		if len(it.After) > 0 {
+			node.Properties["after"] = append([]string(nil), it.After...)
+		}
 		if err := g.UpsertNode(ctx, node); err != nil {
 			return fmt.Errorf("write step %d: %w", i, err)
 		}
@@ -195,6 +204,10 @@ func (s *GraphPlanStore) LoadPlan(ctx context.Context, key string) ([]agent.Plan
 		if v, ok := node.Properties["note"].(string); ok {
 			item.Note = v
 		}
+		if v, ok := node.Properties["step_id"].(string); ok {
+			item.ID = v
+		}
+		item.After = stringList(node.Properties["after"])
 		found = append(found, indexed{idx: i, item: item})
 	}
 	sort.Slice(found, func(a, b int) bool { return found[a].idx < found[b].idx })
@@ -218,4 +231,28 @@ func (s *GraphPlanStore) Close() error {
 		delete(s.open, name)
 	}
 	return firstErr
+}
+
+// stringList reads a []string property back; after a JSON round trip it
+// arrives as []interface{}.
+func stringList(v interface{}) []string {
+	switch t := v.(type) {
+	case []string:
+		if len(t) == 0 {
+			return nil
+		}
+		return append([]string(nil), t...)
+	case []interface{}:
+		out := make([]string, 0, len(t))
+		for _, x := range t {
+			if s, ok := x.(string); ok {
+				out = append(out, s)
+			}
+		}
+		if len(out) == 0 {
+			return nil
+		}
+		return out
+	}
+	return nil
 }

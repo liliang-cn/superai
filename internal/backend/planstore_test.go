@@ -3,6 +3,7 @@ package backend
 import (
 	"context"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/liliang-cn/agent-go/v3/pkg/agent"
@@ -38,7 +39,7 @@ func TestPlanRoundTripsThroughTheGraph(t *testing.T) {
 		t.Fatalf("loaded %d items, want %d: %+v", len(got), len(want), got)
 	}
 	for i := range want {
-		if got[i] != want[i] {
+		if !reflect.DeepEqual(got[i], want[i]) {
 			t.Errorf("item %d = %+v, want %+v", i, got[i], want[i])
 		}
 	}
@@ -179,5 +180,27 @@ func TestKeysThatSanitiseAlikeStayApart(t *testing.T) {
 	}
 	if len(got) != 1 || got[0].Text != "first" {
 		t.Errorf("a/b came back as %+v — it collided with a_b", got)
+	}
+}
+
+// A plan with dependencies keeps them: IDs and predecessors are what the plan
+// tools and the ready-step lint read.
+func TestPlanKeepsItsDependencies(t *testing.T) {
+	ps := newTestPlanStore(t)
+	ctx := context.Background()
+	want := []agent.PlanItem{
+		{ID: "a", Text: "fetch", Done: true},
+		{ID: "b", Text: "parse"},
+		{ID: "c", Text: "summarise", After: []string{"a", "b"}},
+	}
+	if err := ps.SavePlan(ctx, "dag", want); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+	got, err := ps.LoadPlan(ctx, "dag")
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("loaded %+v, want %+v", got, want)
 	}
 }
