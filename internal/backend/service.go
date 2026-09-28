@@ -411,15 +411,12 @@ func NewService(s *Settings) (*Service, error) {
 		if _, e := cortexbridge.RegisterImportFlow(svc, cortexbridge.NewImporter(db, brain)); e != nil {
 			log.Printf("superai: import flow tools skipped: %v", e)
 		}
-		// Memory is agent-go's on both backends (WithMemory above), and its
-		// memory_save reconciles, scopes itself and writes to the configured
-		// store. CortexDB's same-named tools bypassed all of that — a save
-		// skipped reconciliation, failed on a user scope with no user_id, and
-		// landed in this local file even with the shared brain configured —
-		// so they are not offered. user_id fills the remaining CortexDB tools
-		// that take one: this is a single-user app.
+		// Memory is agent-go's on both backends (WithMemory above), so
+		// Register leaves CortexDB's own memory_* tools out by itself — one
+		// memory path, the one that reconciles and writes to the configured
+		// store. user_id fills the remaining CortexDB tools that take one:
+		// this is a single-user app with no per-run memory user.
 		if _, e := cortexbridge.Register(svc, db,
-			cortexbridge.WithDeny(cortexbridge.MemoryTools...),
 			cortexbridge.WithArgDefaults(map[string]interface{}{"user_id": singleUserID}),
 		); e != nil {
 			log.Printf("superai: graphrag tools skipped: %v", e)
