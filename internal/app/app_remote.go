@@ -329,6 +329,115 @@ func (a *App) registerRemoteTools(svc *backend.Service, cfg backend.RemoteAgents
 				res.Agent, res.Host, float64(res.MS)/1000, res.Text), nil
 		},
 		agent.ToolMetadata{Destructive: true})
+
+	a.registerRingTools(inner, cfg)
+}
+
+// ringNames is the entries that are rings — SuperAI instances with a URL — as
+// opposed to agents reached over SSH.
+func ringNames(cfg backend.RemoteAgents) []string {
+	var out []string
+	for _, n := range cfg.Names() {
+		if cfg.Agents[n].URL != "" {
+			out = append(out, n)
+		}
+	}
+	return out
+}
+
+// registerRingTools gives the supreme ring its command over the others.
+//
+// remote_agent_run asks one agent and waits; with a dozen rings that is a
+// dozen sequential waits, when the point of having them is that they work at
+// once. This fans out. Only present when the settings name at least one ring,
+// which is also what makes a worker unable to command anyone: it lists none.
+func (a *App) registerRingTools(inner interface {
+	AddToolWithMetadata(name, description string, params map[string]any, fn func(context.Context, map[string]any) (any, error), meta agent.ToolMetadata)
+}, cfg backend.RemoteAgents) {
+	rings := ringNames(cfg)
+	if len(rings) == 0 {
+		return
+	}
+	inner.AddToolWithMetadata("ring_command",
+		"Command the other rings — SuperAI instances in this hive — to work in parallel and collect what each reports back."+
+			"\n\nYou are the supreme ring: they act on your word, they share your memory, and they cannot command you."+
+			" Give every ring the same order with `prompt`, or split the work with `commands`, one entry per ring."+
+			" Each ring gets a fresh conversation and has no idea what the others were told, so every order must"+
+			" stand alone. What comes back is one report per ring, and a ring that failed says so — read them all"+
+			" before you conclude anything."+
+			"\n\nRings: "+strings.Join(rings, ", "),
+		map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"prompt": map[string]any{"type": "string", "description": "One order sent to every ring (or to `rings`, if given)."},
+				"rings": map[string]any{
+					"type": "array", "items": map[string]any{"type": "string", "enum": rings},
+					"description": "Limit `prompt` to these rings. Omit for all.",
+				},
+				"commands": map[string]any{
+					"type": "array",
+					"items": map[string]any{
+						"type": "object",
+						"properties": map[string]any{
+							"ring":   map[string]any{"type": "string", "enum": rings},
+							"prompt": map[string]any{"type": "string"},
+						},
+						"required": []string{"ring", "prompt"},
+					},
+					"description": "A different order per ring. Use instead of `prompt`.",
+				},
+			},
+		},
+		func(ctx context.Context, args map[string]any) (any, error) {
+			type order struct{ ring, prompt string }
+			var orders []order
+			if cs, ok := args["commands"].([]any); ok && len(cs) > 0 {
+				for _, c := range cs {
+					m, _ := c.(map[string]any)
+					orders = append(orders, order{strings.TrimSpace(str(m["ring"])), str(m["prompt"])})
+				}
+			} else if p := strings.TrimSpace(str(args["prompt"])); p != "" {
+				targets := rings
+				if rs, ok := args["rings"].([]any); ok && len(rs) > 0 {
+					targets = nil
+					for _, r := range rs {
+						targets = append(targets, strings.TrimSpace(str(r)))
+					}
+				}
+				for _, r := range targets {
+					orders = append(orders, order{r, p})
+				}
+			}
+			if len(orders) == 0 {
+				return nil, fmt.Errorf("give either prompt or commands")
+			}
+			runner := a.remoteRunner()
+			out := make([]string, len(orders))
+			var wg sync.WaitGroup
+			for i, o := range orders {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					if !cfg.Has(o.ring) || cfg.Agents[o.ring].URL == "" {
+						out[i] = fmt.Sprintf("## %s\nnot a ring; rings are: %s", o.ring, strings.Join(rings, ", "))
+						return
+					}
+					res, err := runner.Run(ctx, o.ring, o.prompt)
+					switch {
+					case err != nil:
+						out[i] = fmt.Sprintf("## %s\nFAILED: %v", o.ring, err)
+					case res.Failed:
+						out[i] = fmt.Sprintf("## %s\nFAILED (%s) after %.1fs. What came back, if anything:\n%s",
+							o.ring, res.Reason, float64(res.MS)/1000, res.Text)
+					default:
+						out[i] = fmt.Sprintf("## %s (%.1fs)\n%s", o.ring, float64(res.MS)/1000, res.Text)
+					}
+				}()
+			}
+			wg.Wait()
+			return strings.Join(out, "\n\n"), nil
+		},
+		agent.ToolMetadata{Destructive: true})
 }
 
 // routeToRemote forwards an addressed message and reports the answer on the

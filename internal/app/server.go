@@ -14,10 +14,10 @@
 //     would have emitted to the window, as {"name":..., "payload":...}.
 //   - everything else          — the embedded frontend/dist.
 //
-// The listener binds 127.0.0.1 and nothing else. Exposing this beyond the
-// machine means exposing an unauthenticated agent with tools; anyone who wants
-// that puts an authenticating reverse proxy or an SSH tunnel in front, on
-// purpose, rather than being handed a flag that does it by accident.
+// The listener binds 127.0.0.1 unless -bind says otherwise. Every route except
+// login is behind the credential gate (auth.go), so widening the bind is an
+// explicit decision — a container has to, since its loopback is unreachable
+// from the Service — rather than something a default does by accident.
 package app
 
 import (
@@ -266,7 +266,8 @@ func newAPIMux(app *App, hub *eventHub, creds *credentials, handoff *handoffStor
 // serveMain is the `superai-desktop serve` entry point.
 func ServeMain(argv []string) {
 	fl := flag.NewFlagSet("serve", flag.ExitOnError)
-	port := fl.Int("port", 43117, "listen on 127.0.0.1:<port>")
+	port := fl.Int("port", 43117, "listen on <bind>:<port>")
+	bind := fl.String("bind", "127.0.0.1", "address to listen on; anything but loopback exposes the API to the network, so only do it behind the login gate (a container needs 0.0.0.0)")
 	_ = fl.Parse(argv)
 
 	log.SetPrefix("superai-serve ")
@@ -287,7 +288,7 @@ func ServeMain(argv []string) {
 	if err != nil {
 		log.Fatalf("assets: %v", err)
 	}
-	addr := net.JoinHostPort("127.0.0.1", fmt.Sprint(*port))
+	addr := net.JoinHostPort(*bind, fmt.Sprint(*port))
 	srv := &http.Server{Addr: addr, Handler: requireAuth(creds, mux)}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
