@@ -14,6 +14,13 @@
          on its own, so the rule that actually stops the page lurching when a
          field is focused is the 16px minimum on inputs in styles.css. -->
     <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
+    <!-- The SVG first: it stays sharp at any size and is what current browsers
+         take. The .ico is for the ones that ask for /favicon.ico regardless, and
+         the PNG is what iOS puts on a home screen. -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg"/>
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png"/>
+    <link rel="alternate icon" href="/favicon.ico" sizes="any"/>
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png"/>
     <title>SuperAI</title>
 </head>
 <body>

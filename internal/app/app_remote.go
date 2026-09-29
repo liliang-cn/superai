@@ -51,6 +51,10 @@ func (a *App) remoteRunner() *backend.RemoteRunner {
 	a.remoteOnce.Do(func() {
 		a.remote = backend.NewRemoteRunner(s.RemoteAgents)
 		a.remote.SetRoster(a.hiveAgents)
+		a.remote.SetBoard(a.tasks())
+		if s.Hive.Role == backend.HiveRoleWorker {
+			a.remote.SetOrigin(a.hiveNameOf(s))
+		}
 	})
 	return a.remote
 }

@@ -81,6 +81,11 @@ type HiveSettings struct {
 	// AdvertiseURL is where the queen should reach this worker. Empty takes
 	// $SUPERAI_ADVERTISE_URL.
 	AdvertiseURL string `json:"advertise_url,omitempty"`
+	// PeerToken is the bearer other workers accept, when it is not this
+	// instance's own. Empty is right for a hive that shares one token.
+	PeerToken string `json:"peer_token,omitempty"`
+	// Spawner lets a queen make and retire workers. See hive_spawn.go.
+	Spawner *SpawnerSettings `json:"spawner,omitempty"`
 	// IntervalSeconds between announcements. Zero takes the default.
 	IntervalSeconds int `json:"interval_seconds,omitempty"`
 }
@@ -119,6 +124,11 @@ type HiveMember struct {
 	Version  string    `json:"version,omitempty"`
 	JoinedAt time.Time `json:"joined_at"`
 	LastSeen time.Time `json:"last_seen"`
+	// StartedAt is when the worker's process started, as it says. Two pods that
+	// share a name (a StatefulSet's replacement for a retired ordinal) have
+	// different ones, which is what tells a new worker from the last
+	// heartbeat of the one it replaced.
+	StartedAt time.Time `json:"started_at"`
 	// State is "live" or "lost", computed when asked rather than stored, so it
 	// cannot go stale between sweeps.
 	State string `json:"state"`
@@ -175,6 +185,7 @@ func (h *Hive) Join(hello HiveHello) (HiveWelcome, error) {
 		log.Printf("hive: %s is back at %s", hello.Name, hello.URL)
 	}
 	m.Role, m.URL, m.Version, m.token, m.LastSeen = hello.Role, strings.TrimRight(hello.URL, "/"), hello.Version, hello.Token, now
+	m.StartedAt = hello.StartedAt
 	return HiveWelcome{
 		Protocol: HiveProtocol, Queen: h.name,
 		IntervalMS: int(h.interval / time.Millisecond), Members: len(h.members),
@@ -241,6 +252,8 @@ type Announcer struct {
 	joined  bool
 	lastOK  time.Time
 	lastErr string
+	peers   map[string]RemoteAgent
+	peersAt time.Time
 }
 
 // AnnouncerState is what a worker knows about its own membership.
@@ -379,4 +392,116 @@ func (a *Announcer) Run(ctx context.Context) {
 		case <-time.After(wait):
 		}
 	}
+}
+
+// RosterEntry is one live worker as a peer needs to know it: where it is. No
+// credential travels here; how a worker authenticates to a peer is the
+// worker's own business (see Announcer.Peers).
+type RosterEntry struct {
+	Name string `json:"name"`
+	URL  string `json:"url"`
+}
+
+// Roster lists the live workers, sorted.
+func (h *Hive) Roster() []RosterEntry {
+	out := []RosterEntry{}
+	for _, m := range h.Members() {
+		if m.State == "live" {
+			out = append(out, RosterEntry{Name: m.Name, URL: m.URL})
+		}
+	}
+	return out
+}
+
+// peerTTL is how long a worker believes the roster it fetched. Short: a peer
+// that just joined should be askable within a moment, and one that left should
+// stop being offered.
+const peerTTL = 5 * time.Second
+
+// Peers is the other workers, from the queen's roster, ready to be asked.
+//
+// A peer is authenticated with PeerToken when set and otherwise with this
+// worker's own bearer — which is right for a hive that shares one token, the
+// way the k8s deployment builds it, and is why a hive that does not must set
+// it. The queen never hands out anyone's credential.
+func (a *Announcer) Peers(ctx context.Context) map[string]RemoteAgent {
+	a.mu.Lock()
+	if a.peers != nil && time.Since(a.peersAt) < peerTTL {
+		p := a.peers
+		a.mu.Unlock()
+		return p
+	}
+	a.mu.Unlock()
+
+	if a.client == nil {
+		a.client = &http.Client{Timeout: 10 * time.Second}
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimRight(a.Settings.JoinURL, "/")+"/api/hive/roster", nil)
+	if err != nil {
+		return nil
+	}
+	tok := a.Settings.JoinToken
+	if tok == "" {
+		tok = a.Token
+	}
+	req.Header.Set("Authorization", "Bearer "+tok)
+	resp, err := a.client.Do(req)
+	if err != nil {
+		a.mu.Lock()
+		defer a.mu.Unlock()
+		return a.peers // stale beats none when the queen blinks
+	}
+	defer resp.Body.Close()
+	var roster []RosterEntry
+	if resp.StatusCode != http.StatusOK || json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&roster) != nil {
+		a.mu.Lock()
+		defer a.mu.Unlock()
+		return a.peers
+	}
+	pt := a.Settings.PeerToken
+	if pt == "" {
+		pt = a.Token
+	}
+	peers := map[string]RemoteAgent{}
+	for _, e := range roster {
+		if e.Name == a.Name() {
+			continue
+		}
+		peers[e.Name] = RemoteAgent{
+			About: fmt.Sprintf("%s — a fellow worker in the hive. It has its own tools and the shared memory.", e.Name),
+			URL:   e.URL, Token: pt,
+		}
+	}
+	a.mu.Lock()
+	a.peers, a.peersAt = peers, time.Now()
+	a.mu.Unlock()
+	return peers
+}
+
+// Report tells the queen about a task this worker gave a peer, so the queen's
+// board shows dealings the queen was not part of.
+func (a *Announcer) Report(ctx context.Context, t HiveTask) error {
+	if a.client == nil {
+		a.client = &http.Client{Timeout: 10 * time.Second}
+	}
+	body, _ := json.Marshal(t)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(a.Settings.JoinURL, "/")+"/api/hive/task", bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	tok := a.Settings.JoinToken
+	if tok == "" {
+		tok = a.Token
+	}
+	req.Header.Set("Authorization", "Bearer "+tok)
+	resp, err := a.client.Do(req)
+	if err != nil {
+		return err
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("%s", resp.Status)
+	}
+	return nil
 }

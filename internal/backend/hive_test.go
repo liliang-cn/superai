@@ -232,7 +232,7 @@ func TestAWorkerStartedBeforeTheQueenJoinsWhenItAppears(t *testing.T) {
 }
 
 func TestAWorkerSaysWhyItCannotAnnounce(t *testing.T) {
-	cases := map[string]Announcer{
+	cases := map[string]*Announcer{
 		"not a worker":      {Settings: HiveSettings{Role: HiveRoleQueen, JoinURL: "http://x", AdvertiseURL: "http://y"}},
 		"no join url":       {Settings: HiveSettings{Role: HiveRoleWorker, Name: "a", AdvertiseURL: "http://y"}},
 		"nowhere to reach":  {Settings: HiveSettings{Role: HiveRoleWorker, Name: "a", JoinURL: "http://x"}},
@@ -240,7 +240,6 @@ func TestAWorkerSaysWhyItCannotAnnounce(t *testing.T) {
 	}
 	t.Setenv("SUPERAI_ADVERTISE_URL", "")
 	for name, a := range cases {
-		a := a
 		if err := a.Validate(); err == nil {
 			t.Errorf("%s: no error", name)
 		} else if strings.TrimSpace(err.Error()) == "" {

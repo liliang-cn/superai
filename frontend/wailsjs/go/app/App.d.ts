@@ -63,6 +63,12 @@ export function GetSettings():Promise<backend.Settings>;
 
 export function GetStatus():Promise<Record<string, any>>;
 
+export function HiveTaskDetail(arg1:string):Promise<Record<string, any>>;
+
+export function HiveRetire(arg1:number,arg2:boolean):Promise<Record<string, any>>;
+
+export function HiveSpawn(arg1:number):Promise<Record<string, any>>;
+
 export function HiveStatus():Promise<Record<string, any>>;
 
 export function GraphView():Promise<Record<string, any>>;

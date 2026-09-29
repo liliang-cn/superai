@@ -91,7 +91,7 @@ func TestAWorkerAnswersACommand(t *testing.T) {
 		}()
 		return "req-1"
 	}
-	res := askWorker(context.Background(), workerTarget{name: "worker-1", url: f.srv.URL, token: "tok"}, "deploy it")
+	res := askWorker(context.Background(), workerTarget{name: "worker-1", url: f.srv.URL, token: "tok"}, "deploy it", nil)
 	if res.Failed || res.Text != "deployed" {
 		t.Fatalf("got %+v", res)
 	}
@@ -109,7 +109,7 @@ func TestAnAnswerThatBeatsTheResponseIsNotLost(t *testing.T) {
 		time.Sleep(150 * time.Millisecond)
 		return "req-1"
 	}
-	res := askWorker(context.Background(), workerTarget{name: "r", url: f.srv.URL}, "x")
+	res := askWorker(context.Background(), workerTarget{name: "r", url: f.srv.URL}, "x", nil)
 	if res.Failed || res.Text != "fast" {
 		t.Fatalf("got %+v", res)
 	}
@@ -121,7 +121,7 @@ func TestAWorkerErrorIsAFailureNotAnAnswer(t *testing.T) {
 		go r.emit("chat:error", map[string]any{"requestId": "req-1", "error": "model unavailable"})
 		return "req-1"
 	}
-	res := askWorker(context.Background(), workerTarget{name: "r", url: f.srv.URL}, "x")
+	res := askWorker(context.Background(), workerTarget{name: "r", url: f.srv.URL}, "x", nil)
 	if !res.Failed || !strings.Contains(res.Reason, "model unavailable") {
 		t.Fatalf("got %+v", res)
 	}
@@ -129,7 +129,7 @@ func TestAWorkerErrorIsAFailureNotAnAnswer(t *testing.T) {
 
 func TestAWrongTokenIsRefusedAndSaidSo(t *testing.T) {
 	f := newFakeWorker(t, "right")
-	res := askWorker(context.Background(), workerTarget{name: "r", url: f.srv.URL, token: "wrong"}, "x")
+	res := askWorker(context.Background(), workerTarget{name: "r", url: f.srv.URL, token: "wrong"}, "x", nil)
 	if !res.Failed || !strings.Contains(res.Reason, "401") {
 		t.Fatalf("got %+v", res)
 	}
@@ -143,7 +143,7 @@ func TestStoppingTheCommanderStopsTheWorker(t *testing.T) {
 	f.onSend = func(_, _ string, _ *fakeWorker) string { return "req-9" } // never finishes
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() { time.Sleep(200 * time.Millisecond); cancel() }()
-	res := askWorker(ctx, workerTarget{name: "r", url: f.srv.URL}, "long job")
+	res := askWorker(ctx, workerTarget{name: "r", url: f.srv.URL}, "long job", nil)
 	if !res.Failed {
 		t.Fatalf("got %+v", res)
 	}
@@ -155,7 +155,7 @@ func TestStoppingTheCommanderStopsTheWorker(t *testing.T) {
 }
 
 func TestAnUnreachableWorkerFailsWithAReason(t *testing.T) {
-	res := askWorker(context.Background(), workerTarget{name: "r", url: "http://127.0.0.1:1"}, "x")
+	res := askWorker(context.Background(), workerTarget{name: "r", url: "http://127.0.0.1:1"}, "x", nil)
 	if !res.Failed || res.Reason == "" {
 		t.Fatalf("got %+v", res)
 	}
