@@ -5,6 +5,7 @@ import { useRoom } from "./lib/useViewport";
 import StatusBar from "./components/StatusBar";
 import ChatView from "./views/ChatView";
 import StatsView from "./views/StatsView";
+import HiveView from "./views/HiveView";
 import SettingsView from "./views/SettingsView";
 import KnowledgeView from "./views/KnowledgeView";
 import SkillsView from "./views/SkillsView";
@@ -183,6 +184,7 @@ export default function App() {
               />
             )}
             {view === "stats" && <StatsView />}
+            {view === "hive" && <HiveView />}
             {view === "settings" && <SettingsView onSaved={refreshStatus} status={status} />}
             {view === "knowledge" && <KnowledgeView />}
             {view === "skills" && <SkillsView />}

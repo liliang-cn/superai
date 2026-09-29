@@ -12,20 +12,20 @@ import (
 	"time"
 )
 
-// fakeRing stands in for a SuperAI: /api/events streams what the test pushes,
+// fakeWorker stands in for a SuperAI: /api/events streams what the test pushes,
 // /api/rpc/SendChat records the command and replies with a request id.
-type fakeRing struct {
+type fakeWorker struct {
 	srv       *httptest.Server
 	mu        sync.Mutex
 	events    chan string
 	sent      []string
 	cancelled []string
 	token     string
-	onSend    func(session, prompt string, r *fakeRing) string
+	onSend    func(session, prompt string, r *fakeWorker) string
 }
 
-func newFakeRing(t *testing.T, token string) *fakeRing {
-	f := &fakeRing{events: make(chan string, 16), token: token}
+func newFakeWorker(t *testing.T, token string) *fakeWorker {
+	f := &fakeWorker{events: make(chan string, 16), token: token}
 	mux := http.NewServeMux()
 	guard := func(h http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
@@ -75,14 +75,14 @@ func newFakeRing(t *testing.T, token string) *fakeRing {
 	return f
 }
 
-func (f *fakeRing) emit(name string, payload map[string]any) {
+func (f *fakeWorker) emit(name string, payload map[string]any) {
 	b, _ := json.Marshal(map[string]any{"name": name, "payload": payload})
 	f.events <- string(b)
 }
 
-func TestARingAnswersACommand(t *testing.T) {
-	f := newFakeRing(t, "tok")
-	f.onSend = func(_, _ string, r *fakeRing) string {
+func TestAWorkerAnswersACommand(t *testing.T) {
+	f := newFakeWorker(t, "tok")
+	f.onSend = func(_, _ string, r *fakeWorker) string {
 		go func() {
 			// Another conversation's end must not be mistaken for ours, and
 			// it arrives first on purpose.
@@ -91,100 +91,100 @@ func TestARingAnswersACommand(t *testing.T) {
 		}()
 		return "req-1"
 	}
-	res := askRing(context.Background(), ringTarget{name: "ring-1", url: f.srv.URL, token: "tok"}, "deploy it")
+	res := askWorker(context.Background(), workerTarget{name: "worker-1", url: f.srv.URL, token: "tok"}, "deploy it")
 	if res.Failed || res.Text != "deployed" {
 		t.Fatalf("got %+v", res)
 	}
 	if len(f.sent) != 1 || f.sent[0] != "deploy it" {
-		t.Fatalf("the ring was sent %q", f.sent)
+		t.Fatalf("the worker was sent %q", f.sent)
 	}
 }
 
 func TestAnAnswerThatBeatsTheResponseIsNotLost(t *testing.T) {
 	// The terminal event can be emitted before SendChat has even returned its
 	// id. The stream is open first, so it is buffered rather than missed.
-	f := newFakeRing(t, "")
-	f.onSend = func(_, _ string, r *fakeRing) string {
+	f := newFakeWorker(t, "")
+	f.onSend = func(_, _ string, r *fakeWorker) string {
 		r.emit("chat:done", map[string]any{"requestId": "req-1", "final": "fast"})
 		time.Sleep(150 * time.Millisecond)
 		return "req-1"
 	}
-	res := askRing(context.Background(), ringTarget{name: "r", url: f.srv.URL}, "x")
+	res := askWorker(context.Background(), workerTarget{name: "r", url: f.srv.URL}, "x")
 	if res.Failed || res.Text != "fast" {
 		t.Fatalf("got %+v", res)
 	}
 }
 
-func TestARingErrorIsAFailureNotAnAnswer(t *testing.T) {
-	f := newFakeRing(t, "")
-	f.onSend = func(_, _ string, r *fakeRing) string {
+func TestAWorkerErrorIsAFailureNotAnAnswer(t *testing.T) {
+	f := newFakeWorker(t, "")
+	f.onSend = func(_, _ string, r *fakeWorker) string {
 		go r.emit("chat:error", map[string]any{"requestId": "req-1", "error": "model unavailable"})
 		return "req-1"
 	}
-	res := askRing(context.Background(), ringTarget{name: "r", url: f.srv.URL}, "x")
+	res := askWorker(context.Background(), workerTarget{name: "r", url: f.srv.URL}, "x")
 	if !res.Failed || !strings.Contains(res.Reason, "model unavailable") {
 		t.Fatalf("got %+v", res)
 	}
 }
 
 func TestAWrongTokenIsRefusedAndSaidSo(t *testing.T) {
-	f := newFakeRing(t, "right")
-	res := askRing(context.Background(), ringTarget{name: "r", url: f.srv.URL, token: "wrong"}, "x")
+	f := newFakeWorker(t, "right")
+	res := askWorker(context.Background(), workerTarget{name: "r", url: f.srv.URL, token: "wrong"}, "x")
 	if !res.Failed || !strings.Contains(res.Reason, "401") {
 		t.Fatalf("got %+v", res)
 	}
 	if len(f.sent) != 0 {
-		t.Fatal("a command reached a ring that refused the token")
+		t.Fatal("a command reached a worker that refused the token")
 	}
 }
 
-func TestStoppingTheCommanderStopsTheRing(t *testing.T) {
-	f := newFakeRing(t, "")
-	f.onSend = func(_, _ string, _ *fakeRing) string { return "req-9" } // never finishes
+func TestStoppingTheCommanderStopsTheWorker(t *testing.T) {
+	f := newFakeWorker(t, "")
+	f.onSend = func(_, _ string, _ *fakeWorker) string { return "req-9" } // never finishes
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() { time.Sleep(200 * time.Millisecond); cancel() }()
-	res := askRing(ctx, ringTarget{name: "r", url: f.srv.URL}, "long job")
+	res := askWorker(ctx, workerTarget{name: "r", url: f.srv.URL}, "long job")
 	if !res.Failed {
 		t.Fatalf("got %+v", res)
 	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if len(f.cancelled) != 1 || f.cancelled[0] != "req-9" {
-		t.Fatalf("the ring was not told to stop: %v", f.cancelled)
+		t.Fatalf("the worker was not told to stop: %v", f.cancelled)
 	}
 }
 
-func TestAnUnreachableRingFailsWithAReason(t *testing.T) {
-	res := askRing(context.Background(), ringTarget{name: "r", url: "http://127.0.0.1:1"}, "x")
+func TestAnUnreachableWorkerFailsWithAReason(t *testing.T) {
+	res := askWorker(context.Background(), workerTarget{name: "r", url: "http://127.0.0.1:1"}, "x")
 	if !res.Failed || res.Reason == "" {
 		t.Fatalf("got %+v", res)
 	}
 }
 
-func TestARingEntryNeedsNoHostsOrCommand(t *testing.T) {
+func TestAWorkerEntryNeedsNoHostsOrCommand(t *testing.T) {
 	r := RemoteAgents{Enabled: true, Agents: map[string]RemoteAgent{
-		"ring-1": {URL: "http://x:1", Token: "t"},
-		"broken": {},
+		"worker-1": {URL: "http://x:1", Token: "t"},
+		"broken":   {},
 	}}
 	r.normalize()
-	if !r.Has("ring-1") {
-		t.Fatal("a ring was dropped for having no ssh hosts")
+	if !r.Has("worker-1") {
+		t.Fatal("a worker was dropped for having no ssh hosts")
 	}
 	if r.Has("broken") {
 		t.Fatal("an entry with nothing to call was kept")
 	}
 }
 
-func TestRunRoutesAURLEntryToTheRing(t *testing.T) {
-	f := newFakeRing(t, "tok")
-	f.onSend = func(_, _ string, r *fakeRing) string {
+func TestRunRoutesAURLEntryToTheWorker(t *testing.T) {
+	f := newFakeWorker(t, "tok")
+	f.onSend = func(_, _ string, r *fakeWorker) string {
 		go r.emit("chat:done", map[string]any{"requestId": "req-1", "final": "ok"})
 		return "req-1"
 	}
 	run := NewRemoteRunner(RemoteAgents{Enabled: true, Agents: map[string]RemoteAgent{
-		"ring-1": {URL: f.srv.URL, Token: "tok"},
+		"worker-1": {URL: f.srv.URL, Token: "tok"},
 	}})
-	res, err := run.Run(context.Background(), "ring-1", "go")
+	res, err := run.Run(context.Background(), "worker-1", "go")
 	if err != nil || res.Failed || res.Text != "ok" {
 		t.Fatalf("got %+v, %v", res, err)
 	}

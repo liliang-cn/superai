@@ -9,7 +9,7 @@
 #
 # Model and CortexDB credentials are copied from the SuperAI on the apps VM;
 # the bearer token shared by the hive is generated fresh. Roles come from the
-# settings: the supreme accepts joins and the rings announce themselves.
+# settings: the queen accepts joins and the workers announce themselves.
 set -euo pipefail
 export SUPERAI_PASSWORD_HASH="${SUPERAI_PASSWORD_HASH:-}"
 SRC="${SUPERAI_SRC:-ops@192.168.123.65}"
@@ -28,16 +28,16 @@ base.update(memory_backend='shared', shared_memory_endpoint=s['shared_memory_end
             # Off: the default starts an embedded proxy with no accounts in it and
             # routes the model through that, which answers "unknown provider".
             cliproxy_enabled=False)
-# Roles, not a list. The supreme accepts joins; a ring announces itself to it
+# Roles, not a list. The queen accepts joins; a worker announces itself to it
 # (superai-hive/1, see internal/backend/hive.go), so the roster is whoever is
-# actually there and adding a ring is raising the replica count.
-supreme = dict(base, hive={'role': 'supreme', 'name': 'supreme'})
-# Rings act with nobody at a keyboard to approve a tool call, so the gate would
+# actually there and adding a worker is raising the replica count.
+queen = dict(base, hive={'role': 'queen', 'name': 'queen'})
+# Workers act with nobody at a keyboard to approve a tool call, so the gate would
 # only make every command hang. The pod's Role is what bounds them instead.
-ring = dict(base, disable_tool_approval=True,
-            hive={'role': 'ring', 'join_url': 'http://superai-supreme.$NS.svc.cluster.local:43117'})
+worker = dict(base, disable_tool_approval=True,
+            hive={'role': 'worker', 'join_url': 'http://superai-queen.$NS.svc.cluster.local:43117'})
 out = {'token': token, 'cortexdb_token': s['shared_memory_token'],
-                  'settings-supreme.json': json.dumps(supreme), 'settings-ring.json': json.dumps(ring)}
+                  'settings-queen.json': json.dumps(queen), 'settings-worker.json': json.dumps(worker)}
 if os.environ.get('PW'): out['password_hash'] = os.environ['PW']
 print(json.dumps(out))
 PY" | ssh "$KUBE" "python3 -c '

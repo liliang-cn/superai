@@ -71,10 +71,11 @@ type App struct {
 	telegram    *backend.TelegramBridge
 	telegramErr string
 
-	// hive is the supreme ring's roster; nil on anything else. Built once and
-	// kept across rebuilds, because a settings save must not make every ring
-	// look newly joined. hiveStop ends a ring's announcing loop.
+	// hive is the queen's roster; nil on anything else. Built once and
+	// kept across rebuilds, because a settings save must not make every worker
+	// look newly joined. hiveStop ends a worker's announcing loop.
 	hive     *backend.Hive
+	hiveAnn  *backend.Announcer
 	hiveStop context.CancelFunc
 	// scheduleLock is held while this process owns firing schedules; nil means
 	// another process (the daemon) owns them and this one only manages.

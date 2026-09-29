@@ -2,6 +2,7 @@ import React, { useEffect } from "react";
 import {
   BrainIcon,
   ChartColumnIcon,
+  HexagonIcon,
   MessageSquareIcon,
   NotebookTabsIcon,
   PanelLeftCloseIcon,
@@ -34,6 +35,7 @@ const NAV: {
     items: [
       { key: "chat", label: "Chat", Icon: MessageSquareIcon, shortcut: "1" },
       { key: "stats", label: "Stats", Icon: ChartColumnIcon, shortcut: "2" },
+      { key: "hive", label: "Hive", Icon: HexagonIcon },
     ],
   },
   {
