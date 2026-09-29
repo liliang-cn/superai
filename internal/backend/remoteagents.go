@@ -375,7 +375,8 @@ func (r *RemoteRunner) Run(ctx context.Context, name, prompt string) (res Remote
 		// told it and the same UUID names the order on both sides.
 		id := NewTaskID()
 		r.board.StartAs(id, name, from, dir, prompt)
-		out := askWorker(ctx, workerTarget{name: name, url: agent.URL, token: agent.Token, timeout: limit, taskID: id}, prompt,
+		out := askWorker(ctx, workerTarget{name: name, url: agent.URL, token: agent.Token, timeout: limit, taskID: id,
+			pulse: func(kind, tool string, n int) { r.board.Pulse(id, kind, tool, n) }}, prompt,
 			func(phase, tool string) { r.board.Progress(id, phase, tool) })
 		out.MS = time.Since(started).Milliseconds()
 		switch {

@@ -92,9 +92,10 @@ type HiveTask struct {
 
 // TaskBoard holds the recent tasks and reports each change.
 type TaskBoard struct {
-	mu    sync.Mutex
-	tasks []*HiveTask
-	emit  func(HiveTask)
+	mu      sync.Mutex
+	tasks   []*HiveTask
+	emit    func(HiveTask)
+	pulseFn func(HivePulse)
 }
 
 // NewTaskBoard builds a board; emit is called with a copy after every change,
@@ -320,4 +321,107 @@ func (b *TaskBoard) Ingest(in HiveTask) {
 	b.trimLocked()
 	b.mu.Unlock()
 	b.publish(in)
+}
+
+// HivePulse is one thing that happened while an order was being carried out: a
+// tool called, a result back, the model thinking, some text written. It is not
+// stored — the board keeps the story of a task, and this is the flicker on top
+// of it — but it is published as it happens, and that is what the hive panel
+// draws as light travelling between the two ends of the order.
+type HivePulse struct {
+	Task   string `json:"task"`
+	Worker string `json:"worker"`
+	From   string `json:"from,omitempty"`
+	Dir    string `json:"dir"`
+	// Kind is "thinking", "tool", "result" or "text".
+	Kind  string `json:"kind"`
+	Tool  string `json:"tool,omitempty"`
+	Bytes int    `json:"bytes,omitempty"`
+}
+
+// SetPulse says where pulses go. Called once, before use.
+func (b *TaskBoard) SetPulse(f func(HivePulse)) {
+	if b == nil {
+		return
+	}
+	b.mu.Lock()
+	b.pulseFn = f
+	b.mu.Unlock()
+}
+
+// Pulse publishes one pulse for a task, filled in with who and where from the
+// task itself. A task that is not on the board (or has finished) pulses nothing.
+func (b *TaskBoard) Pulse(id, kind, tool string, bytes int) {
+	if b == nil || id == "" {
+		return
+	}
+	b.mu.Lock()
+	fn := b.pulseFn
+	var p HivePulse
+	found := false
+	for _, t := range b.tasks {
+		if t.ID == id && t.State == TaskRunning {
+			p = HivePulse{Task: id, Worker: t.Worker, From: t.From, Dir: t.Dir, Kind: kind, Tool: tool, Bytes: bytes}
+			found = true
+			break
+		}
+	}
+	b.mu.Unlock()
+	if found && fn != nil {
+		fn(p)
+	}
+}
+
+// Pulser turns the raw stream of an agent's events into pulses worth drawing.
+//
+// A model streams text a few characters at a time, many times a second, and a
+// panel that drew one beam per chunk would be a blur that says nothing. So a
+// tool call and its result are each a pulse, thinking is one at most every
+// quarter second, and text is gathered into one pulse every tenth of a second
+// that carries how much of it there was.
+type Pulser struct {
+	fn        func(kind, tool string, bytes int)
+	mu        sync.Mutex
+	lastThink time.Time
+	lastText  time.Time
+	pending   int
+}
+
+// NewPulser builds one that reports to fn.
+func NewPulser(fn func(kind, tool string, bytes int)) *Pulser { return &Pulser{fn: fn} }
+
+// Event takes one agent event: its type, the tool it names, and how many bytes
+// of content and of tool result it carried.
+func (p *Pulser) Event(typ, tool string, content, result int) {
+	if p == nil || p.fn == nil {
+		return
+	}
+	now := time.Now()
+	switch typ {
+	case "tool_call":
+		p.fn("tool", tool, 0)
+	case "tool_result":
+		p.fn("result", tool, result)
+	case "thinking":
+		p.mu.Lock()
+		ok := now.Sub(p.lastThink) >= 250*time.Millisecond
+		if ok {
+			p.lastThink = now
+		}
+		p.mu.Unlock()
+		if ok {
+			p.fn("thinking", "", 0)
+		}
+	case "partial":
+		p.mu.Lock()
+		p.pending += content
+		n := 0
+		if now.Sub(p.lastText) >= 120*time.Millisecond && p.pending > 0 {
+			n, p.pending, p.lastText = p.pending, 0, now
+		}
+		p.mu.Unlock()
+		if n > 0 {
+			p.fn("text", "", n)
+		}
+	}
 }

@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -43,6 +44,9 @@ type workerTarget struct {
 	// taskID is the order's UUID; it becomes the worker's session name, so the
 	// worker's own record of the order carries the same id.
 	taskID string
+	// pulse, when set, is told about every event the worker streams while it
+	// works, thinned into pulses worth drawing (see Pulser).
+	pulse func(kind, tool string, bytes int)
 	// timeout of zero means none. A worker's turn ends when its model stops, not
 	// when a clock does; only an explicit setting cuts one off.
 	timeout time.Duration
@@ -103,6 +107,11 @@ func askWorker(ctx context.Context, t workerTarget, prompt string, progress func
 
 	events := make(chan workerEvent, 64)
 	lastPhase := map[string]string{}
+	// The id of the turn this call started, known only once the worker has
+	// answered the command. Pulses are for that turn and no other: the stream
+	// carries every conversation the worker has.
+	var turn atomic.Value
+	pulser := NewPulser(t.pulse)
 	streamErr := make(chan error, 1)
 	go func() {
 		defer close(events)
@@ -133,6 +142,17 @@ func askWorker(ctx context.Context, t workerTarget, prompt string, progress func
 				// partial text is one "writing" and not a thousand.
 				rid, _ := ev.Payload["requestId"].(string)
 				typ, _ := ev.Payload["type"].(string)
+				if mine, _ := turn.Load().(string); mine != "" && rid == mine {
+					tool, _ := ev.Payload["tool"].(string)
+					content, _ := ev.Payload["content"].(string)
+					resultLen := 0
+					if r := ev.Payload["result"]; r != nil {
+						if b, err := json.Marshal(r); err == nil {
+							resultLen = len(b)
+						}
+					}
+					pulser.Event(typ, tool, len(content), resultLen)
+				}
 				phase := ""
 				switch typ {
 				case "tool_call":
@@ -179,6 +199,7 @@ func askWorker(ctx context.Context, t workerTarget, prompt string, progress func
 	if json.Unmarshal(raw, &id) != nil || id == "" {
 		return fail("the worker did not start a turn: %s", strings.TrimSpace(string(raw)))
 	}
+	turn.Store(id)
 
 	for {
 		select {

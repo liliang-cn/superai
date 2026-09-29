@@ -1,10 +1,10 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { HiveRetire, HiveSpawn, HiveStatus } from "../../wailsjs/go/app/App";
 import { EventsOn } from "../../wailsjs/runtime";
 import { Link, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import HiveTaskPage, { FullTask } from "./HiveTaskPage";
 import { taskPath } from "../lib/routes";
-import HiveStage, { StageTask } from "../components/HiveStage";
+import HiveStage, { StageHandle, StagePulse, StageTask } from "../components/HiveStage";
 
 /** One worker as HiveStatus reports it. */
 interface Member {
@@ -56,6 +56,7 @@ export default function HiveView() {
   const [now, setNow] = useState(Date.now());
   const [tasks, setTasks] = useState<Task[]>([]);
   const [ready, setReady] = useState(false);
+  const stage = useRef<StageHandle>(null);
   // What the add/retire buttons are doing, so a spawn that takes half a minute
   // reads as working and not as a dead button.
   const [making, setMaking] = useState<"" | "spawn" | "retire">("");
@@ -113,6 +114,15 @@ export default function HiveView() {
     };
   }, []);
 
+  // The flicker goes straight to the stage and nowhere else. It is not state:
+  // a re-render per pulse would be a re-render per token.
+  useEffect(() => {
+    const off = EventsOn("hive:pulse", (p: StagePulse) => stage.current?.pulse(p));
+    return () => {
+      if (typeof off === "function") off();
+    };
+  }, []);
+
   useEffect(() => {
     load();
     const poll = window.setInterval(load, 3000);
@@ -152,7 +162,7 @@ export default function HiveView() {
         {err && <div className="hint err">{err}</div>}
         {st && (
           <>
-            <HiveStage role={st.role} self={st.name} workers={members} tasks={tasks} ready={ready} />
+            <HiveStage ref={stage} role={st.role} self={st.name} workers={members} tasks={tasks} ready={ready} />
 
             <div className="card hive-self">
               <span className={`hive-role ${st.role || "alone"}`}>{st.role || "standalone"}</span>

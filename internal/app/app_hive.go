@@ -41,6 +41,19 @@ func (a *App) tasks() *backend.TaskBoard {
 				a.reportToQueen(t)
 			}
 		})
+		a.hiveBoard.SetPulse(func(p backend.HivePulse) {
+			raw, err := json.Marshal(p)
+			if err != nil {
+				return
+			}
+			var m map[string]any
+			if json.Unmarshal(raw, &m) == nil {
+				a.emit("hive:pulse", m)
+			}
+			if p.Dir == backend.TaskPeer {
+				a.reportToQueen(p)
+			}
+		})
 	})
 	return a.hiveBoard
 }
@@ -48,11 +61,11 @@ func (a *App) tasks() *backend.TaskBoard {
 // reportToQueen queues a peer task for the queen. Best effort by design: the
 // queen's picture of the hive is a view, and a worker doing its job must never
 // wait on it.
-func (a *App) reportToQueen(t backend.HiveTask) {
+func (a *App) reportToQueen(v any) {
 	a.hiveReportOnce.Do(func() {
-		a.hiveReports = make(chan backend.HiveTask, 128)
+		a.hiveReports = make(chan any, 256)
 		go func() {
-			for t := range a.hiveReports {
+			for v := range a.hiveReports {
 				a.mu.Lock()
 				ann := a.hiveAnn
 				a.mu.Unlock()
@@ -60,16 +73,25 @@ func (a *App) reportToQueen(t backend.HiveTask) {
 					continue
 				}
 				ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
-				if err := ann.Report(ctx, t); err != nil {
-					log.Printf("hive: could not report a task to the queen: %v", err)
+				var err error
+				switch x := v.(type) {
+				case backend.HiveTask:
+					err = ann.Report(ctx, x)
+				case backend.HivePulse:
+					err = ann.ReportPulse(ctx, x)
+				}
+				if err != nil {
+					log.Printf("hive: could not report to the queen: %v", err)
 				}
 				cancel()
 			}
 		}()
 	})
 	select {
-	case a.hiveReports <- t:
+	case a.hiveReports <- v:
 	default:
+		// A pulse is a flicker; losing one is nothing. A task update lost here is
+		// repaired by the next, which carries the whole task.
 	}
 }
 
@@ -210,6 +232,61 @@ func (a *App) handleHiveRoster(w http.ResponseWriter, r *http.Request) {
 	writeJSONStatus(w, http.StatusOK, h.Roster())
 }
 
+// handleHiveLeave is POST /api/hive/leave: a worker going away on purpose.
+func (a *App) handleHiveLeave(w http.ResponseWriter, r *http.Request) {
+	a.mu.Lock()
+	h := a.hive
+	a.mu.Unlock()
+	if h == nil {
+		writeJSONStatus(w, http.StatusNotFound, map[string]any{"error": "this instance is not a queen"})
+		return
+	}
+	var hello backend.HiveHello
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10)).Decode(&hello); err != nil {
+		writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": "unreadable goodbye: " + err.Error()})
+		return
+	}
+	writeJSONStatus(w, http.StatusOK, map[string]any{"left": h.Leave(hello.Name, hello.StartedAt)})
+}
+
+// handleHivePulse is POST /api/hive/pulse: one flicker of a peer order, from
+// the worker that gave it. Republished on the queen's own stream so the panel
+// can draw light between two workers the queen was not part of. Not stored.
+func (a *App) handleHivePulse(w http.ResponseWriter, r *http.Request) {
+	a.mu.Lock()
+	h := a.hive
+	a.mu.Unlock()
+	if h == nil {
+		writeJSONStatus(w, http.StatusNotFound, map[string]any{"error": "this instance is not a queen"})
+		return
+	}
+	var p backend.HivePulse
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 16<<10)).Decode(&p); err != nil {
+		writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": "unreadable pulse: " + err.Error()})
+		return
+	}
+	if p.Dir != backend.TaskPeer || p.From == "" || p.Worker == "" {
+		writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": "only peer pulses are reported here"})
+		return
+	}
+	known := false
+	for _, m := range h.Members() {
+		if m.Name == p.From {
+			known = true
+		}
+	}
+	if !known {
+		writeJSONStatus(w, http.StatusForbidden, map[string]any{"error": "not on the roster: " + p.From})
+		return
+	}
+	raw, _ := json.Marshal(p)
+	var m map[string]any
+	if json.Unmarshal(raw, &m) == nil {
+		a.emit("hive:pulse", m)
+	}
+	writeJSONStatus(w, http.StatusOK, map[string]any{"ok": true})
+}
+
 // handleHiveTask is POST /api/hive/task: a worker reporting an order it gave a
 // peer. Only from someone on the roster — the credential gate says who may
 // speak to the queen at all, and this says who may speak for a worker.
@@ -268,20 +345,33 @@ func (a *App) startHive() {
 		return
 	}
 	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
 	a.mu.Lock()
 	a.hiveAnn = ann
 	a.hiveStop = cancel
+	a.hiveDone = done
 	a.mu.Unlock()
-	go ann.Run(ctx)
+	go func() {
+		defer close(done)
+		ann.Run(ctx)
+	}()
 }
 
 func (a *App) stopHive() {
 	a.mu.Lock()
-	stop := a.hiveStop
-	a.hiveStop, a.hiveAnn = nil, nil
+	stop, done := a.hiveStop, a.hiveDone
+	a.hiveStop, a.hiveAnn, a.hiveDone = nil, nil, nil
 	a.mu.Unlock()
 	if stop != nil {
 		stop()
+		// Wait for the goodbye to be said: the process is about to exit, and a
+		// goodbye still in flight when it does is a worker shown as lost.
+		if done != nil {
+			select {
+			case <-done:
+			case <-time.After(4 * time.Second):
+			}
+		}
 	}
 }
 

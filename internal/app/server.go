@@ -241,6 +241,8 @@ func newAPIMux(app *App, hub *eventHub, creds *credentials, handoff *handoffStor
 	mux.HandleFunc("/api/tts", app.handleSpeak)
 	mux.HandleFunc("/api/hive/join", app.handleHiveJoin)
 	mux.HandleFunc("/api/hive/roster", app.handleHiveRoster)
+	mux.HandleFunc("/api/hive/leave", app.handleHiveLeave)
+	mux.HandleFunc("/api/hive/pulse", app.handleHivePulse)
 	mux.HandleFunc("/api/hive/task", app.handleHiveTask)
 	// Uploading a file to import. It writes to this machine, so it is gated
 	// like everything else under /api — see gatedPath.
