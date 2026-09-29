@@ -118,6 +118,10 @@ export function GetStatus() {
   return window['go']['app']['App']['GetStatus']();
 }
 
+export function HiveStatus() {
+  return window['go']['app']['App']['HiveStatus']();
+}
+
 export function GraphView() {
   return window['go']['app']['App']['GraphView']();
 }

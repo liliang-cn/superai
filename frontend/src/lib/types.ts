@@ -9,7 +9,8 @@ export type ViewKey =
   | "knowledge"
   | "skills"
   | "mcp"
-  | "records";
+  | "records"
+  | "hive";
 
 /**
  * Every streaming payload is tagged with the id `SendChat` returned for that

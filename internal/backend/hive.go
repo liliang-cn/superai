@@ -18,41 +18,41 @@ import (
 	"time"
 )
 
-// The hive: how rings find each other.
+// The hive: how workers find each other.
 //
-// ring.go is how one SuperAI commands another. This is how the commander comes
+// hive_call.go is how one SuperAI commands another. This is how the commander comes
 // to know who there is to command — and it replaces a list someone typed into
-// a Secret, which was wrong the moment a pod was rescheduled, a ring was added
+// a Secret, which was wrong the moment a pod was rescheduled, a worker was added
 // or one died and nothing said so.
 //
-// The protocol is one message, repeated. A ring says who it is to the supreme
-// ring: protocol, name, role, where it can be reached, and the credential the
-// supreme should use to command it. The supreme answers with how often to say
+// The protocol is one message, repeated. A worker says who it is to the queen
+// worker: protocol, name, role, where it can be reached, and the credential the
+// queen should use to command it. The queen answers with how often to say
 // it again. That is joining and it is also the heartbeat, which is why there is
-// one endpoint and no separate "leave": a ring that stops saying it is gone,
+// one endpoint and no separate "leave": a worker that stops saying it is gone,
 // and the roster reflects that without anyone having to notice.
 //
 // Roles are what the settings say, and a role decides what an instance may do
 // rather than what it is called:
 //
-//	supreme  accepts joins, keeps the roster, commands
-//	ring     announces itself, obeys
+//	queen  accepts joins, keeps the roster, commands
+//	worker     announces itself, obeys
 //	(none)   a standalone install; neither joins nor is joined
 //
-// Handing over the ring's own bearer token in the hello is the join itself —
+// Handing over the worker's own bearer token in the hello is the join itself —
 // "you may command me" is exactly what that sentence means — so it travels
-// only to the address the ring was told to join.
+// only to the address the worker was told to join.
 
-// HiveProtocol names the wire format. A supreme that meets a different string
-// refuses rather than guessing, so a v2 ring cannot half-join a v1 supreme.
+// HiveProtocol names the wire format. A queen that meets a different string
+// refuses rather than guessing, so a v2 worker cannot half-join a v1 queen.
 const HiveProtocol = "superai-hive/1"
 
 const (
-	HiveRoleSupreme = "supreme"
-	HiveRoleRing    = "ring"
+	HiveRoleQueen  = "queen"
+	HiveRoleWorker = "worker"
 )
 
-// DefaultHiveInterval is how often a ring re-announces itself.
+// DefaultHiveInterval is how often a worker re-announces itself.
 const DefaultHiveInterval = 10 * time.Second
 
 // hiveMisses is how many intervals of silence make a member lost. Three,
@@ -61,24 +61,24 @@ const DefaultHiveInterval = 10 * time.Second
 const hiveMisses = 3
 
 // hiveForget is how long a lost member stays on the roster before it is
-// dropped, so a ring that is restarting shows up as lost rather than
+// dropped, so a worker that is restarting shows up as lost rather than
 // vanishing and reappearing as new.
 const hiveForget = 15 * time.Minute
 
 // HiveSettings configures this instance's part in a hive. The zero value is a
 // standalone install.
 type HiveSettings struct {
-	// Role is "supreme", "ring", or empty.
+	// Role is "queen", "worker", or empty.
 	Role string `json:"role,omitempty"`
-	// Name of this ring in the roster and after the @. Empty takes the
+	// Name of this worker in the roster and after the @. Empty takes the
 	// hostname, which in a StatefulSet is already stable and unique.
 	Name string `json:"name,omitempty"`
-	// JoinURL is the supreme ring's address. Only a ring uses it.
+	// JoinURL is the queen's address. Only a worker uses it.
 	JoinURL string `json:"join_url,omitempty"`
-	// JoinToken is the bearer the supreme's API wants. Empty reuses this
+	// JoinToken is the bearer the queen's API wants. Empty reuses this
 	// instance's own token, which is right when a hive shares one.
 	JoinToken string `json:"join_token,omitempty"`
-	// AdvertiseURL is where the supreme should reach this ring. Empty takes
+	// AdvertiseURL is where the queen should reach this worker. Empty takes
 	// $SUPERAI_ADVERTISE_URL.
 	AdvertiseURL string `json:"advertise_url,omitempty"`
 	// IntervalSeconds between announcements. Zero takes the default.
@@ -92,7 +92,7 @@ func (h HiveSettings) Interval() time.Duration {
 	return time.Duration(h.IntervalSeconds) * time.Second
 }
 
-// HiveHello is what a ring sends: who it is and how to reach it.
+// HiveHello is what a worker sends: who it is and how to reach it.
 type HiveHello struct {
 	Protocol  string    `json:"protocol"`
 	Name      string    `json:"name"`
@@ -103,15 +103,15 @@ type HiveHello struct {
 	StartedAt time.Time `json:"started_at"`
 }
 
-// HiveWelcome is the supreme's answer.
+// HiveWelcome is the queen's answer.
 type HiveWelcome struct {
 	Protocol   string `json:"protocol"`
-	Supreme    string `json:"supreme"`
+	Queen      string `json:"queen"`
 	IntervalMS int    `json:"interval_ms"`
 	Members    int    `json:"members"`
 }
 
-// HiveMember is one ring on the roster.
+// HiveMember is one worker on the roster.
 type HiveMember struct {
 	Name     string    `json:"name"`
 	Role     string    `json:"role"`
@@ -127,7 +127,7 @@ type HiveMember struct {
 
 var hiveName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$`)
 
-// Hive is the supreme ring's roster.
+// Hive is the queen's roster.
 type Hive struct {
 	name     string
 	interval time.Duration
@@ -144,16 +144,16 @@ func NewHive(name string, interval time.Duration) *Hive {
 	return &Hive{name: name, interval: interval, now: time.Now, members: map[string]*HiveMember{}}
 }
 
-// Join records one announcement. Idempotent: the tenth hello from a ring is the
+// Join records one announcement. Idempotent: the tenth hello from a worker is the
 // same call as the first, and only refreshes when it was last heard.
 func (h *Hive) Join(hello HiveHello) (HiveWelcome, error) {
 	if hello.Protocol != HiveProtocol {
-		return HiveWelcome{}, fmt.Errorf("unsupported protocol %q; this supreme speaks %s", hello.Protocol, HiveProtocol)
+		return HiveWelcome{}, fmt.Errorf("unsupported protocol %q; this queen speaks %s", hello.Protocol, HiveProtocol)
 	}
-	if hello.Role != HiveRoleRing {
-		// Two supremes in one hive is two things giving orders. Refused
+	if hello.Role != HiveRoleWorker {
+		// Two queens in one hive is two things giving orders. Refused
 		// outright, because there is no arrangement of it that is safe.
-		return HiveWelcome{}, fmt.Errorf("role %q cannot join: only rings join a supreme", hello.Role)
+		return HiveWelcome{}, fmt.Errorf("role %q cannot join: only workers join a queen", hello.Role)
 	}
 	if !hiveName.MatchString(hello.Name) {
 		return HiveWelcome{}, fmt.Errorf("name %q is not usable: letters, digits, . _ - and at most 40 characters", hello.Name)
@@ -176,7 +176,7 @@ func (h *Hive) Join(hello HiveHello) (HiveWelcome, error) {
 	}
 	m.Role, m.URL, m.Version, m.token, m.LastSeen = hello.Role, strings.TrimRight(hello.URL, "/"), hello.Version, hello.Token, now
 	return HiveWelcome{
-		Protocol: HiveProtocol, Supreme: h.name,
+		Protocol: HiveProtocol, Queen: h.name,
 		IntervalMS: int(h.interval / time.Millisecond), Members: len(h.members),
 	}, nil
 }
@@ -208,7 +208,7 @@ func (h *Hive) Members() []HiveMember {
 }
 
 // Agents is the live members as remote agents, ready for the runner. A lost
-// ring is not offered: commanding one is a connection timeout with a name.
+// worker is not offered: commanding one is a connection timeout with a name.
 func (h *Hive) Agents() map[string]RemoteAgent {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -219,23 +219,52 @@ func (h *Hive) Agents() map[string]RemoteAgent {
 			continue
 		}
 		out[name] = RemoteAgent{
-			About: fmt.Sprintf("%s — a ring in the hive, at %s. It has its own tools and the shared memory.", name, m.URL),
+			About: fmt.Sprintf("%s — a worker in the hive, at %s. It has its own tools and the shared memory.", name, m.URL),
 			URL:   m.URL, Token: m.token,
 		}
 	}
 	return out
 }
 
-// Announcer is a ring's half: say who it is, and keep saying it.
+// Announcer is a worker's half: say who it is, and keep saying it.
 type Announcer struct {
 	Settings HiveSettings
-	// Token is this instance's own bearer, sent so the supreme can command it,
+	// Token is this instance's own bearer, sent so the queen can command it,
 	// and used to authenticate the join when JoinToken is empty.
 	Token   string
 	Version string
 
 	started time.Time
 	client  *http.Client
+
+	mu      sync.Mutex
+	joined  bool
+	lastOK  time.Time
+	lastErr string
+}
+
+// AnnouncerState is what a worker knows about its own membership.
+type AnnouncerState struct {
+	Joined  bool      `json:"joined"`
+	LastOK  time.Time `json:"last_ok"`
+	LastErr string    `json:"error"`
+}
+
+// State reports whether the last announcement was heard, and if not why.
+func (a *Announcer) State() AnnouncerState {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return AnnouncerState{Joined: a.joined, LastOK: a.lastOK, LastErr: a.lastErr}
+}
+
+func (a *Announcer) record(err error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if err == nil {
+		a.joined, a.lastOK, a.lastErr = true, time.Now(), ""
+		return
+	}
+	a.joined, a.lastErr = false, err.Error()
 }
 
 // Name is the configured name or, failing that, the hostname.
@@ -254,25 +283,25 @@ func (a *Announcer) advertise() string {
 	return strings.TrimSpace(os.Getenv("SUPERAI_ADVERTISE_URL"))
 }
 
-// Validate says why this ring cannot announce itself, before the loop starts
+// Validate says why this worker cannot announce itself, before the loop starts
 // and cannot say anything.
 func (a *Announcer) Validate() error {
-	if a.Settings.Role != HiveRoleRing {
-		return errors.New("only a ring announces itself")
+	if a.Settings.Role != HiveRoleWorker {
+		return errors.New("only a worker announces itself")
 	}
 	if strings.TrimSpace(a.Settings.JoinURL) == "" {
-		return errors.New("hive.join_url is empty: a ring has to be told where the supreme is")
+		return errors.New("hive.join_url is empty: a worker has to be told where the queen is")
 	}
 	if a.advertise() == "" {
-		return errors.New("no advertise url: set hive.advertise_url or $SUPERAI_ADVERTISE_URL to where the supreme can reach this ring")
+		return errors.New("no advertise url: set hive.advertise_url or $SUPERAI_ADVERTISE_URL to where the queen can reach this worker")
 	}
 	if !hiveName.MatchString(a.Name()) {
-		return fmt.Errorf("ring name %q is not usable", a.Name())
+		return fmt.Errorf("worker name %q is not usable", a.Name())
 	}
 	return nil
 }
 
-// Once sends one hello and returns the supreme's answer.
+// Once sends one hello and returns the queen's answer.
 func (a *Announcer) Once(ctx context.Context) (HiveWelcome, error) {
 	if a.client == nil {
 		a.client = &http.Client{Timeout: 10 * time.Second}
@@ -281,7 +310,7 @@ func (a *Announcer) Once(ctx context.Context) (HiveWelcome, error) {
 		a.started = time.Now()
 	}
 	body, _ := json.Marshal(HiveHello{
-		Protocol: HiveProtocol, Name: a.Name(), Role: HiveRoleRing, URL: a.advertise(),
+		Protocol: HiveProtocol, Name: a.Name(), Role: HiveRoleWorker, URL: a.advertise(),
 		Token: a.Token, Version: a.Version, StartedAt: a.started,
 	})
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
@@ -306,12 +335,12 @@ func (a *Announcer) Once(ctx context.Context) (HiveWelcome, error) {
 	}
 	var w HiveWelcome
 	if err := json.Unmarshal(raw, &w); err != nil || w.Protocol != HiveProtocol {
-		return HiveWelcome{}, fmt.Errorf("that is not a %s supreme: %s", HiveProtocol, strings.TrimSpace(string(raw)))
+		return HiveWelcome{}, fmt.Errorf("that is not a %s queen: %s", HiveProtocol, strings.TrimSpace(string(raw)))
 	}
 	return w, nil
 }
 
-// Run announces until ctx ends. It never gives up: a supreme that is not up yet
+// Run announces until ctx ends. It never gives up: a queen that is not up yet
 // or is restarting is the ordinary case, and the loop is what makes the order
 // pods start in irrelevant.
 func (a *Announcer) Run(ctx context.Context) {
@@ -320,10 +349,11 @@ func (a *Announcer) Run(ctx context.Context) {
 	joined := false
 	for {
 		w, err := a.Once(ctx)
+		a.record(err)
 		switch {
 		case err == nil:
 			if !joined {
-				log.Printf("hive: joined %q as %s", w.Supreme, a.Name())
+				log.Printf("hive: joined %q as %s", w.Queen, a.Name())
 				joined = true
 			}
 			backoff = time.Second
@@ -333,7 +363,7 @@ func (a *Announcer) Run(ctx context.Context) {
 			}
 		default:
 			if joined {
-				log.Printf("hive: lost the supreme: %v", err)
+				log.Printf("hive: lost the queen: %v", err)
 			} else if backoff == time.Second {
 				log.Printf("hive: cannot join yet: %v", err)
 			}

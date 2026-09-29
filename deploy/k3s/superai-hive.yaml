@@ -1,11 +1,11 @@
-# A hive of SuperAI rings sharing one CortexDB.
+# A hive of SuperAI workers sharing one CortexDB.
 #
-# One supreme ring commands the others. What makes it supreme is its settings:
-# they list the rings as remote agents, and the ring_command tool appears only
-# where such a list exists. The rings' settings list nothing, so they have no
+# One queen commands the others. What makes it queen is its settings:
+# they list the workers as remote agents, and the hive_command tool appears only
+# where such a list exists. The workers' settings list nothing, so they have no
 # way to command upward or sideways.
 #
-# Every ring keeps its own volume (sessions, plans, its own login); what they
+# Every worker keeps its own volume (sessions, plans, its own login); what they
 # share is the brain, through memory_backend "shared" on the "hive" namespace.
 #
 # The Secret is created by deploy/k3s/hive-secret.sh — settings carry model
@@ -60,21 +60,21 @@ roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: superai-
 ---
 apiVersion: v1
 kind: Service
-metadata: {name: superai-supreme, namespace: superai}
+metadata: {name: superai-queen, namespace: superai}
 spec:
   clusterIP: None
-  selector: {app: superai-supreme}
+  selector: {app: superai-queen}
   ports: [{name: http, port: 43117}]
 ---
 apiVersion: apps/v1
 kind: StatefulSet
-metadata: {name: superai-supreme, namespace: superai}
+metadata: {name: superai-queen, namespace: superai}
 spec:
-  serviceName: superai-supreme
+  serviceName: superai-queen
   replicas: 1
-  selector: {matchLabels: {app: superai-supreme}}
+  selector: {matchLabels: {app: superai-queen}}
   template:
-    metadata: {labels: {app: superai-supreme}}
+    metadata: {labels: {app: superai-queen}}
     spec:
       serviceAccountName: superai
       containers:
@@ -86,9 +86,9 @@ spec:
             - {name: SUPERAI_TOKEN, valueFrom: {secretKeyRef: {name: superai-hive, key: token}}}
             - {name: SUPERAI_PASSWORD_HASH, valueFrom: {secretKeyRef: {name: superai-hive, key: password_hash, optional: true}}}
             - {name: POD_NAME, valueFrom: {fieldRef: {fieldPath: metadata.name}}}
-            - {name: SUPERAI_ADVERTISE_URL, value: "http://$(POD_NAME).superai-supreme.superai.svc.cluster.local:43117"}
+            - {name: SUPERAI_ADVERTISE_URL, value: "http://$(POD_NAME).superai-queen.superai.svc.cluster.local:43117"}
             - {name: CORTEXDB_GRPC_TOKEN, valueFrom: {secretKeyRef: {name: superai-hive, key: cortexdb_token}}}
-            - {name: SUPERAI_SETTINGS_JSON, valueFrom: {secretKeyRef: {name: superai-hive, key: settings-supreme.json}}}
+            - {name: SUPERAI_SETTINGS_JSON, valueFrom: {secretKeyRef: {name: superai-hive, key: settings-queen.json}}}
           readinessProbe:
             httpGet: {path: /api/session, port: 43117}
           volumeMounts: [{name: data, mountPath: /data}]
@@ -100,21 +100,21 @@ spec:
 ---
 apiVersion: v1
 kind: Service
-metadata: {name: superai-ring, namespace: superai}
+metadata: {name: superai-worker, namespace: superai}
 spec:
   clusterIP: None
-  selector: {app: superai-ring}
+  selector: {app: superai-worker}
   ports: [{name: http, port: 43117}]
 ---
 apiVersion: apps/v1
 kind: StatefulSet
-metadata: {name: superai-ring, namespace: superai}
+metadata: {name: superai-worker, namespace: superai}
 spec:
-  serviceName: superai-ring
+  serviceName: superai-worker
   replicas: 2
-  selector: {matchLabels: {app: superai-ring}}
+  selector: {matchLabels: {app: superai-worker}}
   template:
-    metadata: {labels: {app: superai-ring}}
+    metadata: {labels: {app: superai-worker}}
     spec:
       serviceAccountName: superai
       containers:
@@ -126,9 +126,9 @@ spec:
             - {name: SUPERAI_TOKEN, valueFrom: {secretKeyRef: {name: superai-hive, key: token}}}
             - {name: SUPERAI_PASSWORD_HASH, valueFrom: {secretKeyRef: {name: superai-hive, key: password_hash, optional: true}}}
             - {name: POD_NAME, valueFrom: {fieldRef: {fieldPath: metadata.name}}}
-            - {name: SUPERAI_ADVERTISE_URL, value: "http://$(POD_NAME).superai-ring.superai.svc.cluster.local:43117"}
+            - {name: SUPERAI_ADVERTISE_URL, value: "http://$(POD_NAME).superai-worker.superai.svc.cluster.local:43117"}
             - {name: CORTEXDB_GRPC_TOKEN, valueFrom: {secretKeyRef: {name: superai-hive, key: cortexdb_token}}}
-            - {name: SUPERAI_SETTINGS_JSON, valueFrom: {secretKeyRef: {name: superai-hive, key: settings-ring.json}}}
+            - {name: SUPERAI_SETTINGS_JSON, valueFrom: {secretKeyRef: {name: superai-hive, key: settings-worker.json}}}
           readinessProbe:
             httpGet: {path: /api/session, port: 43117}
           volumeMounts: [{name: data, mountPath: /data}]
@@ -138,24 +138,24 @@ spec:
         accessModes: [ReadWriteOnce]
         resources: {requests: {storage: 2Gi}}
 ---
-# The supreme ring's UI. Traefik answers on port 80 of every node, and with no
+# The queen's UI. Traefik answers on port 80 of every node, and with no
 # host rule any name reaching a node lands here — the LAN address is enough.
-# Only the supreme ring is exposed: the rings are reached by it, from inside.
+# Only the queen is exposed: the workers are reached by it, from inside.
 # The login gate is the app's own (a password_hash in the Secret).
 apiVersion: v1
 kind: Service
-metadata: {name: superai-supreme-web, namespace: superai}
+metadata: {name: superai-queen-web, namespace: superai}
 spec:
-  selector: {app: superai-supreme}
+  selector: {app: superai-queen}
   ports: [{name: http, port: 80, targetPort: 43117}]
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
-metadata: {name: superai-supreme, namespace: superai}
+metadata: {name: superai-queen, namespace: superai}
 spec:
   rules:
     - http:
         paths:
           - path: /
             pathType: Prefix
-            backend: {service: {name: superai-supreme-web, port: {number: 80}}}
+            backend: {service: {name: superai-queen-web, port: {number: 80}}}

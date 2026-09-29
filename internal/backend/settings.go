@@ -230,7 +230,7 @@ type Settings struct {
 	// agent is allowed to write (see settingsWritable in selftools.go).
 	ExternalAgents ExternalAgents `json:"external_agents"`
 
-	// Hive makes this instance a supreme ring or a ring in one — see hive.go.
+	// Hive makes this instance a queen or a worker in one — see hive.go.
 	// The zero value is a standalone install.
 	Hive HiveSettings `json:"hive"`
 

@@ -69,9 +69,9 @@ type RemoteAgents struct {
 type RemoteAgent struct {
 	// What it is, in one line. Shown in the picker and given to the model.
 	About string `json:"about,omitempty"`
-	// URL, when set, makes this a ring: another SuperAI serving over HTTP,
+	// URL, when set, makes this a worker: another SuperAI serving over HTTP,
 	// commanded through its own API instead of over SSH. Token is the bearer
-	// it accepts. See ring.go. Hosts and Command are ignored for a ring.
+	// it accepts. See hive_call.go. Hosts and Command are ignored for a worker.
 	URL   string `json:"url,omitempty"`
 	Token string `json:"token,omitempty"`
 
@@ -145,7 +145,7 @@ func (r *RemoteAgents) normalize() {
 		// An agent with no argv or no host cannot be called, and leaving it in
 		// the list means offering the model a name that always fails.
 		if a.URL != "" {
-			continue // a ring needs neither
+			continue // a worker needs neither
 		}
 		if len(a.Command) == 0 || len(a.Hosts) == 0 {
 			delete(r.Agents, name)
@@ -247,8 +247,8 @@ func defaultRemoteAgents() map[string]RemoteAgent {
 // RemoteRunner asks remote agents things, and remembers where they live.
 type RemoteRunner struct {
 	cfg RemoteAgents
-	// roster supplies agents that are not in the settings — the rings that have
-	// joined the hive — looked up at call time, so a ring that joined a second
+	// roster supplies agents that are not in the settings — the workers that have
+	// joined the hive — looked up at call time, so a worker that joined a second
 	// ago is reachable and one that was lost is not.
 	roster func() map[string]RemoteAgent
 
@@ -271,7 +271,7 @@ func (r *RemoteRunner) SetRoster(f func() map[string]RemoteAgent) { r.roster = f
 // lookup finds an agent by name: the settings first, then the roster. The
 // second answer says whether it came from the roster, which matters because
 // the Enabled switch governs commands run over SSH, not a hive the operator
-// set up by giving this instance the supreme role.
+// set up by giving this instance the queen role.
 func (r *RemoteRunner) lookup(name string) (RemoteAgent, bool, bool) {
 	if a, ok := r.cfg.Agents[name]; ok {
 		return a, true, false
@@ -284,9 +284,9 @@ func (r *RemoteRunner) lookup(name string) (RemoteAgent, bool, bool) {
 	return RemoteAgent{}, false, false
 }
 
-// Rings is every reachable ring — those named in the settings and those that
-// have joined — by name. A ring is any agent with a URL.
-func (r *RemoteRunner) Rings() map[string]RemoteAgent {
+// Workers is every reachable worker — those named in the settings and those that
+// have joined — by name. A worker is any agent with a URL.
+func (r *RemoteRunner) Workers() map[string]RemoteAgent {
 	out := map[string]RemoteAgent{}
 	for n, a := range r.cfg.Agents {
 		if a.URL != "" {
@@ -351,12 +351,12 @@ func (r *RemoteRunner) Run(ctx context.Context, name, prompt string) (res Remote
 	}
 
 	if agent.URL != "" {
-		// An explicit TimeoutSeconds bounds a ring; otherwise nothing does.
+		// An explicit TimeoutSeconds bounds a worker; otherwise nothing does.
 		var limit time.Duration
 		if r.cfg.TimeoutSeconds > 0 {
 			limit = r.cfg.Timeout()
 		}
-		out := askRing(ctx, ringTarget{name: name, url: agent.URL, token: agent.Token, timeout: limit}, prompt)
+		out := askWorker(ctx, workerTarget{name: name, url: agent.URL, token: agent.Token, timeout: limit}, prompt)
 		out.MS = time.Since(started).Milliseconds()
 		return out, nil
 	}

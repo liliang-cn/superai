@@ -63,6 +63,8 @@ export function GetSettings():Promise<backend.Settings>;
 
 export function GetStatus():Promise<Record<string, any>>;
 
+export function HiveStatus():Promise<Record<string, any>>;
+
 export function GraphView():Promise<Record<string, any>>;
 
 export function ImportCSV(arg1:string,arg2:string):Promise<string>;

@@ -3606,3 +3606,26 @@ body.desktop-shell .sidebar.collapsed .nav-key { display: none; }
     white-space: nowrap;
   }
 }
+
+/* Hive panel */
+.hive-self, .hive-link { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
+.hive-link { align-items: flex-start; }
+.hive-self-body { flex: 1; min-width: 0; }
+.hive-self-name { font-weight: 600; }
+.hive-dim { color: var(--text-2); font-size: 12.5px; }
+.hive-mono { font-family: var(--font-mono); word-break: break-all; }
+.hive-warn { color: var(--amber); font-size: 12.5px; }
+.hive-role { text-transform: uppercase; letter-spacing: 0.08em; font-size: 11px; font-weight: 700; padding: 5px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
+.hive-role.alone { background: transparent; color: var(--text-2); border: 1px solid var(--border); }
+.hive-table { display: flex; flex-direction: column; margin-top: 8px; }
+.hive-row { display: grid; grid-template-columns: 18px minmax(120px, 1.2fr) minmax(160px, 2.4fr) 100px 110px; gap: 12px; align-items: center; padding: 9px 4px; border-top: 1px solid var(--border); font-size: 13px; }
+.hive-row.lost { opacity: 0.6; }
+.hive-head { border-top: 0; color: var(--text-2); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
+.hive-name { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.hive-empty { padding: 14px 4px 4px; }
+.hive-empty p { margin: 0 0 6px; }
+.hive-foot { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
+@media (max-width: 640px) {
+  .hive-row { grid-template-columns: 18px 1fr auto; }
+  .hive-row > :nth-child(3), .hive-row > :nth-child(4) { display: none; }
+}
