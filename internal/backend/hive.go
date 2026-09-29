@@ -199,6 +199,22 @@ func (h *Hive) stateLocked(m *HiveMember, now time.Time) string {
 	return "live"
 }
 
+// Leave removes a worker that said goodbye. It only counts when the goodbye
+// carries the start time of the process on the roster: a StatefulSet's
+// replacement pod has the same name, and the old one's last words arriving after
+// the new one has joined must not remove it.
+func (h *Hive) Leave(name string, startedAt time.Time) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	m, ok := h.members[name]
+	if !ok || !m.StartedAt.Equal(startedAt) {
+		return false
+	}
+	delete(h.members, name)
+	log.Printf("hive: %s left", name)
+	return true
+}
+
 // Members is the roster, sorted by name, dropping anyone lost for long enough.
 func (h *Hive) Members() []HiveMember {
 	h.mu.Lock()
@@ -353,6 +369,33 @@ func (a *Announcer) Once(ctx context.Context) (HiveWelcome, error) {
 	return w, nil
 }
 
+// Leave tells the queen this worker is going away on purpose, so it comes off
+// the roster at once instead of sitting there as "lost" until it is forgotten.
+// A worker that vanishes without saying so is still lost, which is the point of
+// having both.
+func (a *Announcer) Leave(ctx context.Context) error {
+	if a.client == nil {
+		a.client = &http.Client{Timeout: 10 * time.Second}
+	}
+	body, _ := json.Marshal(HiveHello{Protocol: HiveProtocol, Name: a.Name(), Role: HiveRoleWorker, StartedAt: a.started})
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(a.Settings.JoinURL, "/")+"/api/hive/leave", bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	tok := a.Settings.JoinToken
+	if tok == "" {
+		tok = a.Token
+	}
+	req.Header.Set("Authorization", "Bearer "+tok)
+	resp, err := a.client.Do(req)
+	if err != nil {
+		return err
+	}
+	resp.Body.Close()
+	return nil
+}
+
 // Run announces until ctx ends. It never gives up: a queen that is not up yet
 // or is restarting is the ordinary case, and the loop is what makes the order
 // pods start in irrelevant.
@@ -388,6 +431,12 @@ func (a *Announcer) Run(ctx context.Context) {
 		}
 		select {
 		case <-ctx.Done():
+			// Its own context: the one that ended is why we are here.
+			if joined {
+				bye, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+				_ = a.Leave(bye)
+				cancel()
+			}
 			return
 		case <-time.After(wait):
 		}
@@ -481,11 +530,20 @@ func (a *Announcer) Peers(ctx context.Context) map[string]RemoteAgent {
 // Report tells the queen about a task this worker gave a peer, so the queen's
 // board shows dealings the queen was not part of.
 func (a *Announcer) Report(ctx context.Context, t HiveTask) error {
+	return a.reportTo(ctx, "/api/hive/task", t)
+}
+
+// ReportPulse is Report for the flicker: one pulse of a peer order.
+func (a *Announcer) ReportPulse(ctx context.Context, p HivePulse) error {
+	return a.reportTo(ctx, "/api/hive/pulse", p)
+}
+
+func (a *Announcer) reportTo(ctx context.Context, path string, v any) error {
 	if a.client == nil {
 		a.client = &http.Client{Timeout: 10 * time.Second}
 	}
-	body, _ := json.Marshal(t)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(a.Settings.JoinURL, "/")+"/api/hive/task", bytes.NewReader(body))
+	body, _ := json.Marshal(v)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(a.Settings.JoinURL, "/")+path, bytes.NewReader(body))
 	if err != nil {
 		return err
 	}

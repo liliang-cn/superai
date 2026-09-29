@@ -255,3 +255,69 @@ func TestTheAdvertiseAddressFallsBackToTheEnvironment(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestAWorkerThatSaysGoodbyeComesOffTheRosterAtOnce(t *testing.T) {
+	h := NewHive("q", time.Minute)
+	x := hello("w0")
+	x.StartedAt = time.Now()
+	h.Join(x)
+	if !h.Leave("w0", x.StartedAt) {
+		t.Fatal("a goodbye was not honoured")
+	}
+	if len(h.Members()) != 0 {
+		t.Fatalf("%+v", h.Members())
+	}
+}
+
+func TestAnOldPodsGoodbyeDoesNotRemoveItsReplacement(t *testing.T) {
+	// A StatefulSet reuses the name. The old pod's last words can arrive after
+	// the new one has joined.
+	h := NewHive("q", time.Minute)
+	old := hello("w0")
+	old.StartedAt = time.Now().Add(-time.Hour)
+	h.Join(old)
+	fresh := hello("w0")
+	fresh.StartedAt = time.Now()
+	h.Join(fresh)
+	if h.Leave("w0", old.StartedAt) {
+		t.Fatal("the old pod's goodbye removed the new pod")
+	}
+	if len(h.Members()) != 1 {
+		t.Fatal("the replacement is gone")
+	}
+}
+
+func TestAWorkerShuttingDownTellsTheQueen(t *testing.T) {
+	h := NewHive("q", 30*time.Millisecond)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/hive/join", func(w http.ResponseWriter, r *http.Request) {
+		var x HiveHello
+		json.NewDecoder(r.Body).Decode(&x)
+		wl, _ := h.Join(x)
+		json.NewEncoder(w).Encode(wl)
+	})
+	mux.HandleFunc("/api/hive/leave", func(w http.ResponseWriter, r *http.Request) {
+		var x HiveHello
+		json.NewDecoder(r.Body).Decode(&x)
+		json.NewEncoder(w).Encode(map[string]any{"left": h.Leave(x.Name, x.StartedAt)})
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	a := &Announcer{Settings: HiveSettings{Role: HiveRoleWorker, Name: "w9", JoinURL: srv.URL, AdvertiseURL: "http://w9:1"}, Token: "t"}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { a.Run(ctx); close(done) }()
+	deadline := time.Now().Add(2 * time.Second)
+	for len(h.Members()) == 0 && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if len(h.Members()) != 1 {
+		t.Fatal("never joined")
+	}
+	cancel()
+	<-done
+	if n := len(h.Members()); n != 0 {
+		t.Fatalf("still on the roster after a clean shutdown: %d", n)
+	}
+}

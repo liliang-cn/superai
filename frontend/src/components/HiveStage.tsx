@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 
 // The hive, drawn while it works.
 //
@@ -26,6 +26,22 @@ export interface StageTask {
   started_at: string;
 }
 
+/** One flicker while an order is carried out: a tool called, a result back,
+ *  the model thinking, some text written. Drawn as light between the two ends. */
+export interface StagePulse {
+  task: string;
+  worker: string;
+  from?: string;
+  dir: "out" | "in" | "peer";
+  kind: "thinking" | "tool" | "result" | "text";
+  tool?: string;
+  bytes?: number;
+}
+
+export interface StageHandle {
+  pulse: (p: StagePulse) => void;
+}
+
 export interface StageWorker {
   name: string;
   state: "live" | "lost";
@@ -42,7 +58,9 @@ interface Props {
 }
 
 type Pt = { x: number; y: number };
-type Packet = { from: string; to: string; t0: number; dur: number; color: string };
+type Packet = { from: string; to: string; t0: number; dur: number; color: string; size?: number; alpha?: number };
+type Label = { at: string; text: string; t0: number; color: string };
+type Ripple = { at: string; t0: number; color: string };
 type Burst = { at: string; t0: number; color: string };
 type Spark = { at: string; t0: number; a: number };
 
@@ -89,7 +107,7 @@ function palette() {
   };
 }
 
-export default function HiveStage({ role, self, workers, tasks, ready }: Props) {
+const HiveStage = forwardRef<StageHandle, Props>(function HiveStage({ role, self, workers, tasks, ready }, ref) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const box = useRef<HTMLDivElement>(null);
 
@@ -99,10 +117,66 @@ export default function HiveStage({ role, self, workers, tasks, ready }: Props) 
   const packets = useRef<Packet[]>([]);
   const bursts = useRef<Burst[]>([]);
   const sparks = useRef<Spark[]>([]);
+  const labels = useRef<Label[]>([]);
+  const ripples = useRef<Ripple[]>([]);
   // What has been animated already, so a re-render of the same task is not a
   // second packet. `null` until the first batch, which is history and is not
   // replayed.
   const seen = useRef<Map<string, { state: string; tools: number }> | null>(null);
+
+  // The live stream. Each pulse is one beam, with a look decided by what it is:
+  // a tool call is a bright amber bolt with the tool's name beside it, a result
+  // a green one as large as the result is, thinking a faint slow dot, and text a
+  // thin quick streak. They run from the worker toward whoever is waiting on it —
+  // the queen, or for a peer order the worker that asked.
+  useImperativeHandle(
+    ref,
+    () => ({
+      pulse: (p: StagePulse) => {
+        const now = performance.now();
+        const rl = live.current.role;
+        const pal = palette();
+        // Where the light travels: from the one doing the work to the one waiting.
+        let from: string;
+        let to: string;
+        if (rl === "worker") {
+          if (p.dir !== "in") return;
+          from = SELF;
+          to = QUEEN;
+        } else if (rl === "queen") {
+          if (p.dir === "peer" && p.from) {
+            from = p.worker;
+            to = p.from;
+          } else {
+            from = p.worker;
+            to = QUEEN;
+          }
+        } else {
+          return;
+        }
+        const grow = Math.min(3, Math.log10(1 + (p.bytes ?? 0)));
+        let beam: Packet;
+        switch (p.kind) {
+          case "tool":
+            beam = { from, to, t0: now, dur: 460, color: pal.amber, size: 5.2 };
+            labels.current.push({ at: from, text: p.tool || "tool", t0: now, color: pal.amber });
+            break;
+          case "result":
+            beam = { from, to, t0: now, dur: 420, color: pal.green, size: 3.6 + grow };
+            break;
+          case "text":
+            beam = { from, to, t0: now, dur: 340, color: pal.accent, size: 2.2 + grow * 0.5, alpha: 0.85 };
+            break;
+          default:
+            beam = { from, to, t0: now, dur: 620, color: pal.accent, size: 2.4, alpha: 0.4 };
+        }
+        packets.current.push(beam);
+        if (packets.current.length > 90) packets.current.splice(0, packets.current.length - 90);
+        if (p.kind !== "thinking") ripples.current.push({ at: to, t0: now + beam.dur, color: beam.color });
+      },
+    }),
+    [],
+  );
 
   // Turn changes into effects.
   useEffect(() => {
@@ -182,12 +256,13 @@ export default function HiveStage({ role, self, workers, tasks, ready }: Props) 
       if (rl === "queen") {
         m.set(QUEEN, { x: cx, y: cy });
         const n = Math.max(ws.length, 1);
-        // The bottom node's label hangs 55px under it, so the vertical radius
-        // leaves that much, plus the node itself, inside the frame. Sizing it
+        // The bottom node's label hangs up to 76px under it while it works (the
+        // status line is two rows lower than when it is idle), so the vertical
+        // radius leaves that much, plus the node itself, inside the frame. Sizing it
         // as a share of the height instead clipped the last label at ten
         // workers and stacked two neighbours on top of each other.
         const rx = Math.min(W * 0.38, 480);
-        const ry = Math.max(80, Math.min(H / 2 - 78, 230));
+        const ry = Math.max(80, Math.min(H / 2 - 96, 230));
         ws.forEach((w, i) => {
           const a = -Math.PI / 2 + (Math.PI * 2 * i) / n;
           m.set(w.name, { x: cx + rx * Math.cos(a), y: cy + ry * Math.sin(a) });
@@ -403,12 +478,12 @@ export default function HiveStage({ role, self, workers, tasks, ready }: Props) 
         for (let k = 0; k < 6; k++) {
           const tt = Math.max(0, ease(t) - k * 0.035);
           ctx.save();
-          ctx.globalAlpha = (1 - k / 6) * 0.9;
+          ctx.globalAlpha = (1 - k / 6) * (p.alpha ?? 0.9);
           ctx.fillStyle = p.color;
           ctx.shadowColor = p.color;
           ctx.shadowBlur = 14 * pal.glow;
           ctx.beginPath();
-          ctx.arc(a.x + (b.x - a.x) * tt, a.y + (b.y - a.y) * tt, 4.5 - k * 0.55, 0, Math.PI * 2);
+          ctx.arc(a.x + (b.x - a.x) * tt, a.y + (b.y - a.y) * tt, Math.max(0.6, (p.size ?? 4.5) - k * ((p.size ?? 4.5) / 8)), 0, Math.PI * 2);
           ctx.fill();
           ctx.restore();
         }
@@ -428,6 +503,37 @@ export default function HiveStage({ role, self, workers, tasks, ready }: Props) 
         ctx.shadowBlur = 18 * pal.glow;
         hexPath(ctx, c, 30 + t * 60, t);
         ctx.stroke();
+        ctx.restore();
+      }
+
+      // Where a beam lands: a small ring that opens and fades.
+      ripples.current = ripples.current.filter((r) => now - r.t0 < 420);
+      for (const r of ripples.current) {
+        const c = pos.get(r.at);
+        if (!c || now < r.t0) continue;
+        const t = (now - r.t0) / 420;
+        ctx.save();
+        ctx.strokeStyle = r.color;
+        ctx.globalAlpha = 0.6 * (1 - t);
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, 16 + t * 20, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // The name of the tool, floating up from the worker that called it.
+      labels.current = labels.current.filter((l) => now - l.t0 < 1400);
+      for (const l of labels.current) {
+        const c = pos.get(l.at);
+        if (!c) continue;
+        const t = (now - l.t0) / 1400;
+        ctx.save();
+        ctx.globalAlpha = 1 - t * t;
+        ctx.fillStyle = l.color;
+        ctx.font = "600 11px ui-monospace, SFMono-Regular, monospace";
+        ctx.textAlign = "center";
+        ctx.fillText(`⚙ ${l.text}`, c.x, c.y - 42 - t * 18);
         ctx.restore();
       }
 
@@ -483,4 +589,6 @@ export default function HiveStage({ role, self, workers, tasks, ready }: Props) 
       <canvas ref={canvas} />
     </div>
   );
-}
+});
+
+export default HiveStage;

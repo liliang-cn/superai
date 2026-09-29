@@ -3,6 +3,7 @@ package backend
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -289,5 +290,106 @@ func TestAWorkerFetchesItsPeersFromTheQueenAndLeavesItselfOut(t *testing.T) {
 	b := &Announcer{Settings: HiveSettings{Role: HiveRoleWorker, Name: "w1", JoinURL: srv.URL, JoinToken: "secret", PeerToken: "peers"}, Token: "own"}
 	if got := b.Peers(context.Background())["w2"].Token; got != "peers" {
 		t.Fatalf("peer token %q", got)
+	}
+}
+
+type pulseLog struct {
+	mu sync.Mutex
+	ps []HivePulse
+}
+
+func (l *pulseLog) add(p HivePulse) { l.mu.Lock(); l.ps = append(l.ps, p); l.mu.Unlock() }
+func (l *pulseLog) all() []HivePulse {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return append([]HivePulse(nil), l.ps...)
+}
+
+func TestAToolCallAndItsResultAreEachAPulse(t *testing.T) {
+	var got []string
+	p := NewPulser(func(kind, tool string, n int) { got = append(got, fmt.Sprintf("%s:%s:%d", kind, tool, n)) })
+	p.Event("tool_call", "shell", 0, 0)
+	p.Event("tool_result", "shell", 0, 1234)
+	if strings.Join(got, " ") != "tool:shell:0 result:shell:1234" {
+		t.Fatalf("%v", got)
+	}
+}
+
+func TestAStreamOfTextIsGatheredNotDrawnChunkByChunk(t *testing.T) {
+	var kinds []string
+	total := 0
+	p := NewPulser(func(kind, tool string, n int) { kinds = append(kinds, kind); total += n })
+	// A hundred chunks inside a few milliseconds: at most a pulse or two.
+	for i := 0; i < 100; i++ {
+		p.Event("partial", "", 5, 0)
+	}
+	if len(kinds) > 2 {
+		t.Fatalf("%d pulses for one burst of text", len(kinds))
+	}
+	time.Sleep(150 * time.Millisecond)
+	p.Event("partial", "", 5, 0)
+	if total < 5*100 {
+		t.Fatalf("the bytes were not carried: %d", total)
+	}
+}
+
+func TestThinkingIsThrottled(t *testing.T) {
+	n := 0
+	p := NewPulser(func(kind, tool string, _ int) { n++ })
+	for i := 0; i < 50; i++ {
+		p.Event("thinking", "", 0, 0)
+	}
+	if n != 1 {
+		t.Fatalf("%d thinking pulses in an instant", n)
+	}
+}
+
+func TestPulsesReachTheBoardWithWhoAndWhere(t *testing.T) {
+	f := newFakeWorker(t, "")
+	f.onSend = func(_, _ string, w *fakeWorker) string {
+		go func() {
+			time.Sleep(100 * time.Millisecond) // after the id is known
+			w.emit("chat:event", map[string]any{"requestId": "req-1", "type": "tool_call", "tool": "kubectl"})
+			w.emit("chat:event", map[string]any{"requestId": "req-1", "type": "tool_result", "tool": "kubectl", "result": "abcdefghij"})
+			// Another conversation on the same worker must not leak in.
+			w.emit("chat:event", map[string]any{"requestId": "someone-else", "type": "tool_call", "tool": "secret"})
+			time.Sleep(50 * time.Millisecond)
+			w.emit("chat:done", map[string]any{"requestId": "req-1", "final": "ok"})
+		}()
+		return "req-1"
+	}
+	b, _ := boardWithLog()
+	var log pulseLog
+	b.SetPulse(log.add)
+	run := NewRemoteRunner(RemoteAgents{Enabled: true, Agents: map[string]RemoteAgent{"w0": {URL: f.srv.URL}}})
+	run.SetBoard(b)
+	run.Run(context.Background(), "w0", "go")
+
+	ps := log.all()
+	var kinds []string
+	for _, p := range ps {
+		kinds = append(kinds, p.Kind+":"+p.Tool)
+		if p.Worker != "w0" || p.Dir != TaskOut || p.Task == "" {
+			t.Fatalf("a pulse without its context: %+v", p)
+		}
+	}
+	if strings.Join(kinds, " ") != "tool:kubectl result:kubectl" {
+		t.Fatalf("pulses: %v", kinds)
+	}
+	if ps[1].Bytes == 0 {
+		t.Fatal("a result pulse carries no size")
+	}
+}
+
+func TestAFinishedTaskPulsesNothing(t *testing.T) {
+	b, _ := boardWithLog()
+	var log pulseLog
+	b.SetPulse(log.add)
+	id := b.Start("w", TaskOut, "x")
+	b.Pulse(id, "tool", "a", 0)
+	b.Finish(id, TaskDone, "", "")
+	b.Pulse(id, "tool", "late", 0)
+	if len(log.all()) != 1 {
+		t.Fatalf("%+v", log.all())
 	}
 }

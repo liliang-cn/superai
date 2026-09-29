@@ -96,7 +96,7 @@ func TestOnlyARosterMemberMayReportATask(t *testing.T) {
 
 func TestRosterAndTaskEndpointsAreQueenOnly(t *testing.T) {
 	a := &App{settings: &backend.Settings{}}
-	for name, h := range map[string]http.HandlerFunc{"roster": a.handleHiveRoster, "task": a.handleHiveTask} {
+	for name, h := range map[string]http.HandlerFunc{"roster": a.handleHiveRoster, "task": a.handleHiveTask, "leave": a.handleHiveLeave, "pulse": a.handleHivePulse} {
 		w := httptest.NewRecorder()
 		h(w, httptest.NewRequest(http.MethodPost, "/x", strings.NewReader(`{}`)))
 		if w.Code != http.StatusNotFound {
@@ -254,5 +254,26 @@ func TestASpawnedOrdinalIsNewOnlyUnderANewStartTime(t *testing.T) {
 	}
 	if j := r["joined"].([]string); len(j) != 1 || j[0] != "w-1" {
 		t.Fatalf("%+v", r)
+	}
+}
+
+func TestOnlyARosterMemberMayReportAPulse(t *testing.T) {
+	a := &App{settings: &backend.Settings{Hive: backend.HiveSettings{Role: backend.HiveRoleQueen}}}
+	a.hive = backend.NewHive("q", 0)
+	a.hive.Join(backend.HiveHello{Protocol: backend.HiveProtocol, Name: "w1", Role: backend.HiveRoleWorker, URL: "http://w1:1"})
+	post := func(body string) int {
+		w := httptest.NewRecorder()
+		a.handleHivePulse(w, httptest.NewRequest(http.MethodPost, "/api/hive/pulse", strings.NewReader(body)))
+		return w.Code
+	}
+	good := `{"task":"t","worker":"w2","from":"w1","dir":"peer","kind":"tool","tool":"x"}`
+	if c := post(good); c != http.StatusOK {
+		t.Fatalf("a member's pulse got %d", c)
+	}
+	if c := post(strings.Replace(good, `"from":"w1"`, `"from":"nobody"`, 1)); c != http.StatusForbidden {
+		t.Fatalf("a stranger's pulse got %d", c)
+	}
+	if c := post(strings.Replace(good, `"dir":"peer"`, `"dir":"out"`, 1)); c != http.StatusBadRequest {
+		t.Fatalf("a non-peer pulse got %d", c)
 	}
 }

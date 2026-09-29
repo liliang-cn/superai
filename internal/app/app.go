@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -82,11 +83,12 @@ type App struct {
 	hiveBoardOnce sync.Once
 	// hiveReports carries a worker's dealings with its peers to the queen, in
 	// order, off the path of whatever produced them.
-	hiveReports    chan backend.HiveTask
+	hiveReports    chan any
 	hiveReportOnce sync.Once
 	// peerAsks bounds how many questions this worker has out to peers at once.
 	peerAsks chan struct{}
 	hiveStop context.CancelFunc
+	hiveDone chan struct{}
 	// scheduleLock is held while this process owns firing schedules; nil means
 	// another process (the daemon) owns them and this one only manages.
 	scheduleLock *backend.ScheduleLock
@@ -758,7 +760,17 @@ func (a *App) SendChat(sessionID, message string, imagePaths []string) string {
 
 		driver.Emit(backend.AvatarEvent{Type: "state", State: backend.AvatarStateThinking})
 
+		pulser := backend.NewPulser(func(kind, tool string, n int) { board.Pulse(taskID, kind, tool, n) })
 		final, err := svc.Stream(ctx, sessionID, message, imagePaths, func(ev *agent.Event) {
+			if taskID != "" {
+				resultLen := 0
+				if ev.ToolResult != nil {
+					if b, e := json.Marshal(ev.ToolResult); e == nil {
+						resultLen = len(b)
+					}
+				}
+				pulser.Event(string(ev.Type), ev.ToolName, len(ev.Content), resultLen)
+			}
 			switch ev.Type {
 			case agent.EventTypeToolCall:
 				board.Progress(taskID, backend.PhaseTool, ev.ToolName)
