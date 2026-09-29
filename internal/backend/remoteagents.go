@@ -247,6 +247,10 @@ func defaultRemoteAgents() map[string]RemoteAgent {
 // RemoteRunner asks remote agents things, and remembers where they live.
 type RemoteRunner struct {
 	cfg RemoteAgents
+	// roster supplies agents that are not in the settings — the rings that have
+	// joined the hive — looked up at call time, so a ring that joined a second
+	// ago is reachable and one that was lost is not.
+	roster func() map[string]RemoteAgent
 
 	mu    sync.Mutex
 	where map[string]resolvedHost
@@ -259,6 +263,44 @@ type resolvedHost struct {
 
 func NewRemoteRunner(cfg RemoteAgents) *RemoteRunner {
 	return &RemoteRunner{cfg: cfg, where: map[string]resolvedHost{}}
+}
+
+// SetRoster attaches a live source of agents. Called once, before use.
+func (r *RemoteRunner) SetRoster(f func() map[string]RemoteAgent) { r.roster = f }
+
+// lookup finds an agent by name: the settings first, then the roster. The
+// second answer says whether it came from the roster, which matters because
+// the Enabled switch governs commands run over SSH, not a hive the operator
+// set up by giving this instance the supreme role.
+func (r *RemoteRunner) lookup(name string) (RemoteAgent, bool, bool) {
+	if a, ok := r.cfg.Agents[name]; ok {
+		return a, true, false
+	}
+	if r.roster != nil {
+		if a, ok := r.roster()[name]; ok {
+			return a, true, true
+		}
+	}
+	return RemoteAgent{}, false, false
+}
+
+// Rings is every reachable ring — those named in the settings and those that
+// have joined — by name. A ring is any agent with a URL.
+func (r *RemoteRunner) Rings() map[string]RemoteAgent {
+	out := map[string]RemoteAgent{}
+	for n, a := range r.cfg.Agents {
+		if a.URL != "" {
+			out[n] = a
+		}
+	}
+	if r.roster != nil {
+		for n, a := range r.roster() {
+			if a.URL != "" {
+				out[n] = a
+			}
+		}
+	}
+	return out
 }
 
 // Config is what this runner was built from.
@@ -292,11 +334,11 @@ func (r *RemoteRunner) Run(ctx context.Context, name, prompt string) (res Remote
 	started := time.Now()
 	defer func() { res.MS = time.Since(started).Milliseconds() }()
 
-	if !r.cfg.Enabled {
+	agent, ok, fromRoster := r.lookup(name)
+	if !r.cfg.Enabled && !fromRoster {
 		res.Failed, res.Reason = true, "remote agents are switched off in Settings"
 		return res, nil
 	}
-	agent, ok := r.cfg.Agents[name]
 	if !ok {
 		res.Failed = true
 		res.Reason = fmt.Sprintf("there is no agent called %q; configured: %s",

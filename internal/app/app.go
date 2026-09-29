@@ -70,6 +70,12 @@ type App struct {
 	// polling, because only one process gets the bot.
 	telegram    *backend.TelegramBridge
 	telegramErr string
+
+	// hive is the supreme ring's roster; nil on anything else. Built once and
+	// kept across rebuilds, because a settings save must not make every ring
+	// look newly joined. hiveStop ends a ring's announcing loop.
+	hive     *backend.Hive
+	hiveStop context.CancelFunc
 	// scheduleLock is held while this process owns firing schedules; nil means
 	// another process (the daemon) owns them and this one only manages.
 	scheduleLock *backend.ScheduleLock
@@ -153,6 +159,7 @@ func (a *App) boot() {
 	a.initNotifications()
 	a.startScheduler()
 	a.startTelegram()
+	a.startHive()
 }
 
 // syncProxy brings the embedded CLIProxyAPI in line with the current settings:
@@ -195,6 +202,7 @@ func (a *App) Shutdown(ctx context.Context) {
 	// its turns against. The Telegram poller is stopped first and for exactly
 	// the same reason — it may be in the middle of a turn.
 	a.stopTelegram()
+	a.stopHive()
 	a.stopScheduler()
 	// Also before the lock, and both for the same reason as the scheduler: each
 	// takes a lock that is not a.mu — the view waits for its HTTP server to
@@ -264,6 +272,7 @@ func (a *App) rebuild() {
 	// same settings this Service was built from, so the tool's catalogue and
 	// the runner can never describe two different sets.
 	a.registerRemoteTools(svc, cfg.RemoteAgents)
+	a.registerHiveTools(svc, cfg)
 }
 
 // restartScheduler rebinds the timers to the current service. Callers must not
@@ -312,6 +321,7 @@ func (a *App) SaveSettings(s backend.Settings) error {
 	// makes turning Telegram on a settings change rather than a restart.
 	a.restartScheduler()
 	a.startTelegram()
+	a.startHive()
 	return nil
 }
 

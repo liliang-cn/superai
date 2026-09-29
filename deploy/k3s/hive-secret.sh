@@ -2,22 +2,21 @@
 # Builds the hive's Secret from an existing SuperAI install and applies it to
 # the cluster, without the values ever reaching a terminal or a file here.
 #
-#   SUPERAI_PASSWORD_HASH='$2a$…' ./deploy/k3s/hive-secret.sh [rings]      default 2
+#   SUPERAI_PASSWORD_HASH='$2a$…' ./deploy/k3s/hive-secret.sh
 #
 # The password hash (bcrypt) is optional; without it only the bearer token
-# gets in. Rings change the token every run, so restart the pods afterwards.
+# gets in. Every run changes the token, so restart the pods afterwards.
 #
 # Model and CortexDB credentials are copied from the SuperAI on the apps VM;
-# the bearer token shared by the hive is generated fresh. The supreme ring's
-# settings name every ring; the rings' name none.
+# the bearer token shared by the hive is generated fresh. Roles come from the
+# settings: the supreme accepts joins and the rings announce themselves.
 set -euo pipefail
-RINGS="${1:-2}"
 export SUPERAI_PASSWORD_HASH="${SUPERAI_PASSWORD_HASH:-}"
 SRC="${SUPERAI_SRC:-ops@192.168.123.65}"
 KUBE="${SUPERAI_KUBE:-orange1}"
 NS=superai
 
-ssh "$SRC" "RINGS=$RINGS PW='$SUPERAI_PASSWORD_HASH' python3 - <<'PY'
+ssh "$SRC" "PW='$SUPERAI_PASSWORD_HASH' python3 - <<'PY'
 import json, os, secrets
 s = json.load(open('/opt/superai/data/settings.json'))
 token = secrets.token_hex(24)
@@ -29,14 +28,14 @@ base.update(memory_backend='shared', shared_memory_endpoint=s['shared_memory_end
             # Off: the default starts an embedded proxy with no accounts in it and
             # routes the model through that, which answers "unknown provider".
             cliproxy_enabled=False)
-n = int(os.environ['RINGS'])
-rings = {f'ring-{i}': {'about': f'ring-{i} — a worker SuperAI in the hive, with its own tools and the shared memory.',
-                       'url': f'http://superai-ring-{i}.superai-ring.$NS.svc.cluster.local:43117',
-                       'token': token} for i in range(n)}
-supreme = dict(base, remote_agents={'enabled': True, 'agents': rings})
+# Roles, not a list. The supreme accepts joins; a ring announces itself to it
+# (superai-hive/1, see internal/backend/hive.go), so the roster is whoever is
+# actually there and adding a ring is raising the replica count.
+supreme = dict(base, hive={'role': 'supreme', 'name': 'supreme'})
 # Rings act with nobody at a keyboard to approve a tool call, so the gate would
 # only make every command hang. The pod's Role is what bounds them instead.
-ring = dict(base, disable_tool_approval=True)
+ring = dict(base, disable_tool_approval=True,
+            hive={'role': 'ring', 'join_url': 'http://superai-supreme.$NS.svc.cluster.local:43117'})
 out = {'token': token, 'cortexdb_token': s['shared_memory_token'],
                   'settings-supreme.json': json.dumps(supreme), 'settings-ring.json': json.dumps(ring)}
 if os.environ.get('PW'): out['password_hash'] = os.environ['PW']

@@ -85,6 +85,8 @@ spec:
           env:
             - {name: SUPERAI_TOKEN, valueFrom: {secretKeyRef: {name: superai-hive, key: token}}}
             - {name: SUPERAI_PASSWORD_HASH, valueFrom: {secretKeyRef: {name: superai-hive, key: password_hash, optional: true}}}
+            - {name: POD_NAME, valueFrom: {fieldRef: {fieldPath: metadata.name}}}
+            - {name: SUPERAI_ADVERTISE_URL, value: "http://$(POD_NAME).superai-supreme.superai.svc.cluster.local:43117"}
             - {name: CORTEXDB_GRPC_TOKEN, valueFrom: {secretKeyRef: {name: superai-hive, key: cortexdb_token}}}
             - {name: SUPERAI_SETTINGS_JSON, valueFrom: {secretKeyRef: {name: superai-hive, key: settings-supreme.json}}}
           readinessProbe:
@@ -123,6 +125,8 @@ spec:
           env:
             - {name: SUPERAI_TOKEN, valueFrom: {secretKeyRef: {name: superai-hive, key: token}}}
             - {name: SUPERAI_PASSWORD_HASH, valueFrom: {secretKeyRef: {name: superai-hive, key: password_hash, optional: true}}}
+            - {name: POD_NAME, valueFrom: {fieldRef: {fieldPath: metadata.name}}}
+            - {name: SUPERAI_ADVERTISE_URL, value: "http://$(POD_NAME).superai-ring.superai.svc.cluster.local:43117"}
             - {name: CORTEXDB_GRPC_TOKEN, valueFrom: {secretKeyRef: {name: superai-hive, key: cortexdb_token}}}
             - {name: SUPERAI_SETTINGS_JSON, valueFrom: {secretKeyRef: {name: superai-hive, key: settings-ring.json}}}
           readinessProbe:
