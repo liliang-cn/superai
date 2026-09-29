@@ -1,5 +1,10 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { HiveStatus } from "../../wailsjs/go/app/App";
+import { HiveRetire, HiveSpawn, HiveStatus } from "../../wailsjs/go/app/App";
+import { EventsOn } from "../../wailsjs/runtime";
+import { Link, Route, Routes, useNavigate, useParams } from "react-router-dom";
+import HiveTaskPage, { FullTask } from "./HiveTaskPage";
+import { taskPath } from "../lib/routes";
+import HiveStage, { StageTask } from "../components/HiveStage";
 
 /** One worker as HiveStatus reports it. */
 interface Member {
@@ -18,7 +23,11 @@ interface QueenLink {
   error: string;
 }
 
+type Task = StageTask & FullTask;
+
 interface Status {
+  tasks?: Task[];
+  spawner?: { enabled: boolean; max: number };
   role: "" | "queen" | "worker";
   name: string;
   protocol: string;
@@ -41,13 +50,41 @@ function ago(iso: string, now: number): string {
 }
 
 export default function HiveView() {
+  const navigate = useNavigate();
   const [st, setSt] = useState<Status | null>(null);
   const [err, setErr] = useState("");
   const [now, setNow] = useState(Date.now());
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [ready, setReady] = useState(false);
+  // What the add/retire buttons are doing, so a spawn that takes half a minute
+  // reads as working and not as a dead button.
+  const [making, setMaking] = useState<"" | "spawn" | "retire">("");
+  const [note, setNote] = useState("");
+
+  const resize = async (kind: "spawn" | "retire") => {
+    setMaking(kind);
+    setNote("");
+    try {
+      const r: any = kind === "spawn" ? await HiveSpawn(1) : await HiveRetire(1, false);
+      if (!r?.ok) setNote(String(r?.error || "did not work"));
+      else if (kind === "spawn" && !r.complete) setNote(`Asked for ${r.replicas}, but only ${r.live} are live yet — the rest are still starting.`);
+    } catch (e: any) {
+      setNote(String(e?.message || e));
+    } finally {
+      setMaking("");
+      load();
+    }
+  };
 
   const load = useCallback(async () => {
     try {
-      setSt((await HiveStatus()) as unknown as Status);
+      const next = (await HiveStatus()) as unknown as Status;
+      setSt(next);
+      // Only the first load seeds the tasks. After that the event stream is the
+      // source, and replacing the list from a poll would drop a change that
+      // arrived a moment before the poll's answer did.
+      setTasks((cur) => (cur.length === 0 && !ready ? next.tasks ?? [] : cur));
+      setReady(true);
       setErr("");
     } catch (e: any) {
       setErr(String(e?.message || e));
@@ -58,6 +95,24 @@ export default function HiveView() {
   // event, and there is nothing to push for that. Three seconds is under the
   // default heartbeat, so a change shows on the next look rather than the one
   // after.
+  // Tasks are pushed. Each event is the whole task as it now stands, so applying
+  // one is a replace-or-append and a missed or repeated event costs nothing.
+  useEffect(() => {
+    const off = EventsOn("hive:task", (t: Task) => {
+      if (!t?.id) return;
+      setTasks((cur) => {
+        const i = cur.findIndex((k) => k.id === t.id);
+        if (i < 0) return [...cur, t].slice(-80);
+        const next = cur.slice();
+        next[i] = t;
+        return next;
+      });
+    });
+    return () => {
+      if (typeof off === "function") off();
+    };
+  }, []);
+
   useEffect(() => {
     load();
     const poll = window.setInterval(load, 3000);
@@ -69,9 +124,20 @@ export default function HiveView() {
   }, [load]);
 
   const members = st?.members ?? [];
+  const running = tasks.filter((t) => t.state === "running").length;
+  const ordered = [...tasks].sort(
+    (a, b) =>
+      Number(b.state === "running") - Number(a.state === "running") ||
+      Date.parse(b.started_at) - Date.parse(a.started_at),
+  );
+  const elapsed = (t: Task) => {
+    const end = t.ended_at && !t.ended_at.startsWith("0001") ? Date.parse(t.ended_at) : now;
+    const s = Math.max(0, Math.round((end - Date.parse(t.started_at)) / 1000));
+    return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`;
+  };
   const live = members.filter((m) => m.state === "live").length;
 
-  return (
+  const overview = (
     <div className="view">
       <div className="view-header with-action">
         <div>
@@ -86,6 +152,8 @@ export default function HiveView() {
         {err && <div className="hint err">{err}</div>}
         {st && (
           <>
+            <HiveStage role={st.role} self={st.name} workers={members} tasks={tasks} ready={ready} />
+
             <div className="card hive-self">
               <span className={`hive-role ${st.role || "alone"}`}>{st.role || "standalone"}</span>
               <div className="hive-self-body">
@@ -120,7 +188,20 @@ export default function HiveView() {
 
             {st.role === "queen" && (
               <div className="card">
-                <div className="card-title">Workers ({members.length})</div>
+                <div className="hive-head-row">
+                  <div className="card-title">Workers ({members.length})</div>
+                  {st.spawner?.enabled && (
+                    <div className="hive-spawn">
+                      <button className="btn ghost sm" disabled={making !== ""} onClick={() => resize("retire")}>
+                        {making === "retire" ? "Retiring…" : "− Worker"}
+                      </button>
+                      <button className="btn ghost sm" disabled={making !== ""} onClick={() => resize("spawn")}>
+                        {making === "spawn" ? "Starting…" : "+ Worker"}
+                      </button>
+                    </div>
+                  )}
+                </div>
+                {note && <div className="hint err" style={{ margin: "6px 0" }}>{note}</div>}
                 {members.length === 0 ? (
                   <div className="hive-empty">
                     <p>No workers have joined yet.</p>
@@ -164,6 +245,53 @@ export default function HiveView() {
               </div>
             )}
 
+            {st.role !== "" && (
+              <div className="card">
+                <div className="card-title">
+                  Missions{running > 0 ? ` · ${running} running` : ""}
+                </div>
+                {ordered.length === 0 ? (
+                  <div className="hive-dim">
+                    {st.role === "queen"
+                      ? "Nothing has been ordered yet. Ask this queen to have the workers do something and it appears here as it happens."
+                      : "No orders received yet. When the queen sends this worker something, it appears here as it happens."}
+                  </div>
+                ) : (
+                  <div className="hive-missions">
+                    {ordered.map((t) => (
+                      <div className="hive-mission" key={t.id}>
+                        <div className="hive-m-head" onClick={() => navigate(taskPath(t.id))}>
+                          <span className={`hive-live-dot ${t.state}`} title={t.state} />
+                          <span className="hive-m-who">{t.dir === "peer"
+                              ? `${(t.from ?? "").replace(/^superai-/, "")} ⇄ ${t.worker.replace(/^superai-/, "")}`
+                              : t.dir === "out"
+                                ? `→ ${t.worker.replace(/^superai-/, "")}`
+                                : "← queen"}</span>
+                          <span className="hive-m-prompt" title={t.prompt}>{t.prompt}</span>
+                          <span className="hive-m-phase">
+                            {t.state === "running"
+                              ? t.phase === "tool"
+                                ? `⚙ ${t.tool || "tool"}`
+                                : t.phase === "writing"
+                                  ? "writing…"
+                                  : "thinking…"
+                              : t.state}
+                            {t.tools > 0 ? ` · ${t.tools} tool${t.tools === 1 ? "" : "s"}` : ""}
+                          </span>
+                          <span className="hive-m-meta">
+                            <Link to={taskPath(t.id)} className="hive-uuid" onClick={(e) => e.stopPropagation()} title={t.id}>
+                              {t.id.slice(0, 8)}
+                            </Link>{" "}
+                            {elapsed(t)}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {st.role === "" && (
               <div className="card">
                 <div className="card-title">Joining a hive</div>
@@ -176,6 +304,26 @@ export default function HiveView() {
             )}
           </>
         )}
+      </div>
+    </div>
+  );
+
+  // The overview, and a page per task at /hive/tasks/<uuid>. The live list
+  // stays up here so a task page keeps moving while it is open.
+  return (
+    <Routes>
+      <Route path="tasks/:id" element={<TaskRoute tasks={tasks} now={now} />} />
+      <Route path="*" element={overview} />
+    </Routes>
+  );
+}
+
+function TaskRoute({ tasks, now }: { tasks: Task[]; now: number }) {
+  const { id = "" } = useParams();
+  return (
+    <div className="view">
+      <div className="panel-scroll">
+        <HiveTaskPage id={id} live={tasks.find((t) => t.id === id)} now={now} />
       </div>
     </div>
   );

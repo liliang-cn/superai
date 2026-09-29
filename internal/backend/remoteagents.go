@@ -251,6 +251,11 @@ type RemoteRunner struct {
 	// joined the hive — looked up at call time, so a worker that joined a second
 	// ago is reachable and one that was lost is not.
 	roster func() map[string]RemoteAgent
+	// board, when set, is told about every order given to a worker.
+	board *TaskBoard
+	// origin is this instance's own name when it is a worker. Orders it gives
+	// are then peer tasks, and carry who gave them.
+	origin string
 
 	mu    sync.Mutex
 	where map[string]resolvedHost
@@ -264,6 +269,12 @@ type resolvedHost struct {
 func NewRemoteRunner(cfg RemoteAgents) *RemoteRunner {
 	return &RemoteRunner{cfg: cfg, where: map[string]resolvedHost{}}
 }
+
+// SetOrigin marks the runner as a worker's. Called once, before use.
+func (r *RemoteRunner) SetOrigin(name string) { r.origin = name }
+
+// SetBoard attaches the task board. Called once, before use.
+func (r *RemoteRunner) SetBoard(b *TaskBoard) { r.board = b }
 
 // SetRoster attaches a live source of agents. Called once, before use.
 func (r *RemoteRunner) SetRoster(f func() map[string]RemoteAgent) { r.roster = f }
@@ -356,8 +367,25 @@ func (r *RemoteRunner) Run(ctx context.Context, name, prompt string) (res Remote
 		if r.cfg.TimeoutSeconds > 0 {
 			limit = r.cfg.Timeout()
 		}
-		out := askWorker(ctx, workerTarget{name: name, url: agent.URL, token: agent.Token, timeout: limit}, prompt)
+		dir, from := TaskOut, ""
+		if r.origin != "" {
+			dir, from = TaskPeer, r.origin
+		}
+		// The id is made here, before the order leaves, so the worker can be
+		// told it and the same UUID names the order on both sides.
+		id := NewTaskID()
+		r.board.StartAs(id, name, from, dir, prompt)
+		out := askWorker(ctx, workerTarget{name: name, url: agent.URL, token: agent.Token, timeout: limit, taskID: id}, prompt,
+			func(phase, tool string) { r.board.Progress(id, phase, tool) })
 		out.MS = time.Since(started).Milliseconds()
+		switch {
+		case ctx.Err() != nil:
+			r.board.Finish(id, TaskCancelled, out.Text, out.Reason)
+		case out.Failed:
+			r.board.Finish(id, TaskFailed, out.Text, out.Reason)
+		default:
+			r.board.Finish(id, TaskDone, out.Text, "")
+		}
 		return out, nil
 	}
 

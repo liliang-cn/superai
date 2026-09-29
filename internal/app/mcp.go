@@ -34,7 +34,7 @@ const mcpPath = "/mcp"
 // mcpServerVersion is what a client sees in the initialize handshake. The app
 // itself carries no version string, so this tracks the tool surface: bump it
 // when a tool is added, removed, or changes shape.
-const mcpServerVersion = "0.1.0"
+const mcpServerVersion = "0.3.0"
 
 // nextRunsShown is how many upcoming times a create/validate answer names.
 //
@@ -55,6 +55,26 @@ type scheduleCreateIn struct {
 	Cron         string `json:"cron" jsonschema:"five-field cron, e.g. '0 8 * * *' for every morning at 08:00, '0 9 * * 1-5' weekdays at 09:00, '0 */4 * * *' every four hours"`
 	Name         string `json:"name,omitempty" jsonschema:"optional label shown in the schedule list; defaults to the prompt"`
 	Conversation string `json:"conversation,omitempty" jsonschema:"optional conversation the runs append to; blank shares one called 'scheduled'"`
+}
+
+type hiveCountIn struct {
+	Count int `json:"count,omitempty" jsonschema:"how many workers; defaults to 1"`
+}
+
+type hiveRetireIn struct {
+	Count int  `json:"count,omitempty" jsonschema:"how many workers to retire; defaults to 1"`
+	Force bool `json:"force,omitempty" jsonschema:"retire even if one is in the middle of an order, losing that work"`
+}
+
+type hiveMapIn struct {
+	Jobs        []string `json:"jobs" jsonschema:"independent, self-contained instructions; each is done by one worker"`
+	SpawnUpTo   int      `json:"spawn_up_to,omitempty" jsonschema:"grow the hive to at most this many workers if the jobs outnumber the live ones; 0 uses only who is there"`
+	RetireAfter bool     `json:"retire_after,omitempty" jsonschema:"let go the workers this call made once the jobs are done"`
+}
+
+type hiveCommandIn struct {
+	Prompt  string   `json:"prompt" jsonschema:"one order, sent to every live worker (or to workers if given)"`
+	Workers []string `json:"workers,omitempty" jsonschema:"limit prompt to these workers; omit for all live ones"`
 }
 
 type scheduleIDIn struct {
@@ -141,6 +161,82 @@ func newMCPHandler(app *App, version string) http.Handler {
 			return toolErr(msg)
 		}
 		return toolOK(map[string]any{"started": in.ID})
+	})
+
+	// The hive. Meaningful on a queen; anywhere else each says so. The same
+	// methods the queen's own agent calls, so what an outside agent can do to a
+	// hive is exactly what the queen can.
+	mcp.AddTool(s, &mcp.Tool{
+		Name:        "superai_hive_members",
+		Title:       "List the hive",
+		Description: "Every worker in the hive, whether it is live or lost, and where it is. Only a queen has a roster.",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, any, error) {
+		st := app.HiveStatus()
+		if st["role"] != "queen" {
+			return toolErr("this instance is not a queen; it has no roster")
+		}
+		return toolOK(map[string]any{"workers": st["members"]})
+	})
+
+	mcp.AddTool(s, &mcp.Tool{
+		Name:  "superai_hive_spawn",
+		Title: "Make more workers",
+		Description: "Add workers to the hive. Returns when they have joined and are live, or says how many did not. " +
+			"Refused past the queen's cap.",
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in hiveCountIn) (*mcp.CallToolResult, any, error) {
+		r := app.hiveSpawn(ctx, in.Count)
+		if ok, _ := r["ok"].(bool); !ok {
+			return toolErr(fmt.Sprint(r["error"]))
+		}
+		return toolOK(r)
+	})
+
+	mcp.AddTool(s, &mcp.Tool{
+		Name:  "superai_hive_retire",
+		Title: "Retire workers",
+		Description: "Let the highest-numbered workers go. Refuses while one is in the middle of an order, " +
+			"unless force is set.",
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in hiveRetireIn) (*mcp.CallToolResult, any, error) {
+		r := app.HiveRetire(in.Count, in.Force)
+		if ok, _ := r["ok"].(bool); !ok {
+			return toolErr(fmt.Sprint(r["error"]))
+		}
+		return toolOK(r)
+	})
+
+	mcp.AddTool(s, &mcp.Tool{
+		Name:  "superai_hive_map",
+		Title: "Run many jobs on the hive",
+		Description: "Queue independent jobs and let every worker take the next when it is free, so a list longer than " +
+			"the hive still finishes as fast as the hive can. With spawn_up_to it makes the workers it needs first.",
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in hiveMapIn) (*mcp.CallToolResult, any, error) {
+		out, err := app.hiveMap(ctx, in.Jobs, in.SpawnUpTo, in.RetireAfter)
+		if err != nil {
+			return toolErr(err.Error())
+		}
+		return toolOK(map[string]any{"report": out})
+	})
+
+	mcp.AddTool(s, &mcp.Tool{
+		Name:  "superai_hive_command",
+		Title: "Order the workers",
+		Description: "Send one order to the live workers in parallel and get one report back from each. " +
+			"Each worker starts a fresh conversation, so the order must stand on its own.",
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in hiveCommandIn) (*mcp.CallToolResult, any, error) {
+		args := map[string]any{"prompt": in.Prompt}
+		if len(in.Workers) > 0 {
+			ws := make([]any, len(in.Workers))
+			for i, w := range in.Workers {
+				ws[i] = w
+			}
+			args["workers"] = ws
+		}
+		out, err := app.hiveCommand(ctx, args)
+		if err != nil {
+			return toolErr(err.Error())
+		}
+		return toolOK(map[string]any{"reports": out})
 	})
 
 	return mcp.NewStreamableHTTPHandler(

@@ -118,6 +118,18 @@ export function GetStatus() {
   return window['go']['app']['App']['GetStatus']();
 }
 
+export function HiveTaskDetail(arg1) {
+  return window['go']['app']['App']['HiveTaskDetail'](arg1);
+}
+
+export function HiveRetire(arg1, arg2) {
+  return window['go']['app']['App']['HiveRetire'](arg1, arg2);
+}
+
+export function HiveSpawn(arg1) {
+  return window['go']['app']['App']['HiveSpawn'](arg1);
+}
+
 export function HiveStatus() {
   return window['go']['app']['App']['HiveStatus']();
 }

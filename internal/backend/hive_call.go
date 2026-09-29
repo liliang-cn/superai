@@ -40,6 +40,9 @@ type workerTarget struct {
 	name  string
 	url   string
 	token string
+	// taskID is the order's UUID; it becomes the worker's session name, so the
+	// worker's own record of the order carries the same id.
+	taskID string
 	// timeout of zero means none. A worker's turn ends when its model stops, not
 	// when a clock does; only an explicit setting cuts one off.
 	timeout time.Duration
@@ -60,7 +63,7 @@ type workerEvent struct {
 }
 
 // askWorker sends one command to a worker and waits for its answer.
-func askWorker(ctx context.Context, t workerTarget, prompt string) RemoteResult {
+func askWorker(ctx context.Context, t workerTarget, prompt string, progress func(phase, tool string)) RemoteResult {
 	res := RemoteResult{Agent: t.name, Host: t.url}
 	fail := func(format string, a ...any) RemoteResult {
 		res.Failed, res.Reason = true, fmt.Sprintf(format, a...)
@@ -99,6 +102,7 @@ func askWorker(ctx context.Context, t workerTarget, prompt string) RemoteResult 
 	}
 
 	events := make(chan workerEvent, 64)
+	lastPhase := map[string]string{}
 	streamErr := make(chan error, 1)
 	go func() {
 		defer close(events)
@@ -113,21 +117,51 @@ func askWorker(ctx context.Context, t workerTarget, prompt string) RemoteResult 
 			if json.Unmarshal([]byte(line[6:]), &ev) != nil {
 				continue
 			}
-			// Only ends of turns matter here; the worker's other traffic is
-			// somebody else's conversation.
 			switch ev.Name {
 			case "chat:done", "chat:error", "chat:cancelled":
+				// The end of a turn must arrive, so this waits for room.
 				select {
 				case events <- ev:
 				case <-sseCtx.Done():
 					return
+				}
+			case "chat:event":
+				// Progress is only worth showing, never worth blocking for: a
+				// token stream would otherwise fill the channel and delay the
+				// end of the turn behind it. A tool call always passes; the
+				// other phases pass only when they change, so a stream of
+				// partial text is one "writing" and not a thousand.
+				rid, _ := ev.Payload["requestId"].(string)
+				typ, _ := ev.Payload["type"].(string)
+				phase := ""
+				switch typ {
+				case "tool_call":
+					phase = PhaseTool
+				case "thinking":
+					phase = PhaseThinking
+				case "partial":
+					phase = PhaseWriting
+				}
+				if phase == "" || rid == "" {
+					continue
+				}
+				if phase != PhaseTool && lastPhase[rid] == phase {
+					continue
+				}
+				lastPhase[rid] = phase
+				select {
+				case events <- ev:
+				default:
 				}
 			}
 		}
 		streamErr <- sc.Err()
 	}()
 
-	session := "worker:" + uuid.NewString()
+	if t.taskID == "" {
+		t.taskID = uuid.NewString()
+	}
+	session := HiveSessionPrefix + t.taskID
 	body, _ := json.Marshal([]any{session, prompt, []string{}})
 	post, _ := http.NewRequestWithContext(ctx, http.MethodPost, base.String()+"/api/rpc/SendChat", bytes.NewReader(body))
 	post.Header.Set("Content-Type", "application/json")
@@ -158,6 +192,21 @@ func askWorker(ctx context.Context, t workerTarget, prompt string) RemoteResult 
 				return fail("lost the worker before it answered: %v", err)
 			}
 			if rid, _ := ev.Payload["requestId"].(string); rid != id {
+				continue
+			}
+			if ev.Name == "chat:event" {
+				if progress != nil {
+					tool, _ := ev.Payload["tool"].(string)
+					typ, _ := ev.Payload["type"].(string)
+					switch typ {
+					case "tool_call":
+						progress(PhaseTool, tool)
+					case "thinking":
+						progress(PhaseThinking, "")
+					case "partial":
+						progress(PhaseWriting, "")
+					}
+				}
 				continue
 			}
 			text, _ := ev.Payload["final"].(string)

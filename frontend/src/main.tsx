@@ -4,6 +4,7 @@
 import './lib/webshim'
 import React, {useEffect, useState} from 'react'
 import {createRoot} from 'react-dom/client'
+import {HashRouter} from 'react-router-dom'
 import './styles.css'
 import App from './App'
 import Gate from './components/Gate'
@@ -44,7 +45,11 @@ function Root() {
 
     if (authed === null) return null
     if (!authed) return <Gate onEnter={() => setAuthed(true)}/>
-    return <App/>
+    return (
+        <HashRouter>
+            <App/>
+        </HashRouter>
+    )
 }
 
 const container = document.getElementById('root')

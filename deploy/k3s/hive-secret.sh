@@ -31,7 +31,10 @@ base.update(memory_backend='shared', shared_memory_endpoint=s['shared_memory_end
 # Roles, not a list. The queen accepts joins; a worker announces itself to it
 # (superai-hive/1, see internal/backend/hive.go), so the roster is whoever is
 # actually there and adding a worker is raising the replica count.
-queen = dict(base, hive={'role': 'queen', 'name': 'queen'})
+# The queen may resize the workers' StatefulSet — its own ServiceAccount says how
+# far (superai-operator) and max_workers says how many.
+queen = dict(base, hive={'role': 'queen', 'name': 'queen',
+                         'spawner': {'kind': 'kubectl', 'namespace': '$NS', 'statefulset': 'superai-worker', 'max_workers': 20}})
 # Workers act with nobody at a keyboard to approve a tool call, so the gate would
 # only make every command hang. The pod's Role is what bounds them instead.
 worker = dict(base, disable_tool_approval=True,

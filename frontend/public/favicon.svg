@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <title>SuperAI</title>
+  <defs>
+    <linearGradient id="c" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f0a36a"/><stop offset="1" stop-color="#cf6d31"/>
+    </linearGradient>
+  </defs>
+  
+  <g stroke-linejoin="round" stroke-width="1.6">
+    <polygon points="18.60,28.90 30.64,35.85 30.64,49.75 18.60,56.70 6.56,49.75 6.56,35.85" fill="#b8642f" stroke="#b8642f"/>
+    <polygon points="45.40,28.90 57.44,35.85 57.44,49.75 45.40,56.70 33.36,49.75 33.36,35.85" fill="#b8642f" stroke="#b8642f"/>
+    <polygon points="32.00,5.70 44.04,12.65 44.04,26.55 32.00,33.50 19.96,26.55 19.96,12.65" fill="url(#c)" stroke="url(#c)"/>
+  </g>
+</svg>

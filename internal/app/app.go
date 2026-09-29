@@ -74,8 +74,18 @@ type App struct {
 	// hive is the queen's roster; nil on anything else. Built once and
 	// kept across rebuilds, because a settings save must not make every worker
 	// look newly joined. hiveStop ends a worker's announcing loop.
-	hive     *backend.Hive
-	hiveAnn  *backend.Announcer
+	hive    *backend.Hive
+	hiveAnn *backend.Announcer
+	// hiveBoard records the orders that cross the hive, on either side. See
+	// backend/hive_tasks.go.
+	hiveBoard     *backend.TaskBoard
+	hiveBoardOnce sync.Once
+	// hiveReports carries a worker's dealings with its peers to the queen, in
+	// order, off the path of whatever produced them.
+	hiveReports    chan backend.HiveTask
+	hiveReportOnce sync.Once
+	// peerAsks bounds how many questions this worker has out to peers at once.
+	peerAsks chan struct{}
 	hiveStop context.CancelFunc
 	// scheduleLock is held while this process owns firing schedules; nil means
 	// another process (the daemon) owns them and this one only manages.
@@ -731,6 +741,17 @@ func (a *App) SendChat(sessionID, message string, imagePaths []string) string {
 	ctx, cancel := context.WithCancel(context.Background())
 	a.trackRun(requestID, cancel)
 
+	// An order from the hive is put on the task board, so the panel can show
+	// this worker working. A person typing at this instance is not a task.
+	taskID, board := "", (*backend.TaskBoard)(nil)
+	if strings.HasPrefix(sessionID, backend.HiveSessionPrefix) {
+		board = a.tasks()
+		// The order's own id when the session carries one, so the queen's
+		// record and this one are the same UUID.
+		id, _ := backend.TaskIDFromSession(sessionID)
+		taskID = board.StartAs(id, a.hiveName(), "", backend.TaskIn, message)
+	}
+
 	go func() {
 		defer cancel()
 		defer a.untrackRun(requestID)
@@ -738,6 +759,14 @@ func (a *App) SendChat(sessionID, message string, imagePaths []string) string {
 		driver.Emit(backend.AvatarEvent{Type: "state", State: backend.AvatarStateThinking})
 
 		final, err := svc.Stream(ctx, sessionID, message, imagePaths, func(ev *agent.Event) {
+			switch ev.Type {
+			case agent.EventTypeToolCall:
+				board.Progress(taskID, backend.PhaseTool, ev.ToolName)
+			case agent.EventTypeThinking:
+				board.Progress(taskID, backend.PhaseThinking, "")
+			case agent.EventTypePartial:
+				board.Progress(taskID, backend.PhaseWriting, "")
+			}
 			// Every type is forwarded, unfiltered: "thinking" and "state_update"
 			// are the only progress the UI has while PTC writes its code.
 			a.emit("chat:event", map[string]any{
@@ -771,12 +800,14 @@ func (a *App) SendChat(sessionID, message string, imagePaths []string) string {
 		if a.runCancelled(requestID) || errors.Is(err, context.Canceled) || ctx.Err() != nil {
 			driver.Emit(backend.AvatarEvent{Type: "state", State: backend.AvatarStateIdle})
 			partial, _ := backend.SplitEmotion(final)
+			board.Finish(taskID, backend.TaskCancelled, partial, "")
 			a.emit("chat:cancelled", map[string]any{"requestId": requestID, "final": partial})
 			return
 		}
 
 		if err != nil {
 			driver.Emit(backend.AvatarEvent{Type: "state", State: backend.AvatarStateIdle})
+			board.Finish(taskID, backend.TaskFailed, "", err.Error())
 			a.emit("chat:error", map[string]any{"requestId": requestID, "error": err.Error()})
 			return
 		}
@@ -789,6 +820,7 @@ func (a *App) SendChat(sessionID, message string, imagePaths []string) string {
 			driver.Emit(backend.AvatarEvent{Type: "speech", Text: reply})
 		}
 		driver.Emit(backend.AvatarEvent{Type: "state", State: backend.AvatarStateIdle})
+		board.Finish(taskID, backend.TaskDone, reply, "")
 		a.emit("chat:done", map[string]any{"requestId": requestID, "final": reply, "emotion": emotion})
 	}()
 

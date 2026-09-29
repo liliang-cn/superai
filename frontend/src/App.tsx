@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
+import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { PATHS, viewOf } from "./lib/routes";
 import Sidebar from "./components/Sidebar";
 import Pet from "./components/Pet";
 import { useRoom } from "./lib/useViewport";
@@ -32,7 +34,11 @@ export default function App() {
   // because the user clicked to another screen to look into it.
   useBackendToasts();
 
-  const [view, setView] = useState<ViewKey>("chat");
+  // The screen is the address. See lib/routes.ts.
+  const location = useLocation();
+  const navigate = useNavigate();
+  const view = viewOf(location.pathname);
+  const setView = useCallback((v: ViewKey) => navigate(PATHS[v]), [navigate]);
   const [status, setStatus] = useState<AppStatus | null>(null);
   // Off until asked for. Something walking across the window is charming when
   // you let it out and an interruption when it arrives on its own.
@@ -83,7 +89,7 @@ export default function App() {
     if (!session) return;
     setPendingSession(session);
     setView("chat");
-  }, []);
+  }, [setView]);
 
   // Scheduled runs are listened for here, not in the Schedules view: a timer
   // fires while the user is somewhere else, which is the whole point of a timer.
@@ -176,22 +182,31 @@ export default function App() {
             onOpenConversation={openConversation}
           />
           <div className="content">
-            {view === "chat" && (
-              <ChatView
-                status={status}
-                openSession={pendingSession}
-                onSessionOpened={() => setPendingSession("")}
+            <Routes>
+              <Route
+                path="/"
+                element={
+                  <ChatView
+                    status={status}
+                    openSession={pendingSession}
+                    onSessionOpened={() => setPendingSession("")}
+                  />
+                }
               />
-            )}
-            {view === "stats" && <StatsView />}
-            {view === "hive" && <HiveView />}
-            {view === "settings" && <SettingsView onSaved={refreshStatus} status={status} />}
-            {view === "knowledge" && <KnowledgeView />}
-            {view === "skills" && <SkillsView />}
-            {view === "mcp" && <MCPView />}
-            {view === "records" && (
-              <RecordsView status={status} log={runs} onOpenConversation={openConversation} />
-            )}
+              <Route path="/stats" element={<StatsView />} />
+              {/* Everything under /hive is the Hive screen's own to route:
+                  the overview, and one page per task. */}
+              <Route path="/hive/*" element={<HiveView />} />
+              <Route path="/settings" element={<SettingsView onSaved={refreshStatus} status={status} />} />
+              <Route path="/knowledge" element={<KnowledgeView />} />
+              <Route path="/skills" element={<SkillsView />} />
+              <Route path="/mcp" element={<MCPView />} />
+              <Route
+                path="/records"
+                element={<RecordsView status={status} log={runs} onOpenConversation={openConversation} />}
+              />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
           </div>
         </div>
       </div>

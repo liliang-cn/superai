@@ -111,7 +111,9 @@ kind: StatefulSet
 metadata: {name: superai-worker, namespace: superai}
 spec:
   serviceName: superai-worker
-  replicas: 2
+  # No replicas here on purpose. The queen resizes this set (hive_spawn,
+  # hive_retire), and a field in this file would put every `kubectl apply` back
+  # to the number written here. It starts at one worker.
   selector: {matchLabels: {app: superai-worker}}
   template:
     metadata: {labels: {app: superai-worker}}
