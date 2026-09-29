@@ -239,6 +239,7 @@ func newAPIMux(app *App, hub *eventHub, creds *credentials, handoff *handoffStor
 	// JSON, and base64 inside JSON would cost a third of the size and all of
 	// the streaming.
 	mux.HandleFunc("/api/tts", app.handleSpeak)
+	mux.HandleFunc("/api/hive/join", app.handleHiveJoin)
 	// Uploading a file to import. It writes to this machine, so it is gated
 	// like everything else under /api — see gatedPath.
 	mux.HandleFunc(uploadPath, app.handleUpload)
