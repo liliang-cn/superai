@@ -1,0 +1,157 @@
+# A hive of SuperAI rings sharing one CortexDB.
+#
+# One supreme ring commands the others. What makes it supreme is its settings:
+# they list the rings as remote agents, and the ring_command tool appears only
+# where such a list exists. The rings' settings list nothing, so they have no
+# way to command upward or sideways.
+#
+# Every ring keeps its own volume (sessions, plans, its own login); what they
+# share is the brain, through memory_backend "shared" on the "hive" namespace.
+#
+# The Secret is created by deploy/k3s/hive-secret.sh — settings carry model
+# keys, so they never live in this file.
+apiVersion: v1
+kind: Namespace
+metadata: {name: superai}
+---
+# What the agent may do to the cluster it lives in. The pod's ServiceAccount
+# token is the only credential kubectl has, so this Role *is* the limit.
+#
+# Read the workload-level objects but not Secrets (a token in a prompt is a
+# token in a model provider's logs), and change workloads: pods, deployments
+# and their kin, services, configmaps, jobs. It cannot touch RBAC, nodes or
+# namespaces. pods/exec is granted because operating a cluster needs it, and
+# it is a way around the Secrets rule for any secret mounted into a pod.
+# Widen it deliberately, not by default.
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: superai, namespace: superai}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata: {name: superai-operator}
+rules:
+  # Listed one by one: "*" in the core group includes secrets.
+  - apiGroups: [""]
+    resources: [pods, services, endpoints, configmaps, namespaces, nodes, events,
+                persistentvolumeclaims, persistentvolumes, serviceaccounts, resourcequotas]
+    verbs: [get, list, watch]
+  - apiGroups: [apps, batch, networking.k8s.io, autoscaling, metrics.k8s.io, events.k8s.io]
+    resources: ["*"]
+    verbs: [get, list, watch]
+  - apiGroups: [""]
+    resources: [pods/log]
+    verbs: [get, list]
+  - apiGroups: [""]
+    resources: [pods, services, configmaps, persistentvolumeclaims]
+    verbs: [create, update, patch, delete]
+  - apiGroups: [""]
+    resources: [pods/exec, pods/portforward]
+    verbs: [create]
+  - apiGroups: [apps, batch, networking.k8s.io, autoscaling]
+    resources: ["*"]
+    verbs: [create, update, patch, delete]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata: {name: superai-operator}
+subjects: [{kind: ServiceAccount, name: superai, namespace: superai}]
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: superai-operator}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: superai-supreme, namespace: superai}
+spec:
+  clusterIP: None
+  selector: {app: superai-supreme}
+  ports: [{name: http, port: 43117}]
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata: {name: superai-supreme, namespace: superai}
+spec:
+  serviceName: superai-supreme
+  replicas: 1
+  selector: {matchLabels: {app: superai-supreme}}
+  template:
+    metadata: {labels: {app: superai-supreme}}
+    spec:
+      serviceAccountName: superai
+      containers:
+        - name: superai
+          image: superai-desktop:hive
+          imagePullPolicy: IfNotPresent
+          ports: [{containerPort: 43117}]
+          env:
+            - {name: SUPERAI_TOKEN, valueFrom: {secretKeyRef: {name: superai-hive, key: token}}}
+            - {name: SUPERAI_PASSWORD_HASH, valueFrom: {secretKeyRef: {name: superai-hive, key: password_hash, optional: true}}}
+            - {name: CORTEXDB_GRPC_TOKEN, valueFrom: {secretKeyRef: {name: superai-hive, key: cortexdb_token}}}
+            - {name: SUPERAI_SETTINGS_JSON, valueFrom: {secretKeyRef: {name: superai-hive, key: settings-supreme.json}}}
+          readinessProbe:
+            httpGet: {path: /api/session, port: 43117}
+          volumeMounts: [{name: data, mountPath: /data}]
+  volumeClaimTemplates:
+    - metadata: {name: data}
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources: {requests: {storage: 2Gi}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: superai-ring, namespace: superai}
+spec:
+  clusterIP: None
+  selector: {app: superai-ring}
+  ports: [{name: http, port: 43117}]
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata: {name: superai-ring, namespace: superai}
+spec:
+  serviceName: superai-ring
+  replicas: 2
+  selector: {matchLabels: {app: superai-ring}}
+  template:
+    metadata: {labels: {app: superai-ring}}
+    spec:
+      serviceAccountName: superai
+      containers:
+        - name: superai
+          image: superai-desktop:hive
+          imagePullPolicy: IfNotPresent
+          ports: [{containerPort: 43117}]
+          env:
+            - {name: SUPERAI_TOKEN, valueFrom: {secretKeyRef: {name: superai-hive, key: token}}}
+            - {name: SUPERAI_PASSWORD_HASH, valueFrom: {secretKeyRef: {name: superai-hive, key: password_hash, optional: true}}}
+            - {name: CORTEXDB_GRPC_TOKEN, valueFrom: {secretKeyRef: {name: superai-hive, key: cortexdb_token}}}
+            - {name: SUPERAI_SETTINGS_JSON, valueFrom: {secretKeyRef: {name: superai-hive, key: settings-ring.json}}}
+          readinessProbe:
+            httpGet: {path: /api/session, port: 43117}
+          volumeMounts: [{name: data, mountPath: /data}]
+  volumeClaimTemplates:
+    - metadata: {name: data}
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources: {requests: {storage: 2Gi}}
+---
+# The supreme ring's UI. Traefik answers on port 80 of every node, and with no
+# host rule any name reaching a node lands here — the LAN address is enough.
+# Only the supreme ring is exposed: the rings are reached by it, from inside.
+# The login gate is the app's own (a password_hash in the Secret).
+apiVersion: v1
+kind: Service
+metadata: {name: superai-supreme-web, namespace: superai}
+spec:
+  selector: {app: superai-supreme}
+  ports: [{name: http, port: 80, targetPort: 43117}]
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata: {name: superai-supreme, namespace: superai}
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend: {service: {name: superai-supreme-web, port: {number: 80}}}

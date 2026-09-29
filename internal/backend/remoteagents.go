@@ -69,6 +69,12 @@ type RemoteAgents struct {
 type RemoteAgent struct {
 	// What it is, in one line. Shown in the picker and given to the model.
 	About string `json:"about,omitempty"`
+	// URL, when set, makes this a ring: another SuperAI serving over HTTP,
+	// commanded through its own API instead of over SSH. Token is the bearer
+	// it accepts. See ring.go. Hosts and Command are ignored for a ring.
+	URL   string `json:"url,omitempty"`
+	Token string `json:"token,omitempty"`
+
 	// Hosts it may be running on, tried in order. More than one because a
 	// clustered agent moves between nodes.
 	//
@@ -138,6 +144,9 @@ func (r *RemoteAgents) normalize() {
 	for name, a := range r.Agents {
 		// An agent with no argv or no host cannot be called, and leaving it in
 		// the list means offering the model a name that always fails.
+		if a.URL != "" {
+			continue // a ring needs neither
+		}
 		if len(a.Command) == 0 || len(a.Hosts) == 0 {
 			delete(r.Agents, name)
 			continue
@@ -297,6 +306,17 @@ func (r *RemoteRunner) Run(ctx context.Context, name, prompt string) (res Remote
 	if prompt == "" {
 		res.Failed, res.Reason = true, "nothing was asked"
 		return res, nil
+	}
+
+	if agent.URL != "" {
+		// An explicit TimeoutSeconds bounds a ring; otherwise nothing does.
+		var limit time.Duration
+		if r.cfg.TimeoutSeconds > 0 {
+			limit = r.cfg.Timeout()
+		}
+		out := askRing(ctx, ringTarget{name: name, url: agent.URL, token: agent.Token, timeout: limit}, prompt)
+		out.MS = time.Since(started).Milliseconds()
+		return out, nil
 	}
 
 	host, herr := r.host(ctx, name, agent)
