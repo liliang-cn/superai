@@ -1,4 +1,4 @@
-module github.com/liliang-cn/superai-desktop
+module github.com/liliang-cn/superai
 
 go 1.26.0
 

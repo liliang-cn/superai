@@ -16,7 +16,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/liliang-cn/superai-desktop/internal/backend"
+	"github.com/liliang-cn/superai/internal/backend"
 )
 
 // pendingApproval is one tool call parked in front of the user, with the

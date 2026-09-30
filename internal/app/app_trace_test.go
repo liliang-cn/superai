@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/liliang-cn/superai-desktop/internal/backend"
+	"github.com/liliang-cn/superai/internal/backend"
 )
 
 // The RPC reads the traces directory this app writes into, and hands back the

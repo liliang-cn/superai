@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/liliang-cn/superai-desktop/internal/backend"
+	"github.com/liliang-cn/superai/internal/backend"
 )
 
 // Two questions at once, end to end through App.

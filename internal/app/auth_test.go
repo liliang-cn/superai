@@ -1,7 +1,7 @@
 package app
 
 import (
-	"github.com/liliang-cn/superai-desktop/internal/backend"
+	"github.com/liliang-cn/superai/internal/backend"
 	"net/http"
 	"net/http/httptest"
 	"strings"

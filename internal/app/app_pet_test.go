@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/liliang-cn/superai-desktop/internal/backend"
+	"github.com/liliang-cn/superai/internal/backend"
 )
 
 // A driver that remembers what it was told, so a test can ask what the window

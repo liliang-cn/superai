@@ -3,7 +3,7 @@ package app
 import (
 	"context"
 
-	"github.com/liliang-cn/superai-desktop/internal/backend"
+	"github.com/liliang-cn/superai/internal/backend"
 )
 
 // The live meter, on the wire.

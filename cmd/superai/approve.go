@@ -21,7 +21,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/liliang-cn/superai-desktop/internal/backend"
+	"github.com/liliang-cn/superai/internal/backend"
 )
 
 // stdinIsTerminal reports whether stdin is a tty. Character-device mode rather

@@ -46,7 +46,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/liliang-cn/superai-desktop/internal/backend"
+	"github.com/liliang-cn/superai/internal/backend"
 )
 
 func main() {

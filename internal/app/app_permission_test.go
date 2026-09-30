@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/liliang-cn/superai-desktop/internal/backend"
+	"github.com/liliang-cn/superai/internal/backend"
 )
 
 // The approval round trip.

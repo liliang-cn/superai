@@ -1,7 +1,7 @@
 package app
 
 import (
-	"github.com/liliang-cn/superai-desktop/internal/backend"
+	"github.com/liliang-cn/superai/internal/backend"
 )
 
 // TraceLines returns the tail of a task's JSONL trace, oldest line first.
