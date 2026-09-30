@@ -34,7 +34,7 @@ const mcpPath = "/mcp"
 // mcpServerVersion is what a client sees in the initialize handshake. The app
 // itself carries no version string, so this tracks the tool surface: bump it
 // when a tool is added, removed, or changes shape.
-const mcpServerVersion = "0.3.0"
+const mcpServerVersion = "0.4.0"
 
 // nextRunsShown is how many upcoming times a create/validate answer names.
 //
@@ -70,6 +70,16 @@ type hiveMapIn struct {
 	Jobs        []string `json:"jobs" jsonschema:"independent, self-contained instructions; each is done by one worker"`
 	SpawnUpTo   int      `json:"spawn_up_to,omitempty" jsonschema:"grow the hive to at most this many workers if the jobs outnumber the live ones; 0 uses only who is there"`
 	RetireAfter bool     `json:"retire_after,omitempty" jsonschema:"let go the workers this call made once the jobs are done"`
+}
+
+type hiveSendIn struct {
+	To      string `json:"to" jsonschema:"a member's name, queen, or * for every other member"`
+	Text    string `json:"text" jsonschema:"the message"`
+	ReplyTo string `json:"reply_to,omitempty" jsonschema:"id of the message this answers"`
+}
+
+type hiveInboxIn struct {
+	All bool `json:"all,omitempty" jsonschema:"the last 20 messages, read or not"`
 }
 
 type hiveCommandIn struct {
@@ -237,6 +247,31 @@ func newMCPHandler(app *App, version string) http.Handler {
 			return toolErr(err.Error())
 		}
 		return toolOK(map[string]any{"reports": out})
+	})
+
+	mcp.AddTool(s, &mcp.Tool{
+		Name:  "superai_hive_send",
+		Title: "Message a hive member",
+		Description: "Put a short message in a member's inbox — a worker by name, \"queen\", or \"*\" for everyone else — " +
+			"without starting any work there. Unlike an order nothing waits for an answer.",
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in hiveSendIn) (*mcp.CallToolResult, any, error) {
+		out, err := app.hiveSend(ctx, in.To, in.Text, in.ReplyTo)
+		if err != nil {
+			return toolErr(err.Error())
+		}
+		return toolOK(map[string]any{"delivery": out})
+	})
+
+	mcp.AddTool(s, &mcp.Tool{
+		Name:        "superai_hive_inbox",
+		Title:       "Read the hive inbox",
+		Description: "The messages hive members sent this instance: the unread ones, marked read by reading; with all, the last 20.",
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in hiveInboxIn) (*mcp.CallToolResult, any, error) {
+		limit := 50
+		if in.All {
+			limit = 20
+		}
+		return toolOK(map[string]any{"messages": app.mailbox().Take(in.All, limit)})
 	})
 
 	return mcp.NewStreamableHTTPHandler(

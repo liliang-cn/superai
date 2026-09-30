@@ -7,6 +7,7 @@ import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPa
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import { palette } from "./hivePalette";
 import type { StageHandle, StagePulse, StageTask, StageWorker } from "./hiveFx";
+import { mailTag } from "./hiveFx";
 
 // The hive in three dimensions.
 //
@@ -179,6 +180,13 @@ const HiveHex3D = forwardRef<StageHandle, Props>(function HiveHex3D({ role, self
         const now = performance.now();
         const rl = live.current.role;
         const pal = palette();
+        if (p.kind === "message") {
+          if (!p.src || !p.dst) return;
+          flights.current.push({ from: p.src, to: p.dst, t0: now, dur: 1000, color: pal.mail, size: 0.3, alpha: 1 });
+          tags.current.push({ at: p.src, text: mailTag(p.text), t0: now, color: pal.mail });
+          rings.current.push({ at: p.dst, t0: now + 1000, color: pal.mail, big: true });
+          return;
+        }
         let from: string;
         let to: string;
         if (rl === "worker") {
