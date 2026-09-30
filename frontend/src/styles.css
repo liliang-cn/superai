@@ -3686,3 +3686,7 @@ body.desktop-shell .sidebar.collapsed .nav-key { display: none; }
 .hive-stage-mode button { padding: 3px 9px; color: var(--text-2); background: transparent; border: 0; cursor: pointer; transition: color 0.15s; }
 .hive-stage-mode button:hover { color: var(--text-0); }
 .hive-stage-mode button[aria-pressed="true"] { color: var(--accent); }
+.hive-stage-sep { width: 1px; margin: 3px 6px; background: var(--border); }
+.hive-stage-grip { position: absolute; left: 0; right: 0; bottom: 0; height: 9px; z-index: 6; cursor: row-resize; touch-action: none; }
+.hive-stage-grip::after { content: ""; position: absolute; left: 50%; bottom: 3px; width: 44px; height: 3px; margin-left: -22px; border-radius: 2px; background: var(--border-strong); opacity: 0; transition: opacity 0.15s; }
+.hive-stage:hover .hive-stage-grip::after { opacity: 1; }
