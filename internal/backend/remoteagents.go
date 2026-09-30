@@ -707,8 +707,13 @@ func CondenseAgentFailure(raw string) string {
 	lead := ""
 	low := strings.ToLower(raw)
 	switch {
+	// Quota as a model service says it, not the word: "free disk space/quota"
+	// in a filesystem error is not a billing problem, and reading it as one
+	// sends the person to the wrong place entirely.
 	case strings.Contains(low, "resource_exhausted") || strings.Contains(low, "rate limit") ||
-		strings.Contains(low, "quota") || strings.Contains(low, "429"):
+		strings.Contains(low, "insufficient_quota") || strings.Contains(low, "quota exceeded") ||
+		strings.Contains(low, "exceeded your") || strings.Contains(low, "out of quota") ||
+		strings.Contains(low, "429"):
 		lead = "rate-limited or out of quota"
 		if d := RetryAfter(raw); d > 0 {
 			lead += fmt.Sprintf(" (it asks for %s)", d.Round(time.Second))

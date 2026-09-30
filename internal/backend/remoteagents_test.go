@@ -249,6 +249,17 @@ func TestFailuresAreClassifiedByWhatToDoAboutThem(t *testing.T) {
 	if got := CondenseAgentFailure(plain); got != plain {
 		t.Errorf("an unclassifiable failure was rewritten: %q", got)
 	}
+	// What openclaw said when it could not use its working directory. The word
+	// quota in it is about a disk, and must not become a billing problem.
+	disk := "Reason: spawn /usr/local/bin/node EACCES; snapshot staging root /var/lib/openclaw-home/.cache/openclaw: free disk space/quota or set XDG_CACHE_HOME to a writable filesystem"
+	if got := CondenseAgentFailure(disk); strings.Contains(got, "rate-limited") {
+		t.Errorf("a filesystem error was read as a rate limit: %q", got)
+	}
+	for _, q := range []string{`{"error":{"code":"insufficient_quota"}}`, "You exceeded your current quota"} {
+		if got := CondenseAgentFailure(q); !strings.Contains(got, "rate-limited") {
+			t.Errorf("a real quota error was not recognised: %q", got)
+		}
+	}
 }
 
 // The API says when to try again; that is worth acting on, but only for a wait
