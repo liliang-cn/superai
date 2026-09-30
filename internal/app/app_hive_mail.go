@@ -390,7 +390,7 @@ func (a *App) registerMailTools(inner interface {
 				if all {
 					return "No messages.", nil
 				}
-				return backend.InboxEmpty, nil
+				return a.mailbox().Empty(), nil
 			}
 			b, err := json.Marshal(msgs)
 			return string(b), err

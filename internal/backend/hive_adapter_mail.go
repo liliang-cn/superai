@@ -120,6 +120,11 @@ const InboxEmpty = "No unread messages. Do not wait for one here — no sleeping
 	" again in a loop. If you are waiting on someone, end your turn and say what you are waiting for: a" +
 	" message that arrives later starts a new turn with it in front of you."
 
+// InboxStillEmpty is the answer to looking again with nothing new.
+const InboxStillEmpty = "Still nothing, and nothing has arrived since you last looked. Stop checking: end your" +
+	" turn now, saying what you are waiting for. Waiting here costs the hive a turn and gains nothing — the" +
+	" message, when it comes, starts a new turn for you with it and your last order in front of you."
+
 func MailPrompt(from string, msgs []HiveMessage, during bool) string {
 	var b strings.Builder
 	if during {
@@ -233,7 +238,7 @@ func (a *Adapter) mcpHandler() http.Handler {
 			if in.All {
 				return text("No messages.")
 			}
-			return text(InboxEmpty)
+			return text(a.mail.Empty())
 		}
 		b, _ := json.Marshal(msgs)
 		return text(string(b))
