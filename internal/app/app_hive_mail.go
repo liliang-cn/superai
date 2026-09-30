@@ -6,9 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
-	"sort"
-	"strings"
-	"sync"
 	"time"
 
 	"github.com/liliang-cn/agent-go/v3/pkg/agent"
@@ -25,36 +22,22 @@ func (a *App) mailbox() *backend.Mailbox {
 	return a.hiveMail
 }
 
-// hiveContact is somewhere a message can be delivered.
-type hiveContact struct {
-	name, url, token string
-	queen            bool
-}
-
 // hiveContacts is everyone this member can write to, and its own name. A
 // queen writes to her workers; a worker to the queen and to its peers. ok is
 // false on an instance that is in no hive.
-func (a *App) hiveContacts(ctx context.Context) (me string, contacts map[string]hiveContact, ok bool) {
+func (a *App) hiveContacts(ctx context.Context) (me string, contacts map[string]backend.HiveContact, ok bool) {
 	a.mu.Lock()
 	h, ann, s := a.hive, a.hiveAnn, a.settings
 	a.mu.Unlock()
-	contacts = map[string]hiveContact{}
 	switch {
 	case h != nil:
+		contacts = map[string]backend.HiveContact{}
 		for n, ag := range h.Agents() {
-			contacts[n] = hiveContact{name: n, url: ag.URL, token: ag.Token}
+			contacts[n] = backend.HiveContact{Name: n, URL: ag.URL, Token: ag.Token}
 		}
 		return a.hiveNameOf(s), contacts, true
 	case ann != nil:
-		q := ann.Queen()
-		if q == "" {
-			q = backend.HiveQueenAlias
-		}
-		contacts[q] = hiveContact{name: q, queen: true}
-		for n, ag := range ann.Peers(ctx) {
-			contacts[n] = hiveContact{name: n, url: ag.URL, token: ag.Token}
-		}
-		return ann.Name(), contacts, true
+		return ann.Name(), ann.Contacts(ctx), true
 	}
 	return "", nil, false
 }
@@ -66,79 +49,22 @@ func (a *App) hiveSend(ctx context.Context, to, text, replyTo string) (string, e
 	if !ok {
 		return "", fmt.Errorf("this instance is not in a hive")
 	}
-	to = strings.TrimSpace(to)
-	var targets []hiveContact
-	switch {
-	case to == backend.HiveBroadcast:
-		for _, c := range contacts {
-			targets = append(targets, c)
-		}
-		sort.Slice(targets, func(i, j int) bool { return targets[i].name < targets[j].name })
-		if len(targets) == 0 {
-			return "Nobody else is in the hive right now.", nil
-		}
-	case to == me:
-		return "", fmt.Errorf("%s is you", to)
-	default:
-		c, found := contacts[to]
-		if !found && to == backend.HiveQueenAlias {
-			for _, x := range contacts {
-				if x.queen {
-					c, found = x, true
-				}
-			}
-		}
-		if !found {
-			names := make([]string, 0, len(contacts))
-			for n := range contacts {
-				names = append(names, n)
-			}
-			sort.Strings(names)
-			if len(names) == 0 {
-				return "", fmt.Errorf("there is nobody called %q, and nobody else is in the hive right now", to)
-			}
-			return "", fmt.Errorf("there is nobody called %q; you can write to: %s", to, strings.Join(names, ", "))
-		}
-		targets = []hiveContact{c}
-	}
-
 	a.mu.Lock()
 	ann := a.hiveAnn
 	a.mu.Unlock()
-	lines := make([]string, len(targets))
-	var wg sync.WaitGroup
-	for i, c := range targets {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			m, err := backend.NewHiveMessage(me, c.name, text, replyTo)
-			if err != nil {
-				lines[i] = fmt.Sprintf("%s: not sent — %v", c.name, err)
-				return
-			}
-			sctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-			defer cancel()
-			if c.queen {
-				err = ann.SendToQueen(sctx, m)
-			} else {
-				err = backend.PostMessage(sctx, c.url, c.token, m)
-			}
-			if err != nil {
-				lines[i] = fmt.Sprintf("%s: not delivered — %v", c.name, err)
-				return
-			}
-			lines[i] = fmt.Sprintf("%s: delivered (id %s)", c.name, m.ID)
-			a.emitMessage(m, "out")
-			// Between two workers the queen was not part of it; she gets a copy
-			// to see, the same way she sees their orders.
-			if ann != nil && !c.queen {
-				m.Observed = true
-				a.reportToQueen(m)
-			}
-		}()
+	var toQueen func(context.Context, backend.HiveMessage) error
+	if ann != nil {
+		toQueen = ann.SendToQueen
 	}
-	wg.Wait()
-	return strings.Join(lines, "\n"), nil
+	return backend.SendHive(ctx, me, contacts, to, text, replyTo, toQueen, func(c backend.HiveContact, m backend.HiveMessage) {
+		a.emitMessage(m, "out")
+		// Between two workers the queen was not part of it; she gets a copy
+		// to see, the same way she sees their orders.
+		if ann != nil && !c.Queen {
+			m.Observed = true
+			a.reportToQueen(m)
+		}
+	})
 }
 
 // emitMessage puts a message on this instance's event stream for the panel.
@@ -257,7 +183,7 @@ func (a *App) steerMail(m backend.HiveMessage) bool {
 			break
 		}
 	}
-	content := a.mailPrompt(m.From, []backend.HiveMessage{m}, true)
+	content := backend.MailPrompt(m.From, []backend.HiveMessage{m}, true)
 	took := false
 	for _, s := range targets {
 		if steer(s, content) {
@@ -286,7 +212,7 @@ func (a *App) steerDropped(content string) {
 	}
 }
 
-// mailIDs finds the message ids mailPrompt writes.
+// mailIDs finds the message ids backend.MailPrompt writes.
 var mailIDs = regexp.MustCompile(`— id ([0-9a-f-]{36}),`)
 
 // wakeFor starts a turn in the conversation with the sender, once any turn
@@ -333,35 +259,8 @@ func (a *App) wakeFor(m backend.HiveMessage) {
 		if len(msgs) == 0 {
 			return // read in the meantime
 		}
-		wake(session, a.mailPrompt(m.From, msgs, false))
+		wake(session, backend.MailPrompt(m.From, msgs, false))
 	}()
-}
-
-// mailPrompt is how messages are put to the agent: who they are from, what
-// they say, and how to answer.
-//
-// during is a message put into a turn that is already going, which has
-// something else in hand: it is told so, and left to judge whether the
-// message changes that.
-func (a *App) mailPrompt(from string, msgs []backend.HiveMessage, during bool) string {
-	var b strings.Builder
-	if during {
-		fmt.Fprintf(&b, "[hive] While you work, a message from %s:\n", from)
-	} else {
-		fmt.Fprintf(&b, "[hive] %d message(s) from %s:\n", len(msgs), from)
-	}
-	for _, m := range msgs {
-		fmt.Fprintf(&b, "\n— id %s, %s\n%s\n", m.ID, m.At.Format(time.RFC3339), m.Text)
-	}
-	if during {
-		fmt.Fprintf(&b, "\nTake it into account in what you are doing: it may change it, or it may not. If %s needs"+
-			" an answer, send it with hive_send (to %q, reply_to the id). Then carry on.", from, from)
-		return b.String()
-	}
-	fmt.Fprintf(&b, "\nDeal with this as a member of the hive. If %s needs an answer, send it with hive_send"+
-		" (to %q, reply_to the id) — a reply is read by them, it does not start work for them. If nothing is"+
-		" needed, say so in a line.", from, from)
-	return b.String()
 }
 
 func onRoster(h *backend.Hive, name string) bool {
