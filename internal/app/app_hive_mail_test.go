@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -335,5 +336,36 @@ func TestADroppedSteerStartsATurn(t *testing.T) {
 		}
 	case <-time.After(3 * time.Second):
 		t.Fatal("a dropped message went nowhere")
+	}
+}
+
+// The queen passes on a message for a member its sender could not reach, and
+// sees it on the way through.
+func TestTheQueenPassesAMessageOn(t *testing.T) {
+	h := newMailHive(t)
+	m, _ := backend.NewHiveMessage("w1", "w2", "relayed hello", "x")
+	b, _ := json.Marshal(m)
+	w := httptest.NewRecorder()
+	h.queen.handleHiveMessage(w, httptest.NewRequest(http.MethodPost, "/api/hive/message", strings.NewReader(string(b))))
+	if w.Code != http.StatusOK {
+		t.Fatalf("relay answered %d: %s", w.Code, w.Body.String())
+	}
+	got := h.w2.mailbox().Take(false, 0)
+	if len(got) != 1 || got[0].Text != "relayed hello" || got[0].Via != "queen" {
+		t.Fatalf("w2 got %+v", got)
+	}
+	if ev := h.events("q"); len(ev) != 1 || ev[0]["dir"] != "peer" {
+		t.Fatalf("the queen did not see it pass: %+v", ev)
+	}
+	if h.queen.mailbox().Unread() != 0 {
+		t.Fatal("the queen kept a message that was not hers")
+	}
+	// Only for someone on the roster.
+	m2, _ := backend.NewHiveMessage("w1", "nobody", "x", "")
+	b, _ = json.Marshal(m2)
+	w = httptest.NewRecorder()
+	h.queen.handleHiveMessage(w, httptest.NewRequest(http.MethodPost, "/api/hive/message", strings.NewReader(string(b))))
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("relay to a stranger answered %d", w.Code)
 	}
 }

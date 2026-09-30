@@ -1,6 +1,8 @@
 package backend
 
 import (
+	"context"
+	"net"
 	"strings"
 	"testing"
 )
@@ -42,5 +44,33 @@ func TestAMessageIsANoteNotADocument(t *testing.T) {
 	_, err := NewHiveMessage("a", "b", strings.Repeat("x", maxMessageText+1), "")
 	if err == nil || !strings.Contains(err.Error(), "shared memory") {
 		t.Fatalf("a long message should point at the memory: %v", err)
+	}
+}
+
+// A peer listed under an address that does not resolve from here — a SuperAI
+// worker's in-cluster name, seen from a worker outside the cluster — is
+// reached through the queen instead.
+func TestAnUnreachablePeerIsReachedThroughTheQueen(t *testing.T) {
+	// An address nothing answers at: a port that was just closed.
+	ln, _ := net.Listen("tcp", "127.0.0.1:0")
+	dead := "http://" + ln.Addr().String()
+	ln.Close()
+	contacts := map[string]HiveContact{
+		"queen":            {Name: "queen", Queen: true},
+		"superai-worker-7": {Name: "superai-worker-7", URL: dead},
+	}
+	var viaQueen []HiveMessage
+	toQueen := func(_ context.Context, m HiveMessage) error { viaQueen = append(viaQueen, m); return nil }
+	var seen []HiveMessage
+	out, err := SendHive(context.Background(), "openclaw", contacts, "superai-worker-7", "what is your hostname?", "", toQueen,
+		func(_ HiveContact, m HiveMessage) { seen = append(seen, m) })
+	if err != nil || !strings.Contains(out, "delivered") {
+		t.Fatalf("out %q err %v", out, err)
+	}
+	if len(viaQueen) != 1 || viaQueen[0].To != "superai-worker-7" || viaQueen[0].Via != "queen" {
+		t.Fatalf("not handed to the queen: %+v", viaQueen)
+	}
+	if len(seen) != 1 || seen[0].Via != "queen" {
+		t.Fatalf("the sender was not told it went through the queen: %+v", seen)
 	}
 }

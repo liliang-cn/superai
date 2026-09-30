@@ -195,8 +195,9 @@ func (a *Adapter) mcpHandler() http.Handler {
 		ann := a.Announcer
 		out, err := SendHive(ctx, a.Name, ann.Contacts(ctx), in.To, in.Text, in.ReplyTo, ann.SendToQueen,
 			func(c HiveContact, m HiveMessage) {
-				// The queen sees what passes between two workers.
-				if !c.Queen {
+				// The queen sees what passes between two workers — unless
+				// she carried it, and has seen it already.
+				if !c.Queen && m.Via == "" {
 					m.Observed = true
 					go func() {
 						sctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)

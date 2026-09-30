@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"sort"
 	"strings"
@@ -51,6 +52,11 @@ type HiveMessage struct {
 	// Observed marks the queen's copy of a message between two workers: shown,
 	// never put in anyone's inbox.
 	Observed bool `json:"observed,omitempty"`
+	// Via is "queen" on a message the queen passed on because its sender could
+	// not reach the recipient: a worker outside the cluster cannot resolve the
+	// in-cluster address a SuperAI worker is listed under, and the queen can
+	// reach both.
+	Via string `json:"via,omitempty"`
 	// Read is the recipient's own bookkeeping and never travels.
 	Read bool `json:"-"`
 }
@@ -204,7 +210,10 @@ func (b *Mailbox) TakeFrom(from string) []HiveMessage {
 	return out
 }
 
-var mailHTTP = &http.Client{Timeout: 10 * time.Second}
+// mailHTTP never goes through a proxy from the environment: members are on
+// the LAN or in the cluster, and a proxy that cannot reach one answers with an
+// error of its own that reads as the recipient's.
+var mailHTTP = &http.Client{Timeout: 10 * time.Second, Transport: &http.Transport{Proxy: nil}}
 
 // PostMessage delivers one message to a member at base, authenticating with
 // token. The recipient's refusal comes back as the error, in its own words.
@@ -314,6 +323,21 @@ func SendHive(ctx context.Context, me string, contacts map[string]HiveContact, t
 				err = errors.New("no way to reach the queen from here")
 			default:
 				err = PostMessage(sctx, c.URL, c.Token, m)
+				// Not reachable from here — an address that does not resolve
+				// or a host that does not answer — is what the queen is for:
+				// she can reach everyone on her roster. A refusal from the
+				// recipient itself is not retried: it has answered.
+				var ne net.Error
+				var dnsErr *net.DNSError
+				var opErr *net.OpError
+				if err != nil && toQueen != nil && (errors.As(err, &dnsErr) || errors.As(err, &opErr) || (errors.As(err, &ne) && ne.Timeout())) {
+					m.Via = "queen"
+					// A clock of its own: an address that hung may have
+					// spent the first one.
+					qctx, qcancel := context.WithTimeout(ctx, 10*time.Second)
+					err = toQueen(qctx, m)
+					qcancel()
+				}
 			}
 			if err != nil {
 				lines[i] = fmt.Sprintf("%s: not delivered — %v", c.Name, err)
