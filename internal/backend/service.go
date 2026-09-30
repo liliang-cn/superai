@@ -250,6 +250,12 @@ func NewService(s *Settings) (*Service, error) {
 			PermissionHandler: gate.Handler(),
 			PermissionPolicy:  gate.Policy(),
 		})
+	if s.Hive.Role == HiveRoleWorker {
+		// A worker takes orders from the queen, questions from peers and a
+		// person's turns through one service. Past the cap a run is refused,
+		// which the queen's scheduler reads as "try another worker".
+		b = b.WithMaxConcurrentRuns(s.Hive.Concurrency())
+	}
 	// agent-go v3 removed PTC entirely — tools are always called directly, so
 	// the DisablePTC setting no longer selects anything. It stays in Settings
 	// only so existing settings files keep parsing.
@@ -485,6 +491,20 @@ func (s *Service) chatRunOptions(sessionID string, imagePaths []string) []agent.
 		agent.WithSessionID(sessionID),
 		agent.WithMaxTurns(maxRounds),
 	}
+	// An order from the hive: the order's UUID is the agent-go task id, so
+	// the plan, the checkpoints and the journal on this worker are named by
+	// the same id the queen's board shows, and a worker that dies mid-order
+	// leaves something a replacement can resume. It runs under the hive
+	// tenant so all orders stop together, and without the automatic memory
+	// write — the queen already remembered giving the order, and N workers
+	// given it would otherwise write N extractions into the memory they share.
+	if id, ok := TaskIDFromSession(sessionID); ok {
+		opts = append(opts,
+			agent.WithTaskID(id),
+			agent.WithTenant(HiveTenant),
+			agent.WithoutMemoryAutoStore(),
+		)
+	}
 	// Route dropped images straight to the vision model as multimodal input
 	// (workspace-relative paths -> absolute, so the provider can read them).
 	if len(imagePaths) > 0 {
@@ -505,9 +525,30 @@ func (s *Service) chatRunOptions(sessionID string, imagePaths []string) []agent.
 	return opts
 }
 
+// TurnResult is what one turn produced: the answer, and what it cost.
+//
+// The cost is here because a turn a worker runs for the queen is spend the
+// queen's own accounting cannot see any other way: it reaches the queen in
+// chat:done and from there the observers on the queen's run. Usage is nil
+// and CostUnpriced true when the provider or the pricing table said nothing,
+// which is an unknown and not a zero.
+type TurnResult struct {
+	Text         string
+	Usage        *domain.TokenUsage
+	CostUSD      float64
+	CostUnpriced bool
+}
+
 // Stream runs one turn, forwarding every agent event to emit, and returns the
-// final completion text.
+// final completion text. StreamTurn is the same turn with its cost.
 func (s *Service) Stream(ctx context.Context, sessionID, message string, imagePaths []string, emit func(ev *agent.Event)) (string, error) {
+	out, err := s.StreamTurn(ctx, sessionID, message, imagePaths, emit)
+	return out.Text, err
+}
+
+// StreamTurn runs one turn and returns the answer with what it cost.
+func (s *Service) StreamTurn(ctx context.Context, sessionID, message string, imagePaths []string, emit func(ev *agent.Event)) (TurnResult, error) {
+	var turn TurnResult
 	opts := s.chatRunOptions(sessionID, imagePaths)
 	// Whatever the turn writes into the workspace belongs to this conversation.
 	root := ""
@@ -536,7 +577,7 @@ func (s *Service) Stream(ctx context.Context, sessionID, message string, imagePa
 	// key. This is the same fact under a key of ours.
 	ch, err := s.svc.RunStreamWithOptions(withSessionID(ctx, sessionID), message, opts...)
 	if err != nil {
-		return "", err
+		return turn, err
 	}
 	var final string
 	var lastErr string
@@ -551,6 +592,7 @@ func (s *Service) Stream(ctx context.Context, sessionID, message string, imagePa
 		case agent.EventTypeComplete, agent.EventTypeBlocked:
 			final = ev.Content
 			sawTerminal = true
+			turn.Usage, turn.CostUSD, turn.CostUnpriced = ev.Usage, ev.EstimatedCostUSD, ev.CostUnpriced
 		case agent.EventTypeError:
 			lastErr = ev.Content
 		}
@@ -560,9 +602,10 @@ func (s *Service) Stream(ctx context.Context, sessionID, message string, imagePa
 	// reason silently dropped (a gateway 502 looked identical to a model that
 	// said nothing). The error event is the explanation; return it as one.
 	if !sawTerminal && lastErr != "" {
-		return "", fmt.Errorf("%s", lastErr)
+		return turn, fmt.Errorf("%s", lastErr)
 	}
-	return final, nil
+	turn.Text = final
+	return turn, nil
 }
 
 // Deliverables returns the agent's produced artifacts.

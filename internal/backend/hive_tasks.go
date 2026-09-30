@@ -25,6 +25,11 @@ import (
 // a person at its keyboard.
 const HiveSessionPrefix = "hive:"
 
+// HiveTenant is the agent-go tenant every order from the hive runs under on a
+// worker, so its runs can be told apart from a person's own turns — and, with
+// CancelTenant, stopped together without touching those.
+const HiveTenant = "hive"
+
 const (
 	TaskRunning   = "running"
 	TaskDone      = "done"

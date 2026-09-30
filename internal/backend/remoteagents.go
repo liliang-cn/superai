@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/liliang-cn/agent-go/v3/pkg/domain"
 )
 
 // Agents on other machines.
@@ -257,8 +259,9 @@ type RemoteRunner struct {
 	// are then peer tasks, and carry who gave them.
 	origin string
 
-	mu    sync.Mutex
-	where map[string]resolvedHost
+	mu      sync.Mutex
+	where   map[string]resolvedHost
+	bracket Bracket
 }
 
 type resolvedHost struct {
@@ -333,7 +336,27 @@ type RemoteResult struct {
 	// that makes a failed delegation read like a real reply.
 	Reason string `json:"reason,omitempty"`
 	MS     int64  `json:"ms"`
+	// TaskID names the order on the task board, for a worker reached over
+	// HTTP; empty for an agent run over SSH, which the board does not record.
+	TaskID string `json:"task_id,omitempty"`
+	// What the worker said its turn cost. Usage is nil when it said nothing;
+	// CostUnpriced is true when it could not price its model — an unknown,
+	// which must not be read as free.
+	Usage        *domain.TokenUsage `json:"usage,omitempty"`
+	CostUSD      float64            `json:"cost_usd,omitempty"`
+	CostUnpriced bool               `json:"cost_unpriced,omitempty"`
 }
+
+// Bracket announces one remote run to whoever watches the caller's own run,
+// and returns the function that announces its end. agent-go's
+// Service.SubAgentBracket is the one meant here: through it every worker a
+// tool commands shows up in the trace, the activity log and the usage
+// accounting as a sub-agent with its own spend, rather than as one opaque
+// tool call that ran for minutes and cost nothing.
+type Bracket func(ctx context.Context, name, prompt string) func(res RemoteResult, err error)
+
+// SetBracket says how a remote run is announced. Nil announces nothing.
+func (r *RemoteRunner) SetBracket(b Bracket) { r.bracket = b }
 
 // Run asks one agent one question.
 //
@@ -365,6 +388,10 @@ func (r *RemoteRunner) Run(ctx context.Context, name, prompt string) (res Remote
 		res.Failed, res.Reason = true, "nothing was asked"
 		return res, nil
 	}
+	if r.bracket != nil {
+		end := r.bracket(ctx, name, prompt)
+		defer func() { end(res, err) }()
+	}
 
 	if agent.URL != "" {
 		// An explicit TimeoutSeconds bounds a worker; otherwise nothing does.
@@ -384,6 +411,7 @@ func (r *RemoteRunner) Run(ctx context.Context, name, prompt string) (res Remote
 			pulse: func(kind, tool string, n int) { r.board.Pulse(id, kind, tool, n) }}, prompt,
 			func(phase, tool string) { r.board.Progress(id, phase, tool) })
 		out.MS = time.Since(started).Milliseconds()
+		out.TaskID = id
 		switch {
 		case ctx.Err() != nil:
 			r.board.Finish(id, TaskCancelled, out.Text, out.Reason)

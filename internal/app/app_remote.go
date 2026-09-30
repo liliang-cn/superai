@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"strings"
@@ -52,6 +53,30 @@ func (a *App) remoteRunner() *backend.RemoteRunner {
 		a.remote = backend.NewRemoteRunner(s.RemoteAgents)
 		a.remote.SetRoster(a.hiveAgents)
 		a.remote.SetBoard(a.tasks())
+		// Every worker a tool commands is a sub-agent of the run that
+		// commanded it, as far as the trace, the activity log and the cost
+		// accounting are concerned. The service is read at call time: it is
+		// rebuilt on a settings save and the runner is not.
+		a.remote.SetBracket(func(ctx context.Context, name, prompt string) func(backend.RemoteResult, error) {
+			a.mu.Lock()
+			svc := a.svc
+			a.mu.Unlock()
+			if svc == nil || svc.Agent() == nil {
+				return func(backend.RemoteResult, error) {}
+			}
+			end := svc.Agent().SubAgentBracket(ctx, agent.SubAgentInfo{Name: name, Goal: prompt, Provider: "superai-hive"})
+			return func(res backend.RemoteResult, err error) {
+				out := agent.RemoteAgentRunResult{
+					Agent: res.Agent, Provider: "superai-hive", Endpoint: res.Host,
+					Summary: res.Text, Failed: res.Failed, Reason: res.Reason, Duration: res.MS,
+					Usage: res.Usage, CostUSD: res.CostUSD, CostUnpriced: res.CostUnpriced || res.Usage == nil,
+				}
+				if err == nil && res.Failed {
+					err = errors.New(res.Reason)
+				}
+				end(out, err)
+			}
+		})
 		if s.Hive.Role == backend.HiveRoleWorker {
 			a.remote.SetOrigin(a.hiveNameOf(s))
 		}

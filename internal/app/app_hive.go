@@ -475,7 +475,9 @@ func (a *App) registerHiveTools(svc *backend.Service, cfg *backend.Settings) {
 				ra, _ := args["retire_after"].(bool)
 				return a.hiveMap(ctx, jobs, up, ra)
 			},
-			agent.ToolMetadata{Destructive: true})
+			// One report per job, all of them: the uniform cap would cut the
+			// middle jobs out and tell the model to re-run paid work.
+			agent.ToolMetadata{Destructive: true, OutputLimit: -1})
 		inner.AddToolWithMetadata("hive_retire",
 			"Let workers go when the work is done. It removes the highest-numbered ones and refuses while any of them"+
 				" is in the middle of an order, so nothing is lost. Do not retire workers you may need again soon.",
@@ -535,7 +537,21 @@ func (a *App) registerHiveTools(svc *backend.Service, cfg *backend.Settings) {
 			},
 		},
 		a.hiveCommand,
-		agent.ToolMetadata{Destructive: true})
+		agent.ToolMetadata{Destructive: true, OutputLimit: -1})
+
+	inner.AddToolWithMetadata("hive_task",
+		"The whole record of one hive order by its id: the full order, the full answer, and every step it went through."+
+			" Use it when a report from hive_map or hive_command was shortened and you need the rest.",
+		map[string]any{
+			"type":       "object",
+			"properties": map[string]any{"id": map[string]any{"type": "string", "description": "The task id, as hive_map and hive_command print it."}},
+			"required":   []string{"id"},
+		},
+		func(ctx context.Context, args map[string]any) (any, error) {
+			b, err := json.Marshal(a.HiveTaskDetail(str(args["id"])))
+			return string(b), err
+		},
+		agent.ToolMetadata{ReadOnly: true, ConcurrencySafe: true, OutputLimit: -1})
 }
 
 // rosterView is hive members plus statically configured workers, for the model.
@@ -691,7 +707,7 @@ func (a *App) registerPeerTools(inner interface {
 			}
 			return fmt.Sprintf("%s answered in %.1fs:\n\n%s", res.Agent, float64(res.MS)/1000, res.Text), nil
 		},
-		agent.ToolMetadata{})
+		agent.ToolMetadata{OutputLimit: -1})
 }
 
 // queenSpawner is the queen's roster and the way it makes workers, or the
@@ -952,10 +968,23 @@ func (a *App) hiveMap(ctx context.Context, jobs []string, spawnUpTo int, retireA
 	b.WriteString("\n")
 	for _, r := range res {
 		if r.OK {
-			fmt.Fprintf(&b, "\n## Job %d — %s (%.1fs)\n%s\n", r.Index+1, r.Worker, float64(r.MS)/1000, r.Text)
+			fmt.Fprintf(&b, "\n## Job %d — %s (%.1fs, task %s)\n%s\n", r.Index+1, r.Worker, float64(r.MS)/1000, r.TaskID, jobText(r.Text, r.TaskID))
 		} else {
 			fmt.Fprintf(&b, "\n## Job %d — FAILED after %d attempt(s)\n%s\n", r.Index+1, r.Attempts, r.Reason)
 		}
 	}
 	return b.String(), nil
+}
+
+// jobTextKeep is how much of one job's answer hive_map puts in front of the
+// model. Two hundred jobs of twenty thousand characters is four megabytes,
+// which no context holds; the rest is one hive_task call away.
+const jobTextKeep = 6000
+
+func jobText(text, taskID string) string {
+	r := []rune(text)
+	if len(r) <= jobTextKeep {
+		return text
+	}
+	return string(r[:jobTextKeep]) + fmt.Sprintf("\n[… %d more characters; the whole answer: hive_task %s]", len(r)-jobTextKeep, taskID)
 }
