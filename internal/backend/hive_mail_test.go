@@ -74,3 +74,21 @@ func TestAnUnreachablePeerIsReachedThroughTheQueen(t *testing.T) {
 		t.Fatalf("the sender was not told it went through the queen: %+v", seen)
 	}
 }
+
+// Looking twice with nothing arriving in between is waiting on the inbox, and
+// the second answer says to stop; a message in between resets it.
+func TestLookingAgainAtAnEmptyInboxIsToldToStop(t *testing.T) {
+	b := NewMailbox(10)
+	if got := b.Empty(); got != InboxEmpty {
+		t.Fatalf("first look: %q", got)
+	}
+	if got := b.Empty(); got != InboxStillEmpty {
+		t.Fatalf("second look with nothing new: %q", got)
+	}
+	m, _ := NewHiveMessage("w1", "w2", "leg 1", "")
+	b.Put(m)
+	b.Take(false, 0)
+	if got := b.Empty(); got != InboxEmpty {
+		t.Fatalf("a look after something arrived was called polling: %q", got)
+	}
+}

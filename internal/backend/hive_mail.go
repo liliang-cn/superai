@@ -97,6 +97,10 @@ type Mailbox struct {
 	mu   sync.Mutex
 	msgs []HiveMessage
 	max  int
+	// When a message last came in, and when a look found nothing: two looks
+	// that found nothing with nothing arriving between them are someone
+	// waiting on the inbox. See Empty.
+	lastPut, lastEmpty time.Time
 }
 
 // NewMailbox keeps the last max messages.
@@ -118,11 +122,32 @@ func (b *Mailbox) Put(m HiveMessage) bool {
 		}
 	}
 	m.Read = false
+	b.lastPut = time.Now()
 	b.msgs = append(b.msgs, m)
 	if len(b.msgs) > b.max {
 		b.msgs = b.msgs[len(b.msgs)-b.max:]
 	}
 	return true
+}
+
+// pollWindow is how close two empty looks have to be to count as polling.
+const pollWindow = 5 * time.Minute
+
+// Empty records a look that found nothing unread, and says what to tell the
+// looker. The first time it is InboxEmpty. A second look with nothing arriving
+// in between is a member waiting on its inbox — the one thing the first answer
+// asked it not to do, and what workers in a relay did anyway, a check and a
+// sleep in the shell a dozen times over — so it is told plainly to stop.
+func (b *Mailbox) Empty() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	now := time.Now()
+	again := !b.lastEmpty.IsZero() && now.Sub(b.lastEmpty) < pollWindow && !b.lastPut.After(b.lastEmpty)
+	b.lastEmpty = now
+	if again {
+		return InboxStillEmpty
+	}
+	return InboxEmpty
 }
 
 // Unread counts what has not been read.
