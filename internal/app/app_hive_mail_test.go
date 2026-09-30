@@ -412,13 +412,13 @@ func TestAnOldOrderIsNotShownToAWokenTurn(t *testing.T) {
 	}
 }
 
-// Nothing waiting says not to wait here, rather than a bare "nothing".
+// Nothing waiting points at the way to wait, rather than a bare "nothing".
 func TestAnEmptyInboxSaysNotToPoll(t *testing.T) {
 	h := newMailHive(t)
 	tools := &toolRecorder{}
 	h.w1.registerMailTools(tools)
 	out, err := tools.fns["hive_inbox"](context.Background(), map[string]any{})
-	if err != nil || !strings.Contains(out.(string), "end your turn") {
+	if err != nil || !strings.Contains(out.(string), "hive_wait") {
 		t.Fatalf("empty inbox said %v %v", out, err)
 	}
 }
@@ -455,4 +455,34 @@ func TestTheQueenSeesTheTrafficBetweenWorkers(t *testing.T) {
 	if out, _ := tools.fns["hive_inbox"](context.Background(), map[string]any{}); strings.Contains(out.(string), "18e99f0d6bff") {
 		t.Fatalf("someone else's message came in as the queen's unread mail: %v", out)
 	}
+}
+
+// A message a turn is waiting for goes to that wait: not steered into the
+// running turns, not made to start a turn of its own.
+func TestAMessageSomeoneIsWaitingForGoesToTheWait(t *testing.T) {
+	h := newMailHive(t)
+	h.w2.wakeFn = func(string, string) { t.Error("a waited-for message started a turn") }
+	h.w2.steerFn = func(string, string) bool { t.Error("a waited-for message was steered"); return true }
+	tools := &toolRecorder{}
+	h.w2.registerMailTools(tools)
+	got := make(chan string, 1)
+	go func() {
+		out, _ := tools.fns["hive_wait"](context.Background(), map[string]any{"from": "w1", "seconds": float64(30)})
+		got <- out.(string)
+	}()
+	for !h.w2.mailbox().Waiting("w1") {
+		time.Sleep(time.Millisecond)
+	}
+	if _, err := h.w1.hiveSend(context.Background(), "w2", "leg 1: 18e99f0d6bff", ""); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case out := <-got:
+		if !strings.Contains(out, "18e99f0d6bff") {
+			t.Fatalf("hive_wait said %q", out)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("hive_wait never returned")
+	}
+	time.Sleep(100 * time.Millisecond) // room for a wrong wake to show itself
 }

@@ -73,6 +73,9 @@ func writeAdapterJSON(w http.ResponseWriter, code int, v any) {
 // deliver puts a message in front of the agent: into the order it is in the
 // middle of if that order can take one, otherwise into a turn of its own.
 func (a *Adapter) deliver(m HiveMessage) {
+	if a.mail.Waiting(m.From) {
+		return // the agent is in hive_wait for it, and takes it from there
+	}
 	a.mu.Lock()
 	injectors := make([]func(string) bool, 0, len(a.injectors))
 	for _, inj := range a.injectors {
@@ -116,14 +119,51 @@ func (a *Adapter) deliver(m HiveMessage) {
 // "nothing" because of what agents did with that: a worker waiting for the
 // previous leg of a relay slept in the shell and called hive_inbox again, a
 // dozen times, when a message arriving later wakes it anyway.
-const InboxEmpty = "No unread messages. Do not wait for one here — no sleeping in the shell, no calling this" +
-	" again in a loop. If you are waiting on someone, end your turn and say what you are waiting for: a" +
-	" message that arrives later starts a new turn with it in front of you."
+const InboxEmpty = "No unread messages. To wait for one, call hive_wait: it returns the moment a message" +
+	" arrives. Do not sleep in the shell, call this again in a loop, or ask the sender with hive_ask whether" +
+	" they have sent it."
 
 // InboxStillEmpty is the answer to looking again with nothing new.
-const InboxStillEmpty = "Still nothing, and nothing has arrived since you last looked. Stop checking: end your" +
-	" turn now, saying what you are waiting for. Waiting here costs the hive a turn and gains nothing — the" +
-	" message, when it comes, starts a new turn for you with it and your last order in front of you."
+const InboxStillEmpty = "Still nothing, and nothing has arrived since you last looked. Stop checking: call" +
+	" hive_wait, which returns the moment the message arrives, or end your turn saying what you are waiting for" +
+	" — the message then starts a new turn for you with it and your last order in front of you."
+
+// HiveWaitDescription is hive_wait's, the same for a SuperAI member and for an
+// agent behind the adapter.
+const HiveWaitDescription = "Wait for a message from another member of the hive and get it the moment it arrives." +
+	"\n\nThe way to wait on someone — the previous step of a relay, an answer you asked for. It takes no" +
+	" effort while it waits and returns as soon as a message is filed, so never sleep in the shell, loop on" +
+	" hive_inbox, or ask the sender with hive_ask whether they have sent it. Returns the messages (marked read)," +
+	" or says that nothing came in time."
+
+// WaitResult runs one hive_wait on box and says what came of it.
+func WaitResult(box *Mailbox, ctx context.Context, from string, seconds any) string {
+	// JSON numbers arrive as float64, and a fraction is a fraction:
+	// time.Duration(0.05)*time.Second is 0, which Wait reads as "the longest".
+	d := 600 * time.Second
+	switch v := seconds.(type) {
+	case float64:
+		if v > 0 {
+			d = time.Duration(v * float64(time.Second))
+		}
+	case int:
+		if v > 0 {
+			d = time.Duration(v) * time.Second
+		}
+	}
+	start := time.Now()
+	msgs := box.Wait(ctx, strings.TrimSpace(from), d)
+	if len(msgs) == 0 {
+		who := "anyone"
+		if strings.TrimSpace(from) != "" {
+			who = from
+		}
+		return fmt.Sprintf("Nothing from %s in %s. If it still matters, say in your answer what you were waiting for.",
+			who, time.Since(start).Round(time.Second))
+	}
+	raw, _ := json.Marshal(msgs)
+	return string(raw)
+}
 
 func MailPrompt(from string, msgs []HiveMessage, during bool) string {
 	var b strings.Builder
@@ -150,6 +190,11 @@ type adapterSendIn struct {
 	To      string `json:"to" jsonschema:"a member's name, queen for the queen, or * for every other member"`
 	Text    string `json:"text" jsonschema:"the message, standing on its own"`
 	ReplyTo string `json:"reply_to,omitempty" jsonschema:"the id of the message this answers, if any"`
+}
+
+type adapterWaitIn struct {
+	From    string `json:"from,omitempty" jsonschema:"wait only for this member's messages; empty for anyone's"`
+	Seconds int    `json:"seconds,omitempty" jsonschema:"the longest to wait, up to 900; default 600"`
 }
 
 type adapterInboxIn struct {
@@ -243,6 +288,11 @@ func (a *Adapter) mcpHandler() http.Handler {
 		b, _ := json.Marshal(msgs)
 		return text(string(b))
 	})
+
+	mcp.AddTool(s, &mcp.Tool{Name: "hive_wait", Description: HiveWaitDescription},
+		func(ctx context.Context, _ *mcp.CallToolRequest, in adapterWaitIn) (*mcp.CallToolResult, any, error) {
+			return text(WaitResult(a.mail, ctx, in.From, in.Seconds))
+		})
 
 	return mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return s },
 		// The agent reaching this is on this machine or told the address; the

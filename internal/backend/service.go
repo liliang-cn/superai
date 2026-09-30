@@ -850,7 +850,7 @@ In the hive you are %[1]s, a worker. Orders from the queen arrive as turns like 
 
 When a task turns on what another member found or said — a disagreement to settle, a result to check — ask that member with hive_ask for its reasons and sources before redoing its work; say in your answer what it told you.
 
-When you have to wait for a message from another member, do not wait inside your turn: no sleeping in the shell, no calling hive_inbox in a loop. Finish the turn saying what you are waiting for. The message, when it comes, starts a new turn with it in front of you, together with the order you were last given.`, h.Self())
+When you have to wait for a message from another member, call hive_wait: it returns the moment the message arrives. Never sleep in the shell, loop on hive_inbox, or ask the sender with hive_ask whether they have sent it — each of those holds up the member you are waiting for.`, h.Self())
 	case HiveRoleQueen:
 		return fmt.Sprintf(`
 

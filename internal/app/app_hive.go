@@ -697,8 +697,8 @@ func (a *App) registerPeerTools(inner interface {
 			" It shares your long-term memory, so anything you have saved it can find."+
 			"\n\nAsk for facts and results, one hop. Do not ask a peer to ask another peer: that is how"+
 			" two workers end up waiting on each other. At most three questions are out at once."+
-			"\n\nNot for asking whether someone has sent you something yet: a message wakes you when it comes,"+
-			" and the question only holds up the member you are waiting for.",
+			"\n\nNot for asking whether someone has sent you something yet: wait for it with hive_wait, which"+
+			" returns the moment it arrives. The question only holds up the member you are waiting for.",
 		map[string]any{
 			"type": "object",
 			"properties": map[string]any{
