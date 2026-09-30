@@ -1,251 +1,124 @@
-import React, { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
+import { palette, type Palette } from "./hivePalette";
+import { doing, ease, hash01, HiveFx, QUEEN, runningOn, SELF, short } from "./hiveFx";
+import type { StageHandle, StagePulse, StageProps, StageWorker } from "./hiveFx";
 
-// The hive, drawn while it works.
+export type { StageHandle, StagePulse, StageTask, StageWorker } from "./hiveFx";
+
+// The hive, drawn flat, in one of two looks.
 //
-// One canvas, redrawn every frame from two things: what the panel knows (who is
-// in the hive, which orders are running) and a handful of short-lived effects
-// spawned when that changes. The effects are the point. A row that turns from
-// "running" to "done" is an update; a packet that leaves the queen, a worker
-// that spins while it thinks and throws a spark for every tool it calls, and a
-// result that flies home and bursts, is something you can watch from across the
-// room and know whether the hive is busy.
+// Orbit: the queen is a star and the workers are planets going round her, each
+// ring a little slower than the one inside it. Orders go out as comets and come
+// back as comets; a working planet burns brighter and a tool call throws a
+// flare off it.
 //
-// Nothing here is React state. The frame loop reads refs, so an order arriving
-// costs one push onto an array rather than a re-render per animation frame.
+// Mycelium: the queen is the root and the workers grow out of her on filaments
+// that branch the way a fungus does — a few trunks, then a fork to each worker.
+// Work shows as light running down the filament, and a worker asking another
+// grows a new thread between them for as long as the question is open.
+//
+// Tree: the queen is the root and the trunk, and the workers are blossoms at the
+// ends of its branches. Work is sap — light climbing the branch to the worker
+// doing it — and a finished order drops back down to the root.
+//
+// All of them read the same events from HiveFx; they differ only in where things are,
+// what path light takes between two of them, and what a node looks like.
 
-export interface StageTask {
-  id: string;
-  worker: string;
-  dir: "out" | "in" | "peer";
-  /** Who asked, when it was a worker and not the queen. */
-  from?: string;
-  state: "running" | "done" | "failed" | "cancelled";
-  phase?: string;
-  tool?: string;
-  tools: number;
-  started_at: string;
-}
-
-/** One flicker while an order is carried out: a tool called, a result back,
- *  the model thinking, some text written. Drawn as light between the two ends. */
-export interface StagePulse {
-  task: string;
-  worker: string;
-  from?: string;
-  dir: "out" | "in" | "peer";
-  kind: "thinking" | "tool" | "result" | "text";
-  tool?: string;
-  bytes?: number;
-}
-
-export interface StageHandle {
-  pulse: (p: StagePulse) => void;
-}
-
-export interface StageWorker {
-  name: string;
-  state: "live" | "lost";
-  /** What is behind it when it is not a SuperAI, e.g. "cli · claude". */
-  engine?: string;
-}
-
-interface Props {
-  role: "" | "queen" | "worker";
-  self: string;
-  workers: StageWorker[];
-  tasks: StageTask[];
-  /** False until the first batch has loaded. That batch is history, and is not
-   *  replayed as if every old order had just been given. */
-  ready: boolean;
-}
+export type Look = "orbit" | "mycelium" | "tree";
 
 type Pt = { x: number; y: number };
-type Packet = { from: string; to: string; t0: number; dur: number; color: string; size?: number; alpha?: number };
-type Label = { at: string; text: string; t0: number; color: string };
-type Ripple = { at: string; t0: number; color: string };
-type Burst = { at: string; t0: number; color: string };
-type Spark = { at: string; t0: number; a: number };
+/** Where a node is this frame. `z` is depth for the orbits, -1 far to 1 near. */
+type Placed = Pt & { z: number; r: number };
 
-const QUEEN = "\u0000queen";
+interface Props extends StageProps {
+  look: Look;
+}
 
-/** How much to shrink the picture for a short stage. A stage the height of a
- *  desktop panel is drawn at full size; the corner of a console is a third of
- *  that, and drawing the same nodes and the same 76px of label under each in it
- *  stacked the bottom worker on the queen. Everything that has a size in pixels
- *  goes through this, so the picture is the same picture, smaller. */
-const wrOf = (n: number) => (n > 14 ? 15 : n > 8 ? 20 : 26);
-const scaleFor = (h: number) => Math.max(0.5, Math.min(1, h / 460));
-const SELF = "\u0000self";
+const rgba = (hex: string, a: number) => {
+  const m = /^#([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return hex;
+  const n = parseInt(m[1], 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+};
 
-const short = (n: string) => n.replace(/^superai-/, "");
-
-function hexPath(ctx: CanvasRenderingContext2D, c: Pt, r: number, rot = 0) {
-  ctx.beginPath();
-  for (let i = 0; i < 6; i++) {
-    const a = rot + (Math.PI / 3) * i - Math.PI / 6;
-    const x = c.x + r * Math.cos(a);
-    const y = c.y + r * Math.sin(a);
-    if (i === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
+/** A point `u` of the way along a polyline, by length. */
+function alongLine(pts: Pt[], u: number): Pt {
+  if (pts.length === 1) return pts[0];
+  let total = 0;
+  const seg: number[] = [];
+  for (let i = 1; i < pts.length; i++) {
+    const d = Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+    seg.push(d);
+    total += d;
   }
-  ctx.closePath();
+  let want = Math.max(0, Math.min(1, u)) * total;
+  for (let i = 0; i < seg.length; i++) {
+    if (want <= seg[i] || i === seg.length - 1) {
+      const k = seg[i] ? want / seg[i] : 0;
+      return { x: pts[i].x + (pts[i + 1].x - pts[i].x) * k, y: pts[i].y + (pts[i + 1].y - pts[i].y) * k };
+    }
+    want -= seg[i];
+  }
+  return pts[pts.length - 1];
 }
 
-const ease = (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
-
-export function palette() {
-  const css = getComputedStyle(document.documentElement);
-  const v = (n: string, d: string) => css.getPropertyValue(n).trim() || d;
-  // Everything comes from the theme's own variables, so a finish or a switch to
-  // light changes the stage with the rest of the page. The stage used to be
-  // painted in fixed dark colours, which on a light page was a black box with
-  // pale grid lines and orange text that could not be read on it.
-  const light = document.documentElement.dataset.theme === "light";
-  return {
-    light,
-    accent: v("--accent", "#d2793f"),
-    green: v("--green", "#5ec48f"),
-    red: v("--red", "#ef6a76"),
-    amber: v("--amber", "#e0a64f"),
-    dim: v("--text-2", "#8f887c"),
-    text: v("--text-0", "#ece7dd"),
-    border: v("--border", "#2e2925"),
-    panel: v("--bg-1", "#1a1714"),
-    // Halos read as light on a dark ground and as smudges on a light one, so
-    // they are scaled down there.
-    glow: light ? 0.35 : 1,
-  };
+/** A curve from a to b that bows sideways by `bow` of its length, as points. */
+function bowed(a: Pt, b: Pt, bow: number, n = 24): Pt[] {
+  const mx = (a.x + b.x) / 2 - (b.y - a.y) * bow;
+  const my = (a.y + b.y) / 2 + (b.x - a.x) * bow;
+  const out: Pt[] = [];
+  for (let i = 0; i <= n; i++) {
+    const u = i / n;
+    const v = 1 - u;
+    out.push({ x: v * v * a.x + 2 * v * u * mx + u * u * b.x, y: v * v * a.y + 2 * v * u * my + u * u * b.y });
+  }
+  return out;
 }
 
-const HiveStage = forwardRef<StageHandle, Props>(function HiveStage({ role, self, workers, tasks, ready }, ref) {
+function strokeLine(ctx: CanvasRenderingContext2D, pts: Pt[], upTo = 1) {
+  if (pts.length < 2) return;
+  const n = Math.max(1, Math.floor((pts.length - 1) * upTo));
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i <= n; i++) ctx.lineTo(pts[i].x, pts[i].y);
+  ctx.stroke();
+}
+
+const HiveStage = forwardRef<StageHandle, Props>(function HiveStage({ role, self, workers, tasks, ready, look }, ref) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const box = useRef<HTMLDivElement>(null);
+  const live = useRef({ role, self, workers, tasks, look });
+  live.current = { role, self, workers, tasks, look };
+  const fx = useRef(new HiveFx());
+  // When each worker first appeared here, for growing it in. The first batch is
+  // not new, so it is stamped far in the past.
+  const born = useRef(new Map<string, number>());
 
-  // What the frame loop reads. Updated by the effects below, never by render.
-  const live = useRef({ role, self, workers, tasks });
-  live.current = { role, self, workers, tasks };
-  const packets = useRef<Packet[]>([]);
-  const bursts = useRef<Burst[]>([]);
-  const sparks = useRef<Spark[]>([]);
-  const labels = useRef<Label[]>([]);
-  const ripples = useRef<Ripple[]>([]);
-  // What has been animated already, so a re-render of the same task is not a
-  // second packet. `null` until the first batch, which is history and is not
-  // replayed.
-  const seen = useRef<Map<string, { state: string; tools: number }> | null>(null);
+  useImperativeHandle(ref, () => ({ pulse: (p: StagePulse) => fx.current.pulse(p, live.current.role, palette()) }), []);
 
-  // The live stream. Each pulse is one beam, with a look decided by what it is:
-  // a tool call is a bright amber bolt with the tool's name beside it, a result
-  // a green one as large as the result is, thinking a faint slow dot, and text a
-  // thin quick streak. They run from the worker toward whoever is waiting on it —
-  // the queen, or for a peer order the worker that asked.
-  useImperativeHandle(
-    ref,
-    () => ({
-      pulse: (p: StagePulse) => {
-        const now = performance.now();
-        const rl = live.current.role;
-        const pal = palette();
-        // Where the light travels: from the one doing the work to the one waiting.
-        let from: string;
-        let to: string;
-        if (rl === "worker") {
-          if (p.dir !== "in") return;
-          from = SELF;
-          to = QUEEN;
-        } else if (rl === "queen") {
-          if (p.dir === "peer" && p.from) {
-            from = p.worker;
-            to = p.from;
-          } else {
-            from = p.worker;
-            to = QUEEN;
-          }
-        } else {
-          return;
-        }
-        const grow = Math.min(3, Math.log10(1 + (p.bytes ?? 0)));
-        let beam: Packet;
-        switch (p.kind) {
-          case "tool":
-            beam = { from, to, t0: now, dur: 460, color: pal.amber, size: 5.2 };
-            labels.current.push({ at: from, text: p.tool || "tool", t0: now, color: pal.amber });
-            break;
-          case "result":
-            beam = { from, to, t0: now, dur: 420, color: pal.green, size: 3.6 + grow };
-            break;
-          case "text":
-            beam = { from, to, t0: now, dur: 340, color: pal.accent, size: 2.2 + grow * 0.5, alpha: 0.85 };
-            break;
-          default:
-            beam = { from, to, t0: now, dur: 620, color: pal.accent, size: 2.4, alpha: 0.4 };
-        }
-        packets.current.push(beam);
-        if (packets.current.length > 90) packets.current.splice(0, packets.current.length - 90);
-        if (p.kind !== "thinking") ripples.current.push({ at: to, t0: now + beam.dur, color: beam.color });
-      },
-    }),
-    [],
-  );
-
-  // Turn changes into effects.
   useEffect(() => {
-    if (!ready) return;
-    const now = performance.now();
-    const target = (t: StageTask) => (live.current.role === "worker" ? SELF : t.worker);
-    const origin = (t: StageTask) => (t.dir === "peer" && t.from ? t.from : QUEEN);
-    const known = seen.current;
-    if (known === null) {
-      seen.current = new Map(tasks.map((t) => [t.id, { state: t.state, tools: t.tools }]));
-      return;
-    }
-    const p = palette();
-    for (const t of tasks) {
-      // A worker's own view has no peers on it to draw.
-      if (live.current.role === "worker" && t.dir === "peer") {
-        known.set(t.id, { state: t.state, tools: t.tools });
-        continue;
-      }
-      const before = known.get(t.id);
-      if (!before) {
-        // A new order: a packet leaves the queen.
-        if (live.current.role === "queen" || live.current.role === "worker") {
-          packets.current.push({ from: origin(t), to: target(t), t0: now, dur: 700, color: p.accent });
-        }
-      } else {
-        for (let i = before.tools; i < t.tools; i++) {
-          sparks.current.push({ at: target(t), t0: now + i * 90, a: Math.random() * Math.PI * 2 });
-        }
-        if (before.state === "running" && t.state !== "running") {
-          const color = t.state === "done" ? p.green : t.state === "failed" ? p.red : p.amber;
-          packets.current.push({ from: target(t), to: origin(t), t0: now, dur: 700, color });
-          bursts.current.push({ at: target(t), t0: now + 650, color });
-        }
-      }
-      known.set(t.id, { state: t.state, tools: t.tools });
-    }
+    if (ready) fx.current.tasks(tasks, live.current.role, palette());
   }, [tasks, ready]);
 
-  // The frame loop.
   useEffect(() => {
     const cv = canvas.current;
     const host = box.current;
     if (!cv || !host) return;
     const ctx = cv.getContext("2d");
     if (!ctx) return;
-
     let W = 0;
     let H = 0;
     let raf = 0;
-    let pal = palette();
+    let pal: Palette = palette();
     let palAt = 0;
+    let first = true;
     const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     const resize = () => {
       const r = host.getBoundingClientRect();
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      W = Math.max(280, Math.floor(r.width));
-      H = Math.max(240, Math.floor(r.height));
+      W = Math.max(260, Math.floor(r.width));
+      H = Math.max(180, Math.floor(r.height));
       cv.width = W * dpr;
       cv.height = H * dpr;
       cv.style.width = `${W}px`;
@@ -256,327 +129,610 @@ const HiveStage = forwardRef<StageHandle, Props>(function HiveStage({ role, self
     ro.observe(host);
     resize();
 
-    // Where everything sits. Recomputed per frame from the size, so a resize
-    // needs no bookkeeping.
-    const layout = (): Map<string, Pt> => {
-      const m = new Map<string, Pt>();
-      const { role: rl, workers: ws } = live.current;
-      const cx = W / 2;
-      const cy = H / 2;
-      if (rl === "queen") {
-        m.set(QUEEN, { x: cx, y: cy });
-        const n = Math.max(ws.length, 1);
-        // The bottom node's label hangs up to 76px under it while it works (the
-        // status line is two rows lower than when it is idle), so the vertical
-        // radius leaves that much, plus the node itself, inside the frame. Sizing it
-        // as a share of the height instead clipped the last label at ten
-        // workers and stacked two neighbours on top of each other.
-        const rx = Math.min(W * 0.38, 480);
-        const k = scaleFor(H);
-        // The room the bottom node's label needs below it, at this scale.
-        const ry = Math.max(50, Math.min(H / 2 - (wrOf(ws.length) * k + Math.max(50 * k, 38) + 12), 230));
-        ws.forEach((w, i) => {
-          const a = -Math.PI / 2 + (Math.PI * 2 * i) / n;
-          m.set(w.name, { x: cx + rx * Math.cos(a), y: cy + ry * Math.sin(a) });
-        });
-      } else if (rl === "worker") {
-        m.set(QUEEN, { x: cx, y: H * 0.18 });
-        m.set(SELF, { x: cx, y: H * 0.62 });
-      } else {
-        m.set(SELF, { x: cx, y: cy });
-      }
-      return m;
-    };
-
-    // The honeycomb behind everything, drawn once per size into its own canvas.
-    let grid: HTMLCanvasElement | null = null;
-    let gridKey = "";
-    const drawGrid = () => {
-      const key = `${W}x${H}${pal.border}${pal.light}`;
-      if (grid && key === gridKey) return grid;
-      gridKey = key;
-      grid = document.createElement("canvas");
-      grid.width = W;
-      grid.height = H;
-      const g = grid.getContext("2d")!;
-      g.strokeStyle = pal.light ? "rgba(28,25,23,0.10)" : pal.border;
-      g.globalAlpha = pal.light ? 1 : 0.55;
-      g.lineWidth = 1;
-      const r = 26;
-      const dx = r * Math.sqrt(3);
-      for (let row = -1, y = 0; y < H + r * 2; row++, y += r * 1.5) {
-        for (let x = (row % 2 ? dx / 2 : 0) - dx; x < W + dx; x += dx) {
-          hexPath(g, { x, y }, r - 1, 0);
-          g.stroke();
-        }
-      }
-      return grid;
-    };
-
-    const nodeState = (id: string, now: number) => {
-      const t = live.current.tasks.find(
-        (k) =>
-          k.state === "running" &&
-          (id === SELF ? live.current.role === "worker" && k.dir === "in" : k.worker === id && (k.dir === "out" || k.dir === "peer")),
-      );
-      return t ?? null;
-    };
+    // A fixed field of stars for the orbits, in the unit square.
+    const stars = Array.from({ length: 160 }, (_, i) => ({
+      x: hash01("x" + i, 7),
+      y: hash01("y" + i, 11),
+      s: 0.4 + hash01("s" + i, 3) * 1.1,
+      tw: hash01("t" + i, 5) * 6.28,
+    }));
 
     const frame = (now: number) => {
       if (now - palAt > 2000) {
         pal = palette();
         palAt = now;
       }
-      ctx.clearRect(0, 0, W, H);
-      ctx.drawImage(drawGrid(), 0, 0);
-      const pos = layout();
-      const { role: rl, workers: ws, self: me } = live.current;
-      const breathe = still ? 0 : Math.sin(now / 900);
+      const t = still ? 0 : now / 1000;
+      const { role: rl, workers: ws, self: me, tasks: ts, look: lk } = live.current;
+      for (const w of ws) if (!born.current.has(w.name)) born.current.set(w.name, first ? now - 60000 : now);
+      first = false;
+      const growth = (name: string) => Math.min(1, (now - (born.current.get(name) ?? 0)) / 1400);
 
-      // Edges.
-      const edgeTo = rl === "queen" ? ws.map((w) => w.name) : rl === "worker" ? [SELF] : [];
-      for (const id of edgeTo) {
-        const a = pos.get(QUEEN);
-        const b = pos.get(id);
-        if (!a || !b) continue;
-        const busy = !!nodeState(id, now);
-        const lost = rl === "queen" && ws.find((w) => w.name === id)?.state === "lost";
+      fx.current.prune(now);
+      ctx.clearRect(0, 0, W, H);
+      const cx = W / 2;
+      const cy = H / 2;
+      const unit = Math.max(0.6, Math.min(1.5, Math.min(W, H) / 360));
+      const busy = (id: string) => runningOn(id, rl, ts);
+      const names: string[] = rl === "queen" ? ws.map((w) => w.name) : rl === "worker" ? [SELF] : [];
+      const info = (id: string): StageWorker | undefined => ws.find((w) => w.name === id);
+
+      const pos = new Map<string, Placed>();
+      // The path from the queen out to each worker, as points.
+      const paths = new Map<string, Pt[]>();
+
+      // ---- small helpers that draw ----
+      const glowDot = (x: number, y: number, r: number, color: string, alpha: number) => {
+        const g = ctx.createRadialGradient(x, y, 0, x, y, r * 3);
+        g.addColorStop(0, rgba(color, alpha));
+        g.addColorStop(0.3, rgba(color, alpha * 0.55));
+        g.addColorStop(1, rgba(color, 0));
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(x, y, r * 3, 0, Math.PI * 2);
+        ctx.fill();
+      };
+      const aura = (x: number, y: number, r: number, color: string, a: number) => {
+        const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+        g.addColorStop(0, rgba(color, a));
+        g.addColorStop(1, rgba(color, 0));
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+      };
+      const blob = (x: number, y: number, r: number, color: string, seed: string, alpha: number) => {
+        // A soft, slightly irregular body: a circle nudged by two slow waves.
+        const p1 = hash01(seed, 30) * 6.28;
         ctx.save();
         ctx.beginPath();
-        ctx.moveTo(a.x, a.y);
-        ctx.lineTo(b.x, b.y);
-        ctx.strokeStyle = busy ? pal.accent : pal.dim;
-        ctx.globalAlpha = busy ? 0.75 : lost ? 0.08 : 0.22;
-        ctx.lineWidth = busy ? 1.6 : 1;
-        ctx.setLineDash(busy ? [6, 8] : lost ? [2, 6] : []);
-        ctx.lineDashOffset = busy && !still ? -now / 25 : 0;
-        ctx.stroke();
-        ctx.restore();
-      }
-
-      // Workers talking to each other: an arc between the two, bowed toward the
-      // centre so it does not run through the nodes between them.
-      if (rl === "queen") {
-        const c = pos.get(QUEEN)!;
-        for (const t of live.current.tasks) {
-          if (t.state !== "running" || t.dir !== "peer" || !t.from) continue;
-          const a = pos.get(t.from);
-          const b = pos.get(t.worker);
-          if (!a || !b) continue;
-          ctx.save();
-          ctx.beginPath();
-          ctx.moveTo(a.x, a.y);
-          ctx.quadraticCurveTo((a.x + b.x) / 2 * 0.55 + c.x * 0.45, (a.y + b.y) / 2 * 0.55 + c.y * 0.45, b.x, b.y);
-          ctx.strokeStyle = pal.amber;
-          ctx.lineWidth = 1.8;
-          ctx.globalAlpha = 0.85;
-          ctx.shadowColor = pal.amber;
-          ctx.shadowBlur = 10 * pal.glow;
-          ctx.setLineDash([5, 7]);
-          ctx.lineDashOffset = still ? 0 : -now / 22;
-          ctx.stroke();
-          ctx.restore();
+        for (let i = 0; i <= 36; i++) {
+          const a = (i / 36) * Math.PI * 2;
+          const rr = r * (1 + 0.08 * Math.sin(a * 3 + p1 + t * 0.9) + 0.05 * Math.sin(a * 5 - t * 1.3));
+          const px = x + Math.cos(a) * rr;
+          const py = y + Math.sin(a) * rr;
+          if (i === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
         }
-      }
-
-      // Nodes.
-      const drawNode = (id: string, label: string, r0: number, kind: "queen" | "worker", lost: boolean, engine?: string) => {
-        const c = pos.get(id);
-        if (!c) return;
-        const task = nodeState(id, now);
-        const k = scaleFor(H);
-        const r = r0 * k * (1 + 0.035 * breathe);
-        const tone = lost ? pal.dim : kind === "queen" ? pal.accent : task ? pal.accent : pal.green;
-        ctx.save();
-        // Glow.
-        ctx.shadowColor = tone;
-        ctx.shadowBlur = (lost ? 0 : task ? 26 : 12) * pal.glow;
-        hexPath(ctx, c, r);
-        ctx.fillStyle = pal.light ? pal.panel : "rgba(0,0,0,0.55)";
+        const g = ctx.createRadialGradient(x - r * 0.3, y - r * 0.3, r * 0.05, x, y, r * 1.1);
+        g.addColorStop(0, pal.light ? "#ffffff" : rgba("#ffffff", 0.9 * alpha));
+        g.addColorStop(0.4, rgba(color, 0.95 * alpha));
+        g.addColorStop(1, rgba(color, 0.35 * alpha));
+        ctx.fillStyle = g;
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 12 * pal.glow * alpha;
         ctx.fill();
-        if (task && pal.light) {
-          // A working cell is tinted, since a halo does not show on paper.
-          ctx.shadowBlur = 0;
-          ctx.globalAlpha = 0.12;
-          ctx.fillStyle = pal.accent;
-          ctx.fill();
-          ctx.globalAlpha = 1;
-          ctx.shadowBlur = 8;
-        }
-        ctx.lineWidth = task ? 2.4 : 1.6;
-        ctx.strokeStyle = tone;
-        ctx.globalAlpha = lost ? 0.45 : 1;
-        if (lost) ctx.setLineDash([3, 5]);
-        ctx.stroke();
         ctx.restore();
+      };
+      const label = (x: number, y: number, name: string, sub: string, subColor: string, lost = false) => {
+        ctx.save();
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.font = `600 ${Math.max(10, 11.5 * unit)}px ui-sans-serif, system-ui, sans-serif`;
+        ctx.fillStyle = lost ? pal.dim : pal.text;
+        ctx.globalAlpha = lost ? 0.6 : 0.92;
+        ctx.fillText(name, x, y);
+        if (sub) {
+          ctx.font = `${Math.max(9, 10 * unit)}px ui-monospace, SFMono-Regular, monospace`;
+          ctx.fillStyle = subColor;
+          ctx.fillText(sub, x, y + 13 * unit);
+        }
+        ctx.restore();
+      };
+      const subOf = (n: string) => {
+        const w = info(n);
+        const task = busy(n);
+        return w?.state === "lost" ? "lost" : task ? doing(task) : w?.engine ? w.engine.replace(/^cli · /, "") : "";
+      };
+      const nameOf = (n: string) => (n === SELF ? me || "worker" : short(n));
+      const queenName = rl === "worker" ? "queen" : me || "queen";
+      const working = ts.some((k) => k.state === "running");
 
-        // A worker at work: a ring turning around it, one arc per tool call
-        // (capped), and the phase written under it.
-        if (task && !still) {
+      if (lk === "orbit") {
+        // ---- a star, and planets on tilted rings ----
+        const tilt = 0.4;
+        const rings: string[][] = [];
+        for (const n of [...names].sort()) {
+          let k = 0;
+          while ((rings[k] ??= []).length >= 4 + k * 2) k++;
+          rings[k].push(n);
+        }
+        const K = Math.max(1, rings.length);
+        // Room below the lowest planet for its two lines of label.
+        const rxMax = Math.min(W * 0.45, (H * 0.5 - 34 * unit) / tilt);
+        const star = Math.max(10, Math.min(26, rxMax * 0.09));
+        const rxMin = Math.max(star * 3.2, rxMax * (K === 1 ? 0.72 : 0.42));
+        const radius = (k: number) => (K === 1 ? rxMin : rxMin + ((rxMax - rxMin) * k) / (K - 1));
+        pos.set(QUEEN, { x: cx, y: cy, z: 0, r: star });
+        rings.forEach((ring, k) => {
+          const rx = radius(k);
+          const speed = 0.16 / Math.pow(1 + k * 0.8, 1.5);
+          ring.forEach((n, i) => {
+            const a = (i / ring.length) * Math.PI * 2 + k * 0.7 + t * speed;
+            const g = ease(growth(n));
+            // A new planet spirals in from outside its orbit.
+            const out = 1 + (1 - g) * 0.9;
+            const z = Math.sin(a);
+            const pr = Math.max(5, Math.min(14, star * 0.46)) * (1 + z * 0.16);
+            pos.set(n, { x: cx + Math.cos(a) * rx * out, y: cy + Math.sin(a) * rx * tilt * out, z, r: pr * (0.3 + 0.7 * g) });
+          });
+        });
+        for (const n of names) paths.set(n, bowed(pos.get(QUEEN)!, pos.get(n)!, 0.18));
+
+        if (!pal.light) {
+          for (const s of stars) {
+            ctx.globalAlpha = 0.16 + 0.22 * (0.5 + 0.5 * Math.sin(t * 1.3 + s.tw));
+            ctx.fillStyle = pal.text;
+            ctx.fillRect(s.x * W, s.y * H, s.s, s.s);
+          }
+          ctx.globalAlpha = 1;
+        }
+        rings.forEach((ring, k) => {
+          const rx = radius(k);
+          const active = ring.some((n) => busy(n));
+          const lost = ring.every((n) => info(n)?.state === "lost");
           ctx.save();
-          ctx.strokeStyle = pal.accent;
-          ctx.lineWidth = 2;
-          ctx.globalAlpha = 0.9;
-          ctx.setLineDash([10, 9]);
-          ctx.lineDashOffset = -now / 35;
-          hexPath(ctx, c, r + 11 * k, now / 1600);
+          ctx.strokeStyle = active ? pal.accent : pal.dim;
+          ctx.globalAlpha = active ? 0.42 : lost ? 0.08 : 0.2;
+          ctx.lineWidth = 1;
+          ctx.setLineDash(lost ? [2, 6] : []);
+          ctx.beginPath();
+          ctx.ellipse(cx, cy, rx, rx * tilt, 0, 0, Math.PI * 2);
           ctx.stroke();
           ctx.restore();
+        });
+
+        const drawStar = () => {
+          const q = pos.get(QUEEN)!;
+          const beat = working ? 1 + 0.08 * Math.sin(t * 5) : 1 + 0.03 * Math.sin(t * 1.4);
+          aura(q.x, q.y, q.r * 4.2 * beat, pal.accent, pal.light ? 0.3 : 0.5);
+          // Rays, turning slowly.
           ctx.save();
-          ctx.strokeStyle = pal.accent;
-          ctx.globalAlpha = 0.55;
-          ctx.lineWidth = 3;
-          const arcs = Math.min(task.tools, 12);
-          for (let i = 0; i < arcs; i++) {
-            const a0 = (Math.PI * 2 * i) / 12 - now / 900;
+          ctx.translate(q.x, q.y);
+          ctx.rotate(t * 0.08);
+          ctx.strokeStyle = rgba(pal.accent, pal.light ? 0.18 : 0.22);
+          ctx.lineWidth = 1;
+          for (let i = 0; i < 12; i++) {
+            const a = (i / 12) * Math.PI * 2;
+            const len = q.r * (1.9 + 0.5 * Math.sin(t * 1.7 + i));
             ctx.beginPath();
-            ctx.arc(c.x, c.y, r + 20 * k, a0, a0 + 0.35);
+            ctx.moveTo(Math.cos(a) * q.r * 1.3, Math.sin(a) * q.r * 1.3);
+            ctx.lineTo(Math.cos(a) * len * 1.5, Math.sin(a) * len * 1.5);
             ctx.stroke();
           }
           ctx.restore();
-        }
-
-        // A dot in the middle: the phase, as light. Thinking pulses, a tool
-        // call is a sharp blink, writing is steady.
-        ctx.save();
-        const ph = task?.phase;
-        const pulse = ph === "thinking" ? 0.5 + 0.5 * Math.sin(now / 160) : ph === "tool" ? (Math.sin(now / 70) > 0 ? 1 : 0.35) : 1;
-        ctx.fillStyle = tone;
-        ctx.globalAlpha = lost ? 0.3 : task ? 0.35 + 0.65 * pulse : 0.7;
-        ctx.beginPath();
-        ctx.arc(c.x, c.y, kind === "queen" ? 6 : 4.5, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-
-        // Labels.
-        ctx.save();
-        ctx.textAlign = "center";
-        ctx.font = `600 ${Math.max(10, 12 * k)}px ui-sans-serif, system-ui, sans-serif`;
-        ctx.fillStyle = lost ? pal.dim : pal.text;
-        // Labels point away from the queen. A worker in the upper half has the queen
-        // below it, and a label hung there ran into her; above is always clear.
-        const nameOff = Math.max((task ? 34 : 20) * k, task ? 24 : 14);
-        const subOff = Math.max((task ? 50 : 35) * k, task ? 38 : 26);
-        const above = rl === "queen" && kind === "worker" && c.y < H / 2 - 10;
-        const subY = above ? c.y - r - Math.max(8 * k, 7) : c.y + r + subOff;
-        const nameY = above ? subY - (subOff - nameOff) : c.y + r + nameOff;
-        ctx.fillText(short(label), c.x, nameY);
-        ctx.font = `${Math.max(9, 11 * k)}px ui-monospace, SFMono-Regular, monospace`;
-        ctx.fillStyle = pal.dim;
-        let sub = lost ? "lost" : kind === "queen" ? (label === "queen" ? "" : "queen") : engine ? `idle · ${engine}` : "idle";
-        if (task) {
-          const secs = Math.max(0, Math.round((Date.now() - Date.parse(task.started_at)) / 1000));
-          sub =
-            task.phase === "tool" ? `⚙ ${task.tool || "tool"}` : task.phase === "writing" ? "writing…" : "thinking…";
-          sub += `  ${secs}s`;
-          ctx.fillStyle = pal.accent;
-        }
-        ctx.fillText(sub, c.x, subY);
-        ctx.restore();
-      };
-
-      if (rl === "queen") {
-        // Smaller cells as the hive fills, so a crowd stays a honeycomb and not a
-        // pile.
-        const wr = wrOf(ws.length);
-        ws.forEach((w) => drawNode(w.name, w.name, wr, "worker", w.state === "lost", w.engine));
-        drawNode(QUEEN, me || "queen", 36, "queen", false);
-      } else if (rl === "worker") {
-        drawNode(QUEEN, "queen", 30, "queen", false);
-        drawNode(SELF, me || "worker", 34, "worker", false);
-      } else {
-        drawNode(SELF, me || "this instance", 34, "worker", false);
-      }
-
-      // Packets: an order out, a result home.
-      packets.current = packets.current.filter((p) => now - p.t0 < p.dur);
-      for (const p of packets.current) {
-        const a = pos.get(p.from);
-        const b = pos.get(p.to);
-        if (!a || !b || now < p.t0) continue;
-        const t = (now - p.t0) / p.dur;
-        for (let k = 0; k < 6; k++) {
-          const tt = Math.max(0, ease(t) - k * 0.035);
+          const core = ctx.createRadialGradient(q.x - q.r * 0.3, q.y - q.r * 0.3, 0, q.x, q.y, q.r * beat);
+          core.addColorStop(0, pal.light ? "#fff8ee" : "#ffffff");
+          core.addColorStop(0.45, pal.accent);
+          core.addColorStop(1, rgba(pal.accent, 0.85));
           ctx.save();
-          ctx.globalAlpha = (1 - k / 6) * (p.alpha ?? 0.9);
-          ctx.fillStyle = p.color;
-          ctx.shadowColor = p.color;
-          ctx.shadowBlur = 14 * pal.glow;
+          ctx.shadowColor = pal.accent;
+          ctx.shadowBlur = 30 * pal.glow;
+          ctx.fillStyle = core;
           ctx.beginPath();
-          ctx.arc(a.x + (b.x - a.x) * tt, a.y + (b.y - a.y) * tt, Math.max(0.6, (p.size ?? 4.5) - k * ((p.size ?? 4.5) / 8)), 0, Math.PI * 2);
+          ctx.arc(q.x, q.y, q.r * beat, 0, Math.PI * 2);
           ctx.fill();
           ctx.restore();
+          label(q.x, q.y + q.r * 2 + 8 * unit, queenName, "", pal.dim);
+        };
+
+        const drawPlanet = (n: string) => {
+          const p = pos.get(n)!;
+          const lost = info(n)?.state === "lost";
+          const task = busy(n);
+          const base = lost ? pal.dim : task ? pal.accent : pal.green;
+          if (task) aura(p.x, p.y, p.r * 3.4, pal.accent, pal.light ? 0.3 : 0.45);
+          // Lit from the star: the bright side faces the middle.
+          const d = Math.max(1, Math.hypot(cx - p.x, cy - p.y));
+          const lx = p.x + ((cx - p.x) / d) * p.r * 0.5;
+          const ly = p.y + ((cy - p.y) / d) * p.r * 0.5;
+          const body = ctx.createRadialGradient(lx, ly, p.r * 0.1, p.x, p.y, p.r);
+          body.addColorStop(0, pal.light ? "#ffffff" : rgba(base, 1));
+          body.addColorStop(0.5, rgba(base, lost ? 0.35 : 0.9));
+          body.addColorStop(1, rgba(base, lost ? 0.12 : pal.light ? 0.45 : 0.28));
+          ctx.save();
+          ctx.fillStyle = body;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+          ctx.fill();
+          if (lost) {
+            ctx.strokeStyle = rgba(pal.dim, 0.5);
+            ctx.setLineDash([2, 3]);
+            ctx.stroke();
+          }
+          ctx.restore();
+          if (task) {
+            // A ring round a planet at work, like the ones round a gas giant,
+            // and a moon for every tool it has called so far, up to five.
+            ctx.save();
+            ctx.strokeStyle = rgba(pal.accent, 0.8);
+            ctx.lineWidth = 1.2;
+            ctx.beginPath();
+            ctx.ellipse(p.x, p.y, p.r * 1.9, p.r * 0.55, -0.35, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.fillStyle = pal.amber;
+            for (let m = 0; m < Math.min(5, task.tools); m++) {
+              const a = t * (1.6 + m * 0.3) + m * 1.3;
+              ctx.beginPath();
+              ctx.arc(p.x + Math.cos(a) * p.r * 2.4, p.y + Math.sin(a) * p.r * 0.9, 1.6 * unit, 0, Math.PI * 2);
+              ctx.fill();
+            }
+            ctx.restore();
+          }
+          label(p.x, p.y + p.r + 12 * unit, nameOf(n), subOf(n), task ? pal.accent : pal.dim, lost);
+        };
+
+        // Far planets, then the star, then near ones: depth by drawing order.
+        const byDepth = [...names].sort((a, b) => pos.get(a)!.z - pos.get(b)!.z);
+        for (const n of byDepth) if (pos.get(n)!.z < 0) drawPlanet(n);
+        drawStar();
+        for (const n of byDepth) if (pos.get(n)!.z >= 0) drawPlanet(n);
+      } else if (lk === "tree") {
+        // ---- a root, a trunk, branches, and a blossom on each twig ----
+        const root = Math.max(9, Math.min(18, Math.min(W, H) * 0.04));
+        const q = { x: cx, y: H - root - 30 * unit, z: 0, r: root };
+        pos.set(QUEEN, q);
+        const fork = { x: cx, y: H * 0.58 };
+        // The canopy: an arch over the fork, left to right in name order, every
+        // other blossom set a little in so neighbours do not touch.
+        const order = [...names].sort();
+        const n = order.length;
+        const rx = W * 0.42;
+        const ry = Math.min(H * 0.46, fork.y - 34 * unit);
+        const sway = (seed: string, amp: number) => Math.sin(t * 0.7 + hash01(seed, 40) * 6.28) * amp * unit;
+        order.forEach((name, i) => {
+          const a = Math.PI * (1.08 + (0.84 * (i + 0.5)) / Math.max(1, n));
+          const d = n > 5 && i % 2 ? 0.78 : 1;
+          pos.set(name, {
+            x: fork.x + Math.cos(a) * rx * d + sway(name, 3),
+            y: fork.y + Math.sin(a) * ry * d + sway(name + "y", 1.5),
+            z: 0,
+            r: Math.max(5, root * 0.55),
+          });
+        });
+        const trunk = bowed(q, fork, 0.04 + Math.sin(t * 0.5) * 0.01, 16);
+        // Branches: up to three neighbours share one, which splits into a twig
+        // for each.
+        const limbs: { pts: Pt[]; names: string[] }[] = [];
+        const twigs: { pts: Pt[]; name: string }[] = [];
+        for (let i = 0; i < n; i += 3) {
+          const group = order.slice(i, i + 3);
+          const ps = group.map((m) => pos.get(m)!);
+          const mx = ps.reduce((s, p) => s + p.x, 0) / ps.length;
+          const my = ps.reduce((s, p) => s + p.y, 0) / ps.length;
+          const j = { x: fork.x + (mx - fork.x) * 0.52 + sway(group[0] + "j", 2), y: fork.y + (my - fork.y) * 0.52 };
+          const side = mx < cx ? 1 : -1;
+          const limb = bowed(fork, j, 0.12 * side, 16);
+          limbs.push({ pts: limb, names: group });
+          for (const m of group) {
+            const tw = bowed(j, pos.get(m)!, 0.1 * side, 12);
+            twigs.push({ pts: tw, name: m });
+            paths.set(m, [...trunk, ...limb.slice(1), ...tw.slice(1)]);
+          }
         }
-      }
 
-      // Bursts where a result lands.
-      bursts.current = bursts.current.filter((b) => now - b.t0 < 900);
-      for (const b of bursts.current) {
-        const c = pos.get(b.at);
-        if (!c || now < b.t0) continue;
-        const t = (now - b.t0) / 900;
+        const bark = pal.light ? "#6b5a48" : pal.green;
+        const drawWood = (pts: Pt[], width: number, active: boolean, lost: boolean, upTo: number) => {
+          ctx.save();
+          ctx.lineCap = "round";
+          ctx.lineJoin = "round";
+          ctx.lineWidth = width;
+          if (active) {
+            ctx.strokeStyle = rgba(pal.accent, 0.9);
+            ctx.shadowColor = pal.accent;
+            ctx.shadowBlur = 12 * pal.glow;
+          } else {
+            ctx.strokeStyle = rgba(lost ? pal.dim : bark, lost ? 0.2 : pal.light ? 0.55 : 0.42);
+            if (lost) ctx.setLineDash([3, 5]);
+          }
+          strokeLine(ctx, pts, upTo);
+          ctx.restore();
+        };
+
+        // Roots, spreading under the queen: decoration, so the tree stands on
+        // something.
         ctx.save();
-        ctx.strokeStyle = b.color;
-        ctx.globalAlpha = 1 - t;
-        ctx.lineWidth = 3 * (1 - t) + 1;
-        ctx.shadowColor = b.color;
-        ctx.shadowBlur = 18 * pal.glow;
-        hexPath(ctx, c, (30 + t * 60) * scaleFor(H), t);
-        ctx.stroke();
-        ctx.restore();
-      }
-
-      // Where a beam lands: a small ring that opens and fades.
-      ripples.current = ripples.current.filter((r) => now - r.t0 < 420);
-      for (const r of ripples.current) {
-        const c = pos.get(r.at);
-        if (!c || now < r.t0) continue;
-        const t = (now - r.t0) / 420;
-        ctx.save();
-        ctx.strokeStyle = r.color;
-        ctx.globalAlpha = 0.6 * (1 - t);
-        ctx.lineWidth = 1.6;
-        ctx.beginPath();
-        ctx.arc(c.x, c.y, (16 + t * 20) * scaleFor(H), 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.restore();
-      }
-
-      // The name of the tool, to the side of the worker that called it and drifting
-      // up as it fades. To the side, because above and below are where the node's
-      // own labels are.
-      labels.current = labels.current.filter((l) => now - l.t0 < 1400);
-      for (const l of labels.current) {
-        const c = pos.get(l.at);
-        if (!c) continue;
-        const t = (now - l.t0) / 1400;
-        const k = scaleFor(H);
-        ctx.save();
-        ctx.globalAlpha = 1 - t * t;
-        ctx.fillStyle = l.color;
-        ctx.font = `600 ${Math.max(9, 11 * k)}px ui-monospace, SFMono-Regular, monospace`;
-        ctx.textAlign = "left";
-        ctx.fillText(`⚙ ${l.text}`, c.x + (wrOf(live.current.workers.length) + 12) * k, c.y - 2 - t * 16 * k);
-        ctx.restore();
-      }
-
-      // Sparks: one per tool call, thrown outward.
-      sparks.current = sparks.current.filter((s) => now - s.t0 < 600);
-      for (const s of sparks.current) {
-        const c = pos.get(s.at);
-        if (!c || now < s.t0) continue;
-        const t = (now - s.t0) / 600;
+        ctx.strokeStyle = rgba(bark, pal.light ? 0.3 : 0.25);
+        ctx.lineCap = "round";
         for (let k = 0; k < 5; k++) {
-          const a = s.a + (k * Math.PI * 2) / 5;
-          const d = (34 + t * 40) * scaleFor(H);
-          ctx.save();
-          ctx.globalAlpha = 1 - t;
-          ctx.fillStyle = pal.amber;
+          const a = Math.PI * (0.12 + k * 0.19);
+          ctx.lineWidth = (2.6 - Math.abs(k - 2) * 0.6) * unit;
           ctx.beginPath();
-          ctx.arc(c.x + Math.cos(a) * d, c.y + Math.sin(a) * d, 2.2 * (1 - t) + 0.4, 0, Math.PI * 2);
-          ctx.fill();
+          ctx.moveTo(q.x, q.y);
+          ctx.quadraticCurveTo(q.x + Math.cos(a) * 18 * unit, q.y + 10 * unit, q.x + Math.cos(a) * 46 * unit, q.y + Math.sin(a) * 14 * unit + 12 * unit);
+          ctx.stroke();
+        }
+        ctx.restore();
+
+        drawWood(trunk, 7 * unit, working, false, 1);
+        for (const l of limbs) {
+          const g = Math.max(...l.names.map((m) => growth(m)));
+          drawWood(l.pts, 3.6 * unit, l.names.some((m) => busy(m)), l.names.every((m) => info(m)?.state === "lost"), ease(Math.min(1, g * 1.6)));
+        }
+        for (const tw of twigs) {
+          drawWood(tw.pts, 1.8 * unit, !!busy(tw.name), info(tw.name)?.state === "lost", ease(Math.max(0, growth(tw.name) * 1.6 - 0.6)));
+        }
+
+        // Leaves along each twig, turning a little in the wind.
+        ctx.save();
+        for (const tw of twigs) {
+          const g = growth(tw.name);
+          if (g < 0.6) continue;
+          const lost = info(tw.name)?.state === "lost";
+          ctx.fillStyle = rgba(lost ? pal.dim : pal.green, lost ? 0.12 : pal.light ? 0.35 : 0.3);
+          for (let k = 0; k < 3; k++) {
+            const at = alongLine(tw.pts, 0.3 + k * 0.22);
+            const a = hash01(tw.name, 50 + k) * 6.28 + Math.sin(t * 1.1 + k) * 0.25;
+            ctx.beginPath();
+            ctx.ellipse(at.x + Math.cos(a) * 6 * unit, at.y + Math.sin(a) * 6 * unit, 6 * unit, 2.6 * unit, a, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+        ctx.restore();
+
+        // Sap: light climbing every busy branch.
+        for (const m of names) {
+          const pts = paths.get(m);
+          if (!busy(m) || !pts) continue;
+          for (let k = 0; k < 4; k++) {
+            const p = alongLine(pts, (t * 0.3 + k / 4) % 1);
+            glowDot(p.x, p.y, 2.2 * unit, pal.accent, 0.85);
+          }
+        }
+
+        // A worker asking another: an arc of light between the two blossoms.
+        for (const k of ts) {
+          if (k.state !== "running" || k.dir !== "peer" || !k.from) continue;
+          const a = pos.get(k.from);
+          const b = pos.get(k.worker);
+          if (!a || !b) continue;
+          ctx.save();
+          ctx.strokeStyle = rgba(pal.amber, 0.85);
+          ctx.lineWidth = 1.4 * unit;
+          ctx.shadowColor = pal.amber;
+          ctx.shadowBlur = 10 * pal.glow;
+          ctx.setLineDash([4 * unit, 5 * unit]);
+          ctx.lineDashOffset = -t * 30;
+          strokeLine(ctx, bowed(a, b, -0.25), ease(Math.min(1, (Date.now() - Date.parse(k.started_at)) / 1500)));
           ctx.restore();
         }
+
+        // The root.
+        const beat = working ? 1 + 0.1 * Math.sin(t * 4) : 1 + 0.04 * Math.sin(t * 1.2);
+        aura(q.x, q.y, q.r * 3.4 * beat, pal.accent, pal.light ? 0.3 : 0.5);
+        blob(q.x, q.y, q.r * beat, pal.accent, "queen", 1);
+        label(q.x + q.r + 30 * unit, q.y, queenName, "", pal.dim);
+
+        // Blossoms, opening once their twig has reached them.
+        for (const m of names) {
+          const p = pos.get(m)!;
+          const g = growth(m);
+          if (g < 0.55) continue;
+          const lost = info(m)?.state === "lost";
+          const task = busy(m);
+          const tone = lost ? pal.dim : task ? pal.accent : pal.green;
+          if (task) aura(p.x, p.y, p.r * 3.4, pal.accent, pal.light ? 0.28 : 0.42);
+          const open = ease(Math.min(1, (g - 0.55) / 0.45));
+          // Five petals, then the heart.
+          ctx.save();
+          ctx.fillStyle = rgba(tone, lost ? 0.15 : 0.35);
+          for (let k = 0; k < 5; k++) {
+            const a = (k / 5) * Math.PI * 2 + t * (task ? 0.8 : 0.1) + hash01(m, 60) * 6.28;
+            ctx.beginPath();
+            ctx.ellipse(p.x + Math.cos(a) * p.r * 1.05 * open, p.y + Math.sin(a) * p.r * 1.05 * open, p.r * 0.75 * open, p.r * 0.45 * open, a, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          ctx.restore();
+          blob(p.x, p.y, p.r * 0.8 * open * (task ? 1.15 + 0.1 * Math.sin(t * 5) : 1), tone, m, lost ? 0.4 : 1);
+          label(p.x, p.y + p.r * 1.9 + 8 * unit, nameOf(m), subOf(m), task ? pal.accent : pal.dim, lost);
+        }
+      } else {
+        // ---- a root, trunks, and a fork to each worker ----
+        const rx = W * 0.4;
+        const ry = H * 0.36;
+        const root = Math.max(9, Math.min(20, Math.min(W, H) * 0.045));
+        pos.set(QUEEN, { x: cx, y: cy, z: 0, r: root });
+        const order = [...names].sort();
+        order.forEach((n, i) => {
+          const spread = 2.2 / Math.max(3, order.length);
+          const a = (i / Math.max(1, order.length)) * Math.PI * 2 - Math.PI / 2 + (hash01(n, 1) - 0.5) * spread;
+          const d = 0.8 + hash01(n, 2) * 0.2;
+          pos.set(n, { x: cx + Math.cos(a) * rx * d, y: cy + Math.sin(a) * ry * d, z: 0, r: Math.max(5, root * 0.55) });
+        });
+        // A filament: the straight line pushed sideways by a couple of slow waves,
+        // the same on every frame but for a little drift.
+        const filament = (a: Pt, b: Pt, seed: string, amp: number, n = 20): Pt[] => {
+          const out: Pt[] = [];
+          const dx = b.x - a.x;
+          const dy = b.y - a.y;
+          const len = Math.hypot(dx, dy) || 1;
+          const nx = -dy / len;
+          const ny = dx / len;
+          const f1 = 1.5 + hash01(seed, 3) * 2;
+          const f2 = 3 + hash01(seed, 4) * 3;
+          const p1 = hash01(seed, 5) * 6.28;
+          for (let i = 0; i <= n; i++) {
+            const u = i / n;
+            const w = (Math.sin(u * f1 * Math.PI + p1 + t * 0.35) * 0.7 + Math.sin(u * f2 * Math.PI + p1 * 2 + t * 0.5) * 0.3) * amp * Math.sin(u * Math.PI);
+            out.push({ x: a.x + dx * u + nx * w, y: a.y + dy * u + ny * w });
+          }
+          return out;
+        };
+        // Trunks: consecutive workers, up to three to a trunk, forking from a
+        // junction partway out.
+        const q = pos.get(QUEEN)!;
+        const trunks: { pts: Pt[]; names: string[] }[] = [];
+        const branches: { pts: Pt[]; name: string }[] = [];
+        for (let i = 0; i < order.length; i += 3) {
+          const tr = order.slice(i, i + 3);
+          const ps = tr.map((n) => pos.get(n)!);
+          const mx = ps.reduce((s, p) => s + p.x, 0) / ps.length;
+          const my = ps.reduce((s, p) => s + p.y, 0) / ps.length;
+          const j = { x: cx + (mx - cx) * 0.46, y: cy + (my - cy) * 0.46 };
+          const trunk = filament(q, j, tr.join("|"), Math.hypot(j.x - cx, j.y - cy) * 0.12);
+          trunks.push({ pts: trunk, names: tr });
+          for (const n of tr) {
+            const p = pos.get(n)!;
+            const br = filament(j, p, n, Math.hypot(p.x - j.x, p.y - j.y) * 0.14, 16);
+            branches.push({ pts: br, name: n });
+            paths.set(n, [...trunk, ...br.slice(1)]);
+          }
+        }
+
+        // Fine hairs off the filaments: faint, so the network looks grown rather
+        // than drawn.
+        ctx.save();
+        ctx.lineWidth = 0.7;
+        ctx.strokeStyle = rgba(pal.light ? "#5b4a3a" : pal.dim, pal.light ? 0.16 : 0.22);
+        for (const b of branches) {
+          const g = growth(b.name);
+          for (let h = 0; h < 3; h++) {
+            const at = alongLine(b.pts, (0.25 + h * 0.25) * g);
+            const a = hash01(b.name, 10 + h) * Math.PI * 2 + Math.sin(t * 0.4 + h) * 0.15;
+            const len = (10 + hash01(b.name, 20 + h) * 18) * unit * g;
+            ctx.beginPath();
+            ctx.moveTo(at.x, at.y);
+            ctx.quadraticCurveTo(at.x + Math.cos(a) * len * 0.6, at.y + Math.sin(a) * len * 0.6 + 4, at.x + Math.cos(a + 0.4) * len, at.y + Math.sin(a + 0.4) * len);
+            ctx.stroke();
+          }
+        }
+        ctx.restore();
+
+        const drawFilament = (pts: Pt[], width: number, active: boolean, lost: boolean, upTo: number) => {
+          ctx.save();
+          ctx.lineCap = "round";
+          ctx.lineJoin = "round";
+          if (active) {
+            ctx.strokeStyle = rgba(pal.accent, 0.9);
+            ctx.shadowColor = pal.accent;
+            ctx.shadowBlur = 12 * pal.glow;
+            ctx.lineWidth = width * 1.3;
+          } else {
+            ctx.strokeStyle = rgba(lost ? pal.dim : pal.light ? "#6b5a48" : pal.green, lost ? 0.18 : pal.light ? 0.4 : 0.34);
+            ctx.lineWidth = width;
+            if (lost) ctx.setLineDash([3, 5]);
+          }
+          strokeLine(ctx, pts, upTo);
+          ctx.restore();
+        };
+        for (const tr of trunks) {
+          const g = Math.max(...tr.names.map((n) => growth(n)));
+          drawFilament(tr.pts, 2.4 * unit, tr.names.some((n) => busy(n)), tr.names.every((n) => info(n)?.state === "lost"), ease(Math.min(1, g * 1.6)));
+        }
+        for (const b of branches) {
+          drawFilament(b.pts, 1.4 * unit, !!busy(b.name), info(b.name)?.state === "lost", ease(Math.max(0, growth(b.name) * 1.6 - 0.6)));
+        }
+
+        // Nutrients: light running out along every busy path, for as long as it
+        // is busy.
+        for (const n of names) {
+          const pts = paths.get(n);
+          if (!busy(n) || !pts) continue;
+          for (let k = 0; k < 4; k++) {
+            const p = alongLine(pts, (t * 0.35 + k / 4) % 1);
+            glowDot(p.x, p.y, 2.2 * unit, pal.accent, 0.8);
+          }
+        }
+
+        // A worker asking another: a new thread between them while it is open.
+        for (const k of ts) {
+          if (k.state !== "running" || k.dir !== "peer" || !k.from) continue;
+          const a = pos.get(k.from);
+          const b = pos.get(k.worker);
+          if (!a || !b) continue;
+          ctx.save();
+          ctx.strokeStyle = rgba(pal.amber, 0.85);
+          ctx.lineWidth = 1.4 * unit;
+          ctx.shadowColor = pal.amber;
+          ctx.shadowBlur = 10 * pal.glow;
+          const since = Math.min(1, (Date.now() - Date.parse(k.started_at)) / 1500);
+          strokeLine(ctx, filament(a, b, k.id, Math.hypot(b.x - a.x, b.y - a.y) * 0.18), ease(since));
+          ctx.restore();
+        }
+
+        // The root.
+        const beat = working ? 1 + 0.1 * Math.sin(t * 4) : 1 + 0.04 * Math.sin(t * 1.2);
+        aura(q.x, q.y, q.r * 3.6 * beat, pal.accent, pal.light ? 0.3 : 0.5);
+        blob(q.x, q.y, q.r * beat, pal.accent, "queen", 1);
+        label(q.x, q.y + q.r * 1.9 + 8 * unit, queenName, "", pal.dim);
+
+        // The workers: spores at the tips, appearing once their filament has
+        // reached them.
+        for (const n of names) {
+          const p = pos.get(n)!;
+          const g = growth(n);
+          if (g < 0.55) continue;
+          const lost = info(n)?.state === "lost";
+          const task = busy(n);
+          const tone = lost ? pal.dim : task ? pal.accent : pal.green;
+          if (task) aura(p.x, p.y, p.r * 3.4, pal.accent, pal.light ? 0.28 : 0.42);
+          const s = ease(Math.min(1, (g - 0.55) / 0.45));
+          blob(p.x, p.y, p.r * s * (task ? 1.15 + 0.1 * Math.sin(t * 5) : 1), tone, n, lost ? 0.4 : 1);
+          label(p.x, p.y + p.r + 12 * unit, nameOf(n), subOf(n), task ? pal.accent : pal.dim, lost);
+        }
+      }
+
+      // ---- the traffic, the same in every look ----
+      const route = (from: string, to: string): Pt[] | null => {
+        if (from === QUEEN && paths.has(to)) return paths.get(to)!;
+        if (to === QUEEN && paths.has(from)) return [...paths.get(from)!].reverse();
+        const a = pos.get(from);
+        const b = pos.get(to);
+        return a && b ? bowed(a, b, lk === "orbit" ? -0.22 : 0.18) : null;
+      };
+      // A comet in the orbits — a long tail — and a bead of light on a filament.
+      const tail = lk === "orbit" ? 10 : 5;
+      const gap = lk === "orbit" ? 0.018 : 0.012;
+      const head = lk === "orbit" ? 4.2 : 3.4;
+      for (const f of fx.current.flights) {
+        if (now < f.t0) continue;
+        const pts = route(f.from, f.to);
+        if (!pts) continue;
+        const u = ease((now - f.t0) / f.dur);
+        for (let k = tail - 1; k >= 0; k--) {
+          const p = alongLine(pts, Math.max(0, u - k * gap));
+          glowDot(p.x, p.y, Math.max(0.6, head * unit * f.size * (1 - k / tail)), f.color, f.alpha * (1 - k / tail) * (k === 0 ? 1 : 0.7));
+        }
+      }
+      for (const l of fx.current.landings) {
+        const p = pos.get(l.at);
+        if (!p || now < l.t0) continue;
+        const u = (now - l.t0) / (l.big ? 1100 : 600);
+        const rr = p.r * (1.4 + u * (l.big ? 3.5 : 1.6));
+        ctx.save();
+        ctx.strokeStyle = l.color;
+        ctx.globalAlpha = (1 - u) * (l.big ? 0.9 : 0.5);
+        ctx.lineWidth = l.big ? 2.4 * (1 - u) + 0.6 : 1.2;
+        ctx.shadowColor = l.color;
+        ctx.shadowBlur = (l.big ? 16 : 6) * pal.glow;
+        ctx.beginPath();
+        if (lk === "orbit") ctx.ellipse(p.x, p.y, rr, rr * 0.55, 0, 0, Math.PI * 2);
+        else ctx.arc(p.x, p.y, rr, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+      for (const s of fx.current.sparks) {
+        const p = pos.get(s.at);
+        if (!p || now < s.t0) continue;
+        const u = (now - s.t0) / 700;
+        for (let k = 0; k < 7; k++) {
+          const a = s.a + (k * Math.PI * 2) / 7;
+          const d = p.r * 1.2 + u * 26 * unit;
+          glowDot(p.x + Math.cos(a) * d, p.y + Math.sin(a) * d * (lk === "orbit" ? 0.6 : 1), 1.6 * unit * (1 - u) + 0.4, pal.amber, 1 - u);
+        }
+      }
+      for (const g of fx.current.tags) {
+        const p = pos.get(g.at);
+        if (!p) continue;
+        const u = (now - g.t0) / 1600;
+        ctx.save();
+        ctx.globalAlpha = 1 - u * u;
+        ctx.fillStyle = g.color;
+        ctx.font = `600 ${Math.max(9, 11 * unit)}px ui-monospace, SFMono-Regular, monospace`;
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        ctx.fillText(`⚙ ${g.text}`, p.x + p.r + 8 * unit, p.y - 4 - u * 14 * unit);
+        ctx.restore();
       }
     };
 
@@ -590,7 +746,6 @@ const HiveStage = forwardRef<StageHandle, Props>(function HiveStage({ role, self
     };
     document.addEventListener("visibilitychange", visible);
     if (still) {
-      // Reduced motion: no loop, one honest frame a second.
       const iv = window.setInterval(() => frame(performance.now()), 1000);
       frame(performance.now());
       return () => {
@@ -608,8 +763,8 @@ const HiveStage = forwardRef<StageHandle, Props>(function HiveStage({ role, self
   }, []);
 
   return (
-    <div className="hive-stage-fill" ref={box}>
-      <canvas ref={canvas} />
+    <div className="relative h-full min-h-[180px] w-full overflow-hidden" ref={box}>
+      <canvas ref={canvas} className="absolute left-0 top-0" />
     </div>
   );
 });
