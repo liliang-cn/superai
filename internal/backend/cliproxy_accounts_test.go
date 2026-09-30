@@ -51,8 +51,18 @@ func TestCLIProxyAccounts(t *testing.T) {
 	}
 
 	// Disabling must flip the flag and preserve every other field.
-	if err := p.SetAccountDisabled("codex-me@example.com.json", true); err != nil {
-		t.Fatalf("SetAccountDisabled: %v", err)
+	//
+	// The proxy picks up auth files by watching the directory, so a file
+	// written a moment ago may not be known to it yet: "auth file not found"
+	// until the watcher has run. Retried until it has, rather than timed.
+	var derr error
+	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(100 * time.Millisecond) {
+		if derr = p.SetAccountDisabled("codex-me@example.com.json", true); derr == nil || !strings.Contains(derr.Error(), "not found") {
+			break
+		}
+	}
+	if derr != nil {
+		t.Fatalf("SetAccountDisabled: %v", derr)
 	}
 	raw, _ := os.ReadFile(filepath.Join(p.AuthDir(), "codex-me@example.com.json"))
 	var doc map[string]any
