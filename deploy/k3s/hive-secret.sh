@@ -30,6 +30,11 @@ token = secrets.token_hex(24) if os.environ.get('NEW') else a['token']
 # own voice.
 base = {k: s[k] for k in ('llm_base_url','llm_key','llm_model','embed_base_url','embed_key','embed_model',
                           'searxng_url','tts_base_url','tts_key','tts_model','tts_voice') if k in s}
+# The hive speaks with Microsoft Edge's Xiaoxiao, through the converter in
+# deploy/k3s/edge-tts: quicker and more natural than the gateway's model. The
+# standalone install keeps its own voice; only the hive's is overridden here.
+base.update(tts_base_url='http://edge-tts.$NS.svc.cluster.local:43540/v1', tts_model='edge',
+            tts_voice='zh-CN-XiaoxiaoNeural', tts_key='')
 base.update(memory_backend='shared', shared_memory_endpoint=s['shared_memory_endpoint'],
             shared_memory_namespace='hive', max_rounds=-1, headless=True, disable_browser=True,
             workspace_dir='/data/workspace',
