@@ -327,7 +327,7 @@ func TestADroppedSteerStartsATurn(t *testing.T) {
 	if len(msgs) != 1 || h.queen.mailbox().Unread() != 0 {
 		t.Fatalf("not taken in: %+v", msgs)
 	}
-	h.queen.steerDropped(h.queen.mailPrompt("w1", msgs, true))
+	h.queen.steerDropped(backend.MailPrompt("w1", msgs, true))
 	select {
 	case p := <-woke:
 		if !strings.Contains(p, "orange3 is down") {

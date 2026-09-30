@@ -21,6 +21,14 @@
 //	superai-hive-worker -queen http://queen:43117 -name openclaw -stdin -- \
 //	    ssh -o BatchMode=yes host 'openclaw agent --message "$(cat)"'
 //
+// Claude Code taking hive messages into the turn it is in, and with the hive
+// tools (hive_peers, hive_send, hive_inbox) connected over MCP. {hive-mcp} is
+// replaced by the path of a config file this writes for --mcp-config:
+//
+//	superai-hive-worker -queen http://queen:43117 -name claude-mac -mode claude -stream-input -- \
+//	    claude -p --input-format stream-json --output-format stream-json --verbose \
+//	    --mcp-config {hive-mcp} --allowedTools 'Bash Read mcp__hive'
+//
 // A model behind an API:
 //
 //	superai-hive-worker -queen http://queen:43117 -name gpt \
@@ -34,6 +42,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -62,6 +71,8 @@ func main() {
 		dir         = flag.String("dir", "", "working directory for the command")
 		stdin       = flag.Bool("stdin", false, "send the order on the command's standard input instead of as {prompt} (use for ssh, so the order is never re-parsed by a remote shell)")
 		mode        = flag.String("mode", "text", "how to read the command's output: text, or claude (Claude Code's stream-json)")
+		streamIn    = flag.Bool("stream-input", false, "with -mode claude: give Claude Code the order as stream-json on stdin and keep it open, so a hive message reaches the turn it is in (no {prompt} then)")
+		tell        = flag.Bool("tell", true, "put a line in front of every order saying the agent is in a hive and which tools it has")
 		oaBase      = flag.String("openai-base", "", "use a model behind this OpenAI-compatible base URL instead of a command")
 		oaKey       = flag.String("openai-key", os.Getenv("OPENAI_API_KEY"), "its key (or $OPENAI_API_KEY)")
 		oaModel     = flag.String("openai-model", "", "its model")
@@ -91,7 +102,7 @@ func main() {
 		}
 		engine = &backend.OpenAIEngine{BaseURL: *oaBase, Key: *oaKey, Model: *oaModel, System: *oaSystem}
 	case flag.NArg() > 0:
-		e := &backend.ExecEngine{Argv: flag.Args(), Dir: *dir, Mode: *mode, Stdin: *stdin}
+		e := &backend.ExecEngine{Argv: flag.Args(), Dir: *dir, Mode: *mode, Stdin: *stdin, StreamInput: *streamIn}
 		if err := e.Validate(); err != nil {
 			log.Fatalf("the command is not usable: %v", err)
 		}
@@ -124,13 +135,27 @@ func main() {
 		adv = fmt.Sprintf("http://%s:%d", host, port)
 	}
 
-	ad := &backend.Adapter{Token: *token, Engine: engine, Concurrency: *concurrency}
-	srv := &http.Server{Handler: ad.Handler()}
-	go func() {
-		if err := srv.Serve(ln); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("serve: %v", err)
+	// {hive-mcp} in the command becomes a config file pointing the agent at
+	// this adapter's hive tools. It holds the bearer, so it is private and it
+	// goes when this does.
+	if e, ok := engine.(*backend.ExecEngine); ok {
+		for i, arg := range e.Argv {
+			if arg != "{hive-mcp}" {
+				continue
+			}
+			f, err := os.CreateTemp("", "hive-mcp-*.json")
+			if err != nil {
+				log.Fatal(err)
+			}
+			local := fmt.Sprintf("http://127.0.0.1:%d/mcp", port)
+			json.NewEncoder(f).Encode(map[string]any{"mcpServers": map[string]any{"hive": map[string]any{
+				"type": "http", "url": local, "headers": map[string]string{"Authorization": "Bearer " + *token},
+			}}})
+			f.Close()
+			defer os.Remove(f.Name())
+			e.Argv[i] = f.Name()
 		}
-	}()
+	}
 
 	ann := &backend.Announcer{
 		Settings: backend.HiveSettings{Role: backend.HiveRoleWorker, Name: *name, JoinURL: *queen, JoinToken: *queenToken, AdvertiseURL: adv},
@@ -141,6 +166,14 @@ func main() {
 	if err := ann.Validate(); err != nil {
 		log.Fatalf("cannot join: %v", err)
 	}
+	ad := &backend.Adapter{Token: *token, Engine: engine, Concurrency: *concurrency, Name: *name, Announcer: ann, Tell: *tell}
+	srv := &http.Server{Handler: ad.Handler()}
+	go func() {
+		if err := srv.Serve(ln); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("serve: %v", err)
+		}
+	}()
+
 	log.Printf("%s (%s) listening on %s, joining %s", *name, engine.Describe(), adv, *queen)
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)

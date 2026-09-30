@@ -63,6 +63,15 @@ type Adapter struct {
 	// Zero means one, because an agent that edits files or drives a browser does
 	// not usually take being run twice at the same moment in the same place.
 	Concurrency int
+	// Name is this worker's name in the hive, and Announcer its membership:
+	// with both set it takes messages and serves the hive tools over MCP
+	// (hive_adapter_mail.go). Without them it only takes orders.
+	Name      string
+	Announcer *Announcer
+	// Tell puts a line in front of every order saying where the agent is and
+	// which hive tools it has, so an agent that knows nothing of hives knows
+	// what hive_send is for.
+	Tell bool
 
 	once sync.Once
 	sem  chan struct{}
@@ -70,6 +79,11 @@ type Adapter struct {
 	mu   sync.Mutex
 	subs map[chan []byte]struct{}
 	runs map[string]context.CancelFunc
+	// injectors, per running order, put a message into it while it runs;
+	// only a SteerableEngine has them.
+	injectors map[string]func(string) bool
+	mail      *Mailbox
+	waking    map[string]bool
 }
 
 func (a *Adapter) init() {
@@ -81,6 +95,9 @@ func (a *Adapter) init() {
 		a.sem = make(chan struct{}, n)
 		a.subs = map[chan []byte]struct{}{}
 		a.runs = map[string]context.CancelFunc{}
+		a.injectors = map[string]func(string) bool{}
+		a.mail = NewMailbox(200)
+		a.waking = map[string]bool{}
 	})
 }
 
@@ -91,6 +108,8 @@ func (a *Adapter) Handler() http.Handler {
 	mux.HandleFunc("/api/events", a.auth(a.serveEvents))
 	mux.HandleFunc("/api/rpc/SendChat", a.auth(a.sendChat))
 	mux.HandleFunc("/api/rpc/CancelChat", a.auth(a.cancelChat))
+	mux.HandleFunc("/api/hive/message", a.auth(a.handleMessage))
+	mux.Handle("/mcp", a.auth(a.mcpHandler().ServeHTTP))
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("ok")) })
 	return mux
 }
@@ -164,13 +183,22 @@ func (a *Adapter) sendChat(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error":"nothing was asked"}`, http.StatusBadRequest)
 		return
 	}
+	id := a.start(func() string { return a.told(prompt) })
+	json.NewEncoder(w).Encode(id)
+}
+
+// start begins a turn and returns its id. The prompt is asked for only once
+// the turn has its slot, so a turn that waited can take in what arrived while
+// it waited; an empty prompt then means there is nothing left to do.
+func (a *Adapter) start(prompt func() string) string {
+	a.init()
 	id := uuid.NewString()
 	ctx, cancel := context.WithCancel(context.Background())
 	a.mu.Lock()
 	a.runs[id] = cancel
 	a.mu.Unlock()
 	go a.run(ctx, cancel, id, prompt)
-	json.NewEncoder(w).Encode(id)
+	return id
 }
 
 func (a *Adapter) cancelChat(w http.ResponseWriter, r *http.Request) {
@@ -189,7 +217,7 @@ func (a *Adapter) cancelChat(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode("ok")
 }
 
-func (a *Adapter) run(ctx context.Context, cancel context.CancelFunc, id, prompt string) {
+func (a *Adapter) run(ctx context.Context, cancel context.CancelFunc, id string, promptFn func() string) {
 	defer cancel()
 	defer func() { a.mu.Lock(); delete(a.runs, id); a.mu.Unlock() }()
 
@@ -210,7 +238,25 @@ func (a *Adapter) run(ctx context.Context, cancel context.CancelFunc, id, prompt
 		return
 	}
 
-	final, err := a.Engine.Run(ctx, prompt, ev)
+	prompt := promptFn()
+	if strings.TrimSpace(prompt) == "" {
+		a.emit("chat:cancelled", map[string]any{"requestId": id, "final": ""})
+		return
+	}
+	var final string
+	var err error
+	if se, ok := a.Engine.(SteerableEngine); ok && se.Steerable() {
+		final, err = se.RunSteerable(ctx, prompt, ev, func(inject func(string) bool) {
+			a.mu.Lock()
+			a.injectors[id] = inject
+			a.mu.Unlock()
+		})
+		a.mu.Lock()
+		delete(a.injectors, id)
+		a.mu.Unlock()
+	} else {
+		final, err = a.Engine.Run(ctx, prompt, ev)
+	}
 	switch {
 	case ctx.Err() != nil:
 		a.emit("chat:cancelled", map[string]any{"requestId": id, "final": final})
@@ -246,7 +292,27 @@ type ExecEngine struct {
 	// Claude Code's stream-json, from which tool calls and the answer are read,
 	// so the panel can show them).
 	Mode string
+	// StreamInput, with Mode "claude", gives Claude Code the order as
+	// stream-json on standard input (--input-format stream-json) and keeps
+	// that open while it works, so a hive message can be put into the turn
+	// it is in the middle of. Claude Code reads it at its next step. No
+	// {prompt} then; stdin closes once the answer is out.
+	StreamInput bool
 }
+
+// SteerableEngine is an Engine that can take a message into an order it is
+// in the middle of.
+type SteerableEngine interface {
+	Engine
+	// Steerable says whether this one, as configured, can.
+	Steerable() bool
+	// RunSteerable is Run that, once the order is under way, hands ready a
+	// function putting a message into it; that function reports false once
+	// the order can no longer take one.
+	RunSteerable(ctx context.Context, prompt string, emit func(AdapterEvent), ready func(inject func(string) bool)) (string, error)
+}
+
+func (e *ExecEngine) Steerable() bool { return e.Mode == "claude" && e.StreamInput }
 
 func (e *ExecEngine) Describe() string {
 	if len(e.Argv) == 0 {
@@ -270,7 +336,10 @@ func (e *ExecEngine) Validate() error {
 			n++
 		}
 	}
-	if e.Stdin {
+	if e.StreamInput && (e.Mode != "claude" || e.Stdin) {
+		return errors.New("stream input is Claude Code's stream-json: it needs mode claude, and not stdin")
+	}
+	if e.Stdin || e.StreamInput {
 		if n != 0 {
 			return errors.New("with stdin the order is not an argument: remove {prompt}")
 		}
@@ -286,6 +355,16 @@ func (e *ExecEngine) Validate() error {
 }
 
 func (e *ExecEngine) Run(ctx context.Context, prompt string, emit func(AdapterEvent)) (string, error) {
+	return e.RunSteerable(ctx, prompt, emit, nil)
+}
+
+// claudeUserLine is one user message in Claude Code's stream-json input.
+func claudeUserLine(text string) []byte {
+	b, _ := json.Marshal(map[string]any{"type": "user", "message": map[string]any{"role": "user", "content": text}})
+	return append(b, '\n')
+}
+
+func (e *ExecEngine) RunSteerable(ctx context.Context, prompt string, emit func(AdapterEvent), ready func(inject func(string) bool)) (string, error) {
 	if err := e.Validate(); err != nil {
 		return "", err
 	}
@@ -305,6 +384,27 @@ func (e *ExecEngine) Run(ctx context.Context, prompt string, emit func(AdapterEv
 	if e.Stdin {
 		cmd.Stdin = strings.NewReader(prompt)
 	}
+	// With stream input the pipe stays open for the whole turn: the order is
+	// its first line, and a message that arrives mid-turn is the next.
+	var (
+		inMu     sync.Mutex
+		in       io.WriteCloser
+		inClosed bool
+	)
+	closeIn := func() {
+		inMu.Lock()
+		defer inMu.Unlock()
+		if in != nil && !inClosed {
+			inClosed = true
+			in.Close()
+		}
+	}
+	if e.StreamInput {
+		var err error
+		if in, err = cmd.StdinPipe(); err != nil {
+			return "", err
+		}
+	}
 	cmd.Dir = e.Dir
 	cmd.Env = append(os.Environ(), e.Env...)
 	// Its own process group, so cancelling takes the agent's children with it: an
@@ -322,6 +422,23 @@ func (e *ExecEngine) Run(ctx context.Context, prompt string, emit func(AdapterEv
 	if err := cmd.Start(); err != nil {
 		return "", fmt.Errorf("could not start %s: %w", e.Argv[0], err)
 	}
+	if e.StreamInput {
+		defer closeIn()
+		if _, err := in.Write(claudeUserLine(prompt)); err != nil {
+			return "", fmt.Errorf("could not give %s the order: %w", e.Argv[0], err)
+		}
+		if ready != nil {
+			ready(func(text string) bool {
+				inMu.Lock()
+				defer inMu.Unlock()
+				if inClosed {
+					return false
+				}
+				_, err := in.Write(claudeUserLine(text))
+				return err == nil
+			})
+		}
+	}
 
 	var all strings.Builder
 	final, sawResult, isErr := "", false, false
@@ -336,6 +453,10 @@ func (e *ExecEngine) Run(ctx context.Context, prompt string, emit func(AdapterEv
 			}
 			if fin {
 				final, sawResult, isErr = res, true, bad
+				// The answer is out: close the input, or Claude Code waits
+				// for another message forever. Anything injected after this
+				// is refused, and the adapter starts a turn for it instead.
+				closeIn()
 			}
 			continue
 		}

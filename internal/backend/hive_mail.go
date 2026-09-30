@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -227,4 +228,103 @@ func PostMessage(ctx context.Context, base, token string, m HiveMessage) error {
 		return fmt.Errorf("%s: %s", resp.Status, strings.TrimSpace(string(raw)))
 	}
 	return nil
+}
+
+// HiveContact is somewhere a message can be delivered: a member's address and
+// the bearer it accepts, or the queen, who is reached through the join.
+type HiveContact struct {
+	Name, URL, Token string
+	Queen            bool
+}
+
+// Contacts is everyone a worker can write to: the queen, under her name once
+// a welcome has given it, and the live peers.
+func (a *Announcer) Contacts(ctx context.Context) map[string]HiveContact {
+	out := map[string]HiveContact{}
+	q := a.Queen()
+	if q == "" {
+		q = HiveQueenAlias
+	}
+	out[q] = HiveContact{Name: q, Queen: true}
+	for n, ag := range a.Peers(ctx) {
+		out[n] = HiveContact{Name: n, URL: ag.URL, Token: ag.Token}
+	}
+	return out
+}
+
+// SendHive delivers text from me to one contact, to the queen by role, or to
+// every contact with "*", and says in a line per copy what became of it. The
+// queen is reached through toQueen, everyone else at their own address;
+// delivered is told of each copy that arrived.
+func SendHive(ctx context.Context, me string, contacts map[string]HiveContact, to, text, replyTo string,
+	toQueen func(context.Context, HiveMessage) error, delivered func(HiveContact, HiveMessage)) (string, error) {
+	to = strings.TrimSpace(to)
+	var targets []HiveContact
+	switch {
+	case to == HiveBroadcast:
+		for _, c := range contacts {
+			targets = append(targets, c)
+		}
+		sort.Slice(targets, func(i, j int) bool { return targets[i].Name < targets[j].Name })
+		if len(targets) == 0 {
+			return "Nobody else is in the hive right now.", nil
+		}
+	case to == me:
+		return "", fmt.Errorf("%s is you", to)
+	default:
+		c, found := contacts[to]
+		if !found && to == HiveQueenAlias {
+			for _, x := range contacts {
+				if x.Queen {
+					c, found = x, true
+				}
+			}
+		}
+		if !found {
+			names := make([]string, 0, len(contacts))
+			for n := range contacts {
+				names = append(names, n)
+			}
+			sort.Strings(names)
+			if len(names) == 0 {
+				return "", fmt.Errorf("there is nobody called %q, and nobody else is in the hive right now", to)
+			}
+			return "", fmt.Errorf("there is nobody called %q; you can write to: %s", to, strings.Join(names, ", "))
+		}
+		targets = []HiveContact{c}
+	}
+
+	lines := make([]string, len(targets))
+	var wg sync.WaitGroup
+	for i, c := range targets {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			m, err := NewHiveMessage(me, c.Name, text, replyTo)
+			if err != nil {
+				lines[i] = fmt.Sprintf("%s: not sent — %v", c.Name, err)
+				return
+			}
+			sctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+			defer cancel()
+			switch {
+			case c.Queen && toQueen != nil:
+				err = toQueen(sctx, m)
+			case c.Queen:
+				err = errors.New("no way to reach the queen from here")
+			default:
+				err = PostMessage(sctx, c.URL, c.Token, m)
+			}
+			if err != nil {
+				lines[i] = fmt.Sprintf("%s: not delivered — %v", c.Name, err)
+				return
+			}
+			lines[i] = fmt.Sprintf("%s: delivered (id %s)", c.Name, m.ID)
+			if delivered != nil {
+				delivered(c, m)
+			}
+		}()
+	}
+	wg.Wait()
+	return strings.Join(lines, "\n"), nil
 }
