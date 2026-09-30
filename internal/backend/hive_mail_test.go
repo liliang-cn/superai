@@ -5,6 +5,7 @@ import (
 	"net"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestMailboxFilesOnceAndReadsInOrder(t *testing.T) {
@@ -90,5 +91,62 @@ func TestLookingAgainAtAnEmptyInboxIsToldToStop(t *testing.T) {
 	b.Take(false, 0)
 	if got := b.Empty(); got != InboxEmpty {
 		t.Fatalf("a look after something arrived was called polling: %q", got)
+	}
+}
+
+func TestAWaitReturnsTheMomentTheMessageArrives(t *testing.T) {
+	b := NewMailbox(10)
+	got := make(chan []HiveMessage, 1)
+	go func() { got <- b.Wait(context.Background(), "w1", time.Minute) }()
+	for !b.Waiting("w1") {
+		time.Sleep(time.Millisecond)
+	}
+	if b.Waiting("w9") {
+		t.Fatal("a wait for w1 claims w9's mail")
+	}
+	other, _ := NewHiveMessage("w9", "w2", "not this one", "")
+	b.Put(other)
+	m, _ := NewHiveMessage("w1", "w2", "leg 1: 18e99f0d6bff", "")
+	start := time.Now()
+	b.Put(m)
+	select {
+	case msgs := <-got:
+		if len(msgs) != 1 || msgs[0].Text != "leg 1: 18e99f0d6bff" {
+			t.Fatalf("got %+v", msgs)
+		}
+		if time.Since(start) > time.Second {
+			t.Fatalf("took %s after the message was filed", time.Since(start))
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("the wait never returned")
+	}
+	if b.Waiting("w1") {
+		t.Fatal("still registered as waiting after it returned")
+	}
+	if b.Unread() != 1 {
+		t.Fatalf("the wait took more than it waited for: %d unread", b.Unread())
+	}
+}
+
+func TestAWaitForAnyoneTakesWhatIsAlreadyThere(t *testing.T) {
+	b := NewMailbox(10)
+	m, _ := NewHiveMessage("w3", "w2", "already here", "")
+	b.Put(m)
+	if msgs := b.Wait(context.Background(), "", time.Minute); len(msgs) != 1 {
+		t.Fatalf("got %+v", msgs)
+	}
+}
+
+func TestAWaitEndsAtItsDeadlineWithNothing(t *testing.T) {
+	b := NewMailbox(10)
+	start := time.Now()
+	if msgs := b.Wait(context.Background(), "", 50*time.Millisecond); msgs != nil {
+		t.Fatalf("got %+v", msgs)
+	}
+	if time.Since(start) > 2*time.Second {
+		t.Fatal("did not keep to its deadline")
+	}
+	if out := WaitResult(b, context.Background(), "w1", float64(0.05)); !strings.Contains(out, "Nothing from w1") {
+		t.Fatalf("WaitResult said %q", out)
 	}
 }

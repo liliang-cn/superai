@@ -165,6 +165,9 @@ const wakeTimeout = 30 * time.Minute
 // and it waits in the inbox — otherwise two members that answer each other
 // would wake each other forever.
 func (a *App) deliverToLoop(m backend.HiveMessage) {
+	if a.mailbox().Waiting(m.From) {
+		return // a turn is in hive_wait for it, and takes it from there
+	}
 	if a.steerMail(m) {
 		return
 	}
@@ -394,6 +397,19 @@ func (a *App) registerMailTools(inner interface {
 			}
 			b, err := json.Marshal(msgs)
 			return string(b), err
+		},
+		agent.ToolMetadata{ConcurrencySafe: true, OutputLimit: -1})
+
+	inner.AddToolWithMetadata("hive_wait", backend.HiveWaitDescription,
+		map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"from":    map[string]any{"type": "string", "description": "Wait only for this member's messages. Empty: anyone's."},
+				"seconds": map[string]any{"type": "integer", "description": "The longest to wait, up to 900. Default 600."},
+			},
+		},
+		func(ctx context.Context, args map[string]any) (any, error) {
+			return backend.WaitResult(a.mailbox(), ctx, str(args["from"]), args["seconds"]), nil
 		},
 		agent.ToolMetadata{ConcurrencySafe: true, OutputLimit: -1})
 }

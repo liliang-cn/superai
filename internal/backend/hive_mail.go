@@ -101,6 +101,12 @@ type Mailbox struct {
 	// that found nothing with nothing arriving between them are someone
 	// waiting on the inbox. See Empty.
 	lastPut, lastEmpty time.Time
+	// arrived is closed and replaced whenever a message is filed, which is
+	// how a Wait hears of it; waiters is who is waiting, by the sender they
+	// wait for ("" for anyone).
+	arrived chan struct{}
+	waiters map[int]string
+	nextW   int
 }
 
 // NewMailbox keeps the last max messages.
@@ -108,7 +114,7 @@ func NewMailbox(max int) *Mailbox {
 	if max <= 0 {
 		max = 200
 	}
-	return &Mailbox{max: max}
+	return &Mailbox{max: max, arrived: make(chan struct{}), waiters: map[int]string{}}
 }
 
 // Put files a message. A message already filed — the same id sent twice by a
@@ -127,7 +133,76 @@ func (b *Mailbox) Put(m HiveMessage) bool {
 	if len(b.msgs) > b.max {
 		b.msgs = b.msgs[len(b.msgs)-b.max:]
 	}
+	close(b.arrived)
+	b.arrived = make(chan struct{})
 	return true
+}
+
+// Waiting says whether a turn here is blocked in Wait for a message like m —
+// from its sender or from anyone. Such a message is the waiter's: it is not put
+// into the running turns or made to start one of its own, or the waiter would
+// see it twice, or not at all.
+func (b *Mailbox) Waiting(from string) bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	for _, f := range b.waiters {
+		if f == "" || f == from {
+			return true
+		}
+	}
+	return false
+}
+
+// MaxWait bounds one Wait.
+const MaxWait = 15 * time.Minute
+
+// Wait blocks until there is unread mail from `from` (anyone, if empty) and
+// takes it, or until d passes or ctx ends, and then returns nothing.
+//
+// It exists because agents told to end their turn and be woken would not:
+// in a relay they slept in the shell between inbox checks, and when told to
+// stop that, asked each other with hive_ask whether the message had been sent
+// yet — each question a two-minute turn on the member being waited for. A
+// wait that returns the moment the message is filed is what they were trying
+// to build.
+func (b *Mailbox) Wait(ctx context.Context, from string, d time.Duration) []HiveMessage {
+	if d <= 0 || d > MaxWait {
+		d = MaxWait
+	}
+	b.mu.Lock()
+	id := b.nextW
+	b.nextW++
+	b.waiters[id] = from
+	b.mu.Unlock()
+	defer func() {
+		b.mu.Lock()
+		delete(b.waiters, id)
+		b.mu.Unlock()
+	}()
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+	for {
+		b.mu.Lock()
+		var out []HiveMessage
+		for i := range b.msgs {
+			if !b.msgs[i].Read && (from == "" || b.msgs[i].From == from) {
+				b.msgs[i].Read = true
+				out = append(out, b.msgs[i])
+			}
+		}
+		arrived := b.arrived
+		b.mu.Unlock()
+		if len(out) > 0 {
+			return out
+		}
+		select {
+		case <-arrived:
+		case <-timer.C:
+			return nil
+		case <-ctx.Done():
+			return nil
+		}
+	}
 }
 
 // pollWindow is how close two empty looks have to be to count as polling.
