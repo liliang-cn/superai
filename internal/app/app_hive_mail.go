@@ -59,8 +59,8 @@ func (a *App) hiveSend(ctx context.Context, to, text, replyTo string) (string, e
 	return backend.SendHive(ctx, me, contacts, to, text, replyTo, toQueen, func(c backend.HiveContact, m backend.HiveMessage) {
 		a.emitMessage(m, "out")
 		// Between two workers the queen was not part of it; she gets a copy
-		// to see, the same way she sees their orders.
-		if ann != nil && !c.Queen {
+		// to see, the same way she sees their orders — unless she carried it.
+		if ann != nil && !c.Queen && m.Via == "" {
 			m.Observed = true
 			a.reportToQueen(m)
 		}
@@ -118,6 +118,10 @@ func (a *App) handleHiveMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	me := a.hiveNameOf(s)
+	if h != nil && m.To != me && m.To != backend.HiveQueenAlias {
+		a.relayMessage(w, r, h, m)
+		return
+	}
 	if m.To != me && !(h != nil && m.To == backend.HiveQueenAlias) {
 		writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": fmt.Sprintf("this is %s, not %s", me, m.To)})
 		return
@@ -261,6 +265,26 @@ func (a *App) wakeFor(m backend.HiveMessage) {
 		}
 		wake(session, backend.MailPrompt(m.From, msgs, false))
 	}()
+}
+
+// relayMessage passes a message on for a member that could not reach the
+// recipient itself. Only between two on the roster; what the recipient says
+// about it is what the sender is told.
+func (a *App) relayMessage(w http.ResponseWriter, r *http.Request, h *backend.Hive, m backend.HiveMessage) {
+	to, ok := h.Agents()[m.To]
+	if !ok {
+		writeJSONStatus(w, http.StatusNotFound, map[string]any{"error": "nobody live called " + m.To})
+		return
+	}
+	m.Via = "queen"
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+	if err := backend.PostMessage(ctx, to.URL, to.Token, m); err != nil {
+		writeJSONStatus(w, http.StatusBadGateway, map[string]any{"error": "could not pass it on: " + err.Error()})
+		return
+	}
+	a.emitMessage(m, "peer")
+	writeJSONStatus(w, http.StatusOK, map[string]any{"ok": true, "via": "queen"})
 }
 
 func onRoster(h *backend.Hive, name string) bool {
