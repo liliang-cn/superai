@@ -85,6 +85,7 @@ spec:
           env:
             - {name: SUPERAI_TOKEN, valueFrom: {secretKeyRef: {name: superai-hive, key: token}}}
             - {name: SUPERAI_PASSWORD_HASH, valueFrom: {secretKeyRef: {name: superai-hive, key: password_hash, optional: true}}}
+            - {name: SUPERAI_USER, valueFrom: {secretKeyRef: {name: superai-hive, key: user, optional: true}}}
             - {name: POD_NAME, valueFrom: {fieldRef: {fieldPath: metadata.name}}}
             - {name: SUPERAI_ADVERTISE_URL, value: "http://$(POD_NAME).superai-queen.superai.svc.cluster.local:43117"}
             - {name: CORTEXDB_GRPC_TOKEN, valueFrom: {secretKeyRef: {name: superai-hive, key: cortexdb_token}}}
@@ -92,10 +93,15 @@ spec:
           readinessProbe:
             httpGet: {path: /api/session, port: 43117}
           volumeMounts: [{name: data, mountPath: /data}]
+  # The queen's volume is DRBD from the cluster's SDS, not local-path: two
+  # replicas, and any node may attach it over the network, so the queen can be
+  # started on another node when its own goes down. The workers keep
+  # local-path — anything they hold that matters is in the shared memory.
   volumeClaimTemplates:
     - metadata: {name: data}
       spec:
         accessModes: [ReadWriteOnce]
+        storageClassName: sds-drbd-remote
         resources: {requests: {storage: 2Gi}}
 ---
 apiVersion: v1
@@ -127,6 +133,7 @@ spec:
           env:
             - {name: SUPERAI_TOKEN, valueFrom: {secretKeyRef: {name: superai-hive, key: token}}}
             - {name: SUPERAI_PASSWORD_HASH, valueFrom: {secretKeyRef: {name: superai-hive, key: password_hash, optional: true}}}
+            - {name: SUPERAI_USER, valueFrom: {secretKeyRef: {name: superai-hive, key: user, optional: true}}}
             - {name: POD_NAME, valueFrom: {fieldRef: {fieldPath: metadata.name}}}
             - {name: SUPERAI_ADVERTISE_URL, value: "http://$(POD_NAME).superai-worker.superai.svc.cluster.local:43117"}
             - {name: CORTEXDB_GRPC_TOKEN, valueFrom: {secretKeyRef: {name: superai-hive, key: cortexdb_token}}}
@@ -144,12 +151,19 @@ spec:
 # host rule any name reaching a node lands here — the LAN address is enough.
 # Only the queen is exposed: the workers are reached by it, from inside.
 # The login gate is the app's own (a password_hash in the Secret).
+#
+# https://ai.superleo.cn comes in on the NodePort instead, from the apps VM's
+# Caddy (:43118), and any node will do. Not through Traefik: the service LB
+# in front of it SNATs, so Traefik cannot tell the apps VM from anyone else on
+# the LAN and rewrites X-Forwarded-Proto to http — the login cookie then goes
+# out without Secure.
 apiVersion: v1
 kind: Service
 metadata: {name: superai-queen-web, namespace: superai}
 spec:
+  type: NodePort
   selector: {app: superai-queen}
-  ports: [{name: http, port: 80, targetPort: 43117}]
+  ports: [{name: http, port: 80, targetPort: 43117, nodePort: 31743}]
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress

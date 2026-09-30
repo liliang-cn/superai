@@ -2,24 +2,29 @@
 # Builds the hive's Secret from an existing SuperAI install and applies it to
 # the cluster, without the values ever reaching a terminal or a file here.
 #
-#   SUPERAI_PASSWORD_HASH='$2a$…' ./deploy/k3s/hive-secret.sh
+#   ./deploy/k3s/hive-secret.sh
 #
-# The password hash (bcrypt) is optional; without it only the bearer token
-# gets in. Every run changes the token, so restart the pods afterwards.
+# The login comes from the SuperAI on the apps VM: its user, password hash and
+# bearer token. The queen is what https://ai.superleo.cn serves, so the same
+# password and the same token keep working after the switch — MCP clients
+# included. SUPERAI_PASSWORD_HASH='$2a$…' overrides the password; with
+# SUPERAI_NEW_TOKEN=1 the token is generated fresh instead, and then the pods
+# need a restart and every client a new token.
 #
-# Model and CortexDB credentials are copied from the SuperAI on the apps VM;
-# the bearer token shared by the hive is generated fresh. Roles come from the
+# Model and CortexDB credentials are copied from the same place. Roles come from the
 # settings: the queen accepts joins and the workers announce themselves.
 set -euo pipefail
 export SUPERAI_PASSWORD_HASH="${SUPERAI_PASSWORD_HASH:-}"
+export SUPERAI_NEW_TOKEN="${SUPERAI_NEW_TOKEN:-}"
 SRC="${SUPERAI_SRC:-ops@192.168.123.65}"
 KUBE="${SUPERAI_KUBE:-orange1}"
 NS=superai
 
-ssh "$SRC" "PW='$SUPERAI_PASSWORD_HASH' python3 - <<'PY'
+ssh "$SRC" "PW='$SUPERAI_PASSWORD_HASH' NEW='$SUPERAI_NEW_TOKEN' sudo -E python3 - <<'PY'
 import json, os, secrets
 s = json.load(open('/opt/superai/data/settings.json'))
-token = secrets.token_hex(24)
+a = json.load(open('/opt/superai/data/auth.json'))
+token = secrets.token_hex(24) if os.environ.get('NEW') else a['token']
 base = {k: s[k] for k in ('llm_base_url','llm_key','llm_model','embed_base_url','embed_key','embed_model',
                           'searxng_url') if k in s}
 base.update(memory_backend='shared', shared_memory_endpoint=s['shared_memory_endpoint'],
@@ -39,7 +44,7 @@ queen = dict(base, hive={'role': 'queen', 'name': 'queen',
 # only make every command hang. The pod's Role is what bounds them instead.
 worker = dict(base, disable_tool_approval=True,
             hive={'role': 'worker', 'join_url': 'http://superai-queen.$NS.svc.cluster.local:43117'})
-out = {'token': token, 'cortexdb_token': s['shared_memory_token'],
+out = {'token': token, 'user': a.get('user') or 'superai', 'password_hash': a.get('password_hash', ''), 'cortexdb_token': s['shared_memory_token'],
                   'settings-queen.json': json.dumps(queen), 'settings-worker.json': json.dumps(worker)}
 if os.environ.get('PW'): out['password_hash'] = os.environ['PW']
 print(json.dumps(out))
