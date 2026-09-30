@@ -23,15 +23,25 @@ export interface StageTask {
 }
 
 /** One flicker while an order is carried out: a tool called, a result back, the
- *  model thinking, some text written. */
+ *  model thinking, some text written — or a message between two members, which
+ *  names its two ends itself (src, dst: stage ids, QUEEN and SELF included). */
 export interface StagePulse {
   task: string;
   worker: string;
   from?: string;
   dir: "out" | "in" | "peer";
-  kind: "thinking" | "tool" | "result" | "text";
+  kind: "thinking" | "tool" | "result" | "text" | "message";
   tool?: string;
   bytes?: number;
+  src?: string;
+  dst?: string;
+  text?: string;
+}
+
+/** A message's first words, for the tag beside whoever sent it. */
+export function mailTag(text?: string): string {
+  const t = (text || "").replace(/\s+/g, " ").trim();
+  return `✉ ${t.length > 28 ? t.slice(0, 27) + "…" : t}`;
 }
 
 export interface StageHandle {
@@ -71,7 +81,7 @@ export type Tag = { at: string; text: string; t0: number; color: string };
 /** A tool called: a small burst. */
 export type Spark = { at: string; t0: number; a: number };
 
-type Colors = { accent: string; green: string; red: string; amber: string };
+type Colors = { accent: string; green: string; red: string; amber: string; mail?: string };
 
 /** The running order on a node, if there is one. */
 export function runningOn(id: string, role: string, tasks: StageTask[]): StageTask | undefined {
@@ -102,6 +112,16 @@ export class HiveFx {
   /** A pulse off the stream: one bolt from whoever is doing the work to whoever
    *  is waiting on it — the queen, or for a peer order the worker that asked. */
   pulse(p: StagePulse, role: string, c: Colors, now = performance.now()) {
+    if (p.kind === "message") {
+      // A message is not work: slower, and in a colour of its own, so a note
+      // passed between two members reads differently from the traffic of an order.
+      if (!p.src || !p.dst) return;
+      const color = c.mail || c.accent;
+      this.flights.push({ from: p.src, to: p.dst, t0: now, dur: 1100, color, size: 1.1, alpha: 1 });
+      this.tags.push({ at: p.src, text: mailTag(p.text), t0: now, color });
+      this.landings.push({ at: p.dst, t0: now + 1100, color, big: true });
+      return;
+    }
     let from: string;
     let to: string;
     if (role === "worker") {

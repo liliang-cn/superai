@@ -302,6 +302,7 @@ type Announcer struct {
 	lastErr string
 	peers   map[string]RemoteAgent
 	peersAt time.Time
+	queen   string
 }
 
 // AnnouncerState is what a worker knows about its own membership.
@@ -397,6 +398,11 @@ func (a *Announcer) Once(ctx context.Context) (HiveWelcome, error) {
 	var w HiveWelcome
 	if err := json.Unmarshal(raw, &w); err != nil || w.Protocol != HiveProtocol {
 		return HiveWelcome{}, fmt.Errorf("that is not a %s queen: %s", HiveProtocol, strings.TrimSpace(string(raw)))
+	}
+	if w.Queen != "" {
+		a.mu.Lock()
+		a.queen = w.Queen
+		a.mu.Unlock()
 	}
 	return w, nil
 }
@@ -557,6 +563,23 @@ func (a *Announcer) Peers(ctx context.Context) map[string]RemoteAgent {
 	a.peers, a.peersAt = peers, time.Now()
 	a.mu.Unlock()
 	return peers
+}
+
+// Queen is the queen's name as her last welcome gave it; empty before the
+// first one.
+func (a *Announcer) Queen() string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.queen
+}
+
+// SendToQueen delivers a message to the queen.
+func (a *Announcer) SendToQueen(ctx context.Context, m HiveMessage) error {
+	tok := a.Settings.JoinToken
+	if tok == "" {
+		tok = a.Token
+	}
+	return PostMessage(ctx, a.Settings.JoinURL, tok, m)
 }
 
 // Report tells the queen about a task this worker gave a peer, so the queen's

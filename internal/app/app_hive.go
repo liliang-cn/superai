@@ -79,6 +79,8 @@ func (a *App) reportToQueen(v any) {
 					err = ann.Report(ctx, x)
 				case backend.HivePulse:
 					err = ann.ReportPulse(ctx, x)
+				case backend.HiveMessage:
+					err = ann.SendToQueen(ctx, x)
 				}
 				if err != nil {
 					log.Printf("hive: could not report to the queen: %v", err)
@@ -163,7 +165,7 @@ func (a *App) HiveStatus() map[string]any {
 
 	out := map[string]any{
 		"protocol": backend.HiveProtocol, "role": "", "name": "",
-		"members": []backend.HiveMember{}, "tasks": a.tasks().Recent(),
+		"members": []backend.HiveMember{}, "tasks": a.tasks().Recent(), "messages": a.mailbox().Take(true, 20),
 	}
 	if s == nil {
 		return out
@@ -184,7 +186,7 @@ func (a *App) HiveStatus() map[string]any {
 	if ann != nil {
 		st := ann.State()
 		out["queen"] = map[string]any{
-			"url": s.Hive.JoinURL, "joined": st.Joined, "last_ok": st.LastOK, "error": st.LastErr,
+			"url": s.Hive.JoinURL, "name": ann.Queen(), "joined": st.Joined, "last_ok": st.LastOK, "error": st.LastErr,
 		}
 	}
 	return out
@@ -417,6 +419,7 @@ func (a *App) registerHiveTools(svc *backend.Service, cfg *backend.Settings) {
 	}
 
 	if a.hive != nil {
+		a.registerMailTools(inner)
 		inner.AddToolWithMetadata("hive_spawn",
 			"Make more workers for this hive. Returns once they have joined and are live, and says who they are."+
 				" Use it when there is more to do than the workers you have can do at once, and check hive_members first:"+
@@ -658,11 +661,23 @@ func (a *App) registerPeerTools(inner interface {
 	AddToolWithMetadata(name, description string, params map[string]any, fn func(context.Context, map[string]any) (any, error), meta agent.ToolMetadata)
 }) {
 	a.peerAsks = make(chan struct{}, 3)
+	a.registerMailTools(inner)
 
 	inner.AddToolWithMetadata("hive_peers",
-		"The other workers in this hive that you can ask something directly.",
+		"Who is in this hive besides you: the queen, and the other workers you can ask something (hive_ask) or write to (hive_send).",
 		map[string]any{"type": "object", "properties": map[string]any{}},
 		func(ctx context.Context, _ map[string]any) (any, error) {
+			a.mu.Lock()
+			ann := a.hiveAnn
+			a.mu.Unlock()
+			var b strings.Builder
+			if ann != nil {
+				q := ann.Queen()
+				if q == "" {
+					q = "(not joined yet)"
+				}
+				fmt.Fprintf(&b, "You are %s, a worker. The queen is %s — write to her with hive_send to \"queen\".\n", ann.Name(), q)
+			}
 			peers := a.remoteRunner().Workers()
 			names := make([]string, 0, len(peers))
 			for n := range peers {
@@ -670,9 +685,11 @@ func (a *App) registerPeerTools(inner interface {
 			}
 			sort.Strings(names)
 			if len(names) == 0 {
-				return "No peers are live right now.", nil
+				b.WriteString("No other workers are live right now.")
+				return b.String(), nil
 			}
-			return strings.Join(names, "\n"), nil
+			b.WriteString("Other workers:\n" + strings.Join(names, "\n"))
+			return b.String(), nil
 		},
 		agent.ToolMetadata{ReadOnly: true, ConcurrencySafe: true})
 

@@ -1,6 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import { palette } from "./hivePalette";
 import type { StageHandle, StagePulse, StageProps, StageTask } from "./hiveFx";
+import { mailTag } from "./hiveFx";
 
 // The hive, drawn while it works — the hexagon look.
 //
@@ -80,6 +81,13 @@ const HiveHex = forwardRef<StageHandle, Props>(function HiveHex({ role, self, wo
         const now = performance.now();
         const rl = live.current.role;
         const pal = palette();
+        if (p.kind === "message") {
+          if (!p.src || !p.dst) return;
+          packets.current.push({ from: p.src, to: p.dst, t0: now, dur: 900, color: pal.mail, size: 4.4 });
+          labels.current.push({ at: p.src, text: mailTag(p.text), t0: now, color: pal.mail });
+          ripples.current.push({ at: p.dst, t0: now + 900, color: pal.mail });
+          return;
+        }
         // Where the light travels: from the one doing the work to the one waiting.
         let from: string;
         let to: string;

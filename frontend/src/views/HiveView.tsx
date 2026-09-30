@@ -6,6 +6,7 @@ import HiveTaskPage, { FullTask } from "./HiveTaskPage";
 import { taskPath } from "../lib/routes";
 import HiveStageView from "../components/HiveStageView";
 import type { StageHandle, StagePulse, StageTask } from "../components/HiveStage";
+import { QUEEN, SELF } from "../components/hiveFx";
 
 /** One worker as HiveStatus reports it. */
 interface Member {
@@ -20,12 +21,25 @@ interface Member {
 
 interface QueenLink {
   url: string;
+  name?: string;
   joined: boolean;
   last_ok: string;
   error: string;
 }
 
 type Task = StageTask & FullTask;
+
+/** A note between two members. dir is this instance's side of it: sent,
+ *  received, or — on a queen — seen passing between two workers. */
+interface Mail {
+  id: string;
+  from: string;
+  to: string;
+  text: string;
+  reply_to?: string;
+  at: string;
+  dir?: "in" | "out" | "peer";
+}
 
 interface Status {
   tasks?: Task[];
@@ -36,6 +50,7 @@ interface Status {
   interval_ms?: number;
   members: Member[];
   queen?: QueenLink;
+  messages?: Mail[];
 }
 
 /** How long ago, in the units a heartbeat is read in. A minute-granularity
@@ -59,6 +74,10 @@ export default function HiveView() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [ready, setReady] = useState(false);
   const stage = useRef<StageHandle>(null);
+  const [mail, setMail] = useState<Mail[]>([]);
+  // The latest status, for the event handlers below, which are set up once.
+  const stRef = useRef<Status | null>(null);
+  stRef.current = st;
   // What the add/retire buttons are doing, so a spawn that takes half a minute
   // reads as working and not as a dead button.
   const [making, setMaking] = useState<"" | "spawn" | "retire">("");
@@ -87,6 +106,7 @@ export default function HiveView() {
       // source, and replacing the list from a poll would drop a change that
       // arrived a moment before the poll's answer did.
       setTasks((cur) => (cur.length === 0 && !ready ? next.tasks ?? [] : cur));
+      setMail((cur) => (cur.length === 0 && !ready ? (next.messages ?? []).map((m) => ({ ...m, dir: "in" as const })) : cur));
       setReady(true);
       setErr("");
     } catch (e: any) {
@@ -120,6 +140,31 @@ export default function HiveView() {
   // a re-render per pulse would be a re-render per token.
   useEffect(() => {
     const off = EventsOn("hive:pulse", (p: StagePulse) => stage.current?.pulse(p));
+    return () => {
+      if (typeof off === "function") off();
+    };
+  }, []);
+
+  // Messages go to the stage as a beam between their two ends, and into the
+  // feed. A name the stage does not draw (a worker's peers, on a worker) has
+  // no beam, only its line in the feed.
+  useEffect(() => {
+    const stageId = (name: string): string | undefined => {
+      const s = stRef.current;
+      if (!s) return undefined;
+      if (name === s.name) return s.role === "worker" ? SELF : QUEEN;
+      if (s.role === "worker") return name === (s.queen?.name || "queen") || name === "queen" ? QUEEN : undefined;
+      return s.members.some((m) => m.name === name) ? name : undefined;
+    };
+    const off = EventsOn("hive:message", (m: Mail) => {
+      if (!m?.id) return;
+      setMail((cur) => (cur.some((x) => x.id === m.id && x.dir === m.dir) ? cur : [...cur, m].slice(-60)));
+      const src = stageId(m.from);
+      const dst = stageId(m.to);
+      if (src && dst) {
+        stage.current?.pulse({ task: m.id, worker: m.from, dir: "peer", kind: "message", src, dst, text: m.text });
+      }
+    });
     return () => {
       if (typeof off === "function") off();
     };
@@ -298,6 +343,31 @@ export default function HiveView() {
                             {elapsed(t)}
                           </span>
                         </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {st.role !== "" && (
+              <div className="card">
+                <div className="card-title">Messages{mail.length ? ` · ${mail.length}` : ""}</div>
+                {mail.length === 0 ? (
+                  <div className="hive-dim">
+                    No messages yet. Members write to each other with <code>hive_send</code>; a message starts a turn
+                    on the one it is for, in its conversation with the sender.
+                  </div>
+                ) : (
+                  <div className="hive-mail">
+                    {[...mail].reverse().map((m) => (
+                      <div className={`hive-mail-row ${m.dir || "in"}`} key={`${m.id}-${m.dir}`}>
+                        <span className="hive-mail-who">
+                          {m.from.replace(/^superai-/, "")} → {m.to.replace(/^superai-/, "")}
+                          {m.reply_to && <span className="chip">reply</span>}
+                        </span>
+                        <span className="hive-mail-text">{m.text}</span>
+                        <span className="hive-dim">{ago(m.at, now)}</span>
                       </div>
                     ))}
                   </div>

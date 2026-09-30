@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -87,6 +88,19 @@ type App struct {
 	hiveReportOnce sync.Once
 	// peerAsks bounds how many questions this worker has out to peers at once.
 	peerAsks chan struct{}
+	// hiveMail is this member's inbox. See backend/hive_mail.go.
+	hiveMail     *backend.Mailbox
+	hiveMailOnce sync.Once
+	// mailWaking is, per sender, whether a goroutine is already waiting to
+	// take that sender's mail up in a turn.
+	mailWaking map[string]bool
+	mailWakeMu sync.Mutex
+	// wakeFn starts a turn for incoming mail; nil means SendChat. A test sets
+	// it to watch what would have been started.
+	wakeFn func(session, prompt string)
+	// steerFn puts a message into a running turn; nil means the service's
+	// Steer. A test sets it.
+	steerFn  func(session, content string) bool
 	hiveStop context.CancelFunc
 	hiveDone chan struct{}
 	// scheduleLock is held while this process owns firing schedules; nil means
@@ -742,6 +756,7 @@ func (a *App) SendChat(sessionID, message string, imagePaths []string) string {
 	// transcript then kept.
 	ctx, cancel := context.WithCancel(context.Background())
 	a.trackRun(requestID, cancel)
+	a.runSession(requestID, sessionID)
 
 	// An order from the hive is put on the task board, so the panel can show
 	// this worker working. A person typing at this instance is not a task.
@@ -752,6 +767,11 @@ func (a *App) SendChat(sessionID, message string, imagePaths []string) string {
 		// record and this one are the same UUID.
 		id, _ := backend.TaskIDFromSession(sessionID)
 		taskID = board.StartAs(id, a.hiveName(), "", backend.TaskIn, message)
+		// Mail waiting is mentioned with the order, not put into it: the order
+		// stands alone, and whether the notes bear on it is the worker's call.
+		if n := a.mailbox().Unread(); n > 0 {
+			message += fmt.Sprintf("\n\n(You have %d unread hive message(s); hive_inbox shows them.)", n)
+		}
 	}
 
 	go func() {
@@ -778,6 +798,9 @@ func (a *App) SendChat(sessionID, message string, imagePaths []string) string {
 				board.Progress(taskID, backend.PhaseThinking, "")
 			case agent.EventTypePartial:
 				board.Progress(taskID, backend.PhaseWriting, "")
+			case agent.EventTypeSteerDropped:
+				// Hive mail put into this turn that it ended without reading.
+				a.steerDropped(ev.Content)
 			}
 			// Every type is forwarded, unfiltered: "thinking" and "state_update"
 			// are the only progress the UI has while PTC writes its code.
@@ -864,6 +887,9 @@ func (a *App) SendChat(sessionID, message string, imagePaths []string) string {
 type chatRun struct {
 	cancel    context.CancelFunc
 	cancelled bool
+	// session is the conversation the turn belongs to, so a hive message for
+	// that conversation can find the turn that is running in it.
+	session string
 }
 
 // trackRun registers an in-flight turn so CancelChat can find it.
@@ -883,6 +909,43 @@ func (a *App) untrackRun(requestID string) {
 	a.runMu.Lock()
 	defer a.runMu.Unlock()
 	delete(a.runs, requestID)
+}
+
+// runSession records which conversation a tracked turn belongs to.
+func (a *App) runSession(requestID, sessionID string) {
+	a.runMu.Lock()
+	defer a.runMu.Unlock()
+	if r := a.runs[requestID]; r != nil {
+		r.session = sessionID
+	}
+}
+
+// runningSessions lists the conversations with a turn running in them.
+func (a *App) runningSessions() []string {
+	a.runMu.Lock()
+	defer a.runMu.Unlock()
+	seen := map[string]bool{}
+	out := []string{}
+	for _, r := range a.runs {
+		if r.session != "" && !seen[r.session] {
+			seen[r.session] = true
+			out = append(out, r.session)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+// sessionBusy reports whether a turn is running in the conversation.
+func (a *App) sessionBusy(sessionID string) bool {
+	a.runMu.Lock()
+	defer a.runMu.Unlock()
+	for _, r := range a.runs {
+		if r.session == sessionID {
+			return true
+		}
+	}
+	return false
 }
 
 // runCancelled reports whether this turn was stopped by the user. It must be

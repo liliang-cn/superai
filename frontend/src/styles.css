@@ -3637,6 +3637,15 @@ body.desktop-shell .sidebar.collapsed .nav-key { display: none; }
 .hive-stage canvas { display: block; }
 .hive-missions { display: flex; flex-direction: column; }
 .hive-mission { border-top: 1px solid var(--border); padding: 10px 4px; }
+/* Messages between members. The violet matches the beam on the stage. */
+.hive-mail { display: flex; flex-direction: column; }
+.hive-mail-row { display: grid; grid-template-columns: minmax(120px, 180px) 1fr auto; gap: 10px; align-items: baseline;
+  border-top: 1px solid var(--border); padding: 8px 4px 8px 10px; border-left: 2px solid #b18cff; font-size: 12.5px; }
+:root[data-theme="light"] .hive-mail-row { border-left-color: #7c4ddb; }
+.hive-mail-row.peer { opacity: 0.75; border-left-style: dashed; }
+.hive-mail-who { font-family: var(--mono, ui-monospace, monospace); color: var(--text-1, inherit); display: flex; gap: 6px; align-items: center; }
+.hive-mail-text { white-space: pre-wrap; word-break: break-word; }
+@media (max-width: 640px) { .hive-mail-row { grid-template-columns: 1fr; gap: 2px; } }
 .hive-mission:first-of-type { border-top: 0; }
 .hive-m-head { display: grid; grid-template-columns: 14px auto 1fr auto auto; gap: 10px; align-items: center; cursor: pointer; font-size: 13px; }
 .hive-m-who { font-family: var(--font-mono); font-size: 12px; color: var(--text-2); white-space: nowrap; }
