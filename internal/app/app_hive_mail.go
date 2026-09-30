@@ -263,8 +263,34 @@ func (a *App) wakeFor(m backend.HiveMessage) {
 		if len(msgs) == 0 {
 			return // read in the meantime
 		}
-		wake(session, backend.MailPrompt(m.From, msgs, false))
+		wake(session, backend.MailPrompt(m.From, msgs, false)+a.lastOrderNote())
 	}()
+}
+
+// orderContextWindow is how recent an order has to be for a woken turn to be
+// shown it.
+const orderContextWindow = 2 * time.Hour
+
+// lastOrderNote is the order this member was last given, for a turn a message
+// has started. That turn is a new conversation with the sender, and a message
+// is often a step in an order given elsewhere — "the previous leg's value is
+// 18e99f0d6bff" means nothing without the relay's rules. With the order in
+// view, a worker can end its turn while it waits instead of looping on its
+// inbox to keep the order in its context.
+func (a *App) lastOrderNote() string {
+	var last *backend.HiveTask
+	tasks := a.tasks().Recent()
+	for i := len(tasks) - 1; i >= 0; i-- {
+		if tasks[i].Dir == backend.TaskIn && time.Since(tasks[i].StartedAt) < orderContextWindow {
+			last = &tasks[i]
+			break
+		}
+	}
+	if last == nil {
+		return ""
+	}
+	return fmt.Sprintf("\n\nFor context, the last order you were given (task %s, %s, %s ago), which this may be part of:\n%s",
+		last.ID, last.State, time.Since(last.StartedAt).Round(time.Second), last.Prompt)
 }
 
 // relayMessage passes a message on for a member that could not reach the
@@ -342,7 +368,7 @@ func (a *App) registerMailTools(inner interface {
 				if all {
 					return "No messages.", nil
 				}
-				return "No unread messages.", nil
+				return backend.InboxEmpty, nil
 			}
 			b, err := json.Marshal(msgs)
 			return string(b), err

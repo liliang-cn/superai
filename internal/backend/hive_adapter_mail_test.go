@@ -258,7 +258,8 @@ func TestTheHiveToolsOverMCP(t *testing.T) {
 	if out := call("hive_inbox", map[string]any{}); !strings.Contains(out, "a note") {
 		t.Fatalf("inbox: %q", out)
 	}
-	if out := call("hive_inbox", map[string]any{}); !strings.Contains(out, "No messages") {
+	// Read mail is gone, and an empty inbox says not to wait on it.
+	if out := call("hive_inbox", map[string]any{}); out != InboxEmpty {
 		t.Fatalf("read mail came back unread: %q", out)
 	}
 

@@ -112,6 +112,14 @@ func (a *Adapter) deliver(m HiveMessage) {
 // MailPrompt is how messages are put to an agent: who they are from, what
 // they say, and how to answer. during is a message put into a turn already
 // going, which is told so and left to judge whether it changes anything.
+// InboxEmpty is what hive_inbox says when nothing is waiting. It says more than
+// "nothing" because of what agents did with that: a worker waiting for the
+// previous leg of a relay slept in the shell and called hive_inbox again, a
+// dozen times, when a message arriving later wakes it anyway.
+const InboxEmpty = "No unread messages. Do not wait for one here — no sleeping in the shell, no calling this" +
+	" again in a loop. If you are waiting on someone, end your turn and say what you are waiting for: a" +
+	" message that arrives later starts a new turn with it in front of you."
+
 func MailPrompt(from string, msgs []HiveMessage, during bool) string {
 	var b strings.Builder
 	if during {
@@ -222,7 +230,10 @@ func (a *Adapter) mcpHandler() http.Handler {
 		}
 		msgs := a.mail.Take(in.All, limit)
 		if len(msgs) == 0 {
-			return text("No messages.")
+			if in.All {
+				return text("No messages.")
+			}
+			return text(InboxEmpty)
 		}
 		b, _ := json.Marshal(msgs)
 		return text(string(b))

@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/liliang-cn/agent-go/v3/pkg/agent"
 	"github.com/liliang-cn/superai/internal/backend"
 )
 
@@ -372,4 +373,63 @@ func TestTheQueenPassesAMessageOn(t *testing.T) {
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("relay to a stranger answered %d", w.Code)
 	}
+}
+
+// A message that is a step in an order — the previous leg of a relay — starts a
+// turn that sees the order, so the worker could end its turn to wait instead
+// of polling its inbox to keep the rules in view.
+func TestAWokenTurnSeesTheOrderItBelongsTo(t *testing.T) {
+	h := newMailHive(t)
+	woke := make(chan string, 4)
+	h.w2.wakeFn = func(_, prompt string) { woke <- prompt }
+	id := h.w2.tasks().Start("w2", backend.TaskIn, "relay rule: hash what w1 sends you and pass it to the queen")
+	h.w2.tasks().Finish(id, backend.TaskDone, "waiting for w1", "")
+
+	if _, err := h.w1.hiveSend(context.Background(), "w2", "leg 1: 18e99f0d6bff", ""); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case got := <-woke:
+		if !strings.Contains(got, "18e99f0d6bff") || !strings.Contains(got, "relay rule: hash what w1 sends") || !strings.Contains(got, id) {
+			t.Fatalf("woke with %q", got)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("the message started nothing")
+	}
+}
+
+// An order from long ago is not what a message is about.
+func TestAnOldOrderIsNotShownToAWokenTurn(t *testing.T) {
+	a := &App{}
+	id := a.tasks().Start("w", backend.TaskIn, "yesterday's order")
+	if a.lastOrderNote() == "" {
+		t.Fatal("a fresh order was not shown")
+	}
+	a.tasks().Ingest(backend.HiveTask{ID: id, Worker: "w", Dir: backend.TaskIn, Prompt: "yesterday's order",
+		State: backend.TaskDone, StartedAt: time.Now().Add(-3 * time.Hour)})
+	if got := a.lastOrderNote(); got != "" {
+		t.Fatalf("a three-hour-old order was shown: %q", got)
+	}
+}
+
+// Nothing waiting says not to wait here, rather than a bare "nothing".
+func TestAnEmptyInboxSaysNotToPoll(t *testing.T) {
+	h := newMailHive(t)
+	tools := &toolRecorder{}
+	h.w1.registerMailTools(tools)
+	out, err := tools.fns["hive_inbox"](context.Background(), map[string]any{})
+	if err != nil || !strings.Contains(out.(string), "end your turn") {
+		t.Fatalf("empty inbox said %v %v", out, err)
+	}
+}
+
+type toolRecorder struct {
+	fns map[string]func(context.Context, map[string]any) (any, error)
+}
+
+func (r *toolRecorder) AddToolWithMetadata(name, _ string, _ map[string]any, fn func(context.Context, map[string]any) (any, error), _ agent.ToolMetadata) {
+	if r.fns == nil {
+		r.fns = map[string]func(context.Context, map[string]any) (any, error){}
+	}
+	r.fns[name] = fn
 }
