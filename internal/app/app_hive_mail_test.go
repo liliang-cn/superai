@@ -18,21 +18,21 @@ import (
 // emits is recorded, so a test can see who saw which message.
 type mailHive struct {
 	queen, w1, w2 *App
+	mu            sync.Mutex                   // the servers record from their own goroutines
 	seen          map[string]*[]map[string]any // by member name, the hive:message events it emitted
 }
 
 func newMailHive(t *testing.T) *mailHive {
 	t.Helper()
 	h := &mailHive{seen: map[string]*[]map[string]any{}}
-	var mu sync.Mutex
 	serve := func(a *App, name string) *httptest.Server {
 		var got []map[string]any
 		h.seen[name] = &got
 		a.emitFn = func(ev string, p map[string]any) {
 			if ev == "hive:message" {
-				mu.Lock()
+				h.mu.Lock()
 				got = append(got, p)
-				mu.Unlock()
+				h.mu.Unlock()
 			}
 		}
 		mux := http.NewServeMux()
@@ -62,7 +62,11 @@ func newMailHive(t *testing.T) *mailHive {
 	return h
 }
 
-func (h *mailHive) events(name string) []map[string]any { return *h.seen[name] }
+func (h *mailHive) events(name string) []map[string]any {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return append([]map[string]any(nil), *h.seen[name]...)
+}
 
 func TestAWorkerWritesToTheQueenByRole(t *testing.T) {
 	h := newMailHive(t)

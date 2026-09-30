@@ -229,7 +229,7 @@ func NewService(s *Settings) (*Service, error) {
 
 	// --- Build the agent service. ---
 	b := agent.New("SuperAI").
-		WithPrompt(buildPersona(time.Now(), !s.DisableSelfInstall, s.ExternalAgents.Enabled) + uiRulesSection()).
+		WithPrompt(buildPersona(time.Now(), !s.DisableSelfInstall, s.ExternalAgents.Enabled) + hiveSection(s.Hive) + uiRulesSection()).
 		WithConfig(cfg).
 		WithLLM(brain).
 		WithSandbox(sb).
@@ -836,6 +836,23 @@ Duties:
 
 Never answer in English, Japanese or Korean — always Chinese.`,
 		now.Format("2006-01-02"), now.Format("15:04:05"), now.Format("Monday"), now.Format("-07:00"), installHint, delegateHint)
+}
+
+// hiveSection tells a member of a hive who it is there. Without it every
+// worker believed it was "SuperAI": asked to save something under its own
+// name, ten workers wrote to one key and each overwrote the last.
+func hiveSection(h HiveSettings) string {
+	switch h.Role {
+	case HiveRoleWorker:
+		return fmt.Sprintf(`
+
+In the hive you are %[1]s, a worker. Orders from the queen arrive as turns like any other. Wherever a task asks for your name, or for something per member — a key, a path, a label — you are %[1]s, not SuperAI. The other members share your memory, so anything you save under a name that is not yours may overwrite theirs.`, h.Self())
+	case HiveRoleQueen:
+		return fmt.Sprintf(`
+
+In the hive you are %[1]s, the queen. Workers' reports are evidence: when they disagree — different numbers, different lists — say so and quote them. Explain a difference only with something a report actually says; otherwise say it is unexplained.`, h.Self())
+	}
+	return ""
 }
 
 // uiRulesSection appends the transcript's rendering rules to the persona, so

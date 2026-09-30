@@ -55,6 +55,12 @@ jobs:
             exit 1
           fi
 
+      # go.sum must be complete on its own. token2money was red for seven
+      # weeks because the missing sums were in an untracked go.work.sum, so
+      # every local build passed and only a clean checkout failed.
+      - name: go mod tidy
+        run: GOWORK=off go mod tidy -diff
+
       - name: go vet
         run: go vet ./...
 
@@ -67,13 +73,16 @@ jobs:
       - name: go test
         run: go test ./... -count=3 -timeout 15m
 
-      # Not a gate. Two races live inside the CLIProxyAPI dependency
-      # (TestEffectiveRoutesThroughProxy, TestCLIProxyAccounts) and are not
-      # ours to fix, so a failure here is reported and read rather than
-      # blocking. Remove the `|| true` once the dependency is fixed.
-      - name: go test -race (advisory)
+      # A gate for everything but the tests that start the embedded proxy:
+      # CLIProxyAPI's Server.Start reads what its watcher's UpdateClients
+      # writes, a race inside the dependency and not ours to fix. While the
+      # whole run was advisory, two races of our own sat in it unread.
+      - name: go test -race
+        run: go test ./... -race -count=1 -timeout 20m -skip 'TestEffectiveRoutesThroughProxy|TestCLIProxyAccounts|TestCLIProxyLifecycle|TestAccountChangesAreNotRevertedByTheProxy'
+
+      - name: go test -race (dependency races, advisory)
         continue-on-error: true
-        run: go test ./... -race -count=1 -timeout 20m
+        run: go test ./... -race -count=1 -timeout 20m -run 'TestEffectiveRoutesThroughProxy|TestCLIProxyAccounts|TestCLIProxyLifecycle|TestAccountChangesAreNotRevertedByTheProxy'
 
   frontend:
     name: Frontend

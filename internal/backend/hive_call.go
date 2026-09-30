@@ -117,8 +117,7 @@ func askWorker(ctx context.Context, t workerTarget, prompt string, progress func
 	streamErr := make(chan error, 1)
 	go func() {
 		defer close(events)
-		sc := bufio.NewScanner(resp.Body)
-		sc.Buffer(make([]byte, 0, 64<<10), 8<<20)
+		sc := newEventLines(resp.Body, 8<<20)
 		for sc.Scan() {
 			line := sc.Text()
 			if !strings.HasPrefix(line, "data: ") {
@@ -293,3 +292,53 @@ func readTurnCost(payload map[string]any, res *RemoteResult) {
 	res.CostUSD, _ = payload["estimated_cost_usd"].(float64)
 	res.CostUnpriced, _ = payload["cost_unpriced"].(bool)
 }
+
+// eventLines reads an event stream a line at a time, and passes over a line
+// longer than max instead of stopping at it. The stream carries every
+// conversation on the worker, so the line too long is usually someone else's
+// tool result; a bufio.Scanner ends the stream there, and the queen was told
+// the worker was lost while it was still working on her order.
+type eventLines struct {
+	r    *bufio.Reader
+	max  int
+	line string
+	err  error
+}
+
+func newEventLines(r io.Reader, max int) *eventLines {
+	return &eventLines{r: bufio.NewReaderSize(r, 64<<10), max: max}
+}
+
+func (e *eventLines) Scan() bool {
+	for {
+		var buf []byte
+		over := false
+		for {
+			frag, isPrefix, err := e.r.ReadLine()
+			if err != nil {
+				if err != io.EOF {
+					e.err = err
+				}
+				return false
+			}
+			if !over {
+				if len(buf)+len(frag) > e.max {
+					over, buf = true, nil
+				} else {
+					buf = append(buf, frag...)
+				}
+			}
+			if !isPrefix {
+				break
+			}
+		}
+		if over {
+			continue
+		}
+		e.line = string(buf)
+		return true
+	}
+}
+
+func (e *eventLines) Text() string { return e.line }
+func (e *eventLines) Err() error   { return e.err }
