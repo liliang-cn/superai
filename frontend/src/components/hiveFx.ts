@@ -41,7 +41,7 @@ export interface StagePulse {
 /** A message's first words, for the tag beside whoever sent it. */
 export function mailTag(text?: string): string {
   const t = (text || "").replace(/\s+/g, " ").trim();
-  return `✉ ${t.length > 28 ? t.slice(0, 27) + "…" : t}`;
+  return `✉ ${t.length > 20 ? t.slice(0, 19) + "…" : t}`;
 }
 
 export interface StageHandle {
