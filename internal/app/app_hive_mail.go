@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"sort"
 	"time"
 
 	"github.com/liliang-cn/agent-go/v3/pkg/agent"
@@ -20,6 +21,15 @@ import (
 func (a *App) mailbox() *backend.Mailbox {
 	a.hiveMailOnce.Do(func() { a.hiveMail = backend.NewMailbox(200) })
 	return a.hiveMail
+}
+
+// seenMail is the traffic between workers this queen has seen, built on first
+// use. Without it she could tell only from the panel how far a relay between
+// workers had got; the model has no panel, so she ordered a worker to check
+// its inbox again, and the step it had already taken was taken twice.
+func (a *App) seenMail() *backend.Mailbox {
+	a.hiveSeenOnce.Do(func() { a.hiveSeen = backend.NewMailbox(200) })
+	return a.hiveSeen
 }
 
 // hiveContacts is everyone this member can write to, and its own name. A
@@ -114,6 +124,7 @@ func (a *App) handleHiveMessage(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		a.emitMessage(m, "peer")
+		a.seenMail().Put(m)
 		writeJSONStatus(w, http.StatusOK, map[string]any{"ok": true})
 		return
 	}
@@ -310,6 +321,7 @@ func (a *App) relayMessage(w http.ResponseWriter, r *http.Request, h *backend.Hi
 		return
 	}
 	a.emitMessage(m, "peer")
+	a.seenMail().Put(m)
 	writeJSONStatus(w, http.StatusOK, map[string]any{"ok": true, "via": "queen"})
 }
 
@@ -350,7 +362,9 @@ func (a *App) registerMailTools(inner interface {
 
 	inner.AddToolWithMetadata("hive_inbox",
 		"Read the messages other members of the hive sent you. Returns the unread ones and marks them read;"+
-			" with all, the last few whether read or not. Check it at the start of an order and when you are told mail is waiting.",
+			" with all, the last few whether read or not — and on the queen, the messages between workers too, marked"+
+			" observed, which is how to see how far work passed between workers has got."+
+			" Check it at the start of an order and when you are told mail is waiting.",
 		map[string]any{
 			"type": "object",
 			"properties": map[string]any{
@@ -364,6 +378,14 @@ func (a *App) registerMailTools(inner interface {
 				limit = 20
 			}
 			msgs := a.mailbox().Take(all, limit)
+			if all {
+				// Empty except on a queen.
+				msgs = append(msgs, a.seenMail().Take(true, limit)...)
+				sort.SliceStable(msgs, func(i, j int) bool { return msgs[i].At.Before(msgs[j].At) })
+				if len(msgs) > limit {
+					msgs = msgs[len(msgs)-limit:]
+				}
+			}
 			if len(msgs) == 0 {
 				if all {
 					return "No messages.", nil

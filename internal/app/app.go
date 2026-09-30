@@ -91,6 +91,10 @@ type App struct {
 	// hiveMail is this member's inbox. See backend/hive_mail.go.
 	hiveMail     *backend.Mailbox
 	hiveMailOnce sync.Once
+	// hiveSeen is, on a queen, the messages between workers she has seen go
+	// by: the copies they send her, and the ones she carried.
+	hiveSeen     *backend.Mailbox
+	hiveSeenOnce sync.Once
 	// mailWaking is, per sender, whether a goroutine is already waiting to
 	// take that sender's mail up in a turn.
 	mailWaking map[string]bool
