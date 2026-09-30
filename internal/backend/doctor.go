@@ -167,6 +167,15 @@ func applySettingsProvider(out *DoctorReport, home string) {
 		}
 	}
 	out.Checks = append(out.Checks, pricing)
+	window := DoctorCheck{Name: "llm.window", Status: "ok", Detail: st.LLMModel + " has a known context window"}
+	if _, known := pool.LookupModelWindow(st.LLMModel); !known {
+		window = DoctorCheck{
+			Name: "llm.window", Status: "warn",
+			Detail: "no context window for " + st.LLMModel + "; conversations compact at a fixed 60k tokens",
+			Fix:    "set llm_context_tokens (and llm_max_output_tokens) in settings.json",
+		}
+	}
+	out.Checks = append(out.Checks, window)
 }
 
 // Agent CLIs installed on this machine.

@@ -20,14 +20,19 @@ type Settings struct {
 	LLMBaseURL string `json:"llm_base_url"`
 	LLMKey     string `json:"llm_key"`
 	LLMModel   string `json:"llm_model"`
-	// Rates for LLMModel, USD per 1k tokens. agent-go prices a run from its
-	// own table, which knows the public model names and nothing about a
-	// gateway alias like gemini-3.7-flash-high; unpriced, every cost reads 0
-	// and the spend ceilings never trigger. Set these and the run wall, the
-	// health card and MaxTotalCostUSD all start meaning something.
+	// Rates for LLMModel, USD per 1k tokens. agent-go has no price table of its
+	// own: unpriced, every cost reads 0 and the spend ceilings never trigger.
+	// Set these and the run wall, the health card and MaxTotalCostUSD all
+	// start meaning something.
 	LLMPriceInputPer1K  float64 `json:"llm_price_input_per_1k,omitempty"`
 	LLMPriceCachedPer1K float64 `json:"llm_price_cached_per_1k,omitempty"`
 	LLMPriceOutputPer1K float64 `json:"llm_price_output_per_1k,omitempty"`
+	// LLMContextTokens is LLMModel's context window, and LLMMaxOutputTokens the
+	// most one response may use. agent-go derives when to compact from the
+	// window and knows none by itself; unset, it compacts at a fixed 60k
+	// tokens, a sixteenth of a 1M-token model.
+	LLMContextTokens   int `json:"llm_context_tokens,omitempty"`
+	LLMMaxOutputTokens int `json:"llm_max_output_tokens,omitempty"`
 
 	// Embeddings (optional). If EmbedKey is empty or "none", SuperAI falls back
 	// to file memory so chat-only proxies still work.
@@ -512,6 +517,7 @@ func (s *Settings) backfill(def *Settings) {
 		s.CLIProxyPort = def.CLIProxyPort
 	}
 	s.registerPricing()
+	s.registerWindow()
 	// An older settings file has no memory_backend; it was on local memory, so
 	// that is what it stays on.
 	if s.MemoryBackend != MemoryBackendShared {
@@ -550,6 +556,19 @@ func (s *Settings) registerPricing() {
 		InputPer1K:       s.LLMPriceInputPer1K,
 		CachedInputPer1K: s.LLMPriceCachedPer1K,
 		OutputPer1K:      s.LLMPriceOutputPer1K,
+	})
+}
+
+// registerWindow tells agent-go how much the brain's model holds, when the
+// settings say.
+func (s *Settings) registerWindow() {
+	model := strings.TrimSpace(s.LLMModel)
+	if model == "" || s.LLMContextTokens <= 0 {
+		return
+	}
+	pool.RegisterModelWindow(model, pool.ModelWindow{
+		ContextTokens:   s.LLMContextTokens,
+		MaxOutputTokens: s.LLMMaxOutputTokens,
 	})
 }
 

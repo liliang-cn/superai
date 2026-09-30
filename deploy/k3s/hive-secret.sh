@@ -41,12 +41,25 @@ base.update(memory_backend='shared', shared_memory_endpoint=s['shared_memory_end
             # Off: the default starts an embedded proxy with no accounts in it and
             # routes the model through that, which answers "unknown provider".
             cliproxy_enabled=False)
+# What the model costs, so a turn's cost is a number and not "unpriced": agent-go
+# has no Gemini rates of its own. Gemini 3.8 Flash's introductory prices, per
+# 1K tokens, valid through 2026-12-31 (ai.google.dev/gemini-api/docs/pricing);
+# from 2027-01-01 they double to 0.0015 / 0.00015 / 0.0075.
+if base.get('llm_model', '').startswith('gemini-3.8-flash'):
+    base.update(llm_price_input_per_1k=0.00075, llm_price_cached_per_1k=0.000075, llm_price_output_per_1k=0.00375)
+    # And what it holds (the model page, ai.google.dev/gemini-api/docs/models):
+    # without it the conversation compacts at 60k tokens of a 1M window.
+    base.update(llm_context_tokens=1048576, llm_max_output_tokens=65536)
 # Roles, not a list. The queen accepts joins; a worker announces itself to it
 # (superai-hive/1, see internal/backend/hive.go), so the roster is whoever is
 # actually there and adding a worker is raising the replica count.
 # The queen may resize the workers' StatefulSet — its own ServiceAccount says how
 # far (superai-operator) and max_workers says how many.
-queen = dict(base, hive={'role': 'queen', 'name': 'queen',
+# The queen runs unattended too: orders come from the console, from schedules
+# and from other programs as often as from a person at the web page, and a
+# shell call she made waited two minutes for an approval nobody was there to
+# give. Like the workers, she is bounded by her pod's Role instead.
+queen = dict(base, disable_tool_approval=True, hive={'role': 'queen', 'name': 'queen',
                          'spawner': {'kind': 'kubectl', 'namespace': '$NS', 'statefulset': 'superai-worker', 'max_workers': 20}})
 # Workers act with nobody at a keyboard to approve a tool call, so the gate would
 # only make every command hang. The pod's Role is what bounds them instead.

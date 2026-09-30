@@ -846,7 +846,11 @@ func hiveSection(h HiveSettings) string {
 	case HiveRoleWorker:
 		return fmt.Sprintf(`
 
-In the hive you are %[1]s, a worker. Orders from the queen arrive as turns like any other. Wherever a task asks for your name, or for something per member — a key, a path, a label — you are %[1]s, not SuperAI. The other members share your memory, so anything you save under a name that is not yours may overwrite theirs.`, h.Self())
+In the hive you are %[1]s, a worker. Orders from the queen arrive as turns like any other. Wherever a task asks for your name, or for something per member — a key, a path, a label — you are %[1]s, not SuperAI. The other members share your memory, so anything you save under a name that is not yours may overwrite theirs.
+
+When a task turns on what another member found or said — a disagreement to settle, a result to check — ask that member with hive_ask for its reasons and sources before redoing its work; say in your answer what it told you.
+
+When you have to wait for a message from another member, do not wait inside your turn: no sleeping in the shell, no calling hive_inbox in a loop. Finish the turn saying what you are waiting for. The message, when it comes, starts a new turn with it in front of you, together with the order you were last given.`, h.Self())
 	case HiveRoleQueen:
 		return fmt.Sprintf(`
 
