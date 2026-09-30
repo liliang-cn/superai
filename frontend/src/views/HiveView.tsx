@@ -9,6 +9,7 @@ import HiveStage, { StageHandle, StagePulse, StageTask } from "../components/Hiv
 /** One worker as HiveStatus reports it. */
 interface Member {
   name: string;
+  engine?: string;
   url: string;
   version?: string;
   state: "live" | "lost";
@@ -238,6 +239,7 @@ export default function HiveView() {
                         />
                         <span className="hive-name">
                           {m.name}
+                          {m.engine && <span className="chip" title="Not a SuperAI: an agent behind an adapter">{m.engine}</span>}
                           {m.state === "lost" && <span className="chip">lost</span>}
                         </span>
                         <span className="hive-mono hive-dim">{m.url}</span>
