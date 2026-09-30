@@ -26,6 +26,7 @@ type MapResult struct {
 	Index    int    `json:"index"`
 	Prompt   string `json:"prompt"`
 	Worker   string `json:"worker"`
+	TaskID   string `json:"task_id,omitempty"`
 	Text     string `json:"text"`
 	OK       bool   `json:"ok"`
 	Reason   string `json:"reason,omitempty"`
@@ -141,6 +142,7 @@ func MapOrders(ctx context.Context, r Runner, prompts []string, opt MapOptions) 
 
 			mu.Lock()
 			results[it.idx].Worker, results[it.idx].Attempts = w, it.attempt
+			results[it.idx].TaskID = res.TaskID
 			results[it.idx].MS += res.MS
 			if ok {
 				results[it.idx].OK, results[it.idx].Text, results[it.idx].Reason = true, res.Text, ""

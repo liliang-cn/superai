@@ -14,6 +14,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/liliang-cn/agent-go/v3/pkg/domain"
+
 	"github.com/google/uuid"
 )
 
@@ -232,6 +234,7 @@ func askWorker(ctx context.Context, t workerTarget, prompt string, progress func
 			}
 			text, _ := ev.Payload["final"].(string)
 			res.Text = strings.TrimSpace(text)
+			readTurnCost(ev.Payload, &res)
 			switch ev.Name {
 			case "chat:error":
 				msg, _ := ev.Payload["error"].(string)
@@ -269,4 +272,24 @@ func cancelWorker(base, token, requestID string) {
 	if resp, err := workerHTTP.Do(req); err == nil {
 		resp.Body.Close()
 	}
+}
+
+// readTurnCost takes what a worker reported about its turn's cost out of a
+// terminal event. A worker built before it reported any leaves everything at
+// its zero value, and Usage nil is exactly how "it did not say" is spelled.
+func readTurnCost(payload map[string]any, res *RemoteResult) {
+	if u, ok := payload["usage"].(map[string]any); ok {
+		n := func(k string) int {
+			f, _ := u[k].(float64)
+			return int(f)
+		}
+		res.Usage = &domain.TokenUsage{
+			PromptTokens:       n("prompt_tokens"),
+			CompletionTokens:   n("completion_tokens"),
+			CachedPromptTokens: n("cached_prompt_tokens"),
+			CacheWriteTokens:   n("cache_write_tokens"),
+		}
+	}
+	res.CostUSD, _ = payload["estimated_cost_usd"].(float64)
+	res.CostUnpriced, _ = payload["cost_unpriced"].(bool)
 }

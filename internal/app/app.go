@@ -761,7 +761,7 @@ func (a *App) SendChat(sessionID, message string, imagePaths []string) string {
 		driver.Emit(backend.AvatarEvent{Type: "state", State: backend.AvatarStateThinking})
 
 		pulser := backend.NewPulser(func(kind, tool string, n int) { board.Pulse(taskID, kind, tool, n) })
-		final, err := svc.Stream(ctx, sessionID, message, imagePaths, func(ev *agent.Event) {
+		turn, err := svc.StreamTurn(ctx, sessionID, message, imagePaths, func(ev *agent.Event) {
 			if taskID != "" {
 				resultLen := 0
 				if ev.ToolResult != nil {
@@ -809,6 +809,7 @@ func (a *App) SendChat(sessionID, message string, imagePaths []string) string {
 		// an ordinary workflow_cancelled event with a nil error — so without
 		// it, a turn cut short would settle as a successful answer with
 		// nothing in it.
+		final := turn.Text
 		if a.runCancelled(requestID) || errors.Is(err, context.Canceled) || ctx.Err() != nil {
 			driver.Emit(backend.AvatarEvent{Type: "state", State: backend.AvatarStateIdle})
 			partial, _ := backend.SplitEmotion(final)
@@ -833,7 +834,21 @@ func (a *App) SendChat(sessionID, message string, imagePaths []string) string {
 		}
 		driver.Emit(backend.AvatarEvent{Type: "state", State: backend.AvatarStateIdle})
 		board.Finish(taskID, backend.TaskDone, reply, "")
-		a.emit("chat:done", map[string]any{"requestId": requestID, "final": reply, "emotion": emotion})
+		// What the turn cost rides along, so a queen that ordered it can add
+		// it to its own accounting instead of reading the worker as free.
+		done := map[string]any{
+			"requestId": requestID, "final": reply, "emotion": emotion,
+			"estimated_cost_usd": turn.CostUSD, "cost_unpriced": turn.CostUnpriced,
+		}
+		if turn.Usage != nil {
+			done["usage"] = map[string]any{
+				"prompt_tokens":        turn.Usage.PromptTokens,
+				"completion_tokens":    turn.Usage.CompletionTokens,
+				"cached_prompt_tokens": turn.Usage.CachedPromptTokens,
+				"cache_write_tokens":   turn.Usage.CacheWriteTokens,
+			}
+		}
+		a.emit("chat:done", done)
 	}()
 
 	return requestID

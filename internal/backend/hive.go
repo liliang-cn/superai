@@ -88,6 +88,23 @@ type HiveSettings struct {
 	Spawner *SpawnerSettings `json:"spawner,omitempty"`
 	// IntervalSeconds between announcements. Zero takes the default.
 	IntervalSeconds int `json:"interval_seconds,omitempty"`
+	// MaxConcurrentOrders is how many turns a worker runs at once, orders and
+	// its own person's together. Zero takes DefaultMaxConcurrentOrders. Past
+	// it a turn is refused rather than queued, so the queen's scheduler moves
+	// the order to a worker that is free instead of waiting on one that is not.
+	MaxConcurrentOrders int `json:"max_concurrent_orders,omitempty"`
+}
+
+// DefaultMaxConcurrentOrders is the worker's concurrency when the settings
+// do not say: one order from the queen, one question from a peer, and one
+// person at the keyboard.
+const DefaultMaxConcurrentOrders = 3
+
+func (h HiveSettings) Concurrency() int {
+	if h.MaxConcurrentOrders <= 0 {
+		return DefaultMaxConcurrentOrders
+	}
+	return h.MaxConcurrentOrders
 }
 
 func (h HiveSettings) Interval() time.Duration {
