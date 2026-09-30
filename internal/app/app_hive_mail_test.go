@@ -433,3 +433,26 @@ func (r *toolRecorder) AddToolWithMetadata(name, _ string, _ map[string]any, fn 
 	}
 	r.fns[name] = fn
 }
+
+// The queen can see how far work passed between workers has got: without it
+// she ordered a worker to check its inbox again, and it repeated its step.
+func TestTheQueenSeesTheTrafficBetweenWorkers(t *testing.T) {
+	h := newMailHive(t)
+	if _, err := h.w1.hiveSend(context.Background(), "w2", "leg 1: 18e99f0d6bff", ""); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(3 * time.Second)
+	for len(h.events("q")) == 0 && time.Now().Before(deadline) {
+		time.Sleep(20 * time.Millisecond)
+	}
+	tools := &toolRecorder{}
+	h.queen.registerMailTools(tools)
+	out, err := tools.fns["hive_inbox"](context.Background(), map[string]any{"all": true})
+	if err != nil || !strings.Contains(out.(string), "18e99f0d6bff") || !strings.Contains(out.(string), `"observed":true`) {
+		t.Fatalf("queen's inbox with all: %v %v", out, err)
+	}
+	// Unread is still only her own mail.
+	if out, _ := tools.fns["hive_inbox"](context.Background(), map[string]any{}); strings.Contains(out.(string), "18e99f0d6bff") {
+		t.Fatalf("someone else's message came in as the queen's unread mail: %v", out)
+	}
+}

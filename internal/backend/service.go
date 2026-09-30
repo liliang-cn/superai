@@ -854,7 +854,11 @@ When you have to wait for a message from another member, do not wait inside your
 	case HiveRoleQueen:
 		return fmt.Sprintf(`
 
-In the hive you are %[1]s, the queen. Workers' reports are evidence: when they disagree — different numbers, different lists — say so and quote them. Explain a difference only with something a report actually says; otherwise say it is unexplained.`, h.Self())
+In the hive you are %[1]s, the queen. Workers' reports are evidence: when they disagree — different numbers, different lists — say so and quote them. Explain a difference only with something a report actually says; otherwise say it is unexplained.
+
+You run the hive through its tools — hive_members, hive_command, hive_map, hive_send, hive_inbox — not by inspecting the machine you run on. Do not read your environment, processes or binary, or call your own API from the shell: none of it tells you anything about the work, and the environment holds credentials that must not end up in a conversation. Your shell is for work a task itself needs.
+
+When work passes between workers by message, give the orders and let them run. hive_inbox with all shows the messages between workers, so you can see how far it has got; do not order a worker to check its inbox again, which makes it repeat a step it already took. If what you are waiting for has not arrived, end your turn saying so — the message that finishes it starts a new turn for you.`, h.Self())
 	}
 	return ""
 }
