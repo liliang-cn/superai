@@ -15,7 +15,8 @@ RUN go mod download
 COPY . .
 COPY --from=web /src/frontend/dist ./frontend/dist
 RUN go build -trimpath -ldflags "-s -w" -o /out/superai-desktop . \
- && go build -trimpath -ldflags "-s -w" -o /out/superai-daemon ./cmd/superai-daemon
+ && go build -trimpath -ldflags "-s -w" -o /out/superai-daemon ./cmd/superai-daemon \
+ && go build -trimpath -ldflags "-s -w" -o /out/superai-hive-worker ./cmd/superai-hive-worker
 
 FROM alpine:3.21 AS kubectl
 ARG TARGETARCH

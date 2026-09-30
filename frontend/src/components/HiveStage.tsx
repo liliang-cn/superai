@@ -45,6 +45,8 @@ export interface StageHandle {
 export interface StageWorker {
   name: string;
   state: "live" | "lost";
+  /** What is behind it when it is not a SuperAI, e.g. "cli · claude". */
+  engine?: string;
 }
 
 interface Props {
@@ -368,7 +370,7 @@ const HiveStage = forwardRef<StageHandle, Props>(function HiveStage({ role, self
       }
 
       // Nodes.
-      const drawNode = (id: string, label: string, r0: number, kind: "queen" | "worker", lost: boolean) => {
+      const drawNode = (id: string, label: string, r0: number, kind: "queen" | "worker", lost: boolean, engine?: string) => {
         const c = pos.get(id);
         if (!c) return;
         const task = nodeState(id, now);
@@ -443,7 +445,7 @@ const HiveStage = forwardRef<StageHandle, Props>(function HiveStage({ role, self
         ctx.fillText(short(label), c.x, c.y + r + (task ? 34 : 20));
         ctx.font = "11px ui-monospace, SFMono-Regular, monospace";
         ctx.fillStyle = pal.dim;
-        let sub = lost ? "lost" : kind === "queen" ? "queen" : "idle";
+        let sub = lost ? "lost" : kind === "queen" ? "queen" : engine ? `idle · ${engine}` : "idle";
         if (task) {
           const secs = Math.max(0, Math.round((Date.now() - Date.parse(task.started_at)) / 1000));
           sub =
@@ -459,7 +461,7 @@ const HiveStage = forwardRef<StageHandle, Props>(function HiveStage({ role, self
         // Smaller cells as the hive fills, so a crowd stays a honeycomb and not a
         // pile.
         const wr = ws.length > 14 ? 15 : ws.length > 8 ? 20 : 26;
-        ws.forEach((w) => drawNode(w.name, w.name, wr, "worker", w.state === "lost"));
+        ws.forEach((w) => drawNode(w.name, w.name, wr, "worker", w.state === "lost", w.engine));
         drawNode(QUEEN, me || "queen", 36, "queen", false);
       } else if (rl === "worker") {
         drawNode(QUEEN, "queen", 30, "queen", false);

@@ -284,13 +284,18 @@ func (r *RemoteRunner) SetRoster(f func() map[string]RemoteAgent) { r.roster = f
 // the Enabled switch governs commands run over SSH, not a hive the operator
 // set up by giving this instance the queen role.
 func (r *RemoteRunner) lookup(name string) (RemoteAgent, bool, bool) {
-	if a, ok := r.cfg.Agents[name]; ok {
-		return a, true, false
-	}
+	// A worker that is in the hive right now wins over a configured agent of the
+	// same name. It found the queen and said so a few seconds ago; the entry in
+	// the settings is a default that may never have been switched on. The other
+	// order broke a real case: an openclaw joined the hive under its own name and
+	// every order to it hit the (disabled) ssh agent of that name instead.
 	if r.roster != nil {
 		if a, ok := r.roster()[name]; ok {
 			return a, true, true
 		}
+	}
+	if a, ok := r.cfg.Agents[name]; ok {
+		return a, true, false
 	}
 	return RemoteAgent{}, false, false
 }
@@ -307,7 +312,7 @@ func (r *RemoteRunner) Workers() map[string]RemoteAgent {
 	if r.roster != nil {
 		for n, a := range r.roster() {
 			if a.URL != "" {
-				out[n] = a
+				out[n] = a // the live worker, as in lookup
 			}
 		}
 	}

@@ -106,6 +106,10 @@ type HiveHello struct {
 	Token     string    `json:"token,omitempty"`
 	Version   string    `json:"version,omitempty"`
 	StartedAt time.Time `json:"started_at"`
+	// Engine says what is behind this worker when it is not a SuperAI ("cli ·
+	// claude"), and About is a line for the roster. Both are only labels.
+	Engine string `json:"engine,omitempty"`
+	About  string `json:"about,omitempty"`
 }
 
 // HiveWelcome is the queen's answer.
@@ -129,6 +133,8 @@ type HiveMember struct {
 	// different ones, which is what tells a new worker from the last
 	// heartbeat of the one it replaced.
 	StartedAt time.Time `json:"started_at"`
+	Engine    string    `json:"engine,omitempty"`
+	about     string
 	// State is "live" or "lost", computed when asked rather than stored, so it
 	// cannot go stale between sweeps.
 	State string `json:"state"`
@@ -185,7 +191,7 @@ func (h *Hive) Join(hello HiveHello) (HiveWelcome, error) {
 		log.Printf("hive: %s is back at %s", hello.Name, hello.URL)
 	}
 	m.Role, m.URL, m.Version, m.token, m.LastSeen = hello.Role, strings.TrimRight(hello.URL, "/"), hello.Version, hello.Token, now
-	m.StartedAt = hello.StartedAt
+	m.StartedAt, m.Engine, m.about = hello.StartedAt, hello.Engine, hello.About
 	return HiveWelcome{
 		Protocol: HiveProtocol, Queen: h.name,
 		IntervalMS: int(h.interval / time.Millisecond), Members: len(h.members),
@@ -245,8 +251,14 @@ func (h *Hive) Agents() map[string]RemoteAgent {
 		if h.stateLocked(m, now) != "live" {
 			continue
 		}
+		about := fmt.Sprintf("%s — a worker in the hive, at %s. It has its own tools and the shared memory.", name, m.URL)
+		if m.about != "" {
+			about = fmt.Sprintf("%s — %s", name, m.about)
+		} else if m.Engine != "" {
+			about = fmt.Sprintf("%s — a %s agent in the hive, at %s.", name, m.Engine, m.URL)
+		}
 		out[name] = RemoteAgent{
-			About: fmt.Sprintf("%s — a worker in the hive, at %s. It has its own tools and the shared memory.", name, m.URL),
+			About: about,
 			URL:   m.URL, Token: m.token,
 		}
 	}
@@ -260,6 +272,9 @@ type Announcer struct {
 	// and used to authenticate the join when JoinToken is empty.
 	Token   string
 	Version string
+	// Engine and About label a worker that is not a SuperAI. See HiveHello.
+	Engine string
+	About  string
 
 	started time.Time
 	client  *http.Client
@@ -340,7 +355,7 @@ func (a *Announcer) Once(ctx context.Context) (HiveWelcome, error) {
 	}
 	body, _ := json.Marshal(HiveHello{
 		Protocol: HiveProtocol, Name: a.Name(), Role: HiveRoleWorker, URL: a.advertise(),
-		Token: a.Token, Version: a.Version, StartedAt: a.started,
+		Token: a.Token, Version: a.Version, StartedAt: a.started, Engine: a.Engine, About: a.About,
 	})
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
 		strings.TrimRight(a.Settings.JoinURL, "/")+"/api/hive/join", bytes.NewReader(body))
