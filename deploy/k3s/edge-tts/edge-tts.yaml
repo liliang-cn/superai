@@ -1,0 +1,29 @@
+# Microsoft Edge's neural voices behind OpenAI's speech endpoint, for the hive.
+# The queen reads answers aloud through it (tts_base_url in hive-secret.sh).
+# Build and load: see the top of server.py; the image is edge-tts:hive.
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: edge-tts, namespace: superai}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: edge-tts}}
+  template:
+    metadata: {labels: {app: edge-tts}}
+    spec:
+      containers:
+        - name: edge-tts
+          image: edge-tts:hive
+          imagePullPolicy: IfNotPresent
+          ports: [{containerPort: 43540}]
+          readinessProbe:
+            httpGet: {path: /healthz, port: 43540}
+          resources:
+            requests: {cpu: 20m, memory: 48Mi}
+            limits: {memory: 192Mi}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: edge-tts, namespace: superai}
+spec:
+  selector: {app: edge-tts}
+  ports: [{name: http, port: 43540, targetPort: 43540}]
