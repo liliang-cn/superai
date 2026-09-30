@@ -330,8 +330,12 @@ func (a *Announcer) record(err error) {
 }
 
 // Name is the configured name or, failing that, the hostname.
-func (a *Announcer) Name() string {
-	if n := strings.TrimSpace(a.Settings.Name); n != "" {
+func (a *Announcer) Name() string { return a.Settings.Self() }
+
+// Self is what this instance is called in the hive: the configured name, else
+// the hostname.
+func (h HiveSettings) Self() string {
+	if n := strings.TrimSpace(h.Name); n != "" {
 		return n
 	}
 	n, _ := os.Hostname()

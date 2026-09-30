@@ -87,12 +87,8 @@ func TestTwoAsksAtOnceStaySeparate(t *testing.T) {
 		Headless:     true,
 		DisablePTC:   true,
 	}
-	app.rebuild()
-	if app.svc == nil {
-		t.Fatalf("backend did not build: %s", app.buildErr)
-	}
-	t.Cleanup(func() { _ = app.svc.Close() })
-
+	// Set before rebuild, as serve mode does: rebuild starts the pulse, which
+	// emits from its own goroutine straight away.
 	var mu sync.Mutex
 	var events []captured
 	app.emitFn = func(name string, payload map[string]any) {
@@ -100,6 +96,11 @@ func TestTwoAsksAtOnceStaySeparate(t *testing.T) {
 		events = append(events, captured{name: name, payload: payload})
 		mu.Unlock()
 	}
+	app.rebuild()
+	if app.svc == nil {
+		t.Fatalf("backend did not build: %s", app.buildErr)
+	}
+	t.Cleanup(func() { _ = app.svc.Close() })
 
 	// Both sent before either can finish — the situation the UI could not
 	// previously represent.

@@ -106,13 +106,10 @@ func (a *App) hiveName() string {
 }
 
 func (a *App) hiveNameOf(s *backend.Settings) string {
-	if s != nil {
-		if n := strings.TrimSpace(s.Hive.Name); n != "" {
-			return n
-		}
+	if s == nil {
+		return backend.HiveSettings{}.Self()
 	}
-	n, _ := os.Hostname()
-	return n
+	return s.Hive.Self()
 }
 
 // hiveAgents is the roster as the runner sees it.

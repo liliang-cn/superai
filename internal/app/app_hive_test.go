@@ -146,7 +146,18 @@ func TestSpawnWaitsForTheNewWorkersToJoin(t *testing.T) {
 	a := queenWithSpawner(t, bin, 10)
 	join(a, "w-0")
 	join(a, "w-1")
-	go func() { time.Sleep(500 * time.Millisecond); join(a, "w-2") }()
+	// w-2 joins once the StatefulSet has been scaled, as a real pod would.
+	// A timer instead let it join before the spawn had read the replicas on a
+	// loaded machine, so it counted as already there and the spawn waited out
+	// its whole deadline for a worker that had arrived.
+	go func() {
+		for deadline := time.Now().Add(30 * time.Second); time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
+			if b, _ := os.ReadFile(state); string(b) == "3" {
+				join(a, "w-2")
+				return
+			}
+		}
+	}()
 
 	r := a.HiveSpawn(1)
 	if ok, _ := r["ok"].(bool); !ok {

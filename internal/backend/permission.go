@@ -422,7 +422,11 @@ func (g *ToolGate) answer(ask ApprovalRequest, dec ApprovalDecision) (*agent.Per
 		dec.By = DecidedByUser
 	}
 	g.record(ask, dec)
-	return &agent.PermissionResponse{Allowed: dec.Allowed, Reason: dec.Reason}, nil
+	// ContinueRun is what makes the paragraph above true: without it agent-go
+	// ends the run on any denial. A hive queen's turn once computed for
+	// nineteen minutes, asked for a shell nobody was watching, and answered
+	// with nothing but "nobody approved bash".
+	return &agent.PermissionResponse{Allowed: dec.Allowed, Reason: dec.Reason, ContinueRun: true}, nil
 }
 
 func (g *ToolGate) record(ask ApprovalRequest, dec ApprovalDecision) {
