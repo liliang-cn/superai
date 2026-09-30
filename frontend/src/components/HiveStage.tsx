@@ -67,6 +67,14 @@ type Burst = { at: string; t0: number; color: string };
 type Spark = { at: string; t0: number; a: number };
 
 const QUEEN = "\u0000queen";
+
+/** How much to shrink the picture for a short stage. A stage the height of a
+ *  desktop panel is drawn at full size; the corner of a console is a third of
+ *  that, and drawing the same nodes and the same 76px of label under each in it
+ *  stacked the bottom worker on the queen. Everything that has a size in pixels
+ *  goes through this, so the picture is the same picture, smaller. */
+const wrOf = (n: number) => (n > 14 ? 15 : n > 8 ? 20 : 26);
+const scaleFor = (h: number) => Math.max(0.5, Math.min(1, h / 460));
 const SELF = "\u0000self";
 
 const short = (n: string) => n.replace(/^superai-/, "");
@@ -85,7 +93,7 @@ function hexPath(ctx: CanvasRenderingContext2D, c: Pt, r: number, rot = 0) {
 
 const ease = (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
 
-function palette() {
+export function palette() {
   const css = getComputedStyle(document.documentElement);
   const v = (n: string, d: string) => css.getPropertyValue(n).trim() || d;
   // Everything comes from the theme's own variables, so a finish or a switch to
@@ -264,7 +272,9 @@ const HiveStage = forwardRef<StageHandle, Props>(function HiveStage({ role, self
         // as a share of the height instead clipped the last label at ten
         // workers and stacked two neighbours on top of each other.
         const rx = Math.min(W * 0.38, 480);
-        const ry = Math.max(80, Math.min(H / 2 - 96, 230));
+        const k = scaleFor(H);
+        // The room the bottom node's label needs below it, at this scale.
+        const ry = Math.max(50, Math.min(H / 2 - (wrOf(ws.length) * k + Math.max(50 * k, 38) + 12), 230));
         ws.forEach((w, i) => {
           const a = -Math.PI / 2 + (Math.PI * 2 * i) / n;
           m.set(w.name, { x: cx + rx * Math.cos(a), y: cy + ry * Math.sin(a) });
@@ -374,7 +384,8 @@ const HiveStage = forwardRef<StageHandle, Props>(function HiveStage({ role, self
         const c = pos.get(id);
         if (!c) return;
         const task = nodeState(id, now);
-        const r = r0 * (1 + 0.035 * breathe);
+        const k = scaleFor(H);
+        const r = r0 * k * (1 + 0.035 * breathe);
         const tone = lost ? pal.dim : kind === "queen" ? pal.accent : task ? pal.accent : pal.green;
         ctx.save();
         // Glow.
@@ -408,7 +419,7 @@ const HiveStage = forwardRef<StageHandle, Props>(function HiveStage({ role, self
           ctx.globalAlpha = 0.9;
           ctx.setLineDash([10, 9]);
           ctx.lineDashOffset = -now / 35;
-          hexPath(ctx, c, r + 11, now / 1600);
+          hexPath(ctx, c, r + 11 * k, now / 1600);
           ctx.stroke();
           ctx.restore();
           ctx.save();
@@ -419,7 +430,7 @@ const HiveStage = forwardRef<StageHandle, Props>(function HiveStage({ role, self
           for (let i = 0; i < arcs; i++) {
             const a0 = (Math.PI * 2 * i) / 12 - now / 900;
             ctx.beginPath();
-            ctx.arc(c.x, c.y, r + 20, a0, a0 + 0.35);
+            ctx.arc(c.x, c.y, r + 20 * k, a0, a0 + 0.35);
             ctx.stroke();
           }
           ctx.restore();
@@ -440,12 +451,19 @@ const HiveStage = forwardRef<StageHandle, Props>(function HiveStage({ role, self
         // Labels.
         ctx.save();
         ctx.textAlign = "center";
-        ctx.font = "600 12px ui-sans-serif, system-ui, sans-serif";
+        ctx.font = `600 ${Math.max(10, 12 * k)}px ui-sans-serif, system-ui, sans-serif`;
         ctx.fillStyle = lost ? pal.dim : pal.text;
-        ctx.fillText(short(label), c.x, c.y + r + (task ? 34 : 20));
-        ctx.font = "11px ui-monospace, SFMono-Regular, monospace";
+        // Labels point away from the queen. A worker in the upper half has the queen
+        // below it, and a label hung there ran into her; above is always clear.
+        const nameOff = Math.max((task ? 34 : 20) * k, task ? 24 : 14);
+        const subOff = Math.max((task ? 50 : 35) * k, task ? 38 : 26);
+        const above = rl === "queen" && kind === "worker" && c.y < H / 2 - 10;
+        const subY = above ? c.y - r - Math.max(8 * k, 7) : c.y + r + subOff;
+        const nameY = above ? subY - (subOff - nameOff) : c.y + r + nameOff;
+        ctx.fillText(short(label), c.x, nameY);
+        ctx.font = `${Math.max(9, 11 * k)}px ui-monospace, SFMono-Regular, monospace`;
         ctx.fillStyle = pal.dim;
-        let sub = lost ? "lost" : kind === "queen" ? "queen" : engine ? `idle · ${engine}` : "idle";
+        let sub = lost ? "lost" : kind === "queen" ? (label === "queen" ? "" : "queen") : engine ? `idle · ${engine}` : "idle";
         if (task) {
           const secs = Math.max(0, Math.round((Date.now() - Date.parse(task.started_at)) / 1000));
           sub =
@@ -453,14 +471,14 @@ const HiveStage = forwardRef<StageHandle, Props>(function HiveStage({ role, self
           sub += `  ${secs}s`;
           ctx.fillStyle = pal.accent;
         }
-        ctx.fillText(sub, c.x, c.y + r + (task ? 50 : 35));
+        ctx.fillText(sub, c.x, subY);
         ctx.restore();
       };
 
       if (rl === "queen") {
         // Smaller cells as the hive fills, so a crowd stays a honeycomb and not a
         // pile.
-        const wr = ws.length > 14 ? 15 : ws.length > 8 ? 20 : 26;
+        const wr = wrOf(ws.length);
         ws.forEach((w) => drawNode(w.name, w.name, wr, "worker", w.state === "lost", w.engine));
         drawNode(QUEEN, me || "queen", 36, "queen", false);
       } else if (rl === "worker") {
@@ -503,7 +521,7 @@ const HiveStage = forwardRef<StageHandle, Props>(function HiveStage({ role, self
         ctx.lineWidth = 3 * (1 - t) + 1;
         ctx.shadowColor = b.color;
         ctx.shadowBlur = 18 * pal.glow;
-        hexPath(ctx, c, 30 + t * 60, t);
+        hexPath(ctx, c, (30 + t * 60) * scaleFor(H), t);
         ctx.stroke();
         ctx.restore();
       }
@@ -519,23 +537,26 @@ const HiveStage = forwardRef<StageHandle, Props>(function HiveStage({ role, self
         ctx.globalAlpha = 0.6 * (1 - t);
         ctx.lineWidth = 1.6;
         ctx.beginPath();
-        ctx.arc(c.x, c.y, 16 + t * 20, 0, Math.PI * 2);
+        ctx.arc(c.x, c.y, (16 + t * 20) * scaleFor(H), 0, Math.PI * 2);
         ctx.stroke();
         ctx.restore();
       }
 
-      // The name of the tool, floating up from the worker that called it.
+      // The name of the tool, to the side of the worker that called it and drifting
+      // up as it fades. To the side, because above and below are where the node's
+      // own labels are.
       labels.current = labels.current.filter((l) => now - l.t0 < 1400);
       for (const l of labels.current) {
         const c = pos.get(l.at);
         if (!c) continue;
         const t = (now - l.t0) / 1400;
+        const k = scaleFor(H);
         ctx.save();
         ctx.globalAlpha = 1 - t * t;
         ctx.fillStyle = l.color;
-        ctx.font = "600 11px ui-monospace, SFMono-Regular, monospace";
-        ctx.textAlign = "center";
-        ctx.fillText(`⚙ ${l.text}`, c.x, c.y - 42 - t * 18);
+        ctx.font = `600 ${Math.max(9, 11 * k)}px ui-monospace, SFMono-Regular, monospace`;
+        ctx.textAlign = "left";
+        ctx.fillText(`⚙ ${l.text}`, c.x + (wrOf(live.current.workers.length) + 12) * k, c.y - 2 - t * 16 * k);
         ctx.restore();
       }
 
@@ -547,7 +568,7 @@ const HiveStage = forwardRef<StageHandle, Props>(function HiveStage({ role, self
         const t = (now - s.t0) / 600;
         for (let k = 0; k < 5; k++) {
           const a = s.a + (k * Math.PI * 2) / 5;
-          const d = 34 + t * 40;
+          const d = (34 + t * 40) * scaleFor(H);
           ctx.save();
           ctx.globalAlpha = 1 - t;
           ctx.fillStyle = pal.amber;
@@ -587,7 +608,7 @@ const HiveStage = forwardRef<StageHandle, Props>(function HiveStage({ role, self
   }, []);
 
   return (
-    <div className="hive-stage" ref={box}>
+    <div className="hive-stage-fill" ref={box}>
       <canvas ref={canvas} />
     </div>
   );

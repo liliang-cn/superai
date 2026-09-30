@@ -3678,3 +3678,11 @@ body.desktop-shell .sidebar.collapsed .nav-key { display: none; }
 .hive-uuid { font-family: var(--font-mono); font-size: 11.5px; color: var(--text-2); text-decoration: none; padding: 1px 6px; border: 1px solid var(--border); border-radius: 5px; }
 .hive-uuid:hover { color: var(--accent); border-color: var(--accent-border); }
 .hive-m-head { cursor: pointer; }
+
+/* The stage frame is the wrapper's; what is inside just fills it. */
+.hive-stage-fill { position: relative; width: 100%; height: 100%; min-height: 200px; overflow: hidden; }
+.hive-stage-fill canvas { position: absolute; left: 0; top: 0; }
+.hive-stage-mode { position: absolute; top: 10px; right: 12px; z-index: 5; display: flex; font-size: 11px; font-weight: 700; letter-spacing: 0.14em; }
+.hive-stage-mode button { padding: 3px 9px; color: var(--text-2); background: transparent; border: 0; cursor: pointer; transition: color 0.15s; }
+.hive-stage-mode button:hover { color: var(--text-0); }
+.hive-stage-mode button[aria-pressed="true"] { color: var(--accent); }

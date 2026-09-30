@@ -4,7 +4,8 @@ import { EventsOn } from "../../wailsjs/runtime";
 import { Link, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import HiveTaskPage, { FullTask } from "./HiveTaskPage";
 import { taskPath } from "../lib/routes";
-import HiveStage, { StageHandle, StagePulse, StageTask } from "../components/HiveStage";
+import HiveStageView from "../components/HiveStageView";
+import type { StageHandle, StagePulse, StageTask } from "../components/HiveStage";
 
 /** One worker as HiveStatus reports it. */
 interface Member {
@@ -163,7 +164,7 @@ export default function HiveView() {
         {err && <div className="hint err">{err}</div>}
         {st && (
           <>
-            <HiveStage ref={stage} role={st.role} self={st.name} workers={members} tasks={tasks} ready={ready} />
+            <HiveStageView ref={stage} role={st.role} self={st.name} workers={members} tasks={tasks} ready={ready} />
 
             <div className="card hive-self">
               <span className={`hive-role ${st.role || "alone"}`}>{st.role || "standalone"}</span>
