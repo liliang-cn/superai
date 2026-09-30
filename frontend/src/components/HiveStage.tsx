@@ -731,7 +731,7 @@ const HiveStage = forwardRef<StageHandle, Props>(function HiveStage({ role, self
         ctx.font = `600 ${Math.max(9, 11 * unit)}px ui-monospace, SFMono-Regular, monospace`;
         ctx.textAlign = "left";
         ctx.textBaseline = "middle";
-        ctx.fillText(`⚙ ${g.text}`, p.x + p.r + 8 * unit, p.y - 4 - u * 14 * unit);
+        ctx.fillText(g.text.startsWith("✉") ? g.text : `⚙ ${g.text}`, p.x + p.r + 8 * unit, p.y - 4 - u * 14 * unit);
         ctx.restore();
       }
     };
