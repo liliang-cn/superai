@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -243,6 +244,11 @@ func (a *Adapter) run(ctx context.Context, cancel context.CancelFunc, id string,
 		a.emit("chat:cancelled", map[string]any{"requestId": id, "final": ""})
 		return
 	}
+	// One line when a turn starts and one when it ends: nobody may be
+	// listening on the stream (a turn woken by a message has no caller), and
+	// without these a failing agent fails in silence.
+	started := time.Now()
+	log.Printf("turn %s: started: %s", id[:8], oneLine(prompt, 100))
 	var final string
 	var err error
 	if se, ok := a.Engine.(SteerableEngine); ok && se.Steerable() {
@@ -256,6 +262,15 @@ func (a *Adapter) run(ctx context.Context, cancel context.CancelFunc, id string,
 		a.mu.Unlock()
 	} else {
 		final, err = a.Engine.Run(ctx, prompt, ev)
+	}
+	took := time.Since(started).Round(time.Second)
+	switch {
+	case ctx.Err() != nil:
+		log.Printf("turn %s: cancelled after %s", id[:8], took)
+	case err != nil:
+		log.Printf("turn %s: failed after %s: %v", id[:8], took, err)
+	default:
+		log.Printf("turn %s: answered after %s: %s", id[:8], took, oneLine(final, 160))
 	}
 	switch {
 	case ctx.Err() != nil:

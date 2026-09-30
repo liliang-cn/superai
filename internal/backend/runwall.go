@@ -545,12 +545,14 @@ func (w *RunWall) List() []TaskSummary {
 
 // --- formatting ---
 
+// oneLine squeezes s onto one line of at most max runes — runes, so a cut
+// never lands inside a character.
 func oneLine(s string, max int) string {
-	s = strings.ReplaceAll(strings.TrimSpace(s), "\n", " ")
-	if len(s) > max {
-		return s[:max-1] + "…"
+	r := []rune(strings.ReplaceAll(strings.TrimSpace(s), "\n", " "))
+	if len(r) > max {
+		return string(r[:max-1]) + "…"
 	}
-	return s
+	return string(r)
 }
 
 func shortDur(ms int64) string {
