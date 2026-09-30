@@ -14,7 +14,9 @@ func fakeKubectl(t *testing.T, replicas string) (bin, log string) {
 	dir := t.TempDir()
 	log = filepath.Join(dir, "calls")
 	bin = filepath.Join(dir, "kubectl")
-	script := "#!/bin/sh\necho \"$@\" >> " + log + "\ncase \"$*\" in *jsonpath*) printf '%s' " + replicas + " ;; esac\n"
+	// printf, not echo: the arguments start with -n, and a POSIX sh's echo
+	// (dash, on the CI runner) takes that as its own option and drops it.
+	script := "#!/bin/sh\nprintf '%s\\n' \"$*\" >> " + log + "\ncase \"$*\" in *jsonpath*) printf '%s' " + replicas + " ;; esac\n"
 	if err := os.WriteFile(bin, []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}
