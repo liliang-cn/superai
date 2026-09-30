@@ -3,7 +3,7 @@ package app
 import (
 	"log"
 
-	"github.com/liliang-cn/superai-desktop/internal/backend"
+	"github.com/liliang-cn/superai/internal/backend"
 )
 
 // The Telegram bridge's lifecycle, alongside the scheduler's.

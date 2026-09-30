@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/liliang-cn/superai-desktop/internal/backend"
+	"github.com/liliang-cn/superai/internal/backend"
 )
 
 // PreviewPrompt returns the turn SendChat would send for this message, without

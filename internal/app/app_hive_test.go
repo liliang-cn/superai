@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/liliang-cn/superai-desktop/internal/backend"
+	"github.com/liliang-cn/superai/internal/backend"
 )
 
 // An instance that has never heard of the hive must stay a whole SuperAI. The

@@ -3,7 +3,7 @@ package app
 import (
 	"testing"
 
-	"github.com/liliang-cn/superai-desktop/internal/backend"
+	"github.com/liliang-cn/superai/internal/backend"
 )
 
 // TestEffectiveRoutesThroughProxy checks the wiring that actually matters: when

@@ -49,7 +49,7 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/liliang-cn/superai-desktop/internal/backend"
+	"github.com/liliang-cn/superai/internal/backend"
 )
 
 // authFileName sits in the data directory, beside settings.json.

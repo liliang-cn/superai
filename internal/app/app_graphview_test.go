@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/liliang-cn/superai-desktop/internal/backend"
+	"github.com/liliang-cn/superai/internal/backend"
 )
 
 // The bound method is the whole contract with the page: it must start the view
