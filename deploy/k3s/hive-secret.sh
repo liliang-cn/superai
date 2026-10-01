@@ -11,16 +11,19 @@
 # SUPERAI_NEW_TOKEN=1 the token is generated fresh instead, and then the pods
 # need a restart and every client a new token.
 #
-# Model and CortexDB credentials are copied from the same place. Roles come from the
+# Model and CortexDB credentials are copied from the same place.
+# SUPERAI_LLM_MODEL='gemini-3.8-flash' runs the hive on another of the gateway's
+# models — for when the usual one has no account behind it. Roles come from the
 # settings: the queen accepts joins and the workers announce themselves.
 set -euo pipefail
 export SUPERAI_PASSWORD_HASH="${SUPERAI_PASSWORD_HASH:-}"
 export SUPERAI_NEW_TOKEN="${SUPERAI_NEW_TOKEN:-}"
+export SUPERAI_LLM_MODEL="${SUPERAI_LLM_MODEL:-}"
 SRC="${SUPERAI_SRC:-ops@192.168.123.65}"
 KUBE="${SUPERAI_KUBE:-orange1}"
 NS=superai
 
-ssh "$SRC" "PW='$SUPERAI_PASSWORD_HASH' NEW='$SUPERAI_NEW_TOKEN' sudo -E python3 - <<'PY'
+ssh "$SRC" "PW='$SUPERAI_PASSWORD_HASH' NEW='$SUPERAI_NEW_TOKEN' MODEL='$SUPERAI_LLM_MODEL' sudo -E python3 - <<'PY'
 import json, os, secrets
 s = json.load(open('/opt/superai/data/settings.json'))
 a = json.load(open('/opt/superai/data/auth.json'))
@@ -33,6 +36,7 @@ base = {k: s[k] for k in ('llm_base_url','llm_key','llm_model','embed_base_url',
 # The hive speaks with Microsoft Edge's Xiaoxiao, through the converter in
 # deploy/k3s/edge-tts: quicker and more natural than the gateway's model. The
 # standalone install keeps its own voice; only the hive's is overridden here.
+if os.environ.get('MODEL'): base['llm_model'] = os.environ['MODEL']
 base.update(tts_base_url='http://edge-tts.$NS.svc.cluster.local:43540/v1', tts_model='edge',
             tts_voice='zh-CN-XiaoxiaoNeural', tts_key='')
 base.update(memory_backend='shared', shared_memory_endpoint=s['shared_memory_endpoint'],
