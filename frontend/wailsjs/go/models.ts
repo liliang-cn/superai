@@ -20,6 +20,8 @@ export namespace agent {
 	    text: string;
 	    done: boolean;
 	    note?: string;
+	    id?: string;
+	    after?: string[];
 	
 	    static createFrom(source: any = {}) {
 	        return new PlanItem(source);
@@ -30,6 +32,8 @@ export namespace agent {
 	        this.text = source["text"];
 	        this.done = source["done"];
 	        this.note = source["note"];
+	        this.id = source["id"];
+	        this.after = source["after"];
 	    }
 	}
 	export class ScheduledPrompt {
@@ -85,6 +89,77 @@ export namespace agent {
 
 export namespace app {
 	
+	export class PairCode {
+	    code: string;
+	    // Go type: time
+	    expires_at: any;
+	
+	    static createFrom(source: any = {}) {
+	        return new PairCode(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.code = source["code"];
+	        this.expires_at = this.convertValues(source["expires_at"], null);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class PairedDevice {
+	    id: string;
+	    name: string;
+	    // Go type: time
+	    created_at: any;
+	    // Go type: time
+	    last_seen: any;
+	
+	    static createFrom(source: any = {}) {
+	        return new PairedDevice(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.created_at = this.convertValues(source["created_at"], null);
+	        this.last_seen = this.convertValues(source["last_seen"], null);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class RemoteAgentStatus {
 	    name: string;
 	    about: string;
@@ -345,6 +420,121 @@ export namespace backend {
 	        this.models = source["models"];
 	        this.timeout_seconds = source["timeout_seconds"];
 	    }
+	}
+	export class HiveMember {
+	    name: string;
+	    role: string;
+	    url: string;
+	    version?: string;
+	    // Go type: time
+	    joined_at: any;
+	    // Go type: time
+	    last_seen: any;
+	    // Go type: time
+	    started_at: any;
+	    engine?: string;
+	    state: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new HiveMember(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.role = source["role"];
+	        this.url = source["url"];
+	        this.version = source["version"];
+	        this.joined_at = this.convertValues(source["joined_at"], null);
+	        this.last_seen = this.convertValues(source["last_seen"], null);
+	        this.started_at = this.convertValues(source["started_at"], null);
+	        this.engine = source["engine"];
+	        this.state = source["state"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class SpawnerSettings {
+	    kind: string;
+	    namespace?: string;
+	    statefulset?: string;
+	    max_workers?: number;
+	    kubectl?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SpawnerSettings(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.kind = source["kind"];
+	        this.namespace = source["namespace"];
+	        this.statefulset = source["statefulset"];
+	        this.max_workers = source["max_workers"];
+	        this.kubectl = source["kubectl"];
+	    }
+	}
+	export class HiveSettings {
+	    role?: string;
+	    name?: string;
+	    join_url?: string;
+	    join_token?: string;
+	    advertise_url?: string;
+	    peer_token?: string;
+	    spawner?: SpawnerSettings;
+	    interval_seconds?: number;
+	    max_concurrent_orders?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new HiveSettings(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.role = source["role"];
+	        this.name = source["name"];
+	        this.join_url = source["join_url"];
+	        this.join_token = source["join_token"];
+	        this.advertise_url = source["advertise_url"];
+	        this.peer_token = source["peer_token"];
+	        this.spawner = this.convertValues(source["spawner"], SpawnerSettings);
+	        this.interval_seconds = source["interval_seconds"];
+	        this.max_concurrent_orders = source["max_concurrent_orders"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class LifeData {
 	    schedules: any[];
@@ -663,6 +853,8 @@ export namespace backend {
 	
 	export class RemoteAgent {
 	    about?: string;
+	    url?: string;
+	    token?: string;
 	    hosts: string[];
 	    probe?: string;
 	    user?: string;
@@ -677,6 +869,8 @@ export namespace backend {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.about = source["about"];
+	        this.url = source["url"];
+	        this.token = source["token"];
 	        this.hosts = source["hosts"];
 	        this.probe = source["probe"];
 	        this.user = source["user"];
@@ -726,6 +920,10 @@ export namespace backend {
 	    failed: boolean;
 	    reason?: string;
 	    ms: number;
+	    task_id?: string;
+	    usage?: domain.TokenUsage;
+	    cost_usd?: number;
+	    cost_unpriced?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new RemoteResult(source);
@@ -739,7 +937,29 @@ export namespace backend {
 	        this.failed = source["failed"];
 	        this.reason = source["reason"];
 	        this.ms = source["ms"];
+	        this.task_id = source["task_id"];
+	        this.usage = this.convertValues(source["usage"], domain.TokenUsage);
+	        this.cost_usd = source["cost_usd"];
+	        this.cost_unpriced = source["cost_unpriced"];
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class RoundStat {
 	    segment: number;
@@ -808,9 +1028,15 @@ export namespace backend {
 	    llm_price_input_per_1k?: number;
 	    llm_price_cached_per_1k?: number;
 	    llm_price_output_per_1k?: number;
+	    llm_context_tokens?: number;
+	    llm_max_output_tokens?: number;
 	    embed_base_url: string;
 	    embed_key: string;
 	    embed_model: string;
+	    tts_base_url: string;
+	    tts_key: string;
+	    tts_model: string;
+	    tts_voice: string;
 	    search_base_url: string;
 	    search_key: string;
 	    search_model: string;
@@ -837,6 +1063,7 @@ export namespace backend {
 	    telegram_bot_token: string;
 	    telegram_allowed_chats: number[];
 	    external_agents: ExternalAgents;
+	    hive: HiveSettings;
 	    remote_agents: RemoteAgents;
 	
 	    static createFrom(source: any = {}) {
@@ -851,9 +1078,15 @@ export namespace backend {
 	        this.llm_price_input_per_1k = source["llm_price_input_per_1k"];
 	        this.llm_price_cached_per_1k = source["llm_price_cached_per_1k"];
 	        this.llm_price_output_per_1k = source["llm_price_output_per_1k"];
+	        this.llm_context_tokens = source["llm_context_tokens"];
+	        this.llm_max_output_tokens = source["llm_max_output_tokens"];
 	        this.embed_base_url = source["embed_base_url"];
 	        this.embed_key = source["embed_key"];
 	        this.embed_model = source["embed_model"];
+	        this.tts_base_url = source["tts_base_url"];
+	        this.tts_key = source["tts_key"];
+	        this.tts_model = source["tts_model"];
+	        this.tts_voice = source["tts_voice"];
 	        this.search_base_url = source["search_base_url"];
 	        this.search_key = source["search_key"];
 	        this.search_model = source["search_model"];
@@ -880,6 +1113,7 @@ export namespace backend {
 	        this.telegram_bot_token = source["telegram_bot_token"];
 	        this.telegram_allowed_chats = source["telegram_allowed_chats"];
 	        this.external_agents = this.convertValues(source["external_agents"], ExternalAgents);
+	        this.hive = this.convertValues(source["hive"], HiveSettings);
 	        this.remote_agents = this.convertValues(source["remote_agents"], RemoteAgents);
 	    }
 	
@@ -939,6 +1173,7 @@ export namespace backend {
 	        this.collection = source["collection"];
 	    }
 	}
+	
 	export class TaskState {
 	    taskId: string;
 	    goal: string;
@@ -1077,6 +1312,29 @@ export namespace backend {
 	        this.planDone = source["planDone"];
 	        this.planTotal = source["planTotal"];
 	        this.spark = source["spark"];
+	    }
+	}
+
+}
+
+export namespace domain {
+	
+	export class TokenUsage {
+	    prompt_tokens: number;
+	    completion_tokens: number;
+	    cached_prompt_tokens?: number;
+	    cache_write_tokens?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new TokenUsage(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.prompt_tokens = source["prompt_tokens"];
+	        this.completion_tokens = source["completion_tokens"];
+	        this.cached_prompt_tokens = source["cached_prompt_tokens"];
+	        this.cache_write_tokens = source["cache_write_tokens"];
 	    }
 	}
 

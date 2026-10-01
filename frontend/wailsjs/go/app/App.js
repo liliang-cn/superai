@@ -118,8 +118,12 @@ export function GetStatus() {
   return window['go']['app']['App']['GetStatus']();
 }
 
-export function HiveTaskDetail(arg1) {
-  return window['go']['app']['App']['HiveTaskDetail'](arg1);
+export function GraphView() {
+  return window['go']['app']['App']['GraphView']();
+}
+
+export function HiveMembers() {
+  return window['go']['app']['App']['HiveMembers']();
 }
 
 export function HiveRetire(arg1, arg2) {
@@ -134,8 +138,8 @@ export function HiveStatus() {
   return window['go']['app']['App']['HiveStatus']();
 }
 
-export function GraphView() {
-  return window['go']['app']['App']['GraphView']();
+export function HiveTaskDetail(arg1) {
+  return window['go']['app']['App']['HiveTaskDetail'](arg1);
 }
 
 export function ImportCSV(arg1, arg2) {
@@ -208,6 +212,14 @@ export function OpenInBrowser() {
 
 export function OpenWorkspaceFileExternal(arg1) {
   return window['go']['app']['App']['OpenWorkspaceFileExternal'](arg1);
+}
+
+export function PairPhone() {
+  return window['go']['app']['App']['PairPhone']();
+}
+
+export function PairedDevices() {
+  return window['go']['app']['App']['PairedDevices']();
 }
 
 export function PendingToolApprovals() {
@@ -336,6 +348,10 @@ export function ToolApprovalInfo(arg1) {
 
 export function TraceLines(arg1, arg2) {
   return window['go']['app']['App']['TraceLines'](arg1, arg2);
+}
+
+export function UnpairDevice(arg1) {
+  return window['go']['app']['App']['UnpairDevice'](arg1);
 }
 
 export function UnreadNotifications() {

@@ -228,6 +228,7 @@ func newAPIMux(app *App, hub *eventHub, creds *credentials, handoff *handoffStor
 	// Sign-in lives on the mux rather than in the middleware so it is a route
 	// like any other; requireAuth lets exactly these four through. See auth.go.
 	authRoutes(mux, creds)
+	pairRoutes(mux, creds)
 	// The desktop app's "Open in Browser" hands the tab it opens a one-shot
 	// token here, so nobody is asked for a password they never chose. nil in
 	// serve mode: nothing there mints tokens, so every arrival is turned away.
