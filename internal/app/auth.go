@@ -74,6 +74,9 @@ type credentials struct {
 	Token string `json:"token"`
 	// SessionKey signs session cookies. Change it to sign everyone out.
 	SessionKey string `json:"session_key"`
+
+	// devices is the paired phones (pairing.go), kept in their own file.
+	devices *deviceStore
 }
 
 func authPath() string { return filepath.Join(backend.DataDir(), authFileName) }
@@ -91,6 +94,9 @@ func loadOrCreateCredentials() (*credentials, error) {
 		}
 		if c.User == "" {
 			c.User = "superai"
+		}
+		if c.devices, err = openDevices(devicesPath()); err != nil {
+			return nil, err
 		}
 		// Installs that predate the login form have no signing key. Mint one
 		// and write it back rather than failing: the password they already
@@ -115,6 +121,9 @@ func loadOrCreateCredentials() (*credentials, error) {
 	}
 	c.PasswordHash = string(hash)
 	if err := writeCredentials(p, c); err != nil {
+		return nil, err
+	}
+	if c.devices, err = openDevices(devicesPath()); err != nil {
 		return nil, err
 	}
 
@@ -332,10 +341,12 @@ func requireAuth(c *credentials, next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		if bearer, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); ok &&
-			subtle.ConstantTimeCompare([]byte(strings.TrimSpace(bearer)), want) == 1 {
-			next.ServeHTTP(w, r)
-			return
+		if bearer, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); ok {
+			bearer = strings.TrimSpace(bearer)
+			if subtle.ConstantTimeCompare([]byte(bearer), want) == 1 || (c.devices != nil && c.devices.authenticate(bearer)) {
+				next.ServeHTTP(w, r)
+				return
+			}
 		}
 		if hasSession(c, r) {
 			next.ServeHTTP(w, r)
@@ -352,6 +363,10 @@ func requireAuth(c *credentials, next http.Handler) http.Handler {
 func gatedPath(p string) bool {
 	switch {
 	case p == "/api/login", p == "/api/logout", p == "/api/session":
+		return false
+	// A phone being paired holds nothing yet; the code it carries is its
+	// credential. See pairing.go.
+	case p == pairClaimPath:
 		return false
 	// The handoff is how a browser holding nothing gets a session; gating it on
 	// already having one would make it useless. It carries its own credential

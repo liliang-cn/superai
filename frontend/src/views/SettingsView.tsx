@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import AvatarSection from "./AvatarSection";
+import PairPhoneCard from "../components/PairPhoneCard";
 import { AppStatus } from "../lib/types";
 import {
   CLIProxyAccounts,
@@ -1256,6 +1257,7 @@ export default function SettingsView({
           {section === "runtime" && <AvatarSection status={status} />}
 
           {!served && section === "runtime" && <OpenInBrowserCard />}
+          {served && section === "runtime" && <PairPhoneCard />}
 
           <div className="settings-actions">
             <button className="btn" onClick={save} disabled={saving}>

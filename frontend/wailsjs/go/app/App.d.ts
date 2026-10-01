@@ -63,7 +63,9 @@ export function GetSettings():Promise<backend.Settings>;
 
 export function GetStatus():Promise<Record<string, any>>;
 
-export function HiveTaskDetail(arg1:string):Promise<Record<string, any>>;
+export function GraphView():Promise<Record<string, any>>;
+
+export function HiveMembers():Promise<Array<backend.HiveMember>>;
 
 export function HiveRetire(arg1:number,arg2:boolean):Promise<Record<string, any>>;
 
@@ -71,7 +73,7 @@ export function HiveSpawn(arg1:number):Promise<Record<string, any>>;
 
 export function HiveStatus():Promise<Record<string, any>>;
 
-export function GraphView():Promise<Record<string, any>>;
+export function HiveTaskDetail(arg1:string):Promise<Record<string, any>>;
 
 export function ImportCSV(arg1:string,arg2:string):Promise<string>;
 
@@ -108,6 +110,10 @@ export function Notify(arg1:string,arg2:string,arg3:string):Promise<string>;
 export function OpenInBrowser():Promise<string>;
 
 export function OpenWorkspaceFileExternal(arg1:string):Promise<string>;
+
+export function PairPhone():Promise<app.PairCode>;
+
+export function PairedDevices():Promise<Array<app.PairedDevice>>;
 
 export function PendingToolApprovals():Promise<Array<Record<string, any>>>;
 
@@ -172,5 +178,7 @@ export function TestWebhook():Promise<string>;
 export function ToolApprovalInfo(arg1:number):Promise<Record<string, any>>;
 
 export function TraceLines(arg1:string,arg2:number):Promise<Array<string>>;
+
+export function UnpairDevice(arg1:string):Promise<void>;
 
 export function UnreadNotifications():Promise<number>;
