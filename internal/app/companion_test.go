@@ -218,7 +218,7 @@ func TestCompanionHandoffSignsInOnceAndGatesTheRest(t *testing.T) {
 		t.Fatalf("opening SSE frame = %q, %v", line, err)
 	}
 
-	frames := make(chan string, 1)
+	frames := make(chan string, 16)
 	go func() {
 		for {
 			line, err := br.ReadString('\n')
@@ -227,18 +227,31 @@ func TestCompanionHandoffSignsInOnceAndGatesTheRest(t *testing.T) {
 			}
 			if strings.HasPrefix(line, "data: ") {
 				frames <- strings.TrimSpace(strings.TrimPrefix(line, "data: "))
-				return
 			}
 		}
 	}()
+	// Sent until it arrives: the opening frame can reach the client a moment
+	// before its subscription is in the hub, and one emit in that moment is
+	// dropped — on a loaded CI runner it was.
+	deadline := time.After(5 * time.Second)
+	tick := time.NewTicker(100 * time.Millisecond)
+	defer tick.Stop()
 	app.emit("chat:event", map[string]any{"type": "token", "text": "hi"})
-	select {
-	case data := <-frames:
-		if !strings.Contains(data, `"chat:event"`) || !strings.Contains(data, `"hi"`) {
-			t.Fatalf("SSE frame = %s", data)
+wait:
+	for {
+		select {
+		case data := <-frames:
+			if strings.Contains(data, `"chat:event"`) {
+				if !strings.Contains(data, `"hi"`) {
+					t.Fatalf("SSE frame = %s", data)
+				}
+				break wait
+			}
+		case <-tick.C:
+			app.emit("chat:event", map[string]any{"type": "token", "text": "hi"})
+		case <-deadline:
+			t.Fatal("the browser tab received no events from the running app")
 		}
-	case <-time.After(3 * time.Second):
-		t.Fatal("the browser tab received no events from the running app")
 	}
 
 	// Shutting down takes the port with it, and the hub out of the emit path.
