@@ -155,3 +155,18 @@ func TestTheModelIsToldWhichCodingAgentsExistWhenItNamesOneThatDoesNot(t *testin
 		t.Fatalf("%v", out)
 	}
 }
+
+func TestALaunchdPlistEscapesWhatItQuotes(t *testing.T) {
+	if got := xmlEscape(`a&b<c>"d"`); got != "a&amp;b&lt;c&gt;&quot;d&quot;" {
+		t.Fatal(got)
+	}
+}
+
+func TestTheNodeReadsTheLoginShellsPath(t *testing.T) {
+	t.Setenv("SHELL", "/bin/sh")
+	t.Setenv("HTTPS_PROXY", "http://127.0.0.1:7890")
+	env := loginEnv()
+	if env["PATH"] == "" || env["HTTPS_PROXY"] != "http://127.0.0.1:7890" {
+		t.Fatalf("%v", env)
+	}
+}
