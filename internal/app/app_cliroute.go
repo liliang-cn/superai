@@ -28,7 +28,7 @@ func (a *App) routeToCLI(requestID, sessionID, name, prompt string) {
 
 	o := cliStart{Agent: name, Prompt: prompt, Ask: !unattended, Chat: sessionID}
 	if prev := a.lastChatRun(sessionID, name); prev != nil {
-		o.Thread, o.Session, o.Cwd, o.Model, o.Ask = prev.Thread, prev.Session, prev.Cwd, prev.Model, prev.Ask
+		o.Thread, o.Session, o.Cwd, o.Model, o.Ask, o.Prev = prev.Thread, prev.Session, prev.Cwd, prev.Model, prev.Ask, prev
 	}
 
 	var said []string
@@ -102,7 +102,7 @@ func (a *App) lastChatRun(chat, agent string) *CLIRun {
 	defer s.mu.Unlock()
 	var best *CLIRun
 	for _, r := range s.runs {
-		if r.Chat == chat && r.Agent == agent && r.Session != "" && r.State != "running" {
+		if r.Chat == chat && r.Agent == agent && (r.Session != "" || r.RemoteRun != "") && r.State != "running" {
 			if best == nil || r.Started.After(best.Started) {
 				c := *r
 				c.Events = nil
@@ -113,9 +113,13 @@ func (a *App) lastChatRun(chat, agent string) *CLIRun {
 	return best
 }
 
-// isLocalCLI reports whether a name is an agent CLI on this machine that the
-// run manager can drive, rather than an agent configured on another host.
-func (a *App) isLocalCLI(name string) bool {
+// isDrivenCLI reports whether a name is an agent CLI the run manager drives —
+// on this machine, or "claude.host" on another SuperAI — rather than an agent
+// reached the older way, by SSH or as a whole SuperAI.
+func (a *App) isDrivenCLI(name string) bool {
+	if a.isRemoteCLI(name) {
+		return true
+	}
 	if a.remoteRunner().Config().Has(name) {
 		return false
 	}

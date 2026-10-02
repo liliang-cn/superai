@@ -144,6 +144,8 @@ export namespace app {
 	    session?: string;
 	    ask: boolean;
 	    chat?: string;
+	    remote?: string;
+	    remoteRun?: string;
 	    state: string;
 	    // Go type: time
 	    started: any;
@@ -173,6 +175,8 @@ export namespace app {
 	        this.session = source["session"];
 	        this.ask = source["ask"];
 	        this.chat = source["chat"];
+	        this.remote = source["remote"];
+	        this.remoteRun = source["remoteRun"];
 	        this.state = source["state"];
 	        this.started = this.convertValues(source["started"], null);
 	        this.ended = this.convertValues(source["ended"], null);
@@ -205,6 +209,24 @@ export namespace app {
 		}
 	}
 	
+	export class LinkedSuperAI {
+	    name: string;
+	    url: string;
+	    clis: string[];
+	    reachable: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new LinkedSuperAI(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.url = source["url"];
+	        this.clis = source["clis"];
+	        this.reachable = source["reachable"];
+	    }
+	}
 	export class PairCode {
 	    code: string;
 	    // Go type: time

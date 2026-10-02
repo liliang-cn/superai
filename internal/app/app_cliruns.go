@@ -63,18 +63,22 @@ type CLIRun struct {
 	Ask bool `json:"ask"`
 	// Chat is the conversation an @mention started this run from, if any;
 	// the next @mention of the same agent there continues this session.
-	Chat    string        `json:"chat,omitempty"`
-	State   string        `json:"state"`
-	Started time.Time     `json:"started"`
-	Ended   *time.Time    `json:"ended,omitempty"`
-	Summary string        `json:"summary,omitempty"`
-	Error   string        `json:"error,omitempty"`
-	In      int           `json:"in"`
-	Out     int           `json:"out"`
-	Cache   int           `json:"cache"`
-	CostUSD float64       `json:"costUsd"`
-	Tools   int           `json:"tools"`
-	Events  []CLIRunEvent `json:"events,omitempty"`
+	Chat string `json:"chat,omitempty"`
+	// Remote is the SuperAI this run is happening on, by its name in Remote
+	// agents; RemoteRun is the run's id there. Empty for a run on this machine.
+	Remote    string        `json:"remote,omitempty"`
+	RemoteRun string        `json:"remoteRun,omitempty"`
+	State     string        `json:"state"`
+	Started   time.Time     `json:"started"`
+	Ended     *time.Time    `json:"ended,omitempty"`
+	Summary   string        `json:"summary,omitempty"`
+	Error     string        `json:"error,omitempty"`
+	In        int           `json:"in"`
+	Out       int           `json:"out"`
+	Cache     int           `json:"cache"`
+	CostUSD   float64       `json:"costUsd"`
+	Tools     int           `json:"tools"`
+	Events    []CLIRunEvent `json:"events,omitempty"`
 }
 
 const (
@@ -97,8 +101,10 @@ type cliStart struct {
 	Agent, Prompt, Cwd, Model string
 	Ask                       bool
 	Thread, Session, Chat     string
-	Watch                     func(CLIRunEvent)
-	Done                      func(CLIRun)
+	// Prev is the run this one continues, if any.
+	Prev  *CLIRun
+	Watch func(CLIRunEvent)
+	Done  func(CLIRun)
 }
 
 func (a *App) cliStore() *cliRunStore {
@@ -223,11 +229,11 @@ func (a *App) FollowUpCLIRun(id, prompt string) (CLIRun, error) {
 	if busy {
 		return CLIRun{}, errors.New("the last turn is still running; wait for it or stop it")
 	}
-	if p.Session == "" {
+	if p.Session == "" && p.RemoteRun == "" {
 		return CLIRun{}, fmt.Errorf("%s did not report a session to continue", p.Agent)
 	}
 	return a.startCLIRun(cliStart{Agent: p.Agent, Prompt: prompt, Cwd: p.Cwd, Model: p.Model, Ask: p.Ask,
-		Thread: p.Thread, Session: p.Session, Chat: p.Chat})
+		Thread: p.Thread, Session: p.Session, Chat: p.Chat, Prev: &p})
 }
 
 // CancelCLIRun stops a running CLI.
@@ -247,6 +253,10 @@ func (a *App) startCLIRun(o cliStart) (CLIRun, error) {
 	agent, prompt, cwd, model, ask, thread, session := strings.TrimSpace(o.Agent), strings.TrimSpace(o.Prompt), o.Cwd, o.Model, o.Ask, o.Thread, o.Session
 	if prompt == "" {
 		return CLIRun{}, errors.New("the prompt is empty")
+	}
+	if name, host, ok := splitRemoteCLI(agent); ok && a.isRemoteCLI(agent) {
+		o.Agent, o.Prompt = name, prompt
+		return a.startRemoteCLIRun(o, host)
 	}
 	a.mu.Lock()
 	var ext backend.ExternalAgents
@@ -357,34 +367,46 @@ func (a *App) driveCLIRun(ctx context.Context, cancel context.CancelFunc, run *C
 	result, tail, finErr := sess.Finalize(context.Background(), res.Output, res.ExitCode)
 	push(tail)
 
+	a.finishCLIRun(run, func(run *CLIRun) {
+		if id := sess.SessionID(); id != "" {
+			run.Session = id
+		}
+		run.Summary = strings.TrimSpace(result.Summary)
+		run.In, run.Out, run.Cache = int(result.Usage.InputTokens), int(result.Usage.OutputTokens), int(result.Usage.CacheTokens)
+		run.CostUSD = result.Usage.EstimatedCostUSD
+		switch {
+		case errors.Is(ctx.Err(), context.Canceled):
+			run.State, run.Error = "cancelled", "stopped"
+		case errors.Is(runErr, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded):
+			run.State, run.Error = "failed", "did not finish in time and was stopped"
+		case runErr != nil:
+			run.State, run.Error = "failed", runErr.Error()
+		case finErr != nil:
+			run.State, run.Error = "failed", finErr.Error()
+		case result.Failed || res.ExitCode != 0:
+			run.State = "failed"
+			run.Error = run.Summary
+			if run.Error == "" {
+				run.Error = cliLastLine(string(res.Output))
+			}
+		default:
+			run.State = "done"
+		}
+	})
+}
+
+// finishCLIRun records how a run ended, saves, tells the UI, and calls the
+// hook of a chat turn waiting on it. set fills in the outcome, under the lock.
+func (a *App) finishCLIRun(run *CLIRun, set func(*CLIRun)) {
 	s := a.cliStore()
 	s.mu.Lock()
+	if run.State != "running" {
+		s.mu.Unlock()
+		return
+	}
 	now := time.Now()
 	run.Ended = &now
-	if id := sess.SessionID(); id != "" {
-		run.Session = id
-	}
-	run.Summary = strings.TrimSpace(result.Summary)
-	run.In, run.Out, run.Cache = int(result.Usage.InputTokens), int(result.Usage.OutputTokens), int(result.Usage.CacheTokens)
-	run.CostUSD = result.Usage.EstimatedCostUSD
-	switch {
-	case errors.Is(ctx.Err(), context.Canceled):
-		run.State, run.Error = "cancelled", "stopped"
-	case errors.Is(runErr, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded):
-		run.State, run.Error = "failed", "did not finish in time and was stopped"
-	case runErr != nil:
-		run.State, run.Error = "failed", runErr.Error()
-	case finErr != nil:
-		run.State, run.Error = "failed", finErr.Error()
-	case result.Failed || res.ExitCode != 0:
-		run.State = "failed"
-		run.Error = run.Summary
-		if run.Error == "" {
-			run.Error = cliLastLine(string(res.Output))
-		}
-	default:
-		run.State = "done"
-	}
+	set(run)
 	delete(s.cancels, run.ID)
 	delete(s.watch, run.ID)
 	done := s.done[run.ID]

@@ -182,6 +182,14 @@ export function Life() {
   return window['go']['app']['App']['Life']();
 }
 
+export function LinkSuperAI(arg1, arg2, arg3) {
+  return window['go']['app']['App']['LinkSuperAI'](arg1, arg2, arg3);
+}
+
+export function LinkedSuperAIs() {
+  return window['go']['app']['App']['LinkedSuperAIs']();
+}
+
 export function LongRunList() {
   return window['go']['app']['App']['LongRunList']();
 }
@@ -368,6 +376,10 @@ export function ToolApprovalInfo(arg1) {
 
 export function TraceLines(arg1, arg2) {
   return window['go']['app']['App']['TraceLines'](arg1, arg2);
+}
+
+export function UnlinkSuperAI(arg1) {
+  return window['go']['app']['App']['UnlinkSuperAI'](arg1);
 }
 
 export function UnpairDevice(arg1) {

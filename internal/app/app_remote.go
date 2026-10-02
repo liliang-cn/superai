@@ -149,6 +149,9 @@ func (a *App) localAgentNames() []agentexec.Installed {
 
 // addressable reports whether a name can be reached at all, either way.
 func (a *App) addressable(name string) bool {
+	if a.isRemoteCLI(name) {
+		return true
+	}
 	if a.remoteRunner().Config().Has(name) {
 		return true
 	}
@@ -181,7 +184,7 @@ func (a *App) RemoteAgentNames() []map[string]string {
 		}
 		out = append(out, map[string]string{"name": c.Name, "about": about})
 	}
-	return out
+	return append(out, a.remoteCLINames()...)
 }
 
 // AskRemoteAgent is the routing path: the frontend hands over a message that

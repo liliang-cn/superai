@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import AvatarSection from "./AvatarSection";
 import PairPhoneCard from "../components/PairPhoneCard";
+import LinkSuperAICard from "../components/LinkSuperAICard";
 import { AppStatus } from "../lib/types";
 import {
   CLIProxyAccounts,
@@ -1258,6 +1259,11 @@ export default function SettingsView({
 
           {!served && section === "runtime" && <OpenInBrowserCard />}
           {served && section === "runtime" && <PairPhoneCard />}
+          {section === "runtime" && (
+            <LinkSuperAICard
+              onChanged={(fresh) => setS((cur) => (cur ? backend.Settings.createFrom({ ...cur, remote_agents: fresh.remote_agents }) : fresh))}
+            />
+          )}
 
           <div className="settings-actions">
             <button className="btn" onClick={save} disabled={saving}>

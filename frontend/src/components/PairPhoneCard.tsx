@@ -86,11 +86,11 @@ export default function PairPhoneCard() {
 
   return (
     <div className="card">
-      <div className="card-title">Phone</div>
+      <div className="card-title">Phones and other SuperAIs</div>
       <div className="card-desc">
-        Pair the SuperAI iPhone app with this server. Scan the code with the phone's camera, or
-        type the address and the six digits into the app. Each phone gets its own key and can be
-        unpaired here.
+        Pair the SuperAI iPhone app — scan the code with the phone's camera — or another SuperAI,
+        which enters this address and the six digits under Other SuperAIs. Each gets its own key
+        and can be unpaired here.
       </div>
 
       {code ? (
@@ -109,7 +109,7 @@ export default function PairPhoneCard() {
       ) : (
         <div className="field">
           <button className="btn" onClick={start} disabled={busy} style={{ alignSelf: "flex-start" }}>
-            {busy ? <><span className="spinner" /> …</> : "Pair a phone"}
+            {busy ? <><span className="spinner" /> …</> : "Pair a device"}
           </button>
         </div>
       )}
