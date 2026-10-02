@@ -467,7 +467,53 @@ func defaults() *Settings {
 // missing. Any zero-valued fields are backfilled with defaults so older files
 // keep working after upgrades.
 func LoadSettings() (*Settings, error) {
-	return loadSettingsFrom(settingsPath())
+	s, err := loadSettingsFrom(settingsPath())
+	if s != nil {
+		s.mergeLinked(LoadLinkedSuperAIs())
+	}
+	return s, err
+}
+
+// linkedPath holds the other SuperAIs linked from Settings › Other SuperAIs.
+// A file of its own because settings.json is not always this app's to keep:
+// in the hive's containers the entrypoint rewrites it from a Secret on every
+// start, and a link made in the page would be gone after the next restart.
+func linkedPath() string { return filepath.Join(DataDir(), "linked.json") }
+
+// LoadLinkedSuperAIs reads the links; none is an empty map.
+func LoadLinkedSuperAIs() map[string]RemoteAgent {
+	out := map[string]RemoteAgent{}
+	if raw, err := os.ReadFile(linkedPath()); err == nil {
+		_ = json.Unmarshal(raw, &out)
+	}
+	return out
+}
+
+// SaveLinkedSuperAIs writes the links, readable by this user only: each
+// carries a device key.
+func SaveLinkedSuperAIs(links map[string]RemoteAgent) error {
+	raw, err := json.MarshalIndent(links, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(linkedPath(), raw, 0o600)
+}
+
+// mergeLinked adds the links to Remote agents. A name settings.json already
+// gives an agent keeps that one: what an operator wrote wins.
+func (s *Settings) mergeLinked(links map[string]RemoteAgent) {
+	if len(links) == 0 {
+		return
+	}
+	if s.RemoteAgents.Agents == nil {
+		s.RemoteAgents.Agents = map[string]RemoteAgent{}
+	}
+	for name, r := range links {
+		if _, ok := s.RemoteAgents.Agents[name]; !ok {
+			s.RemoteAgents.Agents[name] = r
+		}
+	}
+	s.RemoteAgents.Enabled = true
 }
 
 // loadSettingsFrom is LoadSettings against a named file, for callers that

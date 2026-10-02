@@ -86,15 +86,21 @@ func (a *App) LinkSuperAI(address, code, name string) (string, error) {
 		return "", fmt.Errorf("%s did not pair: %s", base, resp.Status)
 	}
 
+	link := backend.RemoteAgent{
+		About: "SuperAI at " + strings.TrimPrefix(strings.TrimPrefix(base, "http://"), "https://"),
+		URL:   base, Token: got.Token,
+	}
+	links := backend.LoadLinkedSuperAIs()
+	links[name] = link
+	if err := backend.SaveLinkedSuperAIs(links); err != nil {
+		return "", err
+	}
 	s := a.GetSettings()
 	if s.RemoteAgents.Agents == nil {
 		s.RemoteAgents.Agents = map[string]backend.RemoteAgent{}
 	}
 	s.RemoteAgents.Enabled = true
-	s.RemoteAgents.Agents[name] = backend.RemoteAgent{
-		About: "SuperAI at " + strings.TrimPrefix(strings.TrimPrefix(base, "http://"), "https://"),
-		URL:   base, Token: got.Token,
-	}
+	s.RemoteAgents.Agents[name] = link
 	if err := a.SaveSettings(s); err != nil {
 		return "", err
 	}
@@ -128,6 +134,11 @@ func (a *App) UnlinkSuperAI(name string) error {
 		return fmt.Errorf("no remote agent called %s", name)
 	}
 	delete(s.RemoteAgents.Agents, name)
+	links := backend.LoadLinkedSuperAIs()
+	delete(links, name)
+	if err := backend.SaveLinkedSuperAIs(links); err != nil {
+		return err
+	}
 	if err := a.SaveSettings(s); err != nil {
 		return err
 	}
