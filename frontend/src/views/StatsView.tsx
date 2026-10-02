@@ -14,6 +14,7 @@ import HealthCard from "../components/HealthCard";
 import RunTracePanel from "../components/RunTracePanel";
 import { useTween } from "../lib/useTween";
 import { useImeGuard } from "@/lib/ime";
+import { useDaylight } from "../lib/useDaylight";
 
 /**
  * The control room.
@@ -226,6 +227,7 @@ export default function StatsView() {
     );
     return list;
   }, [dash, st, pulse.tokens, pulse.cached, pulse.calls, pulse.mcp, pulse.memory, pulse.fails, pulse.cpu, pulse.heap, pulse.goroutines, inv, graph]);
+  const day = useDaylight();
   const brainLabel = dash?.memoryMode?.startsWith("shared") ? "shared brain" : dash?.memoryMode || "local brain";
 
   return (
@@ -248,7 +250,7 @@ export default function StatsView() {
           {/* The live view's own switches, set from the URL: no control panels
               (inside a disc this size they would cover the graph), orbiting from
               the start, and the reactor's own black behind it. */}
-          <Reactor snap={pulse} pillars={pillars} brain={(GRAPH_SRC ?? graph?.url) ? `${GRAPH_SRC ?? graph?.url}?panels=0&spin=4&bg=${document.documentElement.dataset.theme === "dark" ? "05070f" : "f8fafb"}` : null} />
+          <Reactor snap={pulse} pillars={pillars} brain={(GRAPH_SRC ?? graph?.url) ? `${GRAPH_SRC ?? graph?.url}?panels=0&spin=4&bg=${day ? "f8fafb" : "05070f"}` : null} />
         </div>
         <div className="cr-side" data-pet-spot="charts" data-pet-label="the column of charts beside the reactor">
           <div className="cr-panel tight">

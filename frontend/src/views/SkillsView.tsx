@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { InstallSkill, RemoveSkill, SearchSkills, Skills } from "../../wailsjs/go/app/App";
 import { backend } from "../../wailsjs/go/models";
 import { toast } from "../lib/toasts";
+import { PuzzleIcon } from "lucide-react";
 
 export default function SkillsView() {
   const [skills, setSkills] = useState<backend.SkillInfo[]>([]);
@@ -120,7 +121,7 @@ export default function SkillsView() {
         )}
         {!err && !loading && skills.length === 0 && (
           <div className="inline-empty">
-            <div className="ie-icon">🧩</div>
+            <PuzzleIcon className="ie-icon" size={22} strokeWidth={1.6} />
             <div>No skills installed.</div>
             <div className="ie-hint">Use “+ Add skill” to install one already on this machine.</div>
           </div>

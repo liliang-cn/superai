@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { SquareIcon } from "lucide-react";
+import { AlarmClockIcon, SquareIcon } from "lucide-react";
 import {
   CancelScheduledRun,
   DeleteScheduledPrompt,
@@ -306,8 +306,9 @@ export default function SchedulesView({
 
         {banners === "denied" && (
           <div className="save-note" style={{ display: "block", marginBottom: 12 }}>
-            通知被浏览器挡住了。定时任务照常运行，但页面在后台时不会弹提示 —— 要开的话，
-            在地址栏左边的站点设置里把「通知」改成允许。
+            The browser is blocking notifications. Schedules still run, but nothing pops up
+            while this tab is in the background. To allow them, open the site settings left of
+            the address bar and set Notifications to Allow.
           </div>
         )}
 
@@ -333,7 +334,7 @@ export default function SchedulesView({
 
         {!loading && list.length === 0 && (
           <div className="inline-empty">
-            <div className="ie-icon">⏰</div>
+            <AlarmClockIcon className="ie-icon" size={22} strokeWidth={1.6} />
             <div>Nothing is scheduled.</div>
             <div className="ie-hint">
               Use “+ New schedule” to have SuperAI do something every morning, every weekday, or

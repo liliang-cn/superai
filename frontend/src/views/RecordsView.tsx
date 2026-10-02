@@ -4,6 +4,7 @@ import { backend } from "../../wailsjs/go/models";
 import { AppStatus } from "../lib/types";
 import { ScheduleRunLog } from "../lib/useScheduleRuns";
 import SchedulesView from "./SchedulesView";
+import { AlarmClockIcon, CalendarClockIcon, NotebookPenIcon, UserIcon, type LucideIcon } from "lucide-react";
 
 // The tab keyed "records" is labelled Notes, and used to be keyed that way
 // too — inside a page that is itself called Records. Two different things with
@@ -12,11 +13,11 @@ import SchedulesView from "./SchedulesView";
 // one place it is not ambiguous.
 type TabKey = "schedules" | "notes" | "persons" | "reminders";
 
-const TABS: { key: TabKey; label: string; icon: string }[] = [
-  { key: "schedules", label: "Schedules", icon: "📅" },
-  { key: "notes", label: "Notes", icon: "📝" },
-  { key: "persons", label: "People", icon: "👤" },
-  { key: "reminders", label: "Reminders", icon: "⏰" },
+const TABS: { key: TabKey; label: string; icon: LucideIcon }[] = [
+  { key: "schedules", label: "Schedules", icon: CalendarClockIcon },
+  { key: "notes", label: "Notes", icon: NotebookPenIcon },
+  { key: "persons", label: "People", icon: UserIcon },
+  { key: "reminders", label: "Reminders", icon: AlarmClockIcon },
 ];
 
 const EMPTY_HINT: Record<TabKey, string> = {
@@ -89,10 +90,10 @@ function RecordCard({ obj, fallbackTitle }: { obj: any; fallbackTitle?: string }
   );
 }
 
-function InlineEmpty({ icon, hint }: { icon: string; hint: string }) {
+function InlineEmpty({ icon: Icon, hint }: { icon: LucideIcon; hint: string }) {
   return (
     <div className="inline-empty">
-      <div className="ie-icon">{icon}</div>
+      <Icon className="ie-icon" size={22} strokeWidth={1.6} />
       <div>Nothing here yet.</div>
       <div className="ie-hint">{hint}</div>
     </div>
@@ -184,7 +185,7 @@ export default function RecordsView({
     reminders: reminders.length,
   };
 
-  const renderArrayTab = (items: any[], key: TabKey, icon: string) => {
+  const renderArrayTab = (items: any[], key: TabKey, icon: LucideIcon) => {
     if (items.length === 0) return <InlineEmpty icon={icon} hint={EMPTY_HINT[key]} />;
     return (
       <div className="record-list">
@@ -228,7 +229,7 @@ export default function RecordsView({
             className={`tab${tab === t.key ? " active" : ""}`}
             onClick={() => setTab(t.key)}
           >
-            {t.icon} {t.label}
+            <t.icon size={14} strokeWidth={1.8} /> {t.label}
             <span className="tab-count">{count[t.key]}</span>
           </button>
         ))}
@@ -252,11 +253,11 @@ export default function RecordsView({
                 onCount={setScheduleCount}
               />
             )}
-            {tab === "notes" && renderArrayTab(records, "notes", "📝")}
-            {tab === "reminders" && renderArrayTab(reminders, "reminders", "⏰")}
+            {tab === "notes" && renderArrayTab(records, "notes", NotebookPenIcon)}
+            {tab === "reminders" && renderArrayTab(reminders, "reminders", AlarmClockIcon)}
             {tab === "persons" &&
               (personEntries.length === 0 ? (
-                <InlineEmpty icon="👤" hint={EMPTY_HINT.persons} />
+                <InlineEmpty icon={UserIcon} hint={EMPTY_HINT.persons} />
               ) : (
                 <div className="record-list">
                   {personEntries.map(([name, info]) => (

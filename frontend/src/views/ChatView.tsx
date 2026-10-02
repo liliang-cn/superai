@@ -236,8 +236,7 @@ export default function ChatView({
                 >
                   {notReady && (
                     <div className="empty-hint">
-                      ⚙️ Backend not ready — configure your LLM in Settings to
-                      begin.
+                      No model is set up yet. Choose one in Settings to begin.
                     </div>
                   )}
                 </ConversationEmptyState>

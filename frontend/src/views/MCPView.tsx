@@ -3,6 +3,7 @@ import { InstallMCPServer, MCP, RemoveMCPServer, SearchMCPServers } from "../../
 import { mcp } from "../../wailsjs/go/models";
 import { useImeGuard } from "@/lib/ime";
 import { toast } from "../lib/toasts";
+import { PlugIcon } from "lucide-react";
 
 /** One installable server from the registry, as SearchMCPServers returns it. */
 interface Candidate {
@@ -168,7 +169,7 @@ export default function MCPView() {
         )}
         {!err && !loading && servers.length === 0 && (
           <div className="inline-empty">
-            <div className="ie-icon">🔌</div>
+            <PlugIcon className="ie-icon" size={22} strokeWidth={1.6} />
             <div>No MCP servers.</div>
             <div className="ie-hint">
               Add them in ~/.superai/mcpServers.json (standard {"{"}"mcpServers": {"{...}"}{"}"} format) and restart.
