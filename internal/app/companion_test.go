@@ -15,7 +15,7 @@ import (
 // (so two test runs, or a running app, do not fight over 43119).
 func companionTestApp(t *testing.T) *App {
 	t.Helper()
-	t.Setenv("SUPERAI_DESKTOP_HOME", t.TempDir())
+	t.Setenv("SUPERAI_HOME", t.TempDir())
 	prev := companionPort
 	companionPort = 0
 	t.Cleanup(func() { companionPort = prev })

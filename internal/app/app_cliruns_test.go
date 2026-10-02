@@ -81,7 +81,7 @@ func TestARunWorksInsideTheWorkspaceOrARootAndNowhereElse(t *testing.T) {
 }
 
 func TestTheNextMentionContinuesTheNewestFinishedSessionOfThatAgentInThatChat(t *testing.T) {
-	t.Setenv("SUPERAI_DESKTOP_HOME", t.TempDir())
+	t.Setenv("SUPERAI_HOME", t.TempDir())
 	a := &App{}
 	s := a.cliStore()
 	now := time.Now()
@@ -148,7 +148,7 @@ func TestALinkAddressIsReadTheWayItIsTyped(t *testing.T) {
 }
 
 func TestTheModelIsToldWhichCodingAgentsExistWhenItNamesOneThatDoesNot(t *testing.T) {
-	t.Setenv("SUPERAI_DESKTOP_HOME", t.TempDir())
+	t.Setenv("SUPERAI_HOME", t.TempDir())
 	a := &App{settings: &backend.Settings{}}
 	out := a.runCodingAgent(context.Background(), "claude.nowhere", "hi", "", "")
 	if out["ok"] != false || !strings.Contains(out["error"].(string), "no coding agent called") {

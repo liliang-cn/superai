@@ -69,7 +69,7 @@ type DoctorReport struct {
 // config.Config with Home: DataDir(), so that — not the framework's own
 // default — is the install a report about this app has to be about. Desktop
 // and serve mode share it; both boot the same App, and DataDir() honours
-// SUPERAI_DESKTOP_HOME in both.
+// SUPERAI_HOME in both.
 func RunDoctor(ctx context.Context) DoctorReport {
 	return doctorReportFor(ctx, DataDir())
 }

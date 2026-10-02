@@ -73,7 +73,7 @@ func (c captured) str(key string) string {
 
 func TestTwoAsksAtOnceStaySeparate(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("SUPERAI_DESKTOP_HOME", home)
+	t.Setenv("SUPERAI_HOME", home)
 	t.Setenv("SUPERAI_NO_BROWSER", "1")
 
 	provider := &overlappingProvider{delay: 200 * time.Millisecond}

@@ -1,15 +1,15 @@
 package app
 
-// `superai-desktop node`: this machine as an agent node — the way an ops agent
+// `superai node`: this machine as an agent node — the way an ops agent
 // is installed on a host. It runs SuperAI headless as a login service (launchd
 // on macOS, a systemd user unit on Linux) with External agents on, so another
 // SuperAI — a hive queen, a desktop — can link it with a pairing code and drive
 // the Claude Code and Codex installed here as "claude.<name>".
 //
-//	superai-desktop node install [-port 43779] [-roots ~/code,~/work] [-unattended]
-//	superai-desktop node pair        a fresh six-digit code
-//	superai-desktop node status
-//	superai-desktop node uninstall [-purge]
+//	superai node install [-port 43779] [-roots ~/code,~/work] [-unattended]
+//	superai node pair        a fresh six-digit code
+//	superai node status
+//	superai node uninstall [-purge]
 
 import (
 	"context"
@@ -36,10 +36,10 @@ const (
 	nodeDefaultPort = 43779
 )
 
-// NodeMain is `superai-desktop node …`.
+// NodeMain is `superai node …`.
 func NodeMain(argv []string) {
 	if len(argv) == 0 {
-		fmt.Fprintln(os.Stderr, "usage: superai-desktop node install|pair|status|uninstall")
+		fmt.Fprintln(os.Stderr, "usage: superai node install|pair|status|uninstall")
 		os.Exit(2)
 	}
 	var err error
@@ -75,7 +75,7 @@ type nodeConf struct {
 func readNodeConf() (nodeConf, error) {
 	raw, err := os.ReadFile(filepath.Join(nodeHome(), "node.json"))
 	if err != nil {
-		return nodeConf{}, errors.New("no node installed here; run: superai-desktop node install")
+		return nodeConf{}, errors.New("no node installed here; run: superai node install")
 	}
 	var c nodeConf
 	err = json.Unmarshal(raw, &c)
@@ -111,7 +111,7 @@ func nodeInstall(argv []string) error {
 	env := loginEnv()
 
 	// Settings: External agents on, each CLI by its full path.
-	_ = os.Setenv("SUPERAI_DESKTOP_HOME", home)
+	_ = os.Setenv("SUPERAI_HOME", home)
 	s, err := backend.LoadSettings()
 	if err != nil {
 		return err
@@ -231,7 +231,7 @@ func launchdPlist() string {
 }
 
 func installLaunchd(home string, args []string, env map[string]string) error {
-	env["SUPERAI_DESKTOP_HOME"] = home
+	env["SUPERAI_HOME"] = home
 	var b strings.Builder
 	b.WriteString(`<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -288,11 +288,11 @@ func systemdUnit() string {
 
 func installSystemd(home string, args []string, env map[string]string) error {
 	if _, err := exec.LookPath("systemctl"); err != nil {
-		return fmt.Errorf("no systemd here (a container?): start it with your own supervisor:\n  SUPERAI_DESKTOP_HOME=%s %s", home, strings.Join(args, " "))
+		return fmt.Errorf("no systemd here (a container?): start it with your own supervisor:\n  SUPERAI_HOME=%s %s", home, strings.Join(args, " "))
 	}
 	var b strings.Builder
 	b.WriteString("[Unit]\nDescription=SuperAI node\nAfter=network-online.target\n\n[Service]\n")
-	fmt.Fprintf(&b, "Environment=SUPERAI_DESKTOP_HOME=%s\n", home)
+	fmt.Fprintf(&b, "Environment=SUPERAI_HOME=%s\n", home)
 	for k, v := range env {
 		fmt.Fprintf(&b, "Environment=%q\n", k+"="+v)
 	}

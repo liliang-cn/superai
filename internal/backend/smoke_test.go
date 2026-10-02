@@ -17,7 +17,7 @@ import (
 // LLM_BASE / LLM_KEY / LLM_MODEL (or DASHSCOPE_API_KEY).
 //
 //	SUPERAI_SMOKE=1 LLM_BASE=... LLM_KEY=... LLM_MODEL=gpt-5.5 \
-//	  SUPERAI_DESKTOP_HOME=/tmp/superai-smoke go test ./backend/ -run TestSmokeLive -v -count=1 -timeout 15m
+//	  SUPERAI_HOME=/tmp/superai-smoke go test ./backend/ -run TestSmokeLive -v -count=1 -timeout 15m
 func TestSmokeLive(t *testing.T) {
 	if os.Getenv("SUPERAI_SMOKE") != "1" {
 		t.Skip("set SUPERAI_SMOKE=1 to run the live backend smoke test")
@@ -63,7 +63,7 @@ func TestSmokeLive(t *testing.T) {
 	// 2) autonomous task: write + verify a file in the sandbox workspace
 	ctx2, cancel2 := context.WithTimeout(context.Background(), 6*time.Minute)
 	defer cancel2()
-	task := "在你的工作区写一个文件 note.md，内容是一句话：SuperAI Desktop 可用。然后读回确认。"
+	task := "在你的工作区写一个文件 note.md，内容是一句话：SuperAI 可用。然后读回确认。"
 	final, err := svc.Stream(ctx2, "smoke-agent", task, nil, trace("agent"))
 	if err != nil {
 		t.Fatalf("agent stream: %v", err)

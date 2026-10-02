@@ -10,7 +10,7 @@ import (
 // the embedded proxy is running, the Service is built against it rather than the
 // user's cloud endpoint — and the user's own settings are left untouched.
 func TestEffectiveRoutesThroughProxy(t *testing.T) {
-	t.Setenv("SUPERAI_DESKTOP_HOME", t.TempDir())
+	t.Setenv("SUPERAI_HOME", t.TempDir())
 
 	a := NewApp()
 	a.settings = &backend.Settings{

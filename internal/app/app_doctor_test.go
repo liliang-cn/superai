@@ -12,7 +12,7 @@ import (
 // with the checks, and that every failure carries something to do about it.
 func TestDoctorReportsThisAppsHome(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("SUPERAI_DESKTOP_HOME", home)
+	t.Setenv("SUPERAI_HOME", home)
 	t.Setenv("AGENTGO_HOME", filepath.Join(home, "not-this-one"))
 
 	app := NewApp()

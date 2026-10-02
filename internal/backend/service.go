@@ -287,10 +287,10 @@ func NewService(s *Settings) (*Service, error) {
 	// Two paths, because for a while there were two files and only one of them
 	// was ever written to:
 	//
-	//   ~/.superai-desktop/mcpServers.json       ← mcpConfigPath(), where
+	//   ~/.superai/mcpServers.json       ← mcpConfigPath(), where
 	//     InstallMCPServer writes and RemoveMCPServer deletes, and the path
 	//     the add_mcp_server tool names in its own description
-	//   ~/.superai-desktop/data/mcpServers.json  ← cfg.DataDir(), the only one
+	//   ~/.superai/data/mcpServers.json  ← cfg.DataDir(), the only one
 	//     this function used to read
 	//
 	// So anything installed through the UI or by the agent started, worked for

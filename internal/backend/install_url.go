@@ -78,7 +78,7 @@ func (s *Service) registerURLInstallTools() {
 
 	svc.AddToolWithMetadata(
 		"install_skill_from_url",
-		"Given a URL (git repository, raw SKILL.md, docs page), work out what it is and install it as a skill. It explores over several rounds by itself: decide whether it is a repository or a description page, clone it or write a SKILL.md from the page, then verify it loaded. Installed into ~/.superai-desktop/skills/<name> and hot-reloaded.",
+		"Given a URL (git repository, raw SKILL.md, docs page), work out what it is and install it as a skill. It explores over several rounds by itself: decide whether it is a repository or a description page, clone it or write a SKILL.md from the page, then verify it loaded. Installed into ~/.superai/skills/<name> and hot-reloaded.",
 		map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
@@ -581,7 +581,7 @@ func httpGet(ctx context.Context, u string) ([]byte, string, error) {
 	if err != nil {
 		return nil, "", err
 	}
-	req.Header.Set("User-Agent", "SuperAI-Desktop/1.0")
+	req.Header.Set("User-Agent", "SuperAI/1.0")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, "", fmt.Errorf("fetch failed: %w", err)

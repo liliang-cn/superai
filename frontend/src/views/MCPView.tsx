@@ -171,7 +171,7 @@ export default function MCPView() {
             <div className="ie-icon">🔌</div>
             <div>No MCP servers.</div>
             <div className="ie-hint">
-              Add them in ~/.superai-desktop/mcpServers.json (standard {"{"}"mcpServers": {"{...}"}{"}"} format) and restart.
+              Add them in ~/.superai/mcpServers.json (standard {"{"}"mcpServers": {"{...}"}{"}"} format) and restart.
             </div>
           </div>
         )}

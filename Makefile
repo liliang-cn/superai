@@ -1,4 +1,4 @@
-# SuperAI Desktop
+# SuperAI
 #
 # A go.work one directory up lists sibling modules but not this one, so plain
 # `go build ./...` here fails with "directory prefix . does not contain modules

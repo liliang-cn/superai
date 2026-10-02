@@ -13,7 +13,7 @@ import (
 // still wins, because that setting was a no-op once already.
 func TestPTCDefaultsOnButRemainsUserChoosable(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("SUPERAI_DESKTOP_HOME", home)
+	t.Setenv("SUPERAI_HOME", home)
 
 	if defaults().DisablePTC {
 		t.Error("PTC must default to on: it costs ~59% fewer prompt tokens and the reply is fixed")

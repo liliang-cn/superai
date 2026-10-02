@@ -14,7 +14,7 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 COPY --from=web /src/frontend/dist ./frontend/dist
-RUN go build -trimpath -ldflags "-s -w" -o /out/superai-desktop . \
+RUN go build -trimpath -ldflags "-s -w" -o /out/superai . \
  && go build -trimpath -ldflags "-s -w" -o /out/superai-daemon ./cmd/superai-daemon \
  && go build -trimpath -ldflags "-s -w" -o /out/superai-hive-worker ./cmd/superai-hive-worker
 
@@ -34,8 +34,8 @@ COPY --from=go /out/ /usr/local/bin/
 # pod's Role says (deploy/k3s/superai-hive.yaml).
 COPY --from=kubectl /kubectl /usr/local/bin/kubectl
 COPY deploy/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-ENV SUPERAI_DESKTOP_HOME=/data SUPERAI_NO_BROWSER=1
+ENV SUPERAI_HOME=/data SUPERAI_NO_BROWSER=1
 VOLUME /data
 EXPOSE 43117
 ENTRYPOINT ["docker-entrypoint.sh"]
-CMD ["superai-desktop", "serve", "-bind", "0.0.0.0", "-port", "43117"]
+CMD ["superai", "serve", "-bind", "0.0.0.0", "-port", "43117"]

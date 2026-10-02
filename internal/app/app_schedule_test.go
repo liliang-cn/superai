@@ -32,7 +32,7 @@ func scheduleTestApp(t *testing.T) (*App, func() []captured) {
 func scheduleTestAppWith(t *testing.T, beforeReply func(*http.Request)) (*App, func() []captured) {
 	t.Helper()
 	home := t.TempDir()
-	t.Setenv("SUPERAI_DESKTOP_HOME", home)
+	t.Setenv("SUPERAI_HOME", home)
 	t.Setenv("SUPERAI_NO_BROWSER", "1")
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

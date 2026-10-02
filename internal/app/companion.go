@@ -1,6 +1,6 @@
 // "Open in Browser": the running desktop app, in a real browser tab.
 //
-// `superai-desktop serve` already serves this app over HTTP, but it is a
+// `superai serve` already serves this app over HTTP, but it is a
 // different process — main.go branches on argv[1] and the windowed app never
 // reaches serveMain, so a desktop process runs no HTTP server at all. Telling
 // someone to quit the app and relaunch it from a terminal with a flag is not a

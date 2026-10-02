@@ -26,7 +26,7 @@ export default defineConfig({
     },
   },
   server: {
-    // `npm run dev` against a running `superai-desktop serve -port 43117`:
+    // `npm run dev` against a running `superai serve -port 43117`:
     // the shim's /api calls land on the Go server, hot reload stays on vite.
     proxy: {
       '/api': {

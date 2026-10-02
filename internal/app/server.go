@@ -1,6 +1,6 @@
 // Serve mode: the same app without the window.
 //
-//	superai-desktop serve -port 43117
+//	superai serve -port 43117
 //
 // runs the identical App — same settings, same agent, same schedules out of the
 // same database — behind a plain HTTP server instead of a WKWebView, so the
@@ -270,7 +270,7 @@ func newAPIMux(app *App, hub *eventHub, creds *credentials, handoff *handoffStor
 	return mux, nil
 }
 
-// serveMain is the `superai-desktop serve` entry point.
+// serveMain is the `superai serve` entry point.
 func ServeMain(argv []string) {
 	fl := flag.NewFlagSet("serve", flag.ExitOnError)
 	port := fl.Int("port", 43117, "listen on <bind>:<port>")

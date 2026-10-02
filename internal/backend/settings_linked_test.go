@@ -6,7 +6,7 @@ import (
 )
 
 func TestALinkMadeInThePageSurvivesSettingsBeingRewritten(t *testing.T) {
-	t.Setenv("SUPERAI_DESKTOP_HOME", t.TempDir())
+	t.Setenv("SUPERAI_HOME", t.TempDir())
 	if err := SaveLinkedSuperAIs(map[string]RemoteAgent{
 		"mac":     {URL: "http://192.168.123.123:43779", Token: "k"},
 		"cluster": {URL: "http://ignored"},

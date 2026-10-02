@@ -174,7 +174,7 @@ func TestClearEmptiesIt(t *testing.T) {
 // exactly the one that has been missing what it said.
 func TestTheStoreCanBeOpenedWithoutAService(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("SUPERAI_DESKTOP_HOME", home)
+	t.Setenv("SUPERAI_HOME", home)
 
 	daemon := NewInbox(filepath.Join(home, "data"))
 	raise(daemon, Notice{Message: "raised by the other process"})

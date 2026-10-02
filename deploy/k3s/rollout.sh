@@ -5,10 +5,10 @@
 #   ./deploy/k3s/rollout.sh
 #
 # The cluster has no registry: the image is built here, saved, and imported
-# into each node's containerd. The tag stays superai-desktop:hive with
+# into each node's containerd. The tag stays superai:hive with
 # imagePullPolicy IfNotPresent, so a restart is what picks the new one up.
 set -euo pipefail
-IMAGE="${SUPERAI_IMAGE:-superai-desktop:hive}"
+IMAGE="${SUPERAI_IMAGE:-superai:hive}"
 NODES="${SUPERAI_NODES:-orange1 orange2 orange3}"
 KUBE="${SUPERAI_KUBE:-orange1}"
 NS=superai

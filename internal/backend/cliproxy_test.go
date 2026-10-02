@@ -14,7 +14,7 @@ import (
 // expected "enabled but not logged in yet" state.
 func TestCLIProxyLifecycle(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("SUPERAI_DESKTOP_HOME", home)
+	t.Setenv("SUPERAI_HOME", home)
 
 	p, err := StartCLIProxy(43519)
 	if err != nil {

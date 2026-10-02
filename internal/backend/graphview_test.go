@@ -34,7 +34,7 @@ func fakeSource(name string, nodes int) func(*Settings) (*liveview.Source, error
 }
 
 func TestGraphKeyFollowsTheConfiguredBackend(t *testing.T) {
-	t.Setenv("SUPERAI_DESKTOP_HOME", t.TempDir())
+	t.Setenv("SUPERAI_HOME", t.TempDir())
 	t.Setenv("CORTEXDB_REMOTE", "")
 
 	local := graphKey(&Settings{MemoryBackend: MemoryBackendLocal})
@@ -60,7 +60,7 @@ func TestGraphKeyFollowsTheConfiguredBackend(t *testing.T) {
 }
 
 func TestGraphKeyReadsTheEnvironmentFallback(t *testing.T) {
-	t.Setenv("SUPERAI_DESKTOP_HOME", t.TempDir())
+	t.Setenv("SUPERAI_HOME", t.TempDir())
 	t.Setenv("CORTEXDB_REMOTE", "env-brain:9000")
 
 	// Same fallback the memory backend itself uses, so the view and the agent
@@ -71,7 +71,7 @@ func TestGraphKeyReadsTheEnvironmentFallback(t *testing.T) {
 }
 
 func TestGraphSourceRefusesSharedWithoutAnEndpoint(t *testing.T) {
-	t.Setenv("SUPERAI_DESKTOP_HOME", t.TempDir())
+	t.Setenv("SUPERAI_HOME", t.TempDir())
 	t.Setenv("CORTEXDB_REMOTE", "")
 
 	src, err := GraphSource(&Settings{MemoryBackend: MemoryBackendShared})
@@ -85,7 +85,7 @@ func TestGraphSourceRefusesSharedWithoutAnEndpoint(t *testing.T) {
 }
 
 func TestGraphSourceDescribesTheSharedBrain(t *testing.T) {
-	t.Setenv("SUPERAI_DESKTOP_HOME", t.TempDir())
+	t.Setenv("SUPERAI_HOME", t.TempDir())
 
 	src, err := GraphSource(&Settings{
 		MemoryBackend:        MemoryBackendShared,
@@ -112,7 +112,7 @@ func TestGraphSourceDescribesTheSharedBrain(t *testing.T) {
 // is a path CortexDB will actually open, which no fake can tell us.
 func TestGraphSourceOpensTheLocalBrain(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("SUPERAI_DESKTOP_HOME", home)
+	t.Setenv("SUPERAI_HOME", home)
 
 	src, err := GraphSource(&Settings{MemoryBackend: MemoryBackendLocal})
 	if err != nil {
@@ -141,7 +141,7 @@ func TestGraphSourceRejectsNilSettings(t *testing.T) {
 }
 
 func TestEnsureStartsOneViewAndReusesIt(t *testing.T) {
-	t.Setenv("SUPERAI_DESKTOP_HOME", t.TempDir())
+	t.Setenv("SUPERAI_HOME", t.TempDir())
 	g := &GraphViews{open: fakeSource("brain-one", 3)}
 	defer func() { _ = g.Close() }()
 
@@ -168,7 +168,7 @@ func TestEnsureStartsOneViewAndReusesIt(t *testing.T) {
 }
 
 func TestEnsureServesTheLivePage(t *testing.T) {
-	t.Setenv("SUPERAI_DESKTOP_HOME", t.TempDir())
+	t.Setenv("SUPERAI_HOME", t.TempDir())
 	g := &GraphViews{open: fakeSource("brain-one", 1)}
 	defer func() { _ = g.Close() }()
 
@@ -191,7 +191,7 @@ func TestEnsureServesTheLivePage(t *testing.T) {
 }
 
 func TestEnsureRestartsWhenTheBrainChanges(t *testing.T) {
-	t.Setenv("SUPERAI_DESKTOP_HOME", t.TempDir())
+	t.Setenv("SUPERAI_HOME", t.TempDir())
 	t.Setenv("CORTEXDB_REMOTE", "")
 	// Named after the backend it was opened for, so an answer says which view
 	// gave it. A fixed name cannot distinguish the old view from the new one
@@ -271,7 +271,7 @@ func TestEnsureReportsAFailedOpen(t *testing.T) {
 }
 
 func TestCloseStopsServingAndIsIdempotent(t *testing.T) {
-	t.Setenv("SUPERAI_DESKTOP_HOME", t.TempDir())
+	t.Setenv("SUPERAI_HOME", t.TempDir())
 	closed := false
 	g := &GraphViews{open: func(*Settings) (*liveview.Source, error) {
 		src, _ := fakeSource("brain-one", 1)(nil)
@@ -311,7 +311,7 @@ func TestCloseOnAZeroValueDoesNothing(t *testing.T) {
 }
 
 func TestGraphStatusDescribesTheView(t *testing.T) {
-	t.Setenv("SUPERAI_DESKTOP_HOME", t.TempDir())
+	t.Setenv("SUPERAI_HOME", t.TempDir())
 	g := &GraphViews{open: fakeSource("shared brain brain:9000", 2)}
 	defer func() { _ = g.Close() }()
 
@@ -344,7 +344,7 @@ func TestGraphStatusDescribesTheView(t *testing.T) {
 }
 
 func TestGraphStatusCarriesTheReasonThereIsNoView(t *testing.T) {
-	t.Setenv("SUPERAI_DESKTOP_HOME", t.TempDir())
+	t.Setenv("SUPERAI_HOME", t.TempDir())
 	t.Setenv("CORTEXDB_REMOTE", "")
 
 	var g GraphViews

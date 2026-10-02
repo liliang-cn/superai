@@ -16,7 +16,7 @@ import (
 // initiative.
 func TestExternalAgentsStayOffThroughAnUpgrade(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("SUPERAI_DESKTOP_HOME", home)
+	t.Setenv("SUPERAI_HOME", home)
 
 	if defaults().ExternalAgents.Enabled {
 		t.Error("external agents must default to off")
@@ -40,7 +40,7 @@ func TestExternalAgentsStayOffThroughAnUpgrade(t *testing.T) {
 // that silently did not persist would widen that bound on the next restart.
 func TestExternalAgentsRoundTrip(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("SUPERAI_DESKTOP_HOME", home)
+	t.Setenv("SUPERAI_HOME", home)
 
 	s, err := LoadSettings()
 	if err != nil {
@@ -100,7 +100,7 @@ func TestExternalAgentsRoundTrip(t *testing.T) {
 // through the deliverable directory every other tool writes to.
 func TestExternalAgentRootsAlwaysIncludeTheWorkspace(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("SUPERAI_DESKTOP_HOME", home)
+	t.Setenv("SUPERAI_HOME", home)
 
 	s, err := LoadSettings()
 	if err != nil {

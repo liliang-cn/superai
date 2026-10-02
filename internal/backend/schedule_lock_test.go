@@ -11,7 +11,7 @@ import (
 // counted per open file description, so a second acquisition fails even from the
 // same process, which is what makes this testable without spawning one.
 func TestScheduleLockIsExclusive(t *testing.T) {
-	t.Setenv("SUPERAI_DESKTOP_HOME", t.TempDir())
+	t.Setenv("SUPERAI_HOME", t.TempDir())
 
 	first, err := AcquireScheduleLock()
 	if err != nil {
@@ -50,7 +50,7 @@ func TestScheduleLockIsExclusive(t *testing.T) {
 
 func TestScheduleLockRecordsHolder(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("SUPERAI_DESKTOP_HOME", home)
+	t.Setenv("SUPERAI_HOME", home)
 
 	lock, err := AcquireScheduleLock()
 	if err != nil || lock == nil {
@@ -70,7 +70,7 @@ func TestScheduleLockRecordsHolder(t *testing.T) {
 }
 
 func TestScheduleLockHolderWithoutLockFile(t *testing.T) {
-	t.Setenv("SUPERAI_DESKTOP_HOME", t.TempDir())
+	t.Setenv("SUPERAI_HOME", t.TempDir())
 	if got := ScheduleLockHolder(); got != 0 {
 		t.Errorf("with no lock file the holder should be unknown (0), got %d", got)
 	}
