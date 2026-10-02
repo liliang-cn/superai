@@ -125,6 +125,7 @@ type App struct {
 	cliOnce        sync.Once
 	cliApprove     *cliApprover
 	cliApproveOnce sync.Once
+	remoteCLI      remoteCLICache
 	approvals      map[string]*pendingApproval
 
 	// emitFn is an extra sink for frontend events. Tests set it, and serve mode
@@ -731,7 +732,7 @@ func (a *App) SendChat(sessionID, message string, imagePaths []string) string {
 	// unconfigured LLM is no reason not to forward a question to a machine that
 	// has one.
 	if name, rest, ok := addressedTo(message, a.addressable); ok {
-		if a.isLocalCLI(name) {
+		if a.isDrivenCLI(name) {
 			a.routeToCLI(requestID, sessionID, name, rest)
 		} else {
 			a.routeToRemote(requestID, sessionID, name, rest)

@@ -103,3 +103,44 @@ func TestAPtyReasonIsReadableText(t *testing.T) {
 		t.Fatalf("%q", got)
 	}
 }
+
+func TestAnAddressCanNameAMachine(t *testing.T) {
+	known := func(n string) bool { return n == "claude" || n == "claude.mac2" || n == "pi.cluster" }
+	for msg, want := range map[string]string{
+		"@claude.mac2 fix the test": "claude.mac2",
+		"@claude.mac2，看一下":          "claude.mac2",
+		"@claude do it":             "claude",
+		"@pi.cluster hi":            "pi.cluster",
+	} {
+		name, _, ok := addressedTo(msg, known)
+		if !ok || name != want {
+			t.Fatalf("%q → %q %v", msg, name, ok)
+		}
+	}
+	if _, _, ok := addressedTo("@claude.nowhere hi", known); ok {
+		t.Fatal("an unknown machine was addressed")
+	}
+	if a, h, ok := splitRemoteCLI("claude.mac2.home"); !ok || a != "claude" || h != "mac2.home" {
+		t.Fatalf("%q %q", a, h)
+	}
+	for _, bad := range []string{"claude", ".mac2", "claude."} {
+		if _, _, ok := splitRemoteCLI(bad); ok {
+			t.Fatalf("%q split", bad)
+		}
+	}
+}
+
+func TestALinkAddressIsReadTheWayItIsTyped(t *testing.T) {
+	for in, want := range map[string]string{
+		"192.168.1.5:43117":         "http://192.168.1.5:43117",
+		" https://ai.superleo.cn/ ": "https://ai.superleo.cn",
+		"http://mac2.local:47263/":  "http://mac2.local:47263",
+	} {
+		if got, err := normaliseSuperAIURL(in); err != nil || got != want {
+			t.Fatalf("%q → %q %v", in, got, err)
+		}
+	}
+	if validLinkName("mac 2") || validLinkName("a@b") || !validLinkName("mac2.home") {
+		t.Fatal("link name rules")
+	}
+}

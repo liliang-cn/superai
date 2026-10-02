@@ -95,6 +95,10 @@ export function InstallSkill(arg1:string,arg2:string):Promise<string>;
 
 export function Life():Promise<backend.LifeData>;
 
+export function LinkSuperAI(arg1:string,arg2:string,arg3:string):Promise<string>;
+
+export function LinkedSuperAIs():Promise<Array<app.LinkedSuperAI>>;
+
 export function LongRunList():Promise<Array<backend.TaskSummary>>;
 
 export function LongRunStart(arg1:string,arg2:number,arg3:number,arg4:number,arg5:number,arg6:string,arg7:boolean):Promise<string>;
@@ -188,6 +192,8 @@ export function TestWebhook():Promise<string>;
 export function ToolApprovalInfo(arg1:number):Promise<Record<string, any>>;
 
 export function TraceLines(arg1:string,arg2:number):Promise<Array<string>>;
+
+export function UnlinkSuperAI(arg1:string):Promise<void>;
 
 export function UnpairDevice(arg1:string):Promise<void>;
 

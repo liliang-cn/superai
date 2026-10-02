@@ -3756,3 +3756,8 @@ body.desktop-shell .sidebar.collapsed .nav-key { display: none; }
   .agents-split { grid-template-columns: 1fr; }
   .agents-list { max-height: 30vh; }
 }
+
+.link-form { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.link-form .input { flex: 1 1 220px; }
+.link-form .link-code { flex: 0 0 96px; font-variant-numeric: tabular-nums; letter-spacing: 0.12em; }
+.link-form .link-name { flex: 0 1 160px; }
