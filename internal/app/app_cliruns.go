@@ -313,6 +313,14 @@ func (a *App) startCLIRun(o cliStart) (CLIRun, error) {
 		case "claude":
 			req.PermissionMode = agentexec.PermissionDefault
 			req.ExtraArgs = append(req.ExtraArgs, "--permission-prompt-tool", "mcp__superai__approve")
+			// Claude gives an MCP call a short while and then reports "The
+			// operation timed out": a person reaching for their phone took
+			// longer than that, and Claude gave up on the command. The call
+			// is allowed as long as the approval card waits, and a little more.
+			if req.Env == nil {
+				req.Env = map[string]string{}
+			}
+			req.Env["MCP_TOOL_TIMEOUT"] = fmt.Sprint((cliApproveWait + time.Minute).Milliseconds())
 		case "codex":
 			// Codex has no prompt to forward in exec mode; ask means its own
 			// sandbox: writes inside the workspace only, no network.
