@@ -11,7 +11,7 @@ import (
 // on demand, hand back a usable URL and the counts that let the page explain
 // itself, and return the same view the second time rather than a second port.
 func TestGraphViewStartsOnDemandAndStaysPut(t *testing.T) {
-	t.Setenv("SUPERAI_DESKTOP_HOME", t.TempDir())
+	t.Setenv("SUPERAI_HOME", t.TempDir())
 	t.Setenv("CORTEXDB_REMOTE", "")
 
 	a := NewApp()
@@ -53,7 +53,7 @@ func TestGraphViewStartsOnDemandAndStaysPut(t *testing.T) {
 // Opening the page before the app has settings must produce a reason, not a
 // crash and not a blank frame.
 func TestGraphViewWithoutSettingsExplainsItself(t *testing.T) {
-	t.Setenv("SUPERAI_DESKTOP_HOME", t.TempDir())
+	t.Setenv("SUPERAI_HOME", t.TempDir())
 
 	a := NewApp()
 	defer func() { _ = a.graphs.Close() }()
@@ -70,7 +70,7 @@ func TestGraphViewWithoutSettingsExplainsItself(t *testing.T) {
 // shutdown has to take the listener down with it. A view left serving the brain
 // after the window closed is an unauthenticated read of everything in it.
 func TestShutdownStopsTheGraphView(t *testing.T) {
-	t.Setenv("SUPERAI_DESKTOP_HOME", t.TempDir())
+	t.Setenv("SUPERAI_HOME", t.TempDir())
 	t.Setenv("CORTEXDB_REMOTE", "")
 
 	a := NewApp()

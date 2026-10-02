@@ -126,7 +126,7 @@ func startMarkerLLM(t *testing.T, delay time.Duration) string {
 func newChatApp(t *testing.T, delay time.Duration) (*App, *eventLog) {
 	t.Helper()
 	home := t.TempDir()
-	t.Setenv("SUPERAI_DESKTOP_HOME", home)
+	t.Setenv("SUPERAI_HOME", home)
 	// Chrome costs ~1s per NewService and no test here browses.
 	t.Setenv("SUPERAI_NO_BROWSER", "1")
 

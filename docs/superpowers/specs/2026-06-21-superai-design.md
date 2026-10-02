@@ -1,4 +1,4 @@
-# SuperAI Desktop — Design Spec
+# SuperAI — Design Spec
 
 Date: 2026-06-21
 Status: approved, in implementation
@@ -16,7 +16,7 @@ character itself, but broadcasts emotion + agent-lifecycle events over a local
 protocol so any external 2D/3D renderer (Live2D / VRM / Unity / web) can be
 driven by it.
 
-Standalone repo at `~/Things/projects/ai/superai-desktop`, depending on the
+Standalone repo at `~/Things/projects/ai/superai`, depending on the
 published `github.com/liliang-cn/agent-go/v3` (currently v2.89.0) and
 `cortexdb/v2` (v2.24.1). No Go workspace entanglement — it pins released
 versions.
@@ -26,7 +26,7 @@ versions.
 - **Wails v2** (v2.12) — Go backend + React + Vite + TypeScript frontend, native
   webview on both macOS (WKWebView) and Windows (WebView2).
 - Backend: AgentGo `agent.Service` + cortexdb + cortexbridge.
-- Data dir: `~/.superai-desktop/` (cortex.db, workspace/, settings.json).
+- Data dir: `~/.superai/` (cortex.db, workspace/, settings.json).
 - Cross-platform: no OS-specific code in our layer; agent-go's sandbox already
   has unix/other build tags, chromedp + WebView2/WKWebView work on both.
 
@@ -35,7 +35,7 @@ versions.
 ```go
 agent.New("SuperAI").
     WithLLM(providerFromSettings).
-    WithSandbox(sandbox.NewLocal(WithWorkspace(~/.superai-desktop/workspace))).
+    WithSandbox(sandbox.NewLocal(WithWorkspace(~/.superai/workspace))).
     WithBrowser(browser.NewChromedp(headless)).
     WithVision(true).
     WithAutonomy(agent.AutonomyProfile{MaxRounds: 40, Scratchpad: true}).

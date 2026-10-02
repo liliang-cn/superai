@@ -49,7 +49,7 @@ export function AgentsBody({ onMention }: { onMention?: (name: string) => void }
           <p className="agents-dim">
             Turn on <b>external_agents</b> for the CLIs on this machine, or{" "}
             <b>remote_agents</b> for the ones on the cluster, in
-            <code> ~/.superai-desktop/settings.json</code>.
+            <code> ~/.superai/settings.json</code>.
           </p>
         </div>
       </div>

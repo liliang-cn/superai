@@ -4,7 +4,7 @@
 //
 // Inside the desktop app Wails injects both before any module script runs, so
 // the `!window.go` gate below never fires there. In a plain browser tab —
-// served by `superai-desktop serve` — this shim takes their place:
+// served by `superai serve` — this shim takes their place:
 //
 //   window.go.app.App.<Method>(...)  ->  POST /api/rpc/<Method>  (JSON array in,
 //                                         JSON out, non-2xx rejects the promise

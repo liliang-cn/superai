@@ -1,5 +1,5 @@
 // Package backend hosts the AgentGo-powered SuperAI service, the avatar event
-// driver, and the persisted user settings for the SuperAI desktop app.
+// driver, and the persisted user settings for the SuperAI app.
 package backend
 
 import (
@@ -14,7 +14,7 @@ import (
 )
 
 // Settings is the user-editable configuration, persisted as JSON at
-// ~/.superai-desktop/settings.json.
+// ~/.superai/settings.json.
 type Settings struct {
 	// Brain (LLM) — any OpenAI-compatible endpoint.
 	LLMBaseURL string `json:"llm_base_url"`
@@ -409,17 +409,17 @@ const (
 	DefaultCLIProxyPort = 43517
 )
 
-// DataDir returns the SuperAI desktop data directory (~/.superai-desktop),
-// honoring the SUPERAI_DESKTOP_HOME environment override.
+// DataDir returns the SuperAI data directory (~/.superai),
+// honoring the SUPERAI_HOME environment override.
 func DataDir() string {
-	if v := strings.TrimSpace(os.Getenv("SUPERAI_DESKTOP_HOME")); v != "" {
+	if v := strings.TrimSpace(os.Getenv("SUPERAI_HOME")); v != "" {
 		return expandHome(v)
 	}
 	home, err := os.UserHomeDir()
 	if err != nil || home == "" {
-		return ".superai-desktop"
+		return ".superai"
 	}
-	return filepath.Join(home, ".superai-desktop")
+	return filepath.Join(home, ".superai")
 }
 
 func expandHome(p string) string {
@@ -588,7 +588,7 @@ func (s *Settings) backfill(def *Settings) {
 	s.RemoteAgents.normalize()
 }
 
-// Save writes the settings to ~/.superai-desktop/settings.json (creating the
+// Save writes the settings to ~/.superai/settings.json (creating the
 // data directory if needed).
 // registerPricing tells agent-go what the brain's model costs, when the
 // settings say. Registered rates win over the bundled table, so a public

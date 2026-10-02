@@ -24,7 +24,7 @@ export GOWORK=off
 say() { printf '\n=== %s ===\n' "$1"; }
 
 deployed_version() {
-  ssh "$HOST" "stat -c '%y' $REMOTE_BIN/superai-desktop 2>/dev/null | cut -d. -f1" || true
+  ssh "$HOST" "stat -c '%y' $REMOTE_BIN/superai 2>/dev/null | cut -d. -f1" || true
 }
 
 case "${1:-deploy}" in
@@ -42,9 +42,9 @@ case "${1:-deploy}" in
   ssh "$HOST" "
     set -e
     cd $REMOTE_BIN
-    prev=\$(ls -t superai-desktop.prev-* 2>/dev/null | head -1)
+    prev=\$(ls -t superai.prev-* 2>/dev/null | head -1)
     [ -n \"\$prev\" ] || { echo 'no previous build to roll back to'; exit 1; }
-    cp \"\$prev\" superai-desktop.rollback && mv superai-desktop.rollback superai-desktop
+    cp \"\$prev\" superai.rollback && mv superai.rollback superai
     prevd=\$(ls -t superai-daemon.prev-* 2>/dev/null | head -1)
     [ -n \"\$prevd\" ] && { cp \"\$prevd\" superai-daemon.rollback && mv superai-daemon.rollback superai-daemon; }
     sudo systemctl restart $UNITS
@@ -67,12 +67,12 @@ go test ./...
 
 say "cross-compile linux/amd64"
 mkdir -p build/bin
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o build/bin/superai-desktop-linux .
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o build/bin/superai-linux .
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o build/bin/superai-daemon-linux ./cmd/superai-daemon
 ls -la build/bin/superai-*-linux
 
 say "upload"
-scp -q build/bin/superai-desktop-linux build/bin/superai-daemon-linux "$HOST:/tmp/"
+scp -q build/bin/superai-linux build/bin/superai-daemon-linux "$HOST:/tmp/"
 
 say "install and restart"
 # Replacement is a rename, never a copy over the running file: writing into a
@@ -81,14 +81,14 @@ say "install and restart"
 ssh "$HOST" "
   set -e
   ts=\$(date +%Y%m%d%H%M%S)
-  cp $REMOTE_BIN/superai-desktop $REMOTE_BIN/superai-desktop.prev-\$ts
+  cp $REMOTE_BIN/superai $REMOTE_BIN/superai.prev-\$ts
   cp $REMOTE_BIN/superai-daemon  $REMOTE_BIN/superai-daemon.prev-\$ts
-  chmod +x /tmp/superai-desktop-linux /tmp/superai-daemon-linux
-  mv /tmp/superai-desktop-linux $REMOTE_BIN/superai-desktop
+  chmod +x /tmp/superai-linux /tmp/superai-daemon-linux
+  mv /tmp/superai-linux $REMOTE_BIN/superai
   mv /tmp/superai-daemon-linux  $REMOTE_BIN/superai-daemon
   sudo systemctl restart $UNITS
   # Keep the three most recent rollback targets; the binaries are ~115MB each.
-  ls -t $REMOTE_BIN/superai-desktop.prev-* 2>/dev/null | tail -n +4 | xargs -r rm -f
+  ls -t $REMOTE_BIN/superai.prev-* 2>/dev/null | tail -n +4 | xargs -r rm -f
   ls -t $REMOTE_BIN/superai-daemon.prev-*  2>/dev/null | tail -n +4 | xargs -r rm -f
 "
 

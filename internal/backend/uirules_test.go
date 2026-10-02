@@ -7,7 +7,7 @@ import (
 )
 
 func TestUIRulesRoundTrip(t *testing.T) {
-	t.Setenv("SUPERAI_DESKTOP_HOME", t.TempDir())
+	t.Setenv("SUPERAI_HOME", t.TempDir())
 
 	if got := LoadUIRules(); got != "" {
 		t.Fatalf("fresh install should have no rules, got %q", got)

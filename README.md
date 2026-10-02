@@ -1,4 +1,4 @@
-# SuperAI Desktop
+# SuperAI
 
 A cross-platform (macOS + Windows) **Wails v2** desktop app that is a full
 showcase of the [AgentGo](https://github.com/liliang-cn/agent-go) framework: a
@@ -73,4 +73,4 @@ superai node uninstall   # -purge also deletes keys and data
 
 ## Architecture
 
-See `docs/superpowers/specs/2026-06-21-superai-desktop-design.md`.
+See `docs/superpowers/specs/2026-06-21-superai-design.md`.

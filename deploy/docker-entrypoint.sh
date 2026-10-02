@@ -7,7 +7,7 @@
 # restart does not log browsers out. With no env set, files on the volume are
 # used exactly as they are — the plain `docker run -v` case.
 set -eu
-home="${SUPERAI_DESKTOP_HOME:-/data}"
+home="${SUPERAI_HOME:-/data}"
 mkdir -p "$home"
 umask 077
 

@@ -14,7 +14,7 @@ import (
 // `sh -c`.
 func TestToolApprovalDefaultsOnEvenForOlderSettingsFiles(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("SUPERAI_DESKTOP_HOME", home)
+	t.Setenv("SUPERAI_HOME", home)
 
 	if defaults().DisableToolApproval {
 		t.Error("the approval gate must default to on")

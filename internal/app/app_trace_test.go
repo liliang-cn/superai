@@ -15,7 +15,7 @@ import (
 // over, and after a settings save has rebuilt the service that wrote it.
 func TestTraceLinesReadsTheTailWithoutAService(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("SUPERAI_DESKTOP_HOME", home)
+	t.Setenv("SUPERAI_HOME", home)
 
 	dir := backend.TracesDir()
 	if err := os.MkdirAll(dir, 0o755); err != nil {

@@ -15,9 +15,9 @@ cd "$(dirname "$0")/.."
 
 LABEL="com.superleo.superai.scheduler"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
-BIN_DIR="$HOME/.superai-desktop/bin"
+BIN_DIR="$HOME/.superai/bin"
 BIN="$BIN_DIR/superai-daemon"
-LOG="$HOME/.superai-desktop/daemon.log"
+LOG="$HOME/.superai/daemon.log"
 
 case "${1:-install}" in
 --uninstall)

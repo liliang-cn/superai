@@ -9,7 +9,7 @@ import (
 
 func TestRemoveMCPServer(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("SUPERAI_DESKTOP_HOME", home)
+	t.Setenv("SUPERAI_HOME", home)
 	path := mcpConfigPath()
 
 	// Removing from a config that was never written is not an error: the caller
@@ -57,7 +57,7 @@ func TestRemoveMCPServer(t *testing.T) {
 
 func TestRemoveSkill(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("SUPERAI_DESKTOP_HOME", home)
+	t.Setenv("SUPERAI_HOME", home)
 
 	dir := filepath.Join(home, "skills", "doomed")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -94,7 +94,7 @@ func TestRemoveSkill(t *testing.T) {
 
 func TestInstalledSkillNames(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("SUPERAI_DESKTOP_HOME", home)
+	t.Setenv("SUPERAI_HOME", home)
 
 	if names := InstalledSkillNames(); len(names) != 0 {
 		t.Errorf("a fresh install has no skills, got %v", names)
@@ -116,7 +116,7 @@ func TestInstalledSkillNames(t *testing.T) {
 }
 
 func TestInstallMCPServerValidates(t *testing.T) {
-	t.Setenv("SUPERAI_DESKTOP_HOME", t.TempDir())
+	t.Setenv("SUPERAI_HOME", t.TempDir())
 	var svc *Service
 
 	if err := svc.InstallMCPServer(t.Context(), "", "npx", nil, nil); err == nil {

@@ -22,7 +22,7 @@ var assets embed.FS
 func main() {
 	app.Assets = assets
 
-	// The same binary, minus the window: `superai-desktop serve` runs the app
+	// The same binary, minus the window: `superai serve` runs the app
 	// behind a local HTTP server instead of a WKWebView (see
 	// internal/app/server.go).
 	if len(os.Args) > 1 && os.Args[1] == "serve" {

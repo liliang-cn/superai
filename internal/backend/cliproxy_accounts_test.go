@@ -11,7 +11,7 @@ import (
 )
 
 func TestCLIProxyAccounts(t *testing.T) {
-	t.Setenv("SUPERAI_DESKTOP_HOME", t.TempDir())
+	t.Setenv("SUPERAI_HOME", t.TempDir())
 
 	p, err := StartCLIProxy(43537)
 	if err != nil {
@@ -137,7 +137,7 @@ func dirList(dir string) []string {
 // Asserting immediately after the call would not have caught it, because the
 // revert arrives afterwards. This waits.
 func TestAccountChangesAreNotRevertedByTheProxy(t *testing.T) {
-	t.Setenv("SUPERAI_DESKTOP_HOME", t.TempDir())
+	t.Setenv("SUPERAI_HOME", t.TempDir())
 
 	p, err := StartCLIProxy(43539)
 	if err != nil {

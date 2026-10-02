@@ -70,7 +70,7 @@ func (s *Service) registerInstallTools() {
 	// --- add_mcp_server ---
 	svc.AddToolWithMetadata(
 		"add_mcp_server",
-		"Install/add an MCP server (call it when the user asks in conversation for some MCP tool). It starts immediately over stdio and is written to ~/.superai-desktop/mcpServers.json, so it survives a restart.",
+		"Install/add an MCP server (call it when the user asks in conversation for some MCP tool). It starts immediately over stdio and is written to ~/.superai/mcpServers.json, so it survives a restart.",
 		map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
@@ -112,7 +112,7 @@ func (s *Service) registerInstallTools() {
 	// --- install_skill ---
 	svc.AddToolWithMetadata(
 		"install_skill",
-		"Install a skill from one of three sources: a local path (source_path, paired with search_skills), a git repository (git_url), or SKILL.md content given directly (skill_md). It is installed into ~/.superai-desktop/skills/<name> and hot-reloaded; once installed it shows up in the Skills panel.",
+		"Install a skill from one of three sources: a local path (source_path, paired with search_skills), a git repository (git_url), or SKILL.md content given directly (skill_md). It is installed into ~/.superai/skills/<name> and hot-reloaded; once installed it shows up in the Skills panel.",
 		map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{

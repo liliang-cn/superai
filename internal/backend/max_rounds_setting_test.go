@@ -45,7 +45,7 @@ func TestAChosenRoundBudgetIsLeftAlone(t *testing.T) {
 func TestTheAgentCannotGiveItselfAnUnlimitedBudget(t *testing.T) {
 	// The person may set it; the model may not. See the comment on
 	// selfMaxRoundsCeiling.
-	t.Setenv("SUPERAI_DESKTOP_HOME", t.TempDir())
+	t.Setenv("SUPERAI_HOME", t.TempDir())
 	svc := &Service{}
 
 	if _, err := svc.applySetting("max_rounds", agent.UnlimitedRounds); err == nil {

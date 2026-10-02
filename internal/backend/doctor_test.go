@@ -134,7 +134,7 @@ func TestDoctorWarnsRatherThanFailsWhenNoAgentCLIIsInstalled(t *testing.T) {
 	// happen to have installed reported "npx is not on PATH" and failed a test
 	// about agent CLIs. Pointing the whole data directory at the temp home is
 	// what makes this hermetic.
-	t.Setenv("SUPERAI_DESKTOP_HOME", home)
+	t.Setenv("SUPERAI_HOME", home)
 	report := doctorReportFor(context.Background(), home)
 	if report.Fail != 0 || !report.Healthy {
 		t.Fatalf("no agent CLIs made the install unhealthy: fail=%d healthy=%v", report.Fail, report.Healthy)

@@ -75,7 +75,7 @@ func startToolCallingLLM(t *testing.T, command string) string {
 func gateTestApp(t *testing.T, command string, disable bool) (*App, string) {
 	t.Helper()
 	home := t.TempDir()
-	t.Setenv("SUPERAI_DESKTOP_HOME", home)
+	t.Setenv("SUPERAI_HOME", home)
 	t.Setenv("SUPERAI_NO_BROWSER", "1")
 
 	a := NewApp()

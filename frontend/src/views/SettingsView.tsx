@@ -512,7 +512,7 @@ function RemoteAgentsCard({
           <span className="hint">
             The hosts are tried in order and the one currently holding the agent wins, because
             the cluster moves it between nodes. Edit them, or add an agent of your own, under
-            <code> remote_agents </code> in <code>~/.superai-desktop/settings.json</code>.
+            <code> remote_agents </code> in <code>~/.superai/settings.json</code>.
           </span>
         </div>
       )}

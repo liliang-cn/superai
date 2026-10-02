@@ -79,7 +79,7 @@ spec:
       serviceAccountName: superai
       containers:
         - name: superai
-          image: superai-desktop:hive
+          image: superai:hive
           imagePullPolicy: IfNotPresent
           ports: [{containerPort: 43117}]
           env:
@@ -127,7 +127,7 @@ spec:
       serviceAccountName: superai
       containers:
         - name: superai
-          image: superai-desktop:hive
+          image: superai:hive
           imagePullPolicy: IfNotPresent
           ports: [{containerPort: 43117}]
           env:
