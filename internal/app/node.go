@@ -287,6 +287,9 @@ func systemdUnit() string {
 }
 
 func installSystemd(home string, args []string, env map[string]string) error {
+	if _, err := exec.LookPath("systemctl"); err != nil {
+		return fmt.Errorf("no systemd here (a container?): start it with your own supervisor:\n  SUPERAI_DESKTOP_HOME=%s %s", home, strings.Join(args, " "))
+	}
 	var b strings.Builder
 	b.WriteString("[Unit]\nDescription=SuperAI node\nAfter=network-online.target\n\n[Service]\n")
 	fmt.Fprintf(&b, "Environment=SUPERAI_DESKTOP_HOME=%s\n", home)
@@ -366,7 +369,8 @@ func nodePair() error {
 		fmt.Printf("  address  %s\n", a)
 	}
 	fmt.Printf("  code     %s %s   (valid until %s)\n", code.Code[:3], code.Code[3:], code.ExpiresAt.Local().Format("15:04"))
-	fmt.Println("Its agents are then @claude.<name>, @codex.<name> there. A new code: superai-desktop node pair")
+	fmt.Printf("Its agents are then @claude.<name>, @codex.<name> there. A new code: %s node pair\n",
+		filepath.Join(c.Home, "bin", "superai"))
 	return nil
 }
 
