@@ -27,8 +27,13 @@ function CodeBlock({ className, text }: { className?: string; text: string }) {
   );
 }
 
-const mdComponents = {
-  code({ inline, className, children, ...props }: any) {
+export const mdComponents = {
+  code({ node, className, children, ...props }: any) {
+    // react-markdown 9 no longer says which code is inline. A fenced block
+    // spans lines in the source (the fences are lines of their own); `x` in
+    // a sentence does not. Without this every `.` in prose became a block.
+    const pos = node?.position;
+    const inline = pos ? pos.start.line === pos.end.line && !/language-/.test(className ?? "") : !String(children).includes("\n");
     if (inline) {
       return (
         <code className={className} {...props}>

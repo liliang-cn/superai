@@ -63,17 +63,17 @@ type CLIRun struct {
 	Ask bool `json:"ask"`
 	// Chat is the conversation an @mention started this run from, if any;
 	// the next @mention of the same agent there continues this session.
-	Chat    string     `json:"chat,omitempty"`
-	State   string     `json:"state"`
-	Started time.Time  `json:"started"`
-	Ended   *time.Time `json:"ended,omitempty"`
-	Summary string     `json:"summary,omitempty"`
-	Error   string     `json:"error,omitempty"`
-	In      int        `json:"in"`
-	Out     int        `json:"out"`
-	Cache   int        `json:"cache"`
-	CostUSD float64    `json:"costUsd"`
-	Tools   int        `json:"tools"`
+	Chat    string        `json:"chat,omitempty"`
+	State   string        `json:"state"`
+	Started time.Time     `json:"started"`
+	Ended   *time.Time    `json:"ended,omitempty"`
+	Summary string        `json:"summary,omitempty"`
+	Error   string        `json:"error,omitempty"`
+	In      int           `json:"in"`
+	Out     int           `json:"out"`
+	Cache   int           `json:"cache"`
+	CostUSD float64       `json:"costUsd"`
+	Tools   int           `json:"tools"`
 	Events  []CLIRunEvent `json:"events,omitempty"`
 }
 

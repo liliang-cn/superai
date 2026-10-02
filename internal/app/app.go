@@ -125,7 +125,7 @@ type App struct {
 	cliOnce        sync.Once
 	cliApprove     *cliApprover
 	cliApproveOnce sync.Once
-	approvals  map[string]*pendingApproval
+	approvals      map[string]*pendingApproval
 
 	// emitFn is an extra sink for frontend events. Tests set it, and serve mode
 	// points it at the SSE hub, where it is the only sink there is: the Wails

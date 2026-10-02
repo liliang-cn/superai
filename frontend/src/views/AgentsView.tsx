@@ -13,6 +13,9 @@ import { EventsOn } from "../../wailsjs/runtime";
 import { fromNow, parseTime } from "../lib/format";
 import { useImeGuard } from "@/lib/ime";
 import { toast } from "../lib/toasts";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { mdComponents } from "../components/Transcript";
 
 // Plain shapes: what arrives over events is JSON, not the generated classes.
 type Ev = Omit<app.CLIRunEvent, "convertValues">;
@@ -41,6 +44,12 @@ function threadsOf(runs: Run[]): Thread[] {
   out.sort((a, b) => +parseTime(b.latest.started)! - +parseTime(a.latest.started)!);
   return out;
 }
+
+/** The last two parts of a path: enough to know which project. */
+const shortPath = (p: string) => {
+  const parts = p.split("/").filter(Boolean);
+  return parts.length > 2 ? "…/" + parts.slice(-2).join("/") : p;
+};
 
 const cost = (n: number) => (n > 0 ? `$${n.toFixed(n < 1 ? 3 : 2)}` : "");
 
@@ -266,7 +275,7 @@ function ThreadView({ thread, events }: { thread: Thread; events: Record<string,
     <div className="agents-thread">
       <div className="agents-thread-head">
         <span className="ai-agent">@{thread.agent}</span>
-        <span className="agents-cwd" title={thread.latest.cwd}>{thread.latest.cwd}</span>
+        <span className="agents-cwd" title={thread.latest.cwd}>{shortPath(thread.latest.cwd)}</span>
         <span className="agents-meta">
           {thread.latest.ask ? "asks" : "unattended"}
           {total > 0 && ` · ${cost(total)}`}
@@ -321,7 +330,11 @@ function RunBlock({ run, events }: { run: Run; events: Ev[] }) {
         e.kind === "tool" ? (
           <ToolStep key={e.seq} call={e} result={e.callId ? results.get(e.callId) : undefined} />
         ) : e.kind === "text" ? (
-          <div key={e.seq} className="agents-text">{e.text}</div>
+          <div key={e.seq} className="agents-text md">
+            <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
+              {e.text ?? ""}
+            </ReactMarkdown>
+          </div>
         ) : e.kind === "note" ? (
           <div key={e.seq} className={`agents-note${e.failed ? " bad" : ""}`}>
             {e.tool && <b>{e.tool}</b>} {e.text}
