@@ -3,6 +3,7 @@ export type Theme = "dark" | "light";
 export type Accent = "signal" | "copper" | "cobalt" | "jade" | "rose" | "violet";
 
 export type ViewKey =
+  | "home"
   | "chat"
   | "stats"
   | "settings"

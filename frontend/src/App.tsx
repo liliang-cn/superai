@@ -15,6 +15,7 @@ import KnowledgeView from "./views/KnowledgeView";
 import SkillsView from "./views/SkillsView";
 import MCPView from "./views/MCPView";
 import RecordsView from "./views/RecordsView";
+import CanvasView from "./canvas/CanvasView";
 import { ScheduleRunToasts } from "./components/ScheduleRuns";
 import { Toaster } from "./components/Toaster";
 import { useBackendToasts } from "./lib/toasts";
@@ -155,6 +156,19 @@ export default function App() {
     return () => clearInterval(t);
   }, [refreshStatus]);
 
+  // Home is the canvas: the whole window, no sidebar and no status bar; the
+  // other screens are a menu away. What needs you is on the canvas itself, so
+  // the approval cards stay away from it.
+  if (view === "home") {
+    return (
+      <>
+        <CanvasView approvals={approvals} />
+        <ScheduleRunToasts log={runs} onOpenConversation={openConversation} />
+        <Toaster onOpenConversation={openConversation} />
+      </>
+    );
+  }
+
   return (
     <>
       <div className="app">
@@ -186,7 +200,7 @@ export default function App() {
           <div className="content">
             <Routes>
               <Route
-                path="/"
+                path="/chat"
                 element={
                   <ChatView
                     status={status}

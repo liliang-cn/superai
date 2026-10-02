@@ -59,6 +59,17 @@ export default function StatusBar({
         >
           <MenuIcon className="size-4" />
         </button>
+        {/* On a phone the bar carries the mark and the name instead of the
+            word "Ready": there is no sidebar on screen to say where you are.
+            The mark's centre is the status — signal when ready, red when not. */}
+        <span className={`status-brand ${dotClass}`} aria-hidden="true">
+          <svg viewBox="0 0 32 32">
+            <circle cx="16" cy="16" r="10.5" fill="none" stroke="currentColor" strokeWidth="1.8" />
+            <path d="M16 2.5v5M16 24.5v5M2.5 16h5M24.5 16h5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            <circle className="status-brand-dot" cx="16" cy="16" r="3.4" />
+          </svg>
+          SuperAI
+        </span>
         <span className={`status-dot ${dotClass}`} />
         {/* A real element, not a bare text node: text-overflow needs something
             to hang on, and an anonymous flex item is not it — squeezed, the
@@ -79,7 +90,7 @@ export default function StatusBar({
             here is only what is a control. */}
         {status && status.avatarPort > 0 && (
           <button
-            className={`pill-btn icon-only${petOpen ? " on" : ""}`}
+            className={`pill-btn icon-only pet-btn${petOpen ? " on" : ""}`}
             onClick={onTogglePet}
             title={petOpen ? "Send the avatar away" : "Let the avatar out into the window"}
             aria-label="Avatar"

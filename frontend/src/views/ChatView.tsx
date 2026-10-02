@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useChat } from "../lib/useChat";
+import { useRoom } from "../lib/useViewport";
 import { useAttachments } from "../lib/useAttachments";
 import { AppStatus, ChatMessage } from "../lib/types";
 import { copyText } from "../lib/format";
@@ -78,6 +79,7 @@ export default function ChatView({
   const attach = useAttachments();
   const notReady = status !== null && !status.ready;
   const messages = chat.messages;
+  const room = useRoom();
   const history = useHistory();
   const [filesKey, setFilesKey] = useState(0);
   // The composer is controlled so the send button can know whether there is
@@ -419,10 +421,12 @@ export default function ChatView({
                 onPaste={attach.paste}
                 placeholder={
                   notReady
-                    ? "Configure LLM in Settings first…"
-                    : mentions.agents.length > 0
-                      ? "Message SuperAI…  (@ to reach another agent, drag files in, paste a screenshot)"
-                      : "Message SuperAI…  (drag files in, paste a screenshot, or 📎)"
+                    ? "Choose a model in Settings first"
+                    : room === "phone"
+                      ? "Message SuperAI"
+                      : mentions.agents.length > 0
+                        ? "Message SuperAI. @ reaches another agent; drop files or paste a screenshot."
+                        : "Message SuperAI. Drop files or paste a screenshot."
                 }
               />
               <PromptInputToolbar>
