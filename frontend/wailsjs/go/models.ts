@@ -84,11 +84,322 @@ export namespace agent {
 		    return a;
 		}
 	}
+	export class StandingEvent {
+	    source: string;
+	    kind?: string;
+	    payload: string;
+	    // Go type: time
+	    at: any;
+	
+	    static createFrom(source: any = {}) {
+	        return new StandingEvent(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.source = source["source"];
+	        this.kind = source["kind"];
+	        this.payload = source["payload"];
+	        this.at = this.convertValues(source["at"], null);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Wake {
+	    id: string;
+	    responsibility_id: string;
+	    kind: string;
+	    reason?: string;
+	    event?: StandingEvent;
+	    session_id: string;
+	    run_id: string;
+	    // Go type: time
+	    started_at: any;
+	    // Go type: time
+	    ended_at?: any;
+	    cost_usd: number;
+	    unpriced?: boolean;
+	    tool_calls: number;
+	    error?: string;
+	    notified: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new Wake(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.responsibility_id = source["responsibility_id"];
+	        this.kind = source["kind"];
+	        this.reason = source["reason"];
+	        this.event = this.convertValues(source["event"], StandingEvent);
+	        this.session_id = source["session_id"];
+	        this.run_id = source["run_id"];
+	        this.started_at = this.convertValues(source["started_at"], null);
+	        this.ended_at = this.convertValues(source["ended_at"], null);
+	        this.cost_usd = source["cost_usd"];
+	        this.unpriced = source["unpriced"];
+	        this.tool_calls = source["tool_calls"];
+	        this.error = source["error"];
+	        this.notified = source["notified"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 
 }
 
 export namespace app {
 	
+	export class AgentReport {
+	    push: boolean;
+	    telegram: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new AgentReport(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.push = source["push"];
+	        this.telegram = source["telegram"];
+	    }
+	}
+	export class AgentReportEntry {
+	    agent: string;
+	    name: string;
+	    kind: string;
+	    message: string;
+	    // Go type: time
+	    at: any;
+	
+	    static createFrom(source: any = {}) {
+	        return new AgentReportEntry(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.agent = source["agent"];
+	        this.name = source["name"];
+	        this.kind = source["kind"];
+	        this.message = source["message"];
+	        this.at = this.convertValues(source["at"], null);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class AgentSpec {
+	    id: string;
+	    name: string;
+	    glyph?: string;
+	    hue?: string;
+	    goal: string;
+	    watch?: string[];
+	    attention?: string;
+	    never?: string[];
+	    auto?: string[];
+	    ask?: string[];
+	    forbid?: string[];
+	    allConnectors: boolean;
+	    connectors?: string[];
+	    cron?: string;
+	    everyMinutes?: number;
+	    scanEveryMinutes?: number;
+	    report: AgentReport;
+	    maxWakesPerDay?: number;
+	    maxCostPerDayUsd?: number;
+	    hookSecret?: string;
+	    // Go type: time
+	    createdAt: any;
+	
+	    static createFrom(source: any = {}) {
+	        return new AgentSpec(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.glyph = source["glyph"];
+	        this.hue = source["hue"];
+	        this.goal = source["goal"];
+	        this.watch = source["watch"];
+	        this.attention = source["attention"];
+	        this.never = source["never"];
+	        this.auto = source["auto"];
+	        this.ask = source["ask"];
+	        this.forbid = source["forbid"];
+	        this.allConnectors = source["allConnectors"];
+	        this.connectors = source["connectors"];
+	        this.cron = source["cron"];
+	        this.everyMinutes = source["everyMinutes"];
+	        this.scanEveryMinutes = source["scanEveryMinutes"];
+	        this.report = this.convertValues(source["report"], AgentReport);
+	        this.maxWakesPerDay = source["maxWakesPerDay"];
+	        this.maxCostPerDayUsd = source["maxCostPerDayUsd"];
+	        this.hookSecret = source["hookSecret"];
+	        this.createdAt = this.convertValues(source["createdAt"], null);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class AgentView {
+	    id: string;
+	    name: string;
+	    glyph?: string;
+	    hue?: string;
+	    goal: string;
+	    watch?: string[];
+	    attention?: string;
+	    never?: string[];
+	    auto?: string[];
+	    ask?: string[];
+	    forbid?: string[];
+	    allConnectors: boolean;
+	    connectors?: string[];
+	    cron?: string;
+	    everyMinutes?: number;
+	    scanEveryMinutes?: number;
+	    report: AgentReport;
+	    maxWakesPerDay?: number;
+	    maxCostPerDayUsd?: number;
+	    hookSecret?: string;
+	    // Go type: time
+	    createdAt: any;
+	    paused: boolean;
+	    pausedReason?: string;
+	    notes?: string;
+	    running?: agent.Wake;
+	    lastWake?: agent.Wake;
+	    // Go type: time
+	    nextDue?: any;
+	    nextDueKind?: string;
+	    wakesToday: number;
+	    costTodayUsd: number;
+	    hookPath?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AgentView(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.glyph = source["glyph"];
+	        this.hue = source["hue"];
+	        this.goal = source["goal"];
+	        this.watch = source["watch"];
+	        this.attention = source["attention"];
+	        this.never = source["never"];
+	        this.auto = source["auto"];
+	        this.ask = source["ask"];
+	        this.forbid = source["forbid"];
+	        this.allConnectors = source["allConnectors"];
+	        this.connectors = source["connectors"];
+	        this.cron = source["cron"];
+	        this.everyMinutes = source["everyMinutes"];
+	        this.scanEveryMinutes = source["scanEveryMinutes"];
+	        this.report = this.convertValues(source["report"], AgentReport);
+	        this.maxWakesPerDay = source["maxWakesPerDay"];
+	        this.maxCostPerDayUsd = source["maxCostPerDayUsd"];
+	        this.hookSecret = source["hookSecret"];
+	        this.createdAt = this.convertValues(source["createdAt"], null);
+	        this.paused = source["paused"];
+	        this.pausedReason = source["pausedReason"];
+	        this.notes = source["notes"];
+	        this.running = this.convertValues(source["running"], agent.Wake);
+	        this.lastWake = this.convertValues(source["lastWake"], agent.Wake);
+	        this.nextDue = this.convertValues(source["nextDue"], null);
+	        this.nextDueKind = source["nextDueKind"];
+	        this.wakesToday = source["wakesToday"];
+	        this.costTodayUsd = source["costTodayUsd"];
+	        this.hookPath = source["hookPath"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class CLIRunEvent {
 	    seq: number;
 	    // Go type: time

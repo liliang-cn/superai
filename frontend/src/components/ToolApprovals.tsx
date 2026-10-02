@@ -56,7 +56,7 @@ function ApprovalCard({
       <div className="modal approval-modal">
         <div className="modal-head">
           <span className="modal-title">
-            <ShieldAlertIcon className="size-4 approval-icon" /> SuperAI wants to run{" "}
+            <ShieldAlertIcon className="size-4 approval-icon" /> {req.by || "SuperAI"} wants to run{" "}
             <b>{req.tool}</b>
           </span>
           {left >= 0 && (

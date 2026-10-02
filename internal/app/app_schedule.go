@@ -31,6 +31,9 @@ const scheduleNotifyTitle = "SuperAI"
 // A failure is not fatal: the app is still usable, it just will not fire
 // timers, which GetStatus reports.
 func (a *App) startScheduler() {
+	// Standing agents run in the process that fires schedules, under the
+	// same lock; whatever happens below, they follow it.
+	defer a.startStanding()
 	a.mu.Lock()
 	svc := a.svc
 	if a.scheduler != nil {
@@ -92,6 +95,7 @@ func (a *App) startScheduler() {
 
 // stopScheduler halts the cron loop. In-flight runs finish on their own.
 func (a *App) stopScheduler() {
+	a.stopStanding()
 	a.mu.Lock()
 	sch := a.scheduler
 	lock := a.scheduleLock

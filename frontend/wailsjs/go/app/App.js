@@ -102,6 +102,10 @@ export function DeleteScheduledPrompt(arg1) {
   return window['go']['app']['App']['DeleteScheduledPrompt'](arg1);
 }
 
+export function DeleteStandingAgent(arg1) {
+  return window['go']['app']['App']['DeleteStandingAgent'](arg1);
+}
+
 export function Deliverables(arg1) {
   return window['go']['app']['App']['Deliverables'](arg1);
 }
@@ -246,6 +250,10 @@ export function PairedDevices() {
   return window['go']['app']['App']['PairedDevices']();
 }
 
+export function PauseStandingAgent(arg1) {
+  return window['go']['app']['App']['PauseStandingAgent'](arg1);
+}
+
 export function PendingToolApprovals() {
   return window['go']['app']['App']['PendingToolApprovals']();
 }
@@ -298,6 +306,10 @@ export function ResolveToolApproval(arg1, arg2) {
   return window['go']['app']['App']['ResolveToolApproval'](arg1, arg2);
 }
 
+export function ResumeStandingAgent(arg1) {
+  return window['go']['app']['App']['ResumeStandingAgent'](arg1);
+}
+
 export function RunScheduledPromptNow(arg1) {
   return window['go']['app']['App']['RunScheduledPromptNow'](arg1);
 }
@@ -308,6 +320,10 @@ export function SaveDashboard(arg1, arg2, arg3) {
 
 export function SaveSettings(arg1) {
   return window['go']['app']['App']['SaveSettings'](arg1);
+}
+
+export function SaveStandingAgent(arg1) {
+  return window['go']['app']['App']['SaveStandingAgent'](arg1);
 }
 
 export function ScheduleFromText(arg1) {
@@ -354,6 +370,14 @@ export function Skills() {
   return window['go']['app']['App']['Skills']();
 }
 
+export function StandingAgents() {
+  return window['go']['app']['App']['StandingAgents']();
+}
+
+export function StandingReports(arg1) {
+  return window['go']['app']['App']['StandingReports'](arg1);
+}
+
 export function StartCLIRun(arg1, arg2, arg3, arg4, arg5) {
   return window['go']['app']['App']['StartCLIRun'](arg1, arg2, arg3, arg4, arg5);
 }
@@ -388,4 +412,8 @@ export function UnpairDevice(arg1) {
 
 export function UnreadNotifications() {
   return window['go']['app']['App']['UnreadNotifications']();
+}
+
+export function WakeStandingAgent(arg1, arg2) {
+  return window['go']['app']['App']['WakeStandingAgent'](arg1, arg2);
 }
