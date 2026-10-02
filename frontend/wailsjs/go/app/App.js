@@ -42,8 +42,20 @@ export function CLIProxySubmitPrompt(arg1) {
   return window['go']['app']['App']['CLIProxySubmitPrompt'](arg1);
 }
 
+export function CLIRunDetail(arg1) {
+  return window['go']['app']['App']['CLIRunDetail'](arg1);
+}
+
+export function CLIRuns() {
+  return window['go']['app']['App']['CLIRuns']();
+}
+
 export function CancelAllChats() {
   return window['go']['app']['App']['CancelAllChats']();
+}
+
+export function CancelCLIRun(arg1) {
+  return window['go']['app']['App']['CancelCLIRun'](arg1);
 }
 
 export function CancelChat(arg1) {
@@ -108,6 +120,10 @@ export function ExportWorkspaceFile(arg1) {
 
 export function ExternalAgentsStatus() {
   return window['go']['app']['App']['ExternalAgentsStatus']();
+}
+
+export function FollowUpCLIRun(arg1, arg2) {
+  return window['go']['app']['App']['FollowUpCLIRun'](arg1, arg2);
 }
 
 export function GetSettings() {
@@ -328,6 +344,10 @@ export function SetWindowTheme(arg1) {
 
 export function Skills() {
   return window['go']['app']['App']['Skills']();
+}
+
+export function StartCLIRun(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['app']['App']['StartCLIRun'](arg1, arg2, arg3, arg4, arg5);
 }
 
 export function StartYoloMode() {

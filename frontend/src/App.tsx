@@ -8,6 +8,7 @@ import StatusBar from "./components/StatusBar";
 import ChatView from "./views/ChatView";
 import StatsView from "./views/StatsView";
 import HiveView from "./views/HiveView";
+import AgentsView from "./views/AgentsView";
 import SettingsView from "./views/SettingsView";
 import KnowledgeView from "./views/KnowledgeView";
 import SkillsView from "./views/SkillsView";
@@ -73,7 +74,7 @@ export default function App() {
   }, [navOpen]);
   const [loading, setLoading] = useState(true);
   const [theme, setTheme] = useState<Theme>(
-    () => (localStorage.getItem("superai-theme") as Theme) || "dark"
+    () => (localStorage.getItem("superai-theme") as Theme) || "light"
   );
   // The accent finish. Remembered per browser rather than in settings.json:
   // it changes nothing the agent does, and a preference the backend has to be
@@ -197,6 +198,7 @@ export default function App() {
               {/* Everything under /hive is the Hive screen's own to route:
                   the overview, and one page per task. */}
               <Route path="/hive/*" element={<HiveView />} />
+              <Route path="/agents" element={<AgentsView />} />
               <Route path="/settings" element={<SettingsView onSaved={refreshStatus} status={status} />} />
               <Route path="/knowledge" element={<KnowledgeView />} />
               <Route path="/skills" element={<SkillsView />} />

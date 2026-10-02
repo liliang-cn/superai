@@ -89,6 +89,122 @@ export namespace agent {
 
 export namespace app {
 	
+	export class CLIRunEvent {
+	    seq: number;
+	    // Go type: time
+	    at: any;
+	    kind: string;
+	    text?: string;
+	    tool?: string;
+	    detail?: string;
+	    callId?: string;
+	    failed?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new CLIRunEvent(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.seq = source["seq"];
+	        this.at = this.convertValues(source["at"], null);
+	        this.kind = source["kind"];
+	        this.text = source["text"];
+	        this.tool = source["tool"];
+	        this.detail = source["detail"];
+	        this.callId = source["callId"];
+	        this.failed = source["failed"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class CLIRun {
+	    id: string;
+	    thread: string;
+	    agent: string;
+	    prompt: string;
+	    cwd: string;
+	    model?: string;
+	    session?: string;
+	    ask: boolean;
+	    chat?: string;
+	    state: string;
+	    // Go type: time
+	    started: any;
+	    // Go type: time
+	    ended?: any;
+	    summary?: string;
+	    error?: string;
+	    in: number;
+	    out: number;
+	    cache: number;
+	    costUsd: number;
+	    tools: number;
+	    events?: CLIRunEvent[];
+	
+	    static createFrom(source: any = {}) {
+	        return new CLIRun(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.thread = source["thread"];
+	        this.agent = source["agent"];
+	        this.prompt = source["prompt"];
+	        this.cwd = source["cwd"];
+	        this.model = source["model"];
+	        this.session = source["session"];
+	        this.ask = source["ask"];
+	        this.chat = source["chat"];
+	        this.state = source["state"];
+	        this.started = this.convertValues(source["started"], null);
+	        this.ended = this.convertValues(source["ended"], null);
+	        this.summary = source["summary"];
+	        this.error = source["error"];
+	        this.in = source["in"];
+	        this.out = source["out"];
+	        this.cache = source["cache"];
+	        this.costUsd = source["costUsd"];
+	        this.tools = source["tools"];
+	        this.events = this.convertValues(source["events"], CLIRunEvent);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
 	export class PairCode {
 	    code: string;
 	    // Go type: time
