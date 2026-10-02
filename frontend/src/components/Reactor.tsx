@@ -6,6 +6,7 @@ import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPa
 import { EventsOn } from "../../wailsjs/runtime";
 import { Pulse as readPulse } from "../../wailsjs/go/app/App";
 import { useTween } from "../lib/useTween";
+import { useDaylight } from "../lib/useDaylight";
 
 /**
  * The reactor.
@@ -640,18 +641,6 @@ class Wheel {
 // ---------------------------------------------------------------------------
 // The component
 // ---------------------------------------------------------------------------
-
-/** useDaylight follows the app's theme: true unless it is set to dark. */
-function useDaylight(): boolean {
-  const read = () => document.documentElement.dataset.theme !== "dark";
-  const [light, setLight] = useState(read);
-  useEffect(() => {
-    const mo = new MutationObserver(() => setLight(read()));
-    mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-    return () => mo.disconnect();
-  }, []);
-  return light;
-}
 
 export default function Reactor({ snap, pillars, brain }: { snap: Snap; pillars: Pillar[]; brain?: string | null }) {
   const hostRef = useRef<HTMLDivElement>(null);

@@ -98,8 +98,9 @@ export default function SidePanel({
   onMention?: (name: string) => void;
 }) {
   // The key is the one the trace panel has always used, so an existing install
-  // opens the way it was left rather than resetting because the code moved.
-  const [open, setOpen] = useState(() => read(OPEN_KEY, "1") !== "0");
+  // opens the way it was left rather than resetting because the code moved. A
+  // new one starts on the rail: an empty trace is not worth a third of the room.
+  const [open, setOpen] = useState(() => read(OPEN_KEY, "0") !== "0");
   // In a narrow window the panel cannot have a column of its own: 232px of
   // sidebar plus 330 of panel left the conversation about 300 wide, with the
   // message box narrower than its own placeholder. So it starts on its rail

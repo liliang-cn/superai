@@ -5,6 +5,56 @@ import { openExternal } from "../lib/openExternal";
 import ImportPanel from "../components/ImportPanel";
 import { SearchIcon, UploadIcon } from "lucide-react";
 import { useImeGuard } from "@/lib/ime";
+import { useDaylight } from "../lib/useDaylight";
+
+// CortexDB draws its viewer for the dark. By day the scene takes a light
+// ground through its own ?bg option, and its panels are restyled from here,
+// which works because the viewer is served from this origin (/graph/). A
+// viewer on another origin keeps its own look; reading its document throws
+// and the frame is left alone.
+const DAY_BG = "f8fafb";
+const DAY_CSS = `
+html,body,#boot{background:#${DAY_BG}!important;color:#33424d}
+.panel{background:rgba(255,255,255,.92)!important;border-color:#e1e6ea!important;
+  box-shadow:0 1px 2px rgba(14,26,34,.06),0 6px 20px rgba(14,26,34,.06)!important}
+#head h1,#detail .t{color:#0e1a22!important}
+#head h1 a,#counts b{color:#1f5bff!important}
+#counts,#pathinfo,.ev .m,#contract .foot,#ckey,.gr .gc{color:#6b7a85!important}
+.badge{border-color:#c9d6ff!important;color:#1f5bff!important}
+.badge .led{background:#1f5bff!important;box-shadow:none!important}
+#tools h3,#legend h3,#feed h3,#contract h3,#contract .sub,#detail .k,.panel.folded::before{color:#7c8a94!important}
+#tools input,#tools select{background:#fff!important;border-color:#d5dce2!important;color:#0e1a22!important}
+#tools input:focus,#tools select:focus{border-color:#1f5bff!important}
+button{background:#f1f4f7!important;border-color:#e1e6ea!important;color:#33424d!important}
+button:hover{background:#e7ecf0!important;color:#0e1a22!important}
+button.on{background:#1f5bff!important;border-color:#1f5bff!important;color:#fff!important;box-shadow:none!important}
+button.fold{background:none!important;border:none!important;color:#9aa6af!important}
+.li,#contract .say,.gr .gn,.att .aw{color:#4a5964!important}
+.ev .t,.att .an,#detail .v,#contract .say b{color:#0e1a22!important}
+.ev,.att{border-bottom-color:#eef2f5!important}
+.gr .gb{background:#eef2f5!important}
+.spin{border-color:#e1e6ea!important;border-top-color:#1f5bff!important}
+#boot span{color:#6b7a85!important}
+`;
+
+function withBg(src: string | undefined, day: boolean): string | undefined {
+  if (!src || !day) return src;
+  return `${src}${src.includes("?") ? "&" : "?"}bg=${DAY_BG}`;
+}
+
+function dress(frame: HTMLIFrameElement | null, day: boolean) {
+  if (!frame || !day) return;
+  try {
+    const doc = frame.contentDocument;
+    if (!doc || doc.getElementById("superai-day")) return;
+    const style = doc.createElement("style");
+    style.id = "superai-day";
+    style.textContent = DAY_CSS;
+    doc.head.appendChild(style);
+  } catch {
+    // Another origin: its look is its own.
+  }
+}
 
 /**
  * One page for what SuperAI knows.
@@ -80,6 +130,7 @@ export default function KnowledgeView() {
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
   const frameRef = useRef<HTMLIFrameElement | null>(null);
+  const day = useDaylight();
 
   // Recall, which used to be the Memory page.
   const [query, setQuery] = useState("");
@@ -347,10 +398,11 @@ export default function KnowledgeView() {
           come back on a desktop.
         </div>
         <iframe
-          key={`${GRAPH_SRC ?? status?.url}#${nonce}`}
+          key={`${GRAPH_SRC ?? status?.url}#${nonce}#${day}`}
           ref={frameRef}
           className="graph-frame"
-          src={GRAPH_SRC ?? status?.url}
+          src={withBg(GRAPH_SRC ?? status?.url, day)}
+          onLoad={(e) => dress(e.currentTarget, day)}
           title="CortexDB knowledge graph"
         />
         <div className="graph-foot">
