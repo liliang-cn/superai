@@ -149,19 +149,6 @@
 
 /* Light theme — same accent, inverted neutrals. Applied via data-theme="light"
    on <html>; default (no attr / "dark") keeps the :root values above. */
-/* Light is paper, not screen.
- *
- * It used to be cold slate — #eef1f6 ground, #161a22 ink, everything tuned
- * blue — with a copper accent laid on top, and the two spent every screen
- * arguing. Copper is the one thing here that was chosen on purpose (the finish
- * picker, 2026-09-01), so the room moves to meet it instead: a warm paper
- * ground, warm black ink, and copper as the only metal on the desk.
- *
- * The status colours move with it. A blue-green #1fae73 on warm paper reads as
- * a different material from everything around it; these three are the same
- * hues pulled toward the paper's warmth, and they stay the only non-copper
- * colours in the light theme — green means ok and red means look, on every
- * finish. */
 [data-theme="light"] {
   /* Daylight instrument: a cool white ground, white surfaces, near-black ink.
      Structure is drawn with hairlines rather than shadows; the signal blue is
