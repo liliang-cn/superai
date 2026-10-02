@@ -147,16 +147,18 @@ func (a *Adapter) serveEvents(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	fmt.Fprint(w, ": connected\n\n")
-	fl.Flush()
-
+	// Subscribed before the first byte goes out, which the queen takes as
+	// "listening" and answers by sending the command: a turn quicker than the
+	// gap between the two ended unheard, and the queen waited on it forever.
 	ch := make(chan []byte, 512)
 	a.mu.Lock()
 	a.subs[ch] = struct{}{}
 	a.mu.Unlock()
 	defer func() { a.mu.Lock(); delete(a.subs, ch); a.mu.Unlock() }()
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	fmt.Fprint(w, ": connected\n\n")
+	fl.Flush()
 	tick := time.NewTicker(25 * time.Second)
 	defer tick.Stop()
 	for {
