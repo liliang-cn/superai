@@ -1,0 +1,133 @@
+package app
+
+// The model's way to the run manager: hand a task to Claude Code or Codex,
+// here or on a linked SuperAI ("claude.mac"), and get its answer back. The run
+// is an ordinary CLI run — on the Agents page, streaming, stoppable — which is
+// what cli_agent_run's blocking call is not; and it reaches other machines,
+// which is how a hive queen with no CLI of her own puts the Mac's Claude Code
+// to work.
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"strings"
+
+	"github.com/liliang-cn/agent-go/v3/pkg/agent"
+	"github.com/liliang-cn/superai/internal/backend"
+)
+
+// registerCodingAgentTools runs inside the build, which holds a.mu: nothing
+// here may take it. Which CLIs exist is asked at call time.
+func (a *App) registerCodingAgentTools(svc *backend.Service, cfg *backend.Settings) {
+	if svc == nil || cfg == nil {
+		return
+	}
+	linked := false
+	if cfg.RemoteAgents.Enabled {
+		for _, r := range cfg.RemoteAgents.Agents {
+			if strings.TrimSpace(r.URL) != "" {
+				linked = true
+			}
+		}
+	}
+	if !cfg.ExternalAgents.Enabled && !linked {
+		return
+	}
+	inner := svc.Agent()
+	if inner == nil {
+		return
+	}
+
+	inner.AddToolWithMetadata("coding_agent_list",
+		"The coding agents (Claude Code, Codex, …) this app can hand work to: on this machine by name, on a linked SuperAI as name.machine.",
+		map[string]any{"type": "object", "properties": map[string]any{}},
+		func(ctx context.Context, _ map[string]any) (any, error) {
+			b, err := json.Marshal(a.codingAgents())
+			return string(b), err
+		},
+		agent.ToolMetadata{ReadOnly: true, ConcurrencySafe: true})
+
+	inner.AddToolWithMetadata("coding_agent_run",
+		"Hand a task to a coding agent — Claude Code, Codex — and wait for its answer."+
+			" On this machine by name (\"claude\"), on a linked SuperAI as name.machine"+
+			" (\"claude.mac\"); coding_agent_list says which exist."+
+			"\n\nRight for real work in a code base or a shell on that machine: changes,"+
+			" builds, investigations. The prompt must stand on its own; the agent sees none of"+
+			" this conversation. Its tool calls may need the user's approval, so it can take a"+
+			" while."+
+			"\n\nPass continue_run with a previous answer's run id to continue that agent's"+
+			" session instead of starting fresh.",
+		map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"agent":        map[string]any{"type": "string", "description": "e.g. claude, codex, claude.mac"},
+				"prompt":       map[string]any{"type": "string", "description": "The whole task, standing on its own."},
+				"cwd":          map[string]any{"type": "string", "description": "Directory on that machine; blank for its workspace."},
+				"continue_run": map[string]any{"type": "string", "description": "Run id from an earlier answer, to continue that session."},
+			},
+			"required": []string{"agent", "prompt"},
+		},
+		func(ctx context.Context, args map[string]any) (any, error) {
+			return a.runCodingAgent(ctx, str(args["agent"]), str(args["prompt"]), str(args["cwd"]), str(args["continue_run"])), nil
+		},
+		agent.ToolMetadata{Destructive: true})
+}
+
+func (a *App) codingAgents() []map[string]string {
+	out := []map[string]string{}
+	for _, c := range a.localAgentNames() {
+		out = append(out, map[string]string{"name": c.Name, "where": "this machine"})
+	}
+	for _, m := range a.remoteCLINames() {
+		out = append(out, map[string]string{"name": m["name"], "where": m["about"]})
+	}
+	return out
+}
+
+func (a *App) runCodingAgent(ctx context.Context, name, prompt, cwd, cont string) map[string]any {
+	fail := func(msg string) map[string]any { return map[string]any{"ok": false, "error": msg} }
+	if !a.isDrivenCLI(name) {
+		names := []string{}
+		for _, c := range a.codingAgents() {
+			names = append(names, c["name"])
+		}
+		return fail(fmt.Sprintf("no coding agent called %q; available: %s", name, strings.Join(names, ", ")))
+	}
+	a.mu.Lock()
+	unattended := a.settings != nil && a.settings.ExternalAgents.Unattended
+	a.mu.Unlock()
+
+	done := make(chan CLIRun, 1)
+	o := cliStart{Agent: name, Prompt: prompt, Cwd: cwd, Ask: !unattended,
+		Done: func(r CLIRun) { done <- r }}
+	if cont != "" {
+		s := a.cliStore()
+		s.mu.Lock()
+		if p := s.runs[cont]; p != nil {
+			c := *p
+			c.Events = nil
+			o.Prev, o.Thread, o.Session, o.Cwd, o.Model = &c, c.Thread, c.Session, c.Cwd, c.Model
+		}
+		s.mu.Unlock()
+	}
+	run, err := a.startCLIRun(o)
+	if err != nil {
+		return fail(err.Error())
+	}
+	var r CLIRun
+	select {
+	case r = <-done:
+	case <-ctx.Done():
+		a.CancelCLIRun(run.ID)
+		r = <-done
+	}
+	out := map[string]any{
+		"ok": r.State == "done", "agent": name, "run": r.ID, "state": r.State,
+		"answer": r.Summary, "tool_calls": r.Tools, "cost_usd": r.CostUSD,
+	}
+	if r.Error != "" {
+		out["error"] = r.Error
+	}
+	return out
+}

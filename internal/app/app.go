@@ -310,6 +310,7 @@ func (a *App) rebuild() {
 	// same settings this Service was built from, so the tool's catalogue and
 	// the runner can never describe two different sets.
 	a.registerRemoteTools(svc, cfg.RemoteAgents)
+	a.registerCodingAgentTools(svc, cfg)
 	a.registerHiveTools(svc, cfg)
 }
 
