@@ -1,8 +1,10 @@
 package app
 
 import (
+	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -142,5 +144,14 @@ func TestALinkAddressIsReadTheWayItIsTyped(t *testing.T) {
 	}
 	if validLinkName("mac 2") || validLinkName("a@b") || !validLinkName("mac2.home") {
 		t.Fatal("link name rules")
+	}
+}
+
+func TestTheModelIsToldWhichCodingAgentsExistWhenItNamesOneThatDoesNot(t *testing.T) {
+	t.Setenv("SUPERAI_DESKTOP_HOME", t.TempDir())
+	a := &App{settings: &backend.Settings{}}
+	out := a.runCodingAgent(context.Background(), "claude.nowhere", "hi", "", "")
+	if out["ok"] != false || !strings.Contains(out["error"].(string), "no coding agent called") {
+		t.Fatalf("%v", out)
 	}
 }
