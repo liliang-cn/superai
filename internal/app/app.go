@@ -119,6 +119,12 @@ type App struct {
 	// not queue behind a rebuild, and the agent goroutine waiting on one of
 	// these is holding up a turn.
 	approvalMu sync.Mutex
+	// Agent CLI runs started from the Agents page or the phone, and the
+	// loopback MCP server their permission prompts come through.
+	cli            *cliRunStore
+	cliOnce        sync.Once
+	cliApprove     *cliApprover
+	cliApproveOnce sync.Once
 	approvals  map[string]*pendingApproval
 
 	// emitFn is an extra sink for frontend events. Tests set it, and serve mode
@@ -725,7 +731,11 @@ func (a *App) SendChat(sessionID, message string, imagePaths []string) string {
 	// unconfigured LLM is no reason not to forward a question to a machine that
 	// has one.
 	if name, rest, ok := addressedTo(message, a.addressable); ok {
-		a.routeToRemote(requestID, sessionID, name, rest)
+		if a.isLocalCLI(name) {
+			a.routeToCLI(requestID, sessionID, name, rest)
+		} else {
+			a.routeToRemote(requestID, sessionID, name, rest)
+		}
 		return requestID
 	}
 
