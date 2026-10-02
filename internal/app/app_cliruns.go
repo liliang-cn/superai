@@ -258,12 +258,8 @@ func (a *App) startCLIRun(o cliStart) (CLIRun, error) {
 		return CLIRun{}, errors.New("agent CLIs are switched off in Settings (External agents)")
 	}
 	installed := agentexec.Discover(ext.Binaries)
-	// The MCP config is written into the workspace; one file per run, so two
-	// runs in one directory do not read each other's approval URL, and it is
-	// removed when the run ends.
+	registry := agentexec.RegistryFrom(installed)
 	id := uuid.NewString()
-	mcpFile := ".superai-cli-mcp-" + id[:8] + ".json"
-	registry := agentexec.RegistryFrom(installed, agentexec.WithMCPConfig(mcpFile, true))
 	provider, err := registry.Get(agent)
 	if err != nil {
 		return CLIRun{}, fmt.Errorf("%s is not installed here", agent)
@@ -284,19 +280,29 @@ func (a *App) startCLIRun(o cliStart) (CLIRun, error) {
 
 	req := agentexec.Request{
 		RunID: id, Prompt: prompt, WorkspacePath: dir, Model: model,
-		ResumeSessionID: session, NoMCP: true, PermissionMode: agentexec.PermissionBypass,
+		ResumeSessionID: session, PermissionMode: agentexec.PermissionBypass,
 	}
-	if ask {
-		switch agent {
-		case "claude":
+	// Claude's MCP servers go on the command line as JSON, never as a file:
+	// agentexec writes its config into the working directory, where the agent
+	// lists it among the user's files and could read the approval URL.
+	// Strict, so the user's own servers stay out of a delegated run.
+	if agent == "claude" {
+		servers := map[string]any{}
+		if ask {
 			url, err := a.cliApproveURL(id)
 			if err != nil {
 				return CLIRun{}, fmt.Errorf("could not open the approval channel: %w", err)
 			}
+			servers["superai"] = map[string]any{"type": "http", "url": url}
+		}
+		cfg, _ := json.Marshal(map[string]any{"mcpServers": servers})
+		req.ExtraArgs = []string{"--mcp-config", string(cfg), "--strict-mcp-config"}
+	}
+	if ask {
+		switch agent {
+		case "claude":
 			req.PermissionMode = agentexec.PermissionDefault
-			req.NoMCP = false
-			req.ExtraMCPServers = map[string]any{"superai": map[string]any{"type": "http", "url": url}}
-			req.ExtraArgs = []string{"--permission-prompt-tool", "mcp__superai__approve"}
+			req.ExtraArgs = append(req.ExtraArgs, "--permission-prompt-tool", "mcp__superai__approve")
 		case "codex":
 			// Codex has no prompt to forward in exec mode; ask means its own
 			// sandbox: writes inside the workspace only, no network.
@@ -326,10 +332,7 @@ func (a *App) startCLIRun(o cliStart) (CLIRun, error) {
 	s.mu.Unlock()
 	a.emit("cli:run", runPayload(run))
 
-	go func() {
-		a.driveCLIRun(ctx, cancel, run, sess, spec)
-		_ = os.Remove(filepath.Join(dir, mcpFile))
-	}()
+	go a.driveCLIRun(ctx, cancel, run, sess, spec)
 	return summaryOf(run), nil
 }
 

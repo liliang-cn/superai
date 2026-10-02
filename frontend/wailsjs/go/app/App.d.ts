@@ -25,7 +25,13 @@ export function CLIProxyStatus():Promise<Record<string, any>>;
 
 export function CLIProxySubmitPrompt(arg1:string):Promise<string>;
 
+export function CLIRunDetail(arg1:string):Promise<app.CLIRun>;
+
+export function CLIRuns():Promise<Array<app.CLIRun>>;
+
 export function CancelAllChats():Promise<string>;
+
+export function CancelCLIRun(arg1:string):Promise<string>;
 
 export function CancelChat(arg1:string):Promise<string>;
 
@@ -58,6 +64,8 @@ export function EmitAvatarTest(arg1:string):Promise<void>;
 export function ExportWorkspaceFile(arg1:string):Promise<string>;
 
 export function ExternalAgentsStatus():Promise<Array<backend.ExternalAgentStatus>>;
+
+export function FollowUpCLIRun(arg1:string,arg2:string):Promise<app.CLIRun>;
 
 export function GetSettings():Promise<backend.Settings>;
 
@@ -168,6 +176,8 @@ export function SetUIRules(arg1:string):Promise<string>;
 export function SetWindowTheme(arg1:boolean):Promise<void>;
 
 export function Skills():Promise<Array<backend.SkillInfo>>;
+
+export function StartCLIRun(arg1:string,arg2:string,arg3:string,arg4:string,arg5:boolean):Promise<app.CLIRun>;
 
 export function StartYoloMode():Promise<Record<string, any>>;
 
