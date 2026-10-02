@@ -193,6 +193,8 @@ export function StandingAgents():Promise<Array<app.AgentView>>;
 
 export function StandingReports(arg1:string):Promise<Array<app.AgentReportEntry>>;
 
+export function StandingWakes(arg1:number):Promise<Array<app.WakeMark>>;
+
 export function StartCLIRun(arg1:string,arg2:string,arg3:string,arg4:string,arg5:boolean):Promise<app.CLIRun>;
 
 export function StartYoloMode():Promise<Record<string, any>>;

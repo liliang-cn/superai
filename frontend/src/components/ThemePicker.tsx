@@ -15,6 +15,7 @@ import { Accent, Theme } from "../lib/types";
  */
 
 export const ACCENTS: { key: Accent; label: string; swatch: string }[] = [
+  { key: "signal", label: "Signal", swatch: "#1f5bff" },
   { key: "copper", label: "Copper", swatch: "#d2793f" },
   { key: "cobalt", label: "Cobalt", swatch: "#5b93ff" },
   { key: "jade", label: "Jade", swatch: "#2fbfa4" },

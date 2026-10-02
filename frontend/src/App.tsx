@@ -81,7 +81,7 @@ export default function App() {
   // it changes nothing the agent does, and a preference the backend has to be
   // rebuilt to apply is a preference nobody flips twice.
   const [accent, setAccent] = useState<Accent>(
-    () => (localStorage.getItem("superai-accent") as Accent) || "copper"
+    () => (localStorage.getItem("superai-accent") as Accent) || "signal"
   );
   // The conversation a run belongs to, handed to the chat view to open. Cleared
   // as soon as it has been taken so asking for the same one twice works.

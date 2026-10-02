@@ -146,7 +146,12 @@ export default function Sidebar({
           the window is dragged by — see .sidebar-drag. */}
       <div className="sidebar-drag" />
       <div className="brand">
-        <div className="brand-logo">S</div>
+        <svg className="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+          {/* A reticle: the instrument's own mark. */}
+          <circle cx="16" cy="16" r="10.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
+          <path d="M16 2.5v5M16 24.5v5M2.5 16h5M24.5 16h5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+          <circle className="brand-mark-dot" cx="16" cy="16" r="3.2" />
+        </svg>
         {labels && (
           <div className="brand-text">
             <div className="brand-name">SuperAI</div>

@@ -378,6 +378,10 @@ export function StandingReports(arg1) {
   return window['go']['app']['App']['StandingReports'](arg1);
 }
 
+export function StandingWakes(arg1) {
+  return window['go']['app']['App']['StandingWakes'](arg1);
+}
+
 export function StartCLIRun(arg1, arg2, arg3, arg4, arg5) {
   return window['go']['app']['App']['StartCLIRun'](arg1, arg2, arg3, arg4, arg5);
 }

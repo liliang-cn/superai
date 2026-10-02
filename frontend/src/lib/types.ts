@@ -1,6 +1,6 @@
 /** Appearance: how dark the chassis is, and which finish is on it. */
 export type Theme = "dark" | "light";
-export type Accent = "copper" | "cobalt" | "jade" | "rose" | "violet";
+export type Accent = "signal" | "copper" | "cobalt" | "jade" | "rose" | "violet";
 
 export type ViewKey =
   | "chat"
