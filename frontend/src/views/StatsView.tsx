@@ -193,7 +193,11 @@ export default function StatsView() {
   // twelve: what was burned, what was called, what the install has, and
   // what the process is doing. Colours are families, not values.
   const pillars = useMemo<Pillar[]>(() => {
-    const CY = "#5ee0ff", AM = "#ffb547", WH = "#ffffff", PK = "#ff73d9", TL = "#4dffdb", VI = "#b87aff", LI = "#9dff6a", RO = "#ff5c7a";
+    // Ink by day, light by night: the same figures in the room's own colours.
+    const day = document.documentElement.dataset.theme !== "dark";
+    const [CY, AM, WH, PK, TL, VI, LI, RO] = day
+      ? ["#1f5bff", "#b06a00", "#33434d", "#b8338f", "#0e7c92", "#6d3fd0", "#12805c", "#d0313f"]
+      : ["#5ee0ff", "#ffb547", "#ffffff", "#ff73d9", "#4dffdb", "#b87aff", "#9dff6a", "#ff5c7a"];
     const list: Pillar[] = [
       { key: "today", label: "tokens today", value: dash?.usage?.today ?? 0, color: CY },
       { key: "all", label: "tokens all time", value: dash?.usage?.totalTokens ?? 0, color: CY },
@@ -244,7 +248,7 @@ export default function StatsView() {
           {/* The live view's own switches, set from the URL: no control panels
               (inside a disc this size they would cover the graph), orbiting from
               the start, and the reactor's own black behind it. */}
-          <Reactor snap={pulse} pillars={pillars} brain={(GRAPH_SRC ?? graph?.url) ? `${GRAPH_SRC ?? graph?.url}?panels=0&spin=4&bg=05070f` : null} />
+          <Reactor snap={pulse} pillars={pillars} brain={(GRAPH_SRC ?? graph?.url) ? `${GRAPH_SRC ?? graph?.url}?panels=0&spin=4&bg=${document.documentElement.dataset.theme === "dark" ? "05070f" : "f8fafb"}` : null} />
         </div>
         <div className="cr-side" data-pet-spot="charts" data-pet-label="the column of charts beside the reactor">
           <div className="cr-panel tight">

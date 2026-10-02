@@ -342,6 +342,7 @@ export namespace app {
 	    wakesToday: number;
 	    costTodayUsd: number;
 	    hookPath?: string;
+	    waitingFor?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new AgentView(source);
@@ -380,6 +381,7 @@ export namespace app {
 	        this.wakesToday = source["wakesToday"];
 	        this.costTodayUsd = source["costTodayUsd"];
 	        this.hookPath = source["hookPath"];
+	        this.waitingFor = source["waitingFor"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -634,6 +636,54 @@ export namespace app {
 	        this.detail = source["detail"];
 	        this.ms = source["ms"];
 	    }
+	}
+	export class WakeMark {
+	    agent: string;
+	    kind: string;
+	    reason?: string;
+	    // Go type: time
+	    started: any;
+	    // Go type: time
+	    ended?: any;
+	    toolCalls: number;
+	    costUsd: number;
+	    error?: string;
+	    notified: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new WakeMark(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.agent = source["agent"];
+	        this.kind = source["kind"];
+	        this.reason = source["reason"];
+	        this.started = this.convertValues(source["started"], null);
+	        this.ended = this.convertValues(source["ended"], null);
+	        this.toolCalls = source["toolCalls"];
+	        this.costUsd = source["costUsd"];
+	        this.error = source["error"];
+	        this.notified = source["notified"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 
 }

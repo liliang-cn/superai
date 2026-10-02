@@ -109,6 +109,35 @@ function ApprovalCard({
 }
 
 /**
+ * A standing agent's question, docked in the corner instead of over the app.
+ * The person is doing something else — that is the point of an agent that
+ * runs on its own — and a modal would take the whole window away from them
+ * for a call they may answer in a minute. The command is still shown whole.
+ */
+function DockedApproval({ req, more, onResolve }: { req: ToolApproval; more: number; onResolve: (id: string, allow: boolean) => void }) {
+  const left = useCountdown(req.expiresAt);
+  return (
+    <div className="approval-dock" role="alertdialog" aria-label={`${req.by} wants to run ${req.tool}`}>
+      <div className="ad-head">
+        <span className="ad-who">{req.by}</span>
+        <span className="ad-what">wants to run <b>{req.tool}</b></span>
+        {left >= 0 && <span className="ad-left">{left > 0 ? fmtLeft(left) : "expired"}</span>}
+      </div>
+      {req.command ? <pre className="approval-cmd">{req.command}</pre> : <ArgsBlock args={req.args} />}
+      <div className="ad-actions">
+        {more > 0 && <span className="ad-more">{more} more waiting</span>}
+        <button className="btn ghost sm" onClick={() => onResolve(req.id, false)}>Deny</button>
+        <button className="btn sm" onClick={() => onResolve(req.id, true)}>Allow once</button>
+      </div>
+    </div>
+  );
+}
+
+function fmtLeft(s: number) {
+  return s >= 60 ? `${Math.floor(s / 60)} min left` : `${s}s left`;
+}
+
+/**
  * The stack. Only the oldest prompt is shown: two modals on top of each other
  * is how a user ends up approving the one they did not read.
  */
@@ -123,7 +152,12 @@ export default function ToolApprovals({
   onResolve: (id: string, allow: boolean) => void;
   onDismissNote: () => void;
 }) {
-  const head = pending[0];
+  // Your own turn's questions stop you; a standing agent's wait in the corner.
+  const mine = pending.filter((p) => !p.by);
+  const theirs = pending.filter((p) => p.by);
+  const head = mine[0];
+  const dock = theirs[0] ? <DockedApproval req={theirs[0]} more={theirs.length - 1} onResolve={onResolve} /> : null;
+  if (!head && dock) return dock;
   if (!head) {
     if (note === "") return null;
     return (
@@ -147,9 +181,10 @@ export default function ToolApprovals({
   return (
     <>
       <ApprovalCard req={head} onResolve={onResolve} />
-      {pending.length > 1 && (
-        <div className="approval-more">{pending.length - 1} more waiting</div>
+      {mine.length > 1 && (
+        <div className="approval-more">{mine.length - 1} more waiting</div>
       )}
+      {dock}
     </>
   );
 }

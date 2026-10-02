@@ -222,6 +222,8 @@ const DUST = 600;
  * than hooks because a frame loop wants one mutable thing to poke, and because
  * disposing WebGL resources is a job for one place.
  */
+const WHITE = new THREE.Color(1, 1, 1);
+
 class Wheel {
   renderer: THREE.WebGLRenderer;
   scene = new THREE.Scene();
@@ -254,13 +256,20 @@ class Wheel {
   // for.
   tips: HTMLDivElement;
 
-  constructor(canvas: HTMLCanvasElement, tips: HTMLDivElement, reduce: boolean) {
+  /** Daylight: ink on white instead of light on black. No bloom, no additive
+   *  light — on a white ground both only wash out — and the figures' colours
+   *  deepened to read as ink. */
+  light: boolean;
+
+  constructor(canvas: HTMLCanvasElement, tips: HTMLDivElement, reduce: boolean, light = false) {
     this.reduce = reduce;
     this.tips = tips;
+    this.light = light;
+    const blend = light ? THREE.NormalBlending : THREE.AdditiveBlending;
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: "high-performance" });
     // Pure black: the canvas is screen-blended over the panel, and black is
     // the one colour that adds nothing.
-    this.renderer.setClearColor(0x000000, 1);
+    this.renderer.setClearColor(light ? 0xffffff : 0x000000, 1);
     this.camera = new THREE.PerspectiveCamera(30, 1, 1, 6000);
     this.camera.position.set(0, 0, 1000);
     this.camera.lookAt(0, 0, 0);
@@ -268,13 +277,14 @@ class Wheel {
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
     this.bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.8, 0.45, 0.4);
+    this.bloom.enabled = !light;
     this.composer.addPass(this.bloom);
 
     // --- pillars: two instanced quads each, a wide soft body and a bright core ---
     const quad = new THREE.PlaneGeometry(1, 1);
     quad.translate(0.5, 0, 0);
     const postMat = new THREE.MeshBasicMaterial({
-      map: rayTexture(), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false,
+      map: rayTexture(), transparent: true, blending: blend, depthWrite: false, depthTest: false,
     });
     this.posts = new THREE.InstancedMesh(quad, postMat, MAX_PILLARS * 2);
     this.posts.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -311,7 +321,7 @@ class Wheel {
     const rimGeo = new THREE.BufferGeometry();
     rimGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array((RIM_SEGS + 1) * 3), 3).setUsage(THREE.DynamicDrawUsage));
     this.rimLine = new THREE.Line(rimGeo, new THREE.LineBasicMaterial({
-      color: new THREE.Color(0.55, 0.9, 1.0), transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false,
+      color: light ? new THREE.Color(0.12, 0.36, 1.0) : new THREE.Color(0.55, 0.9, 1.0), transparent: true, opacity: light ? 0.55 : 0.9, blending: blend, depthWrite: false, depthTest: false,
     }));
     this.rimLine.frustumCulled = false;
     this.scene.add(this.rimLine);
@@ -322,7 +332,7 @@ class Wheel {
     sg.setAttribute("color", new THREE.BufferAttribute(new Float32Array(MAX_SPARKS * 3), 3).setUsage(THREE.DynamicDrawUsage));
     sg.setDrawRange(0, 0);
     this.sparks = new THREE.Points(sg, new THREE.PointsMaterial({
-      size: 9, map: this.dot, vertexColors: true, transparent: true, blending: THREE.AdditiveBlending,
+      size: 9, map: this.dot, vertexColors: true, transparent: true, blending: blend,
       depthWrite: false, depthTest: false, sizeAttenuation: true,
     }));
     this.sparks.frustumCulled = false;
@@ -340,8 +350,8 @@ class Wheel {
     const dg = new THREE.BufferGeometry();
     dg.setAttribute("position", new THREE.BufferAttribute(dp, 3).setUsage(THREE.DynamicDrawUsage));
     this.dust = new THREE.Points(dg, new THREE.PointsMaterial({
-      size: 2, map: this.dot, color: new THREE.Color(0.35, 0.6, 0.9), transparent: true, opacity: 0.4,
-      blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false,
+      size: 2, map: this.dot, color: light ? new THREE.Color(0.45, 0.52, 0.58) : new THREE.Color(0.35, 0.6, 0.9), transparent: true, opacity: light ? 0.3 : 0.4,
+      blending: blend, depthWrite: false, depthTest: false,
     }));
     this.dust.frustumCulled = false;
     this.scene.add(this.dust);
@@ -403,7 +413,7 @@ class Wheel {
         el.className = "rx-tip";
         el.innerHTML = `<b></b><span></span>`;
         this.tips.appendChild(el);
-        post = { pillar: p, len: 0, target, color: new THREE.Color(p.color), el, text: "", theta };
+        post = { pillar: p, len: 0, target, color: this.tone(new THREE.Color(p.color)), el, text: "", theta };
         this.postList.push(post);
       } else if (p.value > post.pillar.value) {
         this.burst(theta, this.R + 4, post.len, post.color, 14);
@@ -440,12 +450,20 @@ class Wheel {
     }
   }
 
+  /** tone deepens a bright signal colour into ink for the white ground. */
+  tone(c: THREE.Color): THREE.Color {
+    if (!this.light) return c;
+    const hsl = { h: 0, s: 0, l: 0 };
+    c.getHSL(hsl);
+    return c.setHSL(hsl.h, Math.min(1, hsl.s * 1.05 + 0.1), Math.min(hsl.l, 0.44));
+  }
+
   /** ingest reacts to a new snapshot: new events become sparks at twelve. */
   ingest(s: Snap) {
     const replay = this.seenSeq === 0 && s.events.length > 8;
     for (const e of s.events) {
       if (e.seq <= this.seenSeq || replay) continue;
-      const color = SPARK_COLOR[e.kind] ?? SPARK_COLOR.tool;
+      const color = this.tone((SPARK_COLOR[e.kind] ?? SPARK_COLOR.tool).clone());
       this.burst(this.th0, this.R + 2, 0, color, e.kind === "model" ? 14 : e.kind === "tool" ? 8 : 3);
     }
     if (s.events.length) this.seenSeq = s.events[s.events.length - 1].seq;
@@ -455,19 +473,20 @@ class Wheel {
   drawBand(s: Snap, nowSec: number) {
     const g = this.bandCanvas.getContext("2d")!;
     g.clearRect(0, 0, BAND_W, BAND_H);
-    g.fillStyle = "rgba(6,10,24,0.78)";
+    const day = this.light;
+    g.fillStyle = day ? "rgba(244,246,248,0.94)" : "rgba(6,10,24,0.78)";
     g.fillRect(0, 0, BAND_W, BAND_H);
-    g.strokeStyle = "rgba(94,224,255,0.35)";
+    g.strokeStyle = day ? "rgba(31,91,255,0.35)" : "rgba(94,224,255,0.35)";
     g.lineWidth = 2;
     const frac = nowSec % 10;
     for (let t = 10 - frac; t < WINDOW; t += 10) {
       const x = (t / WINDOW) * BAND_W;
       g.beginPath(); g.moveTo(x, 0); g.lineTo(x, 18); g.stroke();
     }
-    g.strokeStyle = "rgba(255,255,255,0.7)";
+    g.strokeStyle = day ? "rgba(14,26,34,0.7)" : "rgba(255,255,255,0.7)";
     g.lineWidth = 3;
     g.beginPath(); g.moveTo(2, 0); g.lineTo(2, BAND_H); g.stroke();
-    g.font = "600 22px ui-monospace, Menlo, monospace";
+    g.font = "600 22px 'Geist Mono Variable', ui-monospace, Menlo, monospace";
     g.textBaseline = "middle";
     let row = 0;
     for (let i = s.events.length - 1; i >= 0; i--) {
@@ -479,7 +498,9 @@ class Wheel {
       const y = row % 2 === 0 ? 44 : 92;
       row++;
       const label = e.kind === "model" ? `${fmtK(e.n ?? 0)} tok` : e.kind === "think" ? e.text.slice(0, 40) : e.name;
-      g.fillStyle = e.bad ? "rgba(255,92,122,0.95)" :
+      g.fillStyle = day
+        ? (e.bad ? "#d0313f" : e.kind === "model" ? "#1f5bff" : e.kind === "think" ? "#12805c" : e.kind === "compact" ? "#6d3fd0" : "#b06a00")
+        : e.bad ? "rgba(255,92,122,0.95)" :
         e.kind === "model" ? "rgba(120,225,255,0.95)" :
         e.kind === "think" ? "rgba(157,255,106,0.8)" :
         e.kind === "compact" ? "rgba(184,122,255,0.9)" : "rgba(255,200,110,0.95)";
@@ -507,10 +528,10 @@ class Wheel {
       this.dummy.scale.set(Math.max(1, post.len), 11, 1);
       this.dummy.updateMatrix();
       this.posts.setMatrixAt(inst, this.dummy.matrix);
-      this.posts.setColorAt(inst, color.copy(post.color).multiplyScalar(0.32));
+      this.posts.setColorAt(inst, this.light ? color.copy(post.color).lerp(WHITE, 0.5) : color.copy(post.color).multiplyScalar(0.32));
       inst++;
       // The core: narrow, bright - what the bloom catches.
-      this.dummy.scale.set(Math.max(1, post.len * 0.96), 2.2, 1);
+      this.dummy.scale.set(Math.max(1, post.len * 0.96), this.light ? 3 : 2.2, 1);
       this.dummy.updateMatrix();
       this.posts.setMatrixAt(inst, this.dummy.matrix);
       this.posts.setColorAt(inst, color.copy(post.color));
@@ -620,6 +641,18 @@ class Wheel {
 // The component
 // ---------------------------------------------------------------------------
 
+/** useDaylight follows the app's theme: true unless it is set to dark. */
+function useDaylight(): boolean {
+  const read = () => document.documentElement.dataset.theme !== "dark";
+  const [light, setLight] = useState(read);
+  useEffect(() => {
+    const mo = new MutationObserver(() => setLight(read()));
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    return () => mo.disconnect();
+  }, []);
+  return light;
+}
+
 export default function Reactor({ snap, pillars, brain }: { snap: Snap; pillars: Pillar[]; brain?: string | null }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -628,6 +661,7 @@ export default function Reactor({ snap, pillars, brain }: { snap: Snap; pillars:
   const pillarsRef = useRef<Pillar[]>(pillars);
   const wheelRef = useRef<Wheel | null>(null);
   const [box, setBox] = useState({ w: 0, h: 0 });
+  const light = useDaylight();
 
   useEffect(() => {
     snapRef.current = snap;
@@ -647,7 +681,7 @@ export default function Reactor({ snap, pillars, brain }: { snap: Snap; pillars:
     const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
     let wheel: Wheel;
     try {
-      wheel = new Wheel(canvas, tips, reduce);
+      wheel = new Wheel(canvas, tips, reduce, light);
     } catch {
       return; // no WebGL: the charts beside it still work
     }
@@ -679,7 +713,7 @@ export default function Reactor({ snap, pillars, brain }: { snap: Snap; pillars:
       wheel.dispose();
       wheelRef.current = null;
     };
-  }, []);
+  }, [light]);
 
   // The brain disc, where the hub is: the same geometry the wheel uses, so
   // the DOM circle and the WebGL ring are concentric to the pixel.

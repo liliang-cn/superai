@@ -15,11 +15,34 @@ import { Snap, fmtK } from "./Reactor";
  * They read the same pushed snapshot the wheel does. One feed, several views.
  */
 
-const CYAN = "#5ee0ff", AMBER = "#ffb547", LIME = "#9dff6a", ROSE = "#ff5c7a", VIOLET = "#b87aff", PINK = "#ff73d9", TEAL = "#4dffdb";
-const DIM = "#6b7690", LINE = "#1a2340", MONO = "ui-monospace, Menlo, monospace";
+// The palette follows the theme: light on black by night, ink on white by
+// day. Re-read at the top of every chart's option, which is rebuilt on every
+// snapshot, so switching themes takes effect within half a second.
+let CYAN = "", AMBER = "", LIME = "", ROSE = "", VIOLET = "", PINK = "", TEAL = "";
+let DIM = "", LINE = "", INK = "", PANEL = "", TIP = "", DAY = true;
+const MONO = "'Geist Mono Variable', ui-monospace, Menlo, monospace";
+function retheme() {
+  DAY = document.documentElement.dataset.theme !== "dark";
+  if (DAY) {
+    [CYAN, AMBER, LIME, ROSE, VIOLET, PINK, TEAL] = ["#1f5bff", "#b06a00", "#12805c", "#d0313f", "#6d3fd0", "#b8338f", "#0e7c92"];
+    [DIM, LINE, INK, PANEL, TIP] = ["#5b6973", "#e1e6ea", "#0e1a22", "#ffffff", "#ffffff"];
+  } else {
+    [CYAN, AMBER, LIME, ROSE, VIOLET, PINK, TEAL] = ["#5ee0ff", "#ffb547", "#9dff6a", "#ff5c7a", "#b87aff", "#ff73d9", "#4dffdb"];
+    [DIM, LINE, INK, PANEL, TIP] = ["#6b7690", "#1a2340", "#e6ebf7", "#05070f", "#0c1120"];
+  }
+  base.textStyle = { fontFamily: MONO, color: DIM };
+  base.tooltip = { trigger: "item", backgroundColor: TIP, borderColor: LINE, textStyle: { color: INK, fontFamily: MONO, fontSize: 11 } };
+}
 
 function glow(color: string, blur = 14) {
-  return { color, shadowBlur: blur, shadowColor: color };
+  // A glow is light; on a white ground it only smudges.
+  return DAY ? { color } : { color, shadowBlur: blur, shadowColor: color };
+}
+
+/** rgba reads a hex colour with an alpha, for the gradients. */
+function rgba(hex: string, a: number) {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
 }
 
 /** One chart, kept alive across renders and resized with its box. */
@@ -45,15 +68,12 @@ function Chart({ option, height = "100%" }: { option: echarts.EChartsOption; hei
   return <div ref={ref} className="rx-chart" style={{ width: "100%", height, minHeight: 0 }} />;
 }
 
-const base: echarts.EChartsOption = {
-  backgroundColor: "transparent",
-  textStyle: { fontFamily: MONO, color: DIM },
-  tooltip: { trigger: "item", backgroundColor: "#0c1120", borderColor: LINE, textStyle: { color: "#e6ebf7", fontFamily: MONO, fontSize: 11 } },
-};
+const base: echarts.EChartsOption = { backgroundColor: "transparent" };
 
 /** Cached against uncached tokens, and a second ring of turns. */
 export function CacheRing({ snap }: { snap: Snap }) {
   const option = useMemo<echarts.EChartsOption>(() => {
+    retheme();
     const cached = snap.cached, fresh = Math.max(0, snap.tokens - snap.cached);
     const pct = snap.tokens ? Math.round((100 * cached) / snap.tokens) : 0;
     return {
@@ -62,7 +82,7 @@ export function CacheRing({ snap }: { snap: Snap }) {
       series: [{
         type: "pie", radius: ["62%", "84%"], center: ["50%", "50%"], avoidLabelOverlap: false,
         label: { show: false }, labelLine: { show: false },
-        itemStyle: { borderColor: "#05070f", borderWidth: 2 },
+        itemStyle: { borderColor: PANEL, borderWidth: 2 },
         // Nothing yet is an empty ring, not two halves of nothing.
         data: snap.tokens === 0 ? [{ value: 1, name: "none yet", itemStyle: { color: LINE } }] : [
           { value: cached, name: "cached", itemStyle: glow(AMBER) },
@@ -77,14 +97,15 @@ export function CacheRing({ snap }: { snap: Snap }) {
 /** What the calls did to the world. */
 export function CallRing({ snap }: { snap: Snap }) {
   const option = useMemo<echarts.EChartsOption>(() => {
+    retheme();
     const other = Math.max(0, snap.calls - snap.reads - snap.writes - snap.shells - snap.mcp - snap.memory);
     return {
       ...base,
-      title: { text: String(snap.calls), subtext: "calls", left: "center", top: "38%", textStyle: { color: "#ffffff", fontFamily: MONO, fontSize: 22, fontWeight: 800 }, subtextStyle: { color: DIM, fontFamily: MONO, fontSize: 9, letterSpacing: 2 } },
+      title: { text: String(snap.calls), subtext: "calls", left: "center", top: "38%", textStyle: { color: INK, fontFamily: MONO, fontSize: 22, fontWeight: 800 }, subtextStyle: { color: DIM, fontFamily: MONO, fontSize: 9, letterSpacing: 2 } },
       series: [{
         type: "pie", radius: ["62%", "84%"], center: ["50%", "50%"],
         label: { show: false }, labelLine: { show: false },
-        itemStyle: { borderColor: "#05070f", borderWidth: 2 },
+        itemStyle: { borderColor: PANEL, borderWidth: 2 },
         data: [
           { value: snap.reads, name: "reads", itemStyle: glow(CYAN) },
           { value: snap.writes, name: "writes", itemStyle: glow(LIME) },
@@ -103,6 +124,7 @@ export function CallRing({ snap }: { snap: Snap }) {
 /** Tokens per model turn, the last sixteen. */
 export function TurnColumns({ snap }: { snap: Snap }) {
   const option = useMemo<echarts.EChartsOption>(() => {
+    retheme();
     const turns = snap.events.filter((e) => e.kind === "model" && (e.n ?? 0) > 0).slice(-16);
     return {
       ...base,
@@ -114,7 +136,7 @@ export function TurnColumns({ snap }: { snap: Snap }) {
         data: turns.map((e) => e.n ?? 0),
         itemStyle: {
           borderRadius: [3, 3, 0, 0],
-          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: CYAN }, { offset: 1, color: "rgba(94,224,255,.15)" }]),
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: CYAN }, { offset: 1, color: rgba(CYAN, 0.15) }]),
           shadowBlur: 16, shadowColor: CYAN,
         },
       }],
@@ -126,6 +148,7 @@ export function TurnColumns({ snap }: { snap: Snap }) {
 /** Calls per tool, busiest at the top. */
 export function ToolColumns({ snap }: { snap: Snap }) {
   const option = useMemo<echarts.EChartsOption>(() => {
+    retheme();
     const top = snap.tools.slice(0, 8).reverse();
     return {
       ...base,
@@ -134,13 +157,13 @@ export function ToolColumns({ snap }: { snap: Snap }) {
       yAxis: { type: "category", data: top.map((t) => t.name.replace(/^mcp_/, "")), axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: DIM, fontSize: 9.5, fontFamily: MONO, width: 112, overflow: "truncate" } },
       series: [{
         type: "bar", barMaxWidth: 12,
-        label: { show: true, position: "right", color: "#e6ebf7", fontFamily: MONO, fontSize: 10 },
+        label: { show: true, position: "right", color: INK, fontFamily: MONO, fontSize: 10 },
         data: top.map((t) => ({
           value: t.calls,
           itemStyle: {
             borderRadius: [0, 3, 3, 0],
             ...(t.errors ? glow(ROSE) : Date.now() - new Date(t.lastAt).getTime() < 3000 ? glow(AMBER, 18) : {
-              color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [{ offset: 0, color: "rgba(255,181,71,.25)" }, { offset: 1, color: AMBER }]),
+              color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [{ offset: 0, color: rgba(AMBER, 0.25) }, { offset: 1, color: AMBER }]),
               shadowBlur: 12, shadowColor: AMBER,
             }),
           },
@@ -154,6 +177,7 @@ export function ToolColumns({ snap }: { snap: Snap }) {
 /** Tokens and reasoning over the last two minutes, one point a second. */
 export function BurnArea({ snap }: { snap: Snap }) {
   const option = useMemo<echarts.EChartsOption>(() => {
+    retheme();
     const bins = snap.bins;
     return {
       ...base,
@@ -168,12 +192,12 @@ export function BurnArea({ snap }: { snap: Snap }) {
         {
           name: "tokens", type: "line", smooth: 0.3, symbol: "none", data: bins.map((b) => b.tokens),
           lineStyle: { color: CYAN, width: 1.5, shadowBlur: 12, shadowColor: CYAN },
-          areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: "rgba(94,224,255,.45)" }, { offset: 1, color: "rgba(94,224,255,0)" }]) },
+          areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: rgba(CYAN, DAY ? 0.22 : 0.45) }, { offset: 1, color: rgba(CYAN, 0) }]) },
         },
         {
           name: "reasoning", type: "line", yAxisIndex: 1, smooth: 0.3, symbol: "none", data: bins.map((b) => b.think),
           lineStyle: { color: LIME, width: 1, shadowBlur: 10, shadowColor: LIME },
-          areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: "rgba(157,255,106,.25)" }, { offset: 1, color: "rgba(157,255,106,0)" }]) },
+          areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: rgba(LIME, DAY ? 0.16 : 0.25) }, { offset: 1, color: rgba(LIME, 0) }]) },
         },
       ],
     };
@@ -184,6 +208,7 @@ export function BurnArea({ snap }: { snap: Snap }) {
 /** CPU and heap, as two dials. */
 export function LoadGauges({ snap }: { snap: Snap }) {
   const option = useMemo<echarts.EChartsOption>(() => {
+    retheme();
     const heapMB = snap.heap / 1048576;
     const heapHi = Math.max(64, Math.ceil((snap.heapHigh / 1048576) * 1.25 / 32) * 32);
     const dial = (center: [string, string], color: string, value: number, max: number, name: string, fmt: (v: number) => string): echarts.GaugeSeriesOption => ({

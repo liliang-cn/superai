@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { PauseIcon, PlayIcon, ZapIcon, PencilIcon, Trash2Icon, CopyIcon, XIcon } from "lucide-react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { PauseIcon, PlayIcon, ZapIcon, CopyIcon, XIcon, PlusIcon } from "lucide-react";
 import {
   DeleteStandingAgent,
   MCP,
@@ -8,15 +8,32 @@ import {
   SaveStandingAgent,
   StandingAgents,
   StandingReports,
+  StandingWakes,
   WakeStandingAgent,
 } from "../../wailsjs/go/app/App";
 import { app } from "../../wailsjs/go/models";
 import { EventsOn } from "../../wailsjs/runtime";
-import { fromNow, parseTime } from "../lib/format";
+import { parseTime } from "../lib/format";
 import { useImeGuard } from "@/lib/ime";
 import { toast } from "../lib/toasts";
 
-type Spec = Omit<app.AgentSpec, "convertValues" | "report"> & { report: { push: boolean; telegram: boolean } };
+// ---------------------------------------------------------------------------
+// Shapes. Plain objects: what arrives over events is JSON, not the classes.
+// ---------------------------------------------------------------------------
+
+type Spec = Omit<app.AgentSpec, "convertValues" | "report" | "createdAt"> & {
+  report: { push: boolean; telegram: boolean };
+  createdAt?: string;
+};
+interface Wake {
+  kind: string;
+  reason?: string;
+  started_at: string;
+  ended_at?: string;
+  tool_calls: number;
+  cost_usd: number;
+  error?: string;
+}
 type View = Spec & {
   paused: boolean;
   pausedReason?: string;
@@ -24,20 +41,17 @@ type View = Spec & {
   running?: Wake;
   lastWake?: Wake;
   nextDue?: string;
-  nextDueKind?: string;
   wakesToday: number;
   costTodayUsd: number;
   hookPath?: string;
   waitingFor?: string;
 };
-interface Wake {
-  id: string;
+interface Mark {
+  agent: string;
   kind: string;
-  reason?: string;
-  started_at: string;
-  ended_at?: string;
-  cost_usd: number;
-  tool_calls: number;
+  started: string;
+  ended?: string;
+  toolCalls: number;
   error?: string;
   notified: number;
 }
@@ -49,9 +63,21 @@ interface Report {
   at: string;
 }
 
-/** The six finishes an agent can wear, as hues. */
-const HUES: Record<string, number> = { cyan: 190, blue: 220, violet: 265, rose: 335, orange: 25, green: 145 };
-const hueOf = (h?: string) => HUES[h ?? ""] ?? HUES.cyan;
+/** Identity hues. Deliberately not the signal blue: that means "needs you". */
+const HUES: Record<string, string> = {
+  cyan: "#0e7c92",
+  blue: "#3d4db7",
+  violet: "#6d3fd0",
+  rose: "#b8265f",
+  orange: "#b35a00",
+  green: "#12805c",
+};
+const hue = (h?: string) => HUES[h ?? ""] ?? HUES.cyan;
+
+/** The track covers the last day and the next three hours. */
+const PAST_H = 24;
+const AHEAD_H = 3;
+const SPAN = (PAST_H + AHEAD_H) * 3600_000;
 
 const blank = (): Spec =>
   ({
@@ -69,29 +95,48 @@ const blank = (): Spec =>
     allConnectors: false,
     connectors: [],
     cron: "",
-    everyMinutes: 0,
+    everyMinutes: 60,
     scanEveryMinutes: 0,
     report: { push: true, telegram: false },
     maxWakesPerDay: 0,
     maxCostPerDayUsd: 0,
   }) as unknown as Spec;
 
+const t = (s?: string) => parseTime(s)?.getTime() ?? 0;
+const hhmm = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+
+function until(ms: number) {
+  const m = Math.round((ms - Date.now()) / 60000);
+  if (m <= 0) return "now";
+  if (m < 60) return `in ${m} min`;
+  const h = Math.floor(m / 60);
+  return m % 60 ? `in ${h} h ${m % 60} min` : `in ${h} h`;
+}
+
+// ---------------------------------------------------------------------------
+// The page
+// ---------------------------------------------------------------------------
+
 /**
- * Standing agents: agents that are never finished. Each is told what should
- * stay true; it wakes on its schedule, on an event, or when it asked to, does
- * one turn, keeps notes, reports what is worth knowing, and sleeps.
+ * Standing agents as a watch bill: one row per agent on a shared 24-hour
+ * track, so it reads at a glance who is on watch, how often each wakes, when
+ * it spoke, and who is waiting for you. The track is the page; everything
+ * else is quiet.
  */
 export default function StandingView() {
   const [agents, setAgents] = useState<View[]>([]);
+  const [wakes, setWakes] = useState<Mark[]>([]);
   const [reports, setReports] = useState<Report[]>([]);
-  const [open, setOpen] = useState<string>("");
+  const [open, setOpen] = useState("");
   const [editing, setEditing] = useState<Spec | null>(null);
   const [error, setError] = useState("");
+  const [now, setNow] = useState(Date.now());
 
   const load = useCallback(async () => {
     try {
-      const [list, rs] = await Promise.all([StandingAgents(), StandingReports("")]);
+      const [list, ws, rs] = await Promise.all([StandingAgents(), StandingWakes(PAST_H), StandingReports("")]);
       setAgents((list ?? []) as unknown as View[]);
+      setWakes((ws ?? []) as unknown as Mark[]);
       setReports(((rs ?? []) as unknown as Report[]).filter((r) => r.message));
       setError("");
     } catch (e) {
@@ -102,9 +147,8 @@ export default function StandingView() {
   useEffect(() => {
     load();
     const offU = EventsOn("agent:update", () => load());
-    const offR = EventsOn("agent:report", (r: Report) => r.message && setReports((prev) => [r, ...prev].slice(0, 300)));
-    // Running wakes have a clock; keep "awake for 12s" honest.
-    const tick = window.setInterval(() => setAgents((a) => [...a]), 5000);
+    const offR = EventsOn("agent:report", (r: Report) => r.message && setReports((p) => [r, ...p].slice(0, 300)));
+    const tick = window.setInterval(() => setNow(Date.now()), 15_000);
     return () => {
       offU();
       offR();
@@ -122,66 +166,77 @@ export default function StandingView() {
     }
   };
 
-  const selected = agents.find((a) => a.id === open) ?? null;
+  const waiting = agents.filter((a) => a.waitingFor).length;
+  const onWatch = agents.filter((a) => !a.paused).length;
+  const from = now - PAST_H * 3600_000;
 
   return (
-    <div className="view standing-view">
+    <div className="view wt-view">
       <div className="view-header with-action">
         <div>
           <div className="view-title">Agents</div>
           <div className="view-desc">
-            Agents that keep something true: they wake on a schedule, on an event, or when they asked to, and tell you
-            what is worth knowing.
+            {agents.length === 0
+              ? "Agents that keep something true, and tell you only what is worth knowing."
+              : `${onWatch} on watch${waiting ? `, ${waiting} waiting for you` : ""}.`}
           </div>
         </div>
         <div className="vh-actions">
-          <button className="btn sm" onClick={() => setEditing(blank())}>
-            New agent
+          <button className="btn" onClick={() => setEditing(blank())}>
+            <PlusIcon size={14} /> New agent
           </button>
         </div>
       </div>
-      {error && <div className="report-error" style={{ marginBottom: 12 }}>{error}</div>}
+      {error && <div className="report-error wt-error">{error}</div>}
 
       {agents.length === 0 && !error ? (
-        <div className="inline-empty">
-          <div className="ie-hint">
-            No agents yet. Give one something to keep true — “main stays green”, “tell me when a worker is down”.
-          </div>
+        <div className="wt-empty">
+          <div className="wt-empty-title">Nothing on watch yet</div>
+          <p>
+            Give an agent one thing to keep true — “every worker in the hive is live”, “main stays green”, “no empty files in
+            the workspace”. It wakes on its own, looks, and tells you only when something needs you.
+          </p>
+          <button className="btn" onClick={() => setEditing(blank())}>
+            <PlusIcon size={14} /> New agent
+          </button>
         </div>
       ) : (
-        <div className="sa-grid">
+        <div className="wt-bill">
+          <Axis from={from} />
           {agents.map((a) => (
-            <AgentCard
-              key={a.id}
-              agent={a}
-              last={reports.find((r) => r.agent === a.id)}
-              open={a.id === open}
-              onOpen={() => setOpen(a.id === open ? "" : a.id)}
-              onWake={() => act(() => WakeStandingAgent(a.id, ""))}
-              onPause={() => act(() => (a.paused ? ResumeStandingAgent(a.id) : PauseStandingAgent(a.id)))}
-            />
+            <React.Fragment key={a.id}>
+              <Row
+                agent={a}
+                marks={wakes.filter((w) => w.agent === a.id)}
+                said={reports.filter((r) => r.agent === a.id)}
+                from={from}
+                now={now}
+                open={open === a.id}
+                onOpen={() => setOpen(open === a.id ? "" : a.id)}
+              />
+              {open === a.id && (
+                <Detail
+                  agent={a}
+                  said={reports.filter((r) => r.agent === a.id)}
+                  onWake={() => act(() => WakeStandingAgent(a.id, ""))}
+                  onPause={() => act(() => (a.paused ? ResumeStandingAgent(a.id) : PauseStandingAgent(a.id)))}
+                  onEdit={() => setEditing({ ...a })}
+                  onDelete={() => {
+                    if (window.confirm(`Delete ${a.name}? Its notes and history go with it.`))
+                      act(() => DeleteStandingAgent(a.id), `Deleted ${a.name}`).then(() => setOpen(""));
+                  }}
+                  onTell={(m) => act(() => WakeStandingAgent(a.id, m), `Told ${a.name}`)}
+                />
+              )}
+            </React.Fragment>
           ))}
         </div>
       )}
 
-      {selected && (
-        <AgentDetail
-          agent={selected}
-          reports={reports.filter((r) => r.agent === selected.id)}
-          onClose={() => setOpen("")}
-          onEdit={() => setEditing({ ...selected })}
-          onDelete={() => {
-            if (window.confirm(`Delete ${selected.name}? Its notes go with it.`))
-              act(() => DeleteStandingAgent(selected.id), `${selected.name} deleted`).then(() => setOpen(""));
-          }}
-          onTell={(msg) => act(() => WakeStandingAgent(selected.id, msg), `Sent to ${selected.name}`)}
-        />
-      )}
-
       {editing && (
-        <AgentEditor
+        <Editor
           spec={editing}
-          onCancel={() => setEditing(null)}
+          onClose={() => setEditing(null)}
           onSaved={(v) => {
             setEditing(null);
             setOpen(v.id);
@@ -193,190 +248,246 @@ export default function StandingView() {
   );
 }
 
-function Disc({ agent, size = 44 }: { agent: Pick<Spec, "glyph" | "hue" | "name"> & { running?: unknown; paused?: boolean }; size?: number }) {
-  const h = hueOf(agent.hue);
-  const glyph = agent.glyph || (agent.name || "?").slice(0, 1).toUpperCase();
+/** Position on the track, 0..100. */
+const pos = (ms: number, from: number) => Math.max(0, Math.min(100, ((ms - from) / SPAN) * 100));
+
+function Axis({ from }: { from: number }) {
+  // A label every four hours, on the hour.
+  const first = new Date(from);
+  first.setMinutes(0, 0, 0);
+  first.setHours(first.getHours() + (4 - (first.getHours() % 4)));
+  const ticks: number[] = [];
+  for (let ms = first.getTime(); ms < from + PAST_H * 3600_000 - 2 * 3600_000; ms += 4 * 3600_000) ticks.push(ms);
+  const nowAt = pos(from + PAST_H * 3600_000, from);
   return (
-    <span
-      className={`sa-disc${agent.running ? " live" : ""}${agent.paused ? " paused" : ""}`}
-      style={{ "--hue": h, width: size, height: size, fontSize: size * 0.46 } as React.CSSProperties}
-    >
-      {glyph}
-    </span>
-  );
-}
-
-function status(a: View): string {
-  if (a.waitingFor) return `waiting for you · ${a.waitingFor}`;
-  if (a.running) return `awake · ${secsSince(a.running.started_at)}`;
-  if (a.paused) return a.pausedReason ? `paused · ${a.pausedReason}` : "paused";
-  if (a.nextDue) return `next ${fromNow(parseTime(a.nextDue) ?? new Date())}`;
-  if (a.cron) return `on ${a.cron}`;
-  return "waits for an event";
-}
-
-function secsSince(t: string) {
-  const s = Math.max(0, Math.round((Date.now() - (parseTime(t)?.getTime() ?? Date.now())) / 1000));
-  return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`;
-}
-
-function AgentCard({
-  agent,
-  last,
-  open,
-  onOpen,
-  onWake,
-  onPause,
-}: {
-  agent: View;
-  last?: Report;
-  open: boolean;
-  onOpen: () => void;
-  onWake: () => void;
-  onPause: () => void;
-}) {
-  return (
-    <div
-      className={`sa-card${open ? " open" : ""}${agent.running ? " live" : ""}${agent.waitingFor ? " needs" : ""}`}
-      style={{ "--hue": hueOf(agent.hue) } as React.CSSProperties}
-      onClick={onOpen}
-    >
-      <div className="sa-card-top">
-        <Disc agent={agent} />
-        <div className="sa-card-id">
-          <div className="sa-name">{agent.name}</div>
-          <div className="sa-status">{status(agent)}</div>
-        </div>
-        <div className="sa-card-actions" onClick={(e) => e.stopPropagation()}>
-          <button className="btn ghost sm" title="Wake it now" onClick={onWake} disabled={!!agent.running}>
-            <ZapIcon size={13} />
-          </button>
-          <button className="btn ghost sm" title={agent.paused ? "Resume" : "Pause"} onClick={onPause}>
-            {agent.paused ? <PlayIcon size={13} /> : <PauseIcon size={13} />}
-          </button>
-        </div>
+    <div className="wt-row wt-axis" aria-hidden="true">
+      <div className="wt-id" />
+      <div className="wt-track">
+        {ticks.map((ms) => (
+          <span key={ms} className="wt-hour" style={{ left: `${pos(ms, from)}%` }}>
+            {hhmm(ms)}
+          </span>
+        ))}
+        <span className="wt-hour now" style={{ left: `${nowAt}%` }}>now</span>
       </div>
-      <div className="sa-goal">{agent.goal}</div>
-      {last && (
-        <div className={`sa-last ${last.kind}`}>
-          <span>{last.message}</span>
-          <span className="sa-when">{fromNow(parseTime(last.at) ?? new Date())}</span>
-        </div>
-      )}
-      <div className="sa-meta">
-        {agent.wakesToday} wakes today
-        {agent.costTodayUsd > 0 && ` · $${agent.costTodayUsd.toFixed(3)}`}
-      </div>
+      <div className="wt-next">Next</div>
     </div>
   );
 }
 
-function AgentDetail({
+function Glyph({ agent, size = 34 }: { agent: Pick<View, "glyph" | "name" | "hue" | "paused" | "running" | "waitingFor">; size?: number }) {
+  const g = agent.glyph || (agent.name ? agent.name.slice(0, 1).toUpperCase() : "◎");
+  return (
+    <span
+      className={`wt-glyph${agent.running ? " live" : ""}${agent.paused ? " paused" : ""}${agent.waitingFor ? " needs" : ""}`}
+      style={{ "--h": hue(agent.hue), width: size, height: size, fontSize: size * 0.48 } as React.CSSProperties}
+    >
+      {g}
+    </span>
+  );
+}
+
+const KIND_LABEL: Record<string, string> = {
+  schedule: "on schedule",
+  self: "it asked to",
+  event: "an event",
+  scan: "looked around",
+  host: "you woke it",
+};
+
+function Row({
   agent,
-  reports,
-  onClose,
+  marks,
+  said,
+  from,
+  now,
+  open,
+  onOpen,
+}: {
+  agent: View;
+  marks: Mark[];
+  said: Report[];
+  from: number;
+  now: number;
+  open: boolean;
+  onOpen: () => void;
+}) {
+  const nowAt = pos(now, from);
+  const next = t(agent.nextDue);
+  const runStart = agent.running ? t(agent.running.started_at) : 0;
+  return (
+    <button
+      className={`wt-row wt-agent${open ? " open" : ""}${agent.waitingFor ? " needs" : ""}${agent.paused ? " paused" : ""}`}
+      style={{ "--h": hue(agent.hue) } as React.CSSProperties}
+      onClick={onOpen}
+      aria-expanded={open}
+    >
+      <div className="wt-id">
+        <Glyph agent={agent} />
+        <div className="wt-names">
+          <span className="wt-name">{agent.name}</span>
+          <span className="wt-goal">{agent.goal}</span>
+        </div>
+      </div>
+      <div className="wt-track">
+        <span className="wt-base" />
+        <span className="wt-future" style={{ left: `${nowAt}%` }} />
+        <span className="wt-nowline" style={{ left: `${nowAt}%` }} />
+        {marks.map((m, i) => (
+          <span
+            key={i}
+            className={`wt-mark k-${m.kind}${m.error ? " bad" : ""}`}
+            style={{ left: `${pos(t(m.started), from)}%` }}
+            title={`${hhmm(t(m.started))}, ${KIND_LABEL[m.kind] ?? m.kind}, ${m.toolCalls} tool calls${m.error ? `, failed: ${m.error}` : ""}`}
+          />
+        ))}
+        {said
+          .filter((r) => t(r.at) >= from)
+          .map((r, i) => (
+            <span key={`r${i}`} className={`wt-said${r.kind === "error" ? " bad" : ""}`} style={{ left: `${pos(t(r.at), from)}%` }} title={`${hhmm(t(r.at))}: ${r.message}`} />
+          ))}
+        {agent.running && (
+          <span className="wt-awake" style={{ left: `${pos(runStart, from)}%`, width: `${Math.max(0.6, nowAt - pos(runStart, from))}%` }} />
+        )}
+        {next > now && next < from + SPAN && <span className="wt-due" style={{ left: `${pos(next, from)}%` }} title={`next ${hhmm(next)}`} />}
+      </div>
+      <div className="wt-next">
+        {agent.waitingFor ? (
+          <span className="wt-state needs">Waiting for you</span>
+        ) : agent.running ? (
+          <span className="wt-state live">Awake</span>
+        ) : agent.paused ? (
+          <span className="wt-state">Paused</span>
+        ) : next ? (
+          <span className="wt-state">{until(next)}</span>
+        ) : (
+          <span className="wt-state quiet">On an event</span>
+        )}
+      </div>
+    </button>
+  );
+}
+
+function Detail({
+  agent,
+  said,
+  onWake,
+  onPause,
   onEdit,
   onDelete,
   onTell,
 }: {
   agent: View;
-  reports: Report[];
-  onClose: () => void;
+  said: Report[];
+  onWake: () => void;
+  onPause: () => void;
   onEdit: () => void;
   onDelete: () => void;
-  onTell: (msg: string) => void;
+  onTell: (m: string) => void;
 }) {
   const [msg, setMsg] = useState("");
   const ime = useImeGuard();
   const hook = agent.hookPath ? window.location.origin + agent.hookPath : "";
-  return (
-    <div className="sa-detail" style={{ "--hue": hueOf(agent.hue) } as React.CSSProperties}>
-      <div className="sa-detail-head">
-        <Disc agent={agent} size={56} />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div className="sa-name big">{agent.name}</div>
-          <div className="sa-status">{status(agent)}</div>
-        </div>
-        <button className="btn ghost sm" onClick={onEdit}>
-          <PencilIcon size={13} /> Edit
-        </button>
-        <button className="btn ghost sm" onClick={onDelete} title="Delete">
-          <Trash2Icon size={13} />
-        </button>
-        <button className="btn ghost sm" onClick={onClose} title="Close">
-          <XIcon size={13} />
-        </button>
-      </div>
+  const when: string[] = [];
+  if (agent.everyMinutes) when.push(`every ${agent.everyMinutes} min`);
+  if (agent.cron) when.push(`on the schedule ${agent.cron}`);
+  if (agent.scanEveryMinutes) when.push(`looks around every ${agent.scanEveryMinutes} min`);
+  when.push("when it asks to, and when an event arrives");
 
-      <div className="sa-cols">
-        <div className="sa-col">
-          <div className="sa-label">Reports</div>
-          {reports.length === 0 ? (
-            <div className="card-desc">Nothing yet. It reports only what is worth your attention.</div>
-          ) : (
-            <div className="sa-feed">
-              {reports.map((r, i) => (
-                <div key={i} className={`sa-report ${r.kind}`}>
-                  <div className="sa-when">{new Date(r.at).toLocaleString()}</div>
-                  <div className="sa-report-text">{r.message}</div>
-                </div>
-              ))}
-            </div>
-          )}
-          <div className="sa-tell">
-            <input
-              className="input"
-              placeholder={`Tell ${agent.name} something — it wakes with it`}
-              value={msg}
-              onChange={(e) => setMsg(e.target.value)}
-              {...ime.handlers}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && msg.trim() && !ime.composing(e)) {
-                  onTell(msg);
-                  setMsg("");
-                }
-              }}
-            />
-          </div>
+  return (
+    <div className="wt-detail" style={{ "--h": hue(agent.hue) } as React.CSSProperties}>
+      <div className="wt-said-col">
+        <div className="wt-tell">
+          <input
+            className="input"
+            placeholder={`Tell ${agent.name} something — it wakes with it`}
+            value={msg}
+            onChange={(e) => setMsg(e.target.value)}
+            {...ime.handlers}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && msg.trim() && !ime.composing(e)) {
+                onTell(msg);
+                setMsg("");
+              }
+            }}
+          />
         </div>
-        <div className="sa-col">
-          <div className="sa-label">Its notes</div>
-          <div className="sa-notes">{agent.notes || "No notes yet — it writes down what the next wake must know."}</div>
-          {agent.lastWake && (
+        {said.length === 0 ? (
+          <p className="wt-quiet">It has said nothing yet. It speaks only when something is worth your attention.</p>
+        ) : (
+          <ol className="wt-log">
+            {said.map((r, i) => (
+              <li key={i} className={r.kind === "error" ? "bad" : ""}>
+                <time>{new Date(r.at).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false })}</time>
+                <span>{r.message}</span>
+              </li>
+            ))}
+          </ol>
+        )}
+      </div>
+      <div className="wt-order-col">
+        <div className="wt-actions">
+          <button className="btn sm" onClick={onWake} disabled={!!agent.running}>
+            <ZapIcon size={13} /> Wake now
+          </button>
+          <button className="btn ghost sm" onClick={onPause}>
+            {agent.paused ? <PlayIcon size={13} /> : <PauseIcon size={13} />} {agent.paused ? "Resume" : "Pause"}
+          </button>
+          <button className="btn ghost sm" onClick={onEdit}>
+            Edit
+          </button>
+          <button className="btn ghost sm wt-del" onClick={onDelete}>
+            Delete
+          </button>
+        </div>
+        <dl className="wt-order">
+          {(agent.watch ?? []).length > 0 && (
             <>
-              <div className="sa-label">Last wake</div>
-              <div className="sa-kv">
-                {agent.lastWake.kind} · {agent.lastWake.tool_calls} tool calls
-                {agent.lastWake.cost_usd > 0 && ` · $${agent.lastWake.cost_usd.toFixed(3)}`}
-                {agent.lastWake.error && <div className="sa-err">{agent.lastWake.error}</div>}
-              </div>
+              <dt>Watches</dt>
+              <dd>{(agent.watch ?? []).join(", ")}</dd>
             </>
           )}
-          <div className="sa-label">Permissions</div>
-          <div className="sa-perm">
-            <Tier name="On its own" items={agent.auto} cls="auto" />
-            <Tier name="Asks first" items={agent.ask} cls="ask" />
-            <Tier name="Never" items={agent.forbid} cls="never" />
-            <div className="sa-kv">
-              Connectors: {agent.allConnectors ? "all" : (agent.connectors ?? []).join(", ") || "none"}
-            </div>
-          </div>
-          {hook && (
+          {agent.attention && (
             <>
-              <div className="sa-label">Webhook</div>
-              <div className="sa-hook">
-                <code>{hook}</code>
-                <button
-                  className="btn ghost sm"
-                  onClick={() => navigator.clipboard.writeText(hook).then(() => toast.success("Webhook copied"))}
-                >
-                  <CopyIcon size={12} />
-                </button>
-              </div>
-              <div className="card-desc">POST any text here and it wakes with it.</div>
+              <dt>Tells you</dt>
+              <dd>{agent.attention}</dd>
             </>
           )}
+          {(agent.never ?? []).length > 0 && (
+            <>
+              <dt>Never</dt>
+              <dd>{(agent.never ?? []).join(", ")}</dd>
+            </>
+          )}
+          <dt>Wakes</dt>
+          <dd>{when.join("; ")}</dd>
+        </dl>
+        <div className="wt-tiers">
+          <Tier name="On its own" items={agent.auto} cls="auto" />
+          <Tier name="Asks first" items={agent.ask} cls="ask" />
+          <Tier name="Never" items={agent.forbid} cls="never" />
         </div>
+        <div className="wt-conn">
+          Connectors: {agent.allConnectors ? "all of them" : (agent.connectors ?? []).join(", ") || "none"}
+        </div>
+        {agent.notes && (
+          <details className="wt-notes">
+            <summary>Its notes for next time</summary>
+            <p>{agent.notes}</p>
+          </details>
+        )}
+        {hook && (
+          <div className="wt-hook">
+            <code title="POST any text here and it wakes with it">{hook}</code>
+            <button
+              className="btn ghost sm"
+              aria-label="Copy webhook"
+              onClick={() => navigator.clipboard.writeText(hook).then(() => toast.success("Webhook copied"))}
+            >
+              <CopyIcon size={12} />
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -384,39 +495,80 @@ function AgentDetail({
 
 function Tier({ name, items, cls }: { name: string; items?: string[]; cls: string }) {
   return (
-    <div className="sa-tier">
-      <span className={`sa-tier-name ${cls}`}>{name}</span>
-      {(items ?? []).length ? (items ?? []).map((t) => <span key={t} className="chip">{t}</span>) : <span className="sa-none">—</span>}
+    <div className={`wt-tier ${cls}`}>
+      <span className="wt-tier-name">{name}</span>
+      <div className="wt-chips">
+        {(items ?? []).length ? (items ?? []).map((x) => <code key={x}>{x}</code>) : <span className="wt-none">nothing</span>}
+      </div>
     </div>
   );
 }
 
-const lines = (s: string) =>
+// ---------------------------------------------------------------------------
+// The editor: a standing order, written out.
+// ---------------------------------------------------------------------------
+
+const split = (s: string) =>
   s
     .split(/[\n,，]/)
     .map((x) => x.trim())
     .filter(Boolean);
 
-function AgentEditor({ spec, onCancel, onSaved }: { spec: Spec; onCancel: () => void; onSaved: (v: View) => void }) {
+function Chips({ value, onChange, placeholder, cls }: { value: string[]; onChange: (v: string[]) => void; placeholder: string; cls: string }) {
+  const [draft, setDraft] = useState("");
+  const add = () => {
+    const more = split(draft).filter((x) => !value.includes(x));
+    if (more.length) onChange([...value, ...more]);
+    setDraft("");
+  };
+  return (
+    <div className={`ed-chips ${cls}`}>
+      {value.map((x) => (
+        <code key={x}>
+          {x}
+          <button aria-label={`Remove ${x}`} onClick={() => onChange(value.filter((y) => y !== x))}>
+            <XIcon size={10} />
+          </button>
+        </code>
+      ))}
+      <input
+        value={draft}
+        placeholder={value.length ? "" : placeholder}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={add}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === ",") {
+            e.preventDefault();
+            add();
+          } else if (e.key === "Backspace" && !draft && value.length) onChange(value.slice(0, -1));
+        }}
+      />
+    </div>
+  );
+}
+
+function Editor({ spec, onClose, onSaved }: { spec: Spec; onClose: () => void; onSaved: (v: View) => void }) {
   const [s, setS] = useState<Spec>(spec);
   const [servers, setServers] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  const first = useRef<HTMLInputElement>(null);
   useEffect(() => {
+    first.current?.focus();
     MCP()
       .then((l) => setServers((l ?? []).map((x) => x.name)))
       .catch(() => {});
-  }, []);
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", esc);
+    return () => window.removeEventListener("keydown", esc);
+  }, [onClose]);
   const set = <K extends keyof Spec>(k: K, v: Spec[K]) => setS((p) => ({ ...p, [k]: v }));
-  const list = (k: "watch" | "never" | "auto" | "ask" | "forbid") => ((s[k] as string[]) ?? []).join(", ");
 
   const save = async () => {
     setSaving(true);
     try {
-      // A new agent has no creation time yet; an empty string is not a time
-      // the server can read.
-      const { createdAt, ...rest } = s as Spec & { createdAt?: string };
+      const { createdAt, ...rest } = s;
       const v = await SaveStandingAgent(app.AgentSpec.createFrom(createdAt ? s : rest));
-      toast.success(`${s.name} saved`);
+      toast.success(s.id ? `Saved ${s.name}` : `${s.name} is on watch`);
       onSaved(v as unknown as View);
     } catch (e) {
       toast.error(String(e));
@@ -425,134 +577,146 @@ function AgentEditor({ spec, onCancel, onSaved }: { spec: Spec; onCancel: () => 
     }
   };
 
-  const preview = useMemo(() => ({ glyph: s.glyph, hue: s.hue, name: s.name }), [s.glyph, s.hue, s.name]);
+  const preview = useMemo(() => ({ glyph: s.glyph, name: s.name, hue: s.hue, paused: false }), [s.glyph, s.name, s.hue]);
 
   return (
-    <div className="sa-modal" onClick={onCancel}>
-      <div className="sa-editor" onClick={(e) => e.stopPropagation()}>
-        <div className="sa-editor-head">
-          <Disc agent={preview} size={48} />
-          <input className="input sa-title" placeholder="Name" value={s.name} onChange={(e) => set("name", e.target.value)} />
-          <input
-            className="input sa-glyph"
-            placeholder="🙂"
-            maxLength={2}
-            value={s.glyph ?? ""}
-            onChange={(e) => set("glyph", e.target.value)}
-            title="One character or emoji on its disc"
-          />
-          <div className="sa-hues">
-            {Object.keys(HUES).map((h) => (
-              <button
-                key={h}
-                className={`sa-hue${s.hue === h ? " on" : ""}`}
-                style={{ "--hue": HUES[h] } as React.CSSProperties}
-                onClick={() => set("hue", h)}
-                aria-label={h}
-              />
-            ))}
+    <div className="ed-scrim" onClick={onClose}>
+      <aside className="ed-drawer" onClick={(e) => e.stopPropagation()} aria-label={s.id ? `Edit ${s.name}` : "New agent"}>
+        <header className="ed-head">
+          <Glyph agent={preview} size={44} />
+          <div className="ed-ident">
+            <input ref={first} className="ed-name" placeholder="Name it" value={s.name} onChange={(e) => set("name", e.target.value)} />
+            <div className="ed-look">
+              <input className="ed-glyph" placeholder="◎" maxLength={2} value={s.glyph ?? ""} onChange={(e) => set("glyph", e.target.value)} aria-label="Glyph" />
+              {Object.keys(HUES).map((h) => (
+                <button
+                  key={h}
+                  className={`ed-hue${s.hue === h ? " on" : ""}`}
+                  style={{ "--h": HUES[h] } as React.CSSProperties}
+                  onClick={() => set("hue", h)}
+                  aria-label={h}
+                />
+              ))}
+            </div>
           </div>
-        </div>
+          <button className="btn ghost sm" onClick={onClose} aria-label="Close">
+            <XIcon size={14} />
+          </button>
+        </header>
 
-        <div className="sa-form">
-          <Field label="What should stay true">
-            <textarea className="input" rows={2} value={s.goal} onChange={(e) => set("goal", e.target.value)} placeholder="main stays green; every worker in the hive is live" />
-          </Field>
-          <Field label="What to watch" hint="comma separated">
-            <input className="input" value={list("watch")} onChange={(e) => set("watch", lines(e.target.value))} placeholder="CI, the hive's workers" />
-          </Field>
-          <Field label="Worth telling you about">
-            <input className="input" value={s.attention ?? ""} onChange={(e) => set("attention", e.target.value)} placeholder="only when something is broken or needs a decision" />
-          </Field>
-          <Field label="Must never" hint="in words, comma separated">
-            <input className="input" value={list("never")} onChange={(e) => set("never", lines(e.target.value))} placeholder="push to main, spend money" />
-          </Field>
+        <div className="ed-body">
+          <section className="ed-order">
+            <label>
+              <span>Keeps this true</span>
+              <textarea rows={2} value={s.goal} onChange={(e) => set("goal", e.target.value)} placeholder="Every worker in the hive is live" />
+            </label>
+            <label>
+              <span>Watches</span>
+              <input value={(s.watch ?? []).join(", ")} onChange={(e) => set("watch", split(e.target.value))} placeholder="hive members, running tasks" />
+            </label>
+            <label>
+              <span>Tells you when</span>
+              <input value={s.attention ?? ""} onChange={(e) => set("attention", e.target.value)} placeholder="a worker goes down, or a task is stuck" />
+            </label>
+            <label>
+              <span>Never</span>
+              <input value={(s.never ?? []).join(", ")} onChange={(e) => set("never", split(e.target.value))} placeholder="dispatch work, retire a worker" />
+            </label>
+          </section>
 
-          <div className="sa-section">Permissions — tool names, * as a wildcard, mcp:server for a whole connector</div>
-          <Field label="On its own">
-            <input className="input" value={list("auto")} onChange={(e) => set("auto", lines(e.target.value))} placeholder="fs_read*, web_search" />
-          </Field>
-          <Field label="Asks first">
-            <input className="input" value={list("ask")} onChange={(e) => set("ask", lines(e.target.value))} placeholder="*bash*, mcp:github" />
-          </Field>
-          <Field label="Never">
-            <input className="input" value={list("forbid")} onChange={(e) => set("forbid", lines(e.target.value))} placeholder="*delete*, *payment*" />
-          </Field>
-          <Field label="Connectors">
-            <div className="sa-checks">
-              <label>
-                <input type="checkbox" checked={s.allConnectors} onChange={(e) => set("allConnectors", e.target.checked)} /> all
+          <section>
+            <h3>Tools</h3>
+            <p className="ed-hint">Tool names; * matches anything, mcp:github means every tool of that connector.</p>
+            <div className="ed-tiers">
+              <div>
+                <span className="ed-tier auto">On its own</span>
+                <Chips cls="auto" value={s.auto ?? []} onChange={(v) => set("auto", v)} placeholder="fs_read*" />
+              </div>
+              <div>
+                <span className="ed-tier ask">Asks first</span>
+                <Chips cls="ask" value={s.ask ?? []} onChange={(v) => set("ask", v)} placeholder="*bash*" />
+              </div>
+              <div>
+                <span className="ed-tier never">Never</span>
+                <Chips cls="never" value={s.forbid ?? []} onChange={(v) => set("forbid", v)} placeholder="*delete*" />
+              </div>
+            </div>
+            <div className="ed-conn">
+              <span>Connectors</span>
+              <label className="ed-check">
+                <input type="checkbox" checked={s.allConnectors} onChange={(e) => set("allConnectors", e.target.checked)} /> All
               </label>
               {!s.allConnectors &&
                 servers.map((n) => (
-                  <label key={n}>
+                  <label key={n} className="ed-check">
                     <input
                       type="checkbox"
                       checked={(s.connectors ?? []).includes(n)}
-                      onChange={(e) =>
-                        set("connectors", e.target.checked ? [...(s.connectors ?? []), n] : (s.connectors ?? []).filter((x) => x !== n))
-                      }
+                      onChange={(e) => set("connectors", e.target.checked ? [...(s.connectors ?? []), n] : (s.connectors ?? []).filter((x) => x !== n))}
                     />{" "}
                     {n}
                   </label>
                 ))}
-              {!s.allConnectors && servers.length === 0 && <span className="sa-none">no MCP servers configured</span>}
+              {!s.allConnectors && servers.length === 0 && <span className="ed-hint">No MCP servers yet.</span>}
             </div>
-          </Field>
+          </section>
 
-          <div className="sa-section">When it wakes — also whenever it asks to, and on every event</div>
-          <div className="sa-row">
-            <Field label="Schedule (cron)">
-              <input className="input" value={s.cron ?? ""} onChange={(e) => set("cron", e.target.value)} placeholder="0 9 * * 1-5" />
-            </Field>
-            <Field label="Every (minutes)">
-              <input className="input" type="number" min={0} value={s.everyMinutes || ""} onChange={(e) => set("everyMinutes", Number(e.target.value) || 0)} />
-            </Field>
-            <Field label="Look around every (minutes)" hint="read-only">
-              <input className="input" type="number" min={0} value={s.scanEveryMinutes || ""} onChange={(e) => set("scanEveryMinutes", Number(e.target.value) || 0)} />
-            </Field>
-          </div>
+          <section>
+            <h3>Wakes</h3>
+            <div className="ed-wakes">
+              <label>
+                Every
+                <input type="number" min={0} value={s.everyMinutes || ""} onChange={(e) => set("everyMinutes", Number(e.target.value) || 0)} placeholder="—" />
+                min
+              </label>
+              <label>
+                On the schedule
+                <input className="ed-cron" value={s.cron ?? ""} onChange={(e) => set("cron", e.target.value)} placeholder="0 9 * * 1-5" />
+              </label>
+              <label>
+                Looks around every
+                <input type="number" min={0} value={s.scanEveryMinutes || ""} onChange={(e) => set("scanEveryMinutes", Number(e.target.value) || 0)} placeholder="—" />
+                min
+              </label>
+            </div>
+            <p className="ed-hint">Also whenever it asks to, when you tell it something, and when its webhook is called.</p>
+            <div className="ed-wakes">
+              <label>
+                At most
+                <input type="number" min={0} value={s.maxWakesPerDay || ""} onChange={(e) => set("maxWakesPerDay", Number(e.target.value) || 0)} placeholder="24" />
+                wakes a day
+              </label>
+              <label>
+                Spends at most $
+                <input type="number" min={0} step="0.1" value={s.maxCostPerDayUsd || ""} onChange={(e) => set("maxCostPerDayUsd", Number(e.target.value) || 0)} placeholder="—" />
+                a day
+              </label>
+            </div>
+          </section>
 
-          <div className="sa-section">Reports — always here, and</div>
-          <div className="sa-checks">
-            <label>
-              <input type="checkbox" checked={s.report.push} onChange={(e) => set("report", { ...s.report, push: e.target.checked })} /> push (notification webhook)
-            </label>
-            <label>
-              <input type="checkbox" checked={s.report.telegram} onChange={(e) => set("report", { ...s.report, telegram: e.target.checked })} /> Telegram
-            </label>
-          </div>
-          <div className="sa-row">
-            <Field label="Wakes per day at most" hint="0: 24">
-              <input className="input" type="number" min={0} value={s.maxWakesPerDay || ""} onChange={(e) => set("maxWakesPerDay", Number(e.target.value) || 0)} />
-            </Field>
-            <Field label="Spend per day at most (USD)" hint="0: no ceiling">
-              <input className="input" type="number" min={0} step="0.1" value={s.maxCostPerDayUsd || ""} onChange={(e) => set("maxCostPerDayUsd", Number(e.target.value) || 0)} />
-            </Field>
-          </div>
+          <section>
+            <h3>Reports</h3>
+            <p className="ed-hint">Always here and on your phone.</p>
+            <div className="ed-reports">
+              <label className="ed-check">
+                <input type="checkbox" checked={s.report.push} onChange={(e) => set("report", { ...s.report, push: e.target.checked })} /> Push notification
+              </label>
+              <label className="ed-check">
+                <input type="checkbox" checked={s.report.telegram} onChange={(e) => set("report", { ...s.report, telegram: e.target.checked })} /> Telegram
+              </label>
+            </div>
+          </section>
         </div>
 
-        <div className="sa-editor-foot">
-          <button className="btn ghost" onClick={onCancel}>
+        <footer className="ed-foot">
+          <button className="btn ghost" onClick={onClose}>
             Cancel
           </button>
           <button className="btn" onClick={save} disabled={saving || !s.name.trim() || !s.goal.trim()}>
-            {saving ? "Saving…" : s.id ? "Save" : "Create agent"}
+            {saving ? "Saving…" : s.id ? "Save" : "Put on watch"}
           </button>
-        </div>
-      </div>
+        </footer>
+      </aside>
     </div>
-  );
-}
-
-function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
-  return (
-    <label className="sa-field">
-      <span className="sa-field-label">
-        {label}
-        {hint && <span className="sa-hint"> {hint}</span>}
-      </span>
-      {children}
-    </label>
   );
 }

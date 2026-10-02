@@ -107,6 +107,23 @@ type AgentReportEntry struct {
 
 const agentReportsKept = 300
 
+// agentWakesKept bounds the wake log: enough for a day of hourly wakes per
+// agent across a handful of agents, which is what the watch track draws.
+const agentWakesKept = 600
+
+// WakeMark is one wake on an agent's watch track.
+type WakeMark struct {
+	Agent     string     `json:"agent"`
+	Kind      string     `json:"kind"`
+	Reason    string     `json:"reason,omitempty"`
+	Started   time.Time  `json:"started"`
+	Ended     *time.Time `json:"ended,omitempty"`
+	ToolCalls int        `json:"toolCalls"`
+	CostUSD   float64    `json:"costUsd"`
+	Error     string     `json:"error,omitempty"`
+	Notified  int        `json:"notified"`
+}
+
 type standingHost struct {
 	mu      sync.Mutex
 	st      *agent.Standing
@@ -114,11 +131,13 @@ type standingHost struct {
 	cron    *cron.Cron
 	entries map[string]cron.EntryID
 	reports []AgentReportEntry
+	wakes   []WakeMark
 	reason  string // why there is no engine, when there is none
 }
 
 func agentsPath() string  { return filepath.Join(backend.DataDir(), "agents.json") }
 func reportsPath() string { return filepath.Join(backend.DataDir(), "agent-reports.json") }
+func wakesPath() string   { return filepath.Join(backend.DataDir(), "agent-wakes.json") }
 
 func (a *App) standing() *standingHost {
 	a.standingOnce.Do(func() {
@@ -128,6 +147,9 @@ func (a *App) standing() *standingHost {
 		}
 		if raw, err := os.ReadFile(reportsPath()); err == nil {
 			_ = json.Unmarshal(raw, &h.reports)
+		}
+		if raw, err := os.ReadFile(wakesPath()); err == nil {
+			_ = json.Unmarshal(raw, &h.wakes)
 		}
 		a.standingHost = h
 	})
@@ -376,6 +398,13 @@ func (a *App) DeleteStandingAgent(id string) error {
 	}
 	h.mu.Lock()
 	delete(h.specs, id)
+	keep := h.wakes[:0]
+	for _, w := range h.wakes {
+		if w.Agent != id {
+			keep = append(keep, w)
+		}
+	}
+	h.wakes = keep
 	h.scheduleLocked(a, id, "")
 	err := h.saveSpecsLocked()
 	h.mu.Unlock()
@@ -419,6 +448,43 @@ func (a *App) WakeStandingAgent(id, message string) error {
 	return err
 }
 
+func (a *App) recordWake(id string, w *agent.Wake) {
+	m := WakeMark{Agent: id, Kind: string(w.Kind), Reason: w.Reason, Started: w.StartedAt,
+		ToolCalls: w.ToolCalls, CostUSD: w.CostUSD, Error: w.Error, Notified: w.Notified}
+	if !w.EndedAt.IsZero() {
+		t := w.EndedAt
+		m.Ended = &t
+	}
+	h := a.standing()
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.wakes = append(h.wakes, m)
+	if len(h.wakes) > agentWakesKept {
+		h.wakes = h.wakes[len(h.wakes)-agentWakesKept:]
+	}
+	if raw, err := json.Marshal(h.wakes); err == nil {
+		_ = os.WriteFile(wakesPath(), raw, 0o600)
+	}
+}
+
+// StandingWakes is every agent's wakes since a moment, oldest first.
+func (a *App) StandingWakes(sinceHours int) []WakeMark {
+	if sinceHours <= 0 {
+		sinceHours = 24
+	}
+	from := time.Now().Add(-time.Duration(sinceHours) * time.Hour)
+	h := a.standing()
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	out := []WakeMark{}
+	for _, w := range h.wakes {
+		if w.Started.After(from) {
+			out = append(out, w)
+		}
+	}
+	return out
+}
+
 // StandingReports is what the agents have told the person, newest first.
 func (a *App) StandingReports(id string) []AgentReportEntry {
 	h := a.standing()
@@ -437,6 +503,9 @@ func (a *App) StandingReports(id string) []AgentReportEntry {
 func (a *App) onStandingNotice(ctx context.Context, n agent.Notification) {
 	// A wake starting or ending is the agent's state, not something it said.
 	if n.Kind == agent.NotifyWakeStarted || n.Kind == agent.NotifyWakeEnded {
+		if n.Kind == agent.NotifyWakeEnded && n.Wake != nil {
+			a.recordWake(n.ResponsibilityID, n.Wake)
+		}
 		a.emit("agent:update", map[string]any{"id": n.ResponsibilityID})
 		return
 	}
