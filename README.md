@@ -43,6 +43,34 @@ GET http://127.0.0.1:<avatar_port>/avatar          # reference 2D placeholder pa
 
 `AvatarEvent`: `{ type: "state"|"emotion"|"speech", state, emotion, text, tool, ts }`.
 
+## Agent node: let another SuperAI use this machine's Claude Code
+
+Install on the machine that has Claude Code or Codex (logged in):
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/liliang-cn/superai/main/scripts/install-node.sh | sh
+```
+
+It runs SuperAI headless as a login service (launchd on macOS, a systemd user
+unit on Linux) on port 43779 and prints the address and a six-digit code. On the
+SuperAI that should drive it — a desktop, or a hive queen — open
+Settings › Runtime › Other SuperAIs, enter both, and name it, e.g. `mac`. Its
+agents are then `@claude.mac` and `@codex.mac` in chat, and the model can hand
+work to them with `coding_agent_run`.
+
+Every tool call Claude makes there is asked on the driving side's approval
+cards (and on a paired phone) unless the node was installed with `-unattended`.
+Agents work in `~/.superai-node/workspace`; add directories with
+`-roots ~/code,~/work`.
+
+```sh
+superai node pair        # a new code
+superai node status      # agents, linked machines
+superai node uninstall   # -purge also deletes keys and data
+```
+
+(`superai` is `~/.superai-node/bin/superai`; the installer's copy.)
+
 ## Architecture
 
 See `docs/superpowers/specs/2026-06-21-superai-desktop-design.md`.
