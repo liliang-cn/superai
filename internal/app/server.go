@@ -98,15 +98,19 @@ func (h *eventHub) serveSSE(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
 		return
 	}
+	// Subscribed before anything is flushed: whoever opened the stream treats
+	// the first byte as "listening" and sends its command — a queen asking a
+	// worker does exactly that — and an answer quicker than the gap between
+	// the flush and the subscription was lost, leaving the asker waiting for
+	// an end that had already gone by.
+	ch, off := h.subscribe()
+	defer off()
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	// An opening comment makes EventSource fire `open` immediately, so the
 	// frontend knows the stream is live before the first real event.
 	fmt.Fprint(w, ": connected\n\n")
 	fl.Flush()
-
-	ch, off := h.subscribe()
-	defer off()
 	keepalive := time.NewTicker(25 * time.Second)
 	defer keepalive.Stop()
 	for {
