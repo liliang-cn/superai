@@ -18,6 +18,17 @@
 // sitting at the machine.
 
 import { useEffect, useRef, useState } from "react";
+import Sky from "../canvas/Sky";
+import "../canvas/canvas.css";
+
+// The door is the canvas's own sky with one pane of glass on it, so signing in
+// and arriving look like the same place.
+const IDLE = [
+  { key: "a", busy: 0.2, rgb: [242, 165, 22] as [number, number, number] },
+  { key: "b", busy: 0.15, rgb: [255, 120, 90] as [number, number, number] },
+  { key: "c", busy: 0.15, rgb: [70, 180, 170] as [number, number, number] },
+  { key: "d", busy: 0.15, rgb: [140, 110, 230] as [number, number, number] },
+];
 
 export default function Gate({ onEnter }: { onEnter: () => void }) {
   const [password, setPassword] = useState("");
@@ -43,48 +54,42 @@ export default function Gate({ onEnter }: { onEnter: () => void }) {
       if (!r.ok) {
         // The server's own words: "wrong password" and "too many attempts" are
         // different problems and a single generic failure hides which one.
-        setErr(d.error || `登录失败（HTTP ${r.status}）`);
+        setErr(d.error || `Sign-in failed (HTTP ${r.status})`);
         setPassword("");
         field.current?.focus();
         return;
       }
       onEnter();
     } catch {
-      setErr("连不上后端");
+      setErr("Cannot reach the server.");
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <div className="gate">
-      <form className="gate-card" onSubmit={submit}>
-        <div className="gate-logo">S</div>
-        <div className="gate-name">SuperAI</div>
-        <div className="gate-sub">输入密码继续</div>
-        <div className="input-pw gate-field">
+    <div className="cv-root gate2">
+      <Sky at={new Date()} lanes={IDLE} />
+      <form className="cv-glass gate2-card" onSubmit={submit}>
+        <h1>SuperAI</h1>
+        <p>Your hive is behind this door.</p>
+        <div className="gate2-field">
           <input
             ref={field}
-            className="input"
             type={show ? "text" : "password"}
             value={password}
             autoComplete="current-password"
-            placeholder="密码"
+            placeholder="Password"
             onChange={(e) => setPassword(e.target.value)}
           />
-          <button
-            type="button"
-            className="pw-toggle"
-            tabIndex={-1}
-            onClick={() => setShow((s) => !s)}
-          >
-            {show ? "隐藏" : "显示"}
+          <button type="button" tabIndex={-1} onClick={() => setShow((s) => !s)}>
+            {show ? "Hide" : "Show"}
           </button>
         </div>
-        <button className="btn gate-btn" type="submit" disabled={busy || !password}>
-          {busy ? "验证中…" : "进入"}
+        <button className="cv-pill ink gate2-go" type="submit" disabled={busy || !password}>
+          {busy ? "Checking…" : "Enter"}
         </button>
-        {err && <div className="gate-err">{err}</div>}
+        {err && <div className="gate2-err">{err}</div>}
       </form>
     </div>
   );

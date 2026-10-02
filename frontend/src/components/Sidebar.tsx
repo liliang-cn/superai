@@ -3,6 +3,8 @@ import {
   BrainIcon,
   ChartColumnIcon,
   HexagonIcon,
+  LayoutGridIcon,
+  LogOutIcon,
   BotIcon,
   TerminalIcon,
   MessageSquareIcon,
@@ -15,6 +17,8 @@ import {
 } from "lucide-react";
 import { ViewKey } from "../lib/types";
 import { useRoom } from "../lib/useViewport";
+
+const served = Boolean((window as unknown as Record<string, unknown>).superaiServed);
 
 // The nav used to carry one emoji per row (💬📊🧠🧩🔌🗂️⚙️). On the old slate
 // ground they passed for icons; on warm paper they are seven colour stickers
@@ -35,6 +39,7 @@ const NAV: {
   {
     section: "Workspace",
     items: [
+      { key: "home", label: "Home", Icon: LayoutGridIcon },
       { key: "chat", label: "Chat", Icon: MessageSquareIcon, shortcut: "1" },
       { key: "stats", label: "Stats", Icon: ChartColumnIcon, shortcut: "2" },
       { key: "hive", label: "Hive", Icon: HexagonIcon },
@@ -199,6 +204,20 @@ export default function Sidebar({
         ))}
       </nav>
       <div className="sidebar-footer">
+        {/* On a phone the top bar has no room for sign-out; it lives here,
+            next to the way out of the drawer. */}
+        {served && room === "phone" && (
+          <button
+            type="button"
+            className="nav-item drawer-sign-out"
+            onClick={() => {
+              void fetch("/api/logout", { method: "POST" }).finally(() => window.location.reload());
+            }}
+          >
+            <LogOutIcon className="size-4" />
+            <span className="nav-label">Sign out</span>
+          </button>
+        )}
         <button
           type="button"
           className="panel-toggle"

@@ -11,7 +11,8 @@ import { ViewKey } from "./types";
 // window, where there is no server to answer an arbitrary path with the app, and
 // in a browser behind one; a path after the # works identically in both.
 export const PATHS: Record<ViewKey, string> = {
-  chat: "/",
+  home: "/",
+  chat: "/chat",
   stats: "/stats",
   hive: "/hive",
   agents: "/agents",
@@ -23,12 +24,12 @@ export const PATHS: Record<ViewKey, string> = {
   settings: "/settings",
 };
 
-/** Which screen an address belongs to. Anything unknown is Chat. */
+/** Which screen an address belongs to. Anything unknown is home. */
 export function viewOf(pathname: string): ViewKey {
-  if (pathname === "/" || pathname === "") return "chat";
+  if (pathname === "/" || pathname === "") return "home";
   const first = "/" + pathname.split("/")[1];
   const hit = (Object.keys(PATHS) as ViewKey[]).find((k) => PATHS[k] === first);
-  return hit ?? "chat";
+  return hit ?? "home";
 }
 
 /** The address of one hive task. The id is a UUID, so it needs no escaping. */
