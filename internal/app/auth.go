@@ -368,6 +368,9 @@ func gatedPath(p string) bool {
 	// credential. See pairing.go.
 	case p == pairClaimPath:
 		return false
+	// A standing agent's webhook carries its own secret in the path.
+	case strings.HasPrefix(p, agentHookPrefix):
+		return false
 	// The handoff is how a browser holding nothing gets a session; gating it on
 	// already having one would make it useless. It carries its own credential
 	// (see companion.go) and hands out nothing without one.

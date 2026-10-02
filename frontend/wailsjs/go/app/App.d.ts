@@ -55,6 +55,8 @@ export function DeleteDashboard(arg1:string):Promise<Record<string, any>>;
 
 export function DeleteScheduledPrompt(arg1:string):Promise<string>;
 
+export function DeleteStandingAgent(arg1:string):Promise<void>;
+
 export function Deliverables(arg1:string):Promise<Array<agent.Deliverable>>;
 
 export function Doctor():Promise<backend.DoctorReport>;
@@ -127,6 +129,8 @@ export function PairPhone():Promise<app.PairCode>;
 
 export function PairedDevices():Promise<Array<app.PairedDevice>>;
 
+export function PauseStandingAgent(arg1:string):Promise<void>;
+
 export function PendingToolApprovals():Promise<Array<Record<string, any>>>;
 
 export function PetStage(arg1:string,arg2:Array<Record<string, string>>):Promise<void>;
@@ -153,11 +157,15 @@ export function RenameDashboard(arg1:string,arg2:string):Promise<Record<string, 
 
 export function ResolveToolApproval(arg1:string,arg2:boolean):Promise<string>;
 
+export function ResumeStandingAgent(arg1:string):Promise<void>;
+
 export function RunScheduledPromptNow(arg1:string):Promise<string>;
 
 export function SaveDashboard(arg1:string,arg2:string,arg3:string):Promise<Record<string, any>>;
 
 export function SaveSettings(arg1:backend.Settings):Promise<void>;
+
+export function SaveStandingAgent(arg1:app.AgentSpec):Promise<app.AgentView>;
 
 export function ScheduleFromText(arg1:string):Promise<Record<string, any>>;
 
@@ -181,6 +189,10 @@ export function SetWindowTheme(arg1:boolean):Promise<void>;
 
 export function Skills():Promise<Array<backend.SkillInfo>>;
 
+export function StandingAgents():Promise<Array<app.AgentView>>;
+
+export function StandingReports(arg1:string):Promise<Array<app.AgentReportEntry>>;
+
 export function StartCLIRun(arg1:string,arg2:string,arg3:string,arg4:string,arg5:boolean):Promise<app.CLIRun>;
 
 export function StartYoloMode():Promise<Record<string, any>>;
@@ -198,3 +210,5 @@ export function UnlinkSuperAI(arg1:string):Promise<void>;
 export function UnpairDevice(arg1:string):Promise<void>;
 
 export function UnreadNotifications():Promise<number>;
+
+export function WakeStandingAgent(arg1:string,arg2:string):Promise<void>;

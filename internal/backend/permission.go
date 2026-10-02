@@ -68,7 +68,10 @@ type ApprovalRequest struct {
 	Args      map[string]any `json:"args,omitempty"`
 	SessionID string         `json:"sessionId,omitempty"`
 	AgentID   string         `json:"agentId,omitempty"`
-	AskedAt   time.Time      `json:"askedAt"`
+	// By names who is asking, when it is not SuperAI itself: a standing
+	// agent, a Claude Code run on another machine.
+	By      string    `json:"by,omitempty"`
+	AskedAt time.Time `json:"askedAt"`
 	// ExpiresAt lets the UI show a countdown, so the user knows the prompt is
 	// on a clock rather than wondering why the card vanished.
 	ExpiresAt time.Time `json:"expiresAt"`
@@ -113,6 +116,9 @@ type ToolGate struct {
 	// and a two-minute wait for an approval that never comes ends the segment.
 	// Still audited, every call, under its own name.
 	unattended map[string]struct{}
+
+	// rule judges calls of particular sessions first; see permission_rule.go.
+	rule SessionRule
 
 	// Injected so tests can pin ids and timestamps.
 	newID func() string
@@ -244,7 +250,15 @@ func (g *ToolGate) Policy() agent.PermissionPolicy {
 	g.mu.RLock()
 	d := g.decider
 	g.mu.RUnlock()
-	return policyWith(d)
+	base := policyWith(d)
+	return func(req agent.PermissionRequest) bool {
+		// A call a session rule has an opinion on reaches the handler, read
+		// only or not: an agent may be forbidden a tool that changes nothing.
+		if v, _ := g.sessionVerdict(req); v != VerdictNone {
+			return true
+		}
+		return base(req)
+	}
 }
 
 // SetDecider installs (or with nil, removes) the argument-judging pass.
@@ -308,7 +322,23 @@ func (g *ToolGate) decide(ctx context.Context, req agent.PermissionRequest) (*ag
 	}
 	ask.ExpiresAt = ask.AskedAt.Add(wait)
 
-	if !enabled {
+	// The session's own rule first. A refusal holds even with the gate
+	// switched off or YOLO on: those relax asking, and "never" is not an ask.
+	verdict, why := g.sessionVerdict(req)
+	switch verdict {
+	case VerdictDeny:
+		return g.answer(ask, ApprovalDecision{By: DecidedByRule, Reason: why})
+	case VerdictAllow:
+		return g.answer(ask, ApprovalDecision{Allowed: true, By: DecidedByRule, Reason: why})
+	}
+	if verdict == VerdictAsk {
+		if wait < RuleAskWait {
+			wait = RuleAskWait
+		}
+		ask.ExpiresAt = ask.AskedAt.Add(wait)
+	}
+
+	if !enabled && verdict != VerdictAsk {
 		// Still audited. Turning the gate off is a decision about prompts, not
 		// a decision to stop keeping records — and the log is the only way to
 		// answer "what did it run while I had this switched off?".
@@ -322,7 +352,7 @@ func (g *ToolGate) decide(ctx context.Context, req agent.PermissionRequest) (*ag
 	// Checked after the gate-off case and before the approver: with the gate
 	// off there is nothing to relax, and with YOLO on it does not matter
 	// whether a surface exists to ask — that is the point of it.
-	if dec := g.yoloDecision(); dec != nil {
+	if dec := g.yoloDecision(); dec != nil && verdict != VerdictAsk {
 		return g.answer(ask, *dec)
 	}
 
@@ -330,7 +360,7 @@ func (g *ToolGate) decide(ctx context.Context, req agent.PermissionRequest) (*ag
 	// writing task ran `wc -w` to check its own gate, waited two minutes for
 	// an approval on a page nobody had open, was denied, and the segment died
 	// with the brief already written.
-	if g.isUnattended(req.SessionID) {
+	if verdict != VerdictAsk && g.isUnattended(req.SessionID) {
 		return g.answer(ask, ApprovalDecision{
 			Allowed: true,
 			By:      DecidedByUnattended,

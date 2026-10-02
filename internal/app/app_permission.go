@@ -32,6 +32,9 @@ type pendingApproval struct {
 // askToolApproval is the backend.Approver installed on every service this app
 // builds. It blocks until the user answers or the gate stops waiting.
 func (a *App) askToolApproval(ctx context.Context, req backend.ApprovalRequest) (backend.ApprovalDecision, error) {
+	if req.By == "" {
+		req.By = a.standingNameForSession(req.SessionID)
+	}
 	p := &pendingApproval{req: req, answer: make(chan backend.ApprovalDecision, 1)}
 
 	a.approvalMu.Lock()
@@ -51,9 +54,12 @@ func (a *App) askToolApproval(ctx context.Context, req backend.ApprovalRequest) 
 		// Allow on it does nothing, which is the worst possible thing for a
 		// button whose whole job is to be trusted.
 		a.emit("tool:approval:closed", map[string]any{"id": req.ID})
+		a.emit("agent:update", map[string]any{"session": req.SessionID})
 	}()
 
 	a.emit("tool:approval", approvalPayload(req))
+	// A standing agent's card shows it is waiting on you.
+	a.emit("agent:update", map[string]any{"session": req.SessionID})
 
 	select {
 	case dec := <-p.answer:
@@ -72,6 +78,9 @@ func (a *App) askToolApproval(ctx context.Context, req backend.ApprovalRequest) 
 // read in full is one they cannot vouch for.
 func approvalPayload(req backend.ApprovalRequest) map[string]any {
 	return map[string]any{
+		// Who is asking, in words: a standing agent by its name; empty is
+		// SuperAI itself.
+		"by":        req.By,
 		"id":        req.ID,
 		"tool":      req.Tool,
 		"command":   req.Command,

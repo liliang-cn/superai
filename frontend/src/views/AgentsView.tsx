@@ -120,7 +120,7 @@ export default function AgentsView() {
     <div className="view agents-view">
       <div className="view-header with-action">
         <div>
-          <div className="view-title">Agents</div>
+          <div className="view-title">Coding</div>
           <div className="view-desc">
             {agents.length > 0
               ? `Claude Code, Codex and the other agent CLIs on this machine. Type @${agents[0].name} in a conversation, or start one here.`

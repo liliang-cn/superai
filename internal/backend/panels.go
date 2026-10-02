@@ -181,3 +181,15 @@ func (s *Service) ImportFile(ctx context.Context, path, hint string) (string, er
 func (s *Service) ImportCSV(ctx context.Context, path, hint string) (string, error) {
 	return s.ImportFile(ctx, path, hint)
 }
+
+// MCPServerNames are the configured MCP servers, by name.
+func (s *Service) MCPServerNames() []string {
+	var out []string
+	for _, st := range s.MCPServers() {
+		out = append(out, st.Name)
+	}
+	return out
+}
+
+// Gate is the tool gate every turn's calls go through.
+func (s *Service) Gate() *ToolGate { return s.ToolGate() }

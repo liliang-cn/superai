@@ -126,7 +126,10 @@ type App struct {
 	cliApprove     *cliApprover
 	cliApproveOnce sync.Once
 	remoteCLI      remoteCLICache
-	approvals      map[string]*pendingApproval
+	// Standing agents (app_standing.go).
+	standingHost *standingHost
+	standingOnce sync.Once
+	approvals    map[string]*pendingApproval
 
 	// emitFn is an extra sink for frontend events. Tests set it, and serve mode
 	// points it at the SSE hub, where it is the only sink there is: the Wails

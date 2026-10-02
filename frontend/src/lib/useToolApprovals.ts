@@ -11,6 +11,8 @@ export interface ToolApproval {
   /** Everything else the tool was called with, for tools that are not shells. */
   args: Record<string, unknown>;
   session: string;
+  /** Who is asking, when not SuperAI itself: a standing agent's name. */
+  by: string;
   /** RFC3339. When the gate stops waiting and denies on its own. */
   expiresAt: string;
 }
@@ -24,6 +26,7 @@ function toApproval(payload: any): ToolApproval | null {
     command: String(payload?.command ?? ""),
     args: (payload?.args as Record<string, unknown>) ?? {},
     session: String(payload?.session ?? ""),
+    by: String(payload?.by ?? ""),
     expiresAt: String(payload?.expiresAt ?? ""),
   };
 }

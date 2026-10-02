@@ -4,6 +4,7 @@ import {
   ChartColumnIcon,
   HexagonIcon,
   BotIcon,
+  TerminalIcon,
   MessageSquareIcon,
   NotebookTabsIcon,
   PanelLeftCloseIcon,
@@ -38,6 +39,7 @@ const NAV: {
       { key: "stats", label: "Stats", Icon: ChartColumnIcon, shortcut: "2" },
       { key: "hive", label: "Hive", Icon: HexagonIcon },
       { key: "agents", label: "Agents", Icon: BotIcon },
+      { key: "coding", label: "Coding", Icon: TerminalIcon },
     ],
   },
   {
@@ -148,7 +150,6 @@ export default function Sidebar({
         {labels && (
           <div className="brand-text">
             <div className="brand-name">SuperAI</div>
-            <div className="brand-sub">Desktop</div>
           </div>
         )}
       </div>

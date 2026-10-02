@@ -376,6 +376,19 @@ func (b *TelegramBridge) keepTyping(ctx context.Context, chat int64) func() {
 }
 
 // send delivers text, splitting it when Telegram would refuse the length.
+// Broadcast sends a message, unprompted, to every chat allowed to talk to the
+// bot: a standing agent reporting in.
+func (b *TelegramBridge) Broadcast(ctx context.Context, text string) {
+	if b == nil {
+		return
+	}
+	for chat, ok := range b.allowed {
+		if ok {
+			b.send(ctx, chat, text)
+		}
+	}
+}
+
 func (b *TelegramBridge) send(ctx context.Context, chat int64, text string) {
 	for _, part := range splitForTelegram(text, telegramMessageLimit) {
 		q := url.Values{}

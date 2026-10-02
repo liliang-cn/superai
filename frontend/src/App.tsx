@@ -9,6 +9,7 @@ import ChatView from "./views/ChatView";
 import StatsView from "./views/StatsView";
 import HiveView from "./views/HiveView";
 import AgentsView from "./views/AgentsView";
+import StandingView from "./views/StandingView";
 import SettingsView from "./views/SettingsView";
 import KnowledgeView from "./views/KnowledgeView";
 import SkillsView from "./views/SkillsView";
@@ -198,7 +199,8 @@ export default function App() {
               {/* Everything under /hive is the Hive screen's own to route:
                   the overview, and one page per task. */}
               <Route path="/hive/*" element={<HiveView />} />
-              <Route path="/agents" element={<AgentsView />} />
+              <Route path="/agents" element={<StandingView />} />
+              <Route path="/coding" element={<AgentsView />} />
               <Route path="/settings" element={<SettingsView onSaved={refreshStatus} status={status} />} />
               <Route path="/knowledge" element={<KnowledgeView />} />
               <Route path="/skills" element={<SkillsView />} />
