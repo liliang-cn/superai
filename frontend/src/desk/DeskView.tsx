@@ -1,8 +1,8 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  ArrowUpIcon, BookOpenIcon, BotIcon, ChartColumnIcon, HexagonIcon, MessageSquareIcon, MoonIcon, NotebookTabsIcon,
-  PlusIcon, SlidersHorizontalIcon, SquareIcon, SquarePenIcon, SunIcon, TerminalIcon, TriangleAlertIcon, XIcon, ChevronRightIcon,
+  ArrowUpIcon, HexagonIcon, 
+  PlusIcon, SquareIcon, SquarePenIcon, TerminalIcon, TriangleAlertIcon, XIcon, ChevronRightIcon,
   LayoutDashboardIcon,
 } from "lucide-react";
 import { useChat } from "../lib/useChat";
@@ -10,26 +10,21 @@ import type { ToolApproval } from "../lib/useToolApprovals";
 import { PATHS } from "../lib/routes";
 import { withoutCallNotes } from "../lib/format";
 import { Response } from "@/components/ai-elements/response";
-import Sky, { Lane } from "../canvas/Sky";
-import { CanvasTheme, loadTheme, saveTheme, themeVars } from "../canvas/theme";
-import { Bee, QUEEN_SESSION, elapsed, short, useBees, useCodingRuns, useHive, useUpcoming } from "../canvas/data";
+import { Bee, QUEEN_SESSION, elapsed, useBees, useCodingRuns, useHive, useUpcoming } from "../canvas/data";
 import type { CodingRun, UpcomingItem } from "../canvas/tiles";
 import { dashboards, Dashboard } from "../lib/dashboards";
 import {
-  CancelAllChats, CancelCLIRun, ChatSessions, HiveLinkStatus, SetWindowTheme, TakeOver, UnlinkHive,
+  CancelAllChats, CancelCLIRun, ChatSessions, HiveLinkStatus, TakeOver, UnlinkHive,
 } from "../../wailsjs/go/app/App";
 import { EventsOn } from "../../wailsjs/runtime";
 import { setAlone } from "../lib/hivelink";
 import LiveHive from "./LiveHive";
 import LiveRun, { useRun } from "./LiveRun";
-import "../canvas/canvas.css";
-import "./desk.css";
+import { useDeskTheme } from "./DeskShell";
 
 type TabKey = string; // "hive" | "run:<id>" | "dash:<id>"
 
 const served = Boolean((window as unknown as Record<string, unknown>).superaiServed);
-const drag = { "--wails-draggable": "drag" } as React.CSSProperties;
-const noDrag = { "--wails-draggable": "no-drag" } as React.CSSProperties;
 
 function useNow(ms = 1000) {
   const [now, setNow] = useState(() => new Date());
@@ -90,15 +85,6 @@ function useLink() {
   return link;
 }
 
-const RAIL = [
-  { key: "home", label: "The queen", Icon: MessageSquareIcon, cls: "dk-a-chat" },
-  { key: "hive", label: "Hive", Icon: HexagonIcon, cls: "dk-a-hive" },
-  { key: "agents", label: "Bees", Icon: BotIcon, cls: "dk-a-bees" },
-  { key: "coding", label: "Coding", Icon: TerminalIcon, cls: "dk-a-code" },
-  { key: "knowledge", label: "Knowledge", Icon: BookOpenIcon, cls: "dk-a-know" },
-  { key: "stats", label: "Stats", Icon: ChartColumnIcon, cls: "dk-a-stats" },
-  { key: "records", label: "Records", Icon: NotebookTabsIcon, cls: "dk-a-rec" },
-] as const;
 
 const PIN_COLORS = ["dk-a-later", "dk-a-hive", "dk-a-code", "dk-a-bees", "dk-a-know", "dk-a-stats", "dk-a-rec"];
 
@@ -108,7 +94,12 @@ const PIN_COLORS = ["dk-a-later", "dk-a-hive", "dk-a-code", "dk-a-bees", "dk-a-k
  * the comb, or a coding agent's session as it types — with a way to take
  * over; along the bottom, what you pinned.
  */
-export default function DeskView({ approvals }: { approvals: { pending: ToolApproval[]; resolve: (id: string, allow: boolean) => void } }) {
+export default function DeskView({ approvals, openSession, onSessionOpened }: {
+  approvals: { pending: ToolApproval[]; resolve: (id: string, allow: boolean) => void };
+  /** A conversation to open on arrival — a notification's, a scheduled run's. */
+  openSession?: string;
+  onSessionOpened?: () => void;
+}) {
   const navigate = useNavigate();
   const now = useNow();
   const hive = useHive();
@@ -118,7 +109,7 @@ export default function DeskView({ approvals }: { approvals: { pending: ToolAppr
   const chat = useChat();
   const recents = useRecents(chat.sending);
   const link = useLink();
-  const [theme, setThemeState] = useState<CanvasTheme>(loadTheme);
+  const { theme } = useDeskTheme();
   const [pins, setPins] = useState<Dashboard[]>([]);
   const [draft, setDraft] = useState("");
   const [onQueen, setOnQueen] = useState(true);
@@ -130,16 +121,18 @@ export default function DeskView({ approvals }: { approvals: { pending: ToolAppr
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    chat.loadSession(QUEEN_SESSION).catch(() => {});
+    if (!openSession) chat.loadSession(QUEEN_SESSION).catch(() => {});
     dashboards.list().then((l) => setPins(l ?? [])).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    if (!served) void SetWindowTheme(theme.mode === "dark").catch(() => {});
-  }, [theme.mode]);
-
-  const setTheme = (t: CanvasTheme) => { setThemeState(t); saveTheme(t); };
+    if (!openSession) return;
+    setOnQueen(openSession === QUEEN_SESSION);
+    chat.loadSession(openSession).catch(() => {});
+    onSessionOpened?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openSession]);
 
   const msgs = chat.messages.filter((m) => m.kind !== "context");
   const lastText = msgs.length ? msgs[msgs.length - 1].content : "";
@@ -189,11 +182,6 @@ export default function DeskView({ approvals }: { approvals: { pending: ToolAppr
     chat.loadSession(id).catch(() => {});
   };
 
-  const lanes = useMemo<Lane[]>(() => {
-    const palette: [number, number, number][] = [[242, 165, 22], [255, 120, 90], [70, 180, 170], [60, 170, 100], [80, 150, 240]];
-    return Array.from({ length: 5 }, (_, i) => ({ key: "d" + i, busy: 0.12, rgb: palette[i] }));
-  }, []);
-
   const busyWorkers = new Set(hive.tasks.filter((t) => t.state === "running").map((t) => t.worker)).size;
   const live = hive.members.filter((m) => m.state === "live" && !/queen/.test(m.name)).length;
   const workers = hive.members.filter((m) => !/queen/.test(m.name)).length;
@@ -201,39 +189,7 @@ export default function DeskView({ approvals }: { approvals: { pending: ToolAppr
   const title = onQueen ? "The queen" : recents.find((s) => s.id === chat.sessionId)?.title || "Conversation";
 
   return (
-    <div className={`cv-root dk ${theme.mode === "dark" ? "dk-dark" : ""}`} style={themeVars(theme)}>
-      <Sky at={now} lanes={lanes} base={theme.base} mode={theme.mode} />
-
-      <div className="dk-bar" style={drag}>
-        <div className="dk-bar-tabs" style={noDrag}>
-          {tabs.map((k) => {
-            const r = runOf(k);
-            const on = k === current;
-            const liveDot = k === "hive" ? busyWorkers > 0 : r?.state === "running";
-            return (
-              <button key={k} className={on ? "dk-tab on" : "dk-tab"} onClick={() => setActive(k)}>
-                {liveDot ? <i className="dk-livedot" /> : k.startsWith("run:") ? <TerminalIcon size={14} /> : k.startsWith("dash:") ? <LayoutDashboardIcon size={14} /> : <HexagonIcon size={14} />}
-                <span>{tabLabel(k)}</span>
-                {k !== "hive" && <XIcon size={13} className="dk-tab-x" onClick={(e) => { e.stopPropagation(); close(k); }} />}
-              </button>
-            );
-          })}
-          <button className="dk-icon" title="Open a coding run" onClick={() => navigate(PATHS.coding)}><PlusIcon size={17} /></button>
-        </div>
-      </div>
-
-      <nav className="dk-rail" style={drag}>
-        {RAIL.map(({ key, label, Icon, cls }) => (
-          <button key={key} title={label} style={noDrag} className={`dk-app ${cls} ${key === "home" ? "on" : ""}`}
-            onClick={() => (key === "home" ? pickSession(QUEEN_SESSION) : navigate(PATHS[key]))}>
-            <Icon size={21} strokeWidth={2} />
-            {key === "coding" && liveRuns.length > 0 && <span className="dk-badge">{liveRuns.length}</span>}
-          </button>
-        ))}
-        <span className="dk-sp" />
-        <button title="Settings" style={noDrag} className="dk-app dk-a-set" onClick={() => navigate(PATHS.settings)}><SlidersHorizontalIcon size={20} /></button>
-      </nav>
-
+    <div className="dk">
       <aside className="cv-glass dk-side">
         <div className="dk-ws"><b>SuperAI</b></div>
         {needs > 0 && (
@@ -263,9 +219,6 @@ export default function DeskView({ approvals }: { approvals: { pending: ToolAppr
               {link.linked ? (link.url || "").replace(/^https?:\/\//, "") : "This Mac only"}
               <small><i className={link.live ? "dk-ok" : "dk-off"} />{link.linked ? (link.live ? "Linked" : "Reconnecting") : "Not in a hive"}</small>
             </span>
-          </button>
-          <button className="dk-icon" title={theme.mode === "dark" ? "Light" : "Dark"} onClick={() => setTheme({ ...theme, mode: theme.mode === "dark" ? "light" : "dark" })}>
-            {theme.mode === "dark" ? <SunIcon size={17} /> : <MoonIcon size={17} />}
           </button>
           {menu && !served && (
             <div className="cv-glass dk-menu">
@@ -337,6 +290,21 @@ export default function DeskView({ approvals }: { approvals: { pending: ToolAppr
       </section>
 
       <section className="dk-live">
+        <div className="dk-tabs">
+          {tabs.map((k) => {
+            const r = runOf(k);
+            const on = k === current;
+            const liveDot = k === "hive" ? busyWorkers > 0 : r?.state === "running";
+            return (
+              <button key={k} className={on ? "dk-tab on" : "dk-tab"} onClick={() => setActive(k)}>
+                {liveDot ? <i className="dk-livedot" /> : k.startsWith("run:") ? <TerminalIcon size={14} /> : k.startsWith("dash:") ? <LayoutDashboardIcon size={14} /> : <HexagonIcon size={14} />}
+                <span>{tabLabel(k)}</span>
+                {k !== "hive" && <XIcon size={13} className="dk-tab-x" onClick={(e) => { e.stopPropagation(); close(k); }} />}
+              </button>
+            );
+          })}
+          <button className="dk-icon" title="Open a coding run" onClick={() => navigate(PATHS.coding)}><PlusIcon size={17} /></button>
+        </div>
         <div className="dk-screen">
           <div className="dk-in">
             {current === "hive" && <LiveHive hive={hive} runs={runs} theme={theme} now={now} />}

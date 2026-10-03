@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import { useMemo } from "react";
 import Sky, { Lane } from "../canvas/Sky";
 import type { CanvasTheme } from "../canvas/theme";
 import type { CodingRun } from "../canvas/tiles";

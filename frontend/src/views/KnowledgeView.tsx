@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { graphSrc } from "../lib/hivelink";
 import { ClipboardSetText } from "../../wailsjs/runtime";
 import { GraphView as startGraphView, MemoryRecall } from "../../wailsjs/go/app/App";
 import { openExternal } from "../lib/openExternal";
@@ -114,7 +115,7 @@ function normalize(raw: Record<string, any> | null): GraphStatus {
 const SERVED = Boolean((window as unknown as Record<string, unknown>).superaiServed);
 // Same origin as this page, so the session cookie rides along and the proxy's
 // authentication applies to the frame exactly as it does to everything else.
-const GRAPH_SRC = SERVED ? "/graph/" : null;
+
 
 export default function KnowledgeView() {
   const ime = useImeGuard();
@@ -398,11 +399,13 @@ export default function KnowledgeView() {
           come back on a desktop.
         </div>
         <iframe
-          key={`${GRAPH_SRC ?? status?.url}#${nonce}#${day}`}
+          key={`${graphSrc() ?? status?.url}#${nonce}#${day}`}
           ref={frameRef}
           className="graph-frame"
-          src={withBg(GRAPH_SRC ?? status?.url, day)}
-          onLoad={(e) => dress(e.currentTarget, day)}
+          // Always on its own dark ground: CortexDB's live view draws with
+          // additive glow, which leaves nothing visible on a light one.
+          src={withBg(graphSrc() ?? status?.url, false)}
+          onLoad={(e) => dress(e.currentTarget, false)}
           title="CortexDB knowledge graph"
         />
         <div className="graph-foot">

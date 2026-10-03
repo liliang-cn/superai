@@ -16,7 +16,7 @@ export function palette() {
     amber: v("--amber", "#e0a64f"),
     // Messages between members: not a theme token, because nothing else on the
     // page means "a note passed along". Violet reads on both grounds.
-    mail: light ? "#7c4ddb" : "#b18cff",
+    mail: light ? "#0f8a8a" : "#3fd0c9",
     dim: v("--text-2", "#8f887c"),
     text: v("--text-0", "#ece7dd"),
     border: v("--border", "#2e2925"),

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { graphSrc } from "../lib/hivelink";
 import { EventsOn } from "../../wailsjs/runtime";
 import {
   Dashboard, GetStatus, GraphView as startGraphView, LongRunList, LongRunStart, LongRunState, LongRunStop,
@@ -60,7 +61,7 @@ interface DashData {
 }
 
 const SERVED = Boolean((window as unknown as Record<string, unknown>).superaiServed);
-const GRAPH_SRC = SERVED ? "/graph/" : null;
+
 
 const fmtK = (n: number) => (n >= 1e6 ? (n / 1e6).toFixed(2) + "M" : n >= 1e3 ? (n / 1e3).toFixed(1) + "k" : String(Math.round(n)));
 const pct = (a: number, b: number) => (b > 0 ? Math.round((100 * a) / b) : 0);
@@ -197,8 +198,8 @@ export default function StatsView() {
     // Ink by day, light by night: the same figures in the room's own colours.
     const day = document.documentElement.dataset.theme !== "dark";
     const [CY, AM, WH, PK, TL, VI, LI, RO] = day
-      ? ["#1f5bff", "#b06a00", "#33434d", "#b8338f", "#0e7c92", "#6d3fd0", "#12805c", "#d0313f"]
-      : ["#5ee0ff", "#ffb547", "#ffffff", "#ff73d9", "#4dffdb", "#b87aff", "#9dff6a", "#ff5c7a"];
+      ? ["#c98208", "#b06a00", "#33434d", "#cf3655", "#0e7c92", "#0f8a8a", "#12805c", "#d0313f"]
+      : ["#f2a516", "#ffb547", "#ffffff", "#ff7a93", "#4dffdb", "#3fd0c9", "#9dff6a", "#ff5c7a"];
     const list: Pillar[] = [
       { key: "today", label: "tokens today", value: dash?.usage?.today ?? 0, color: CY },
       { key: "all", label: "tokens all time", value: dash?.usage?.totalTokens ?? 0, color: CY },
@@ -250,7 +251,7 @@ export default function StatsView() {
           {/* The live view's own switches, set from the URL: no control panels
               (inside a disc this size they would cover the graph), orbiting from
               the start, and the reactor's own black behind it. */}
-          <Reactor snap={pulse} pillars={pillars} brain={(GRAPH_SRC ?? graph?.url) ? `${GRAPH_SRC ?? graph?.url}?panels=0&spin=4&bg=${day ? "f8fafb" : "05070f"}` : null} />
+          <Reactor snap={pulse} pillars={pillars} brain={(graphSrc() ?? graph?.url) ? `${graphSrc() ?? graph?.url}?panels=0&spin=4&bg=05070f` : null} />
         </div>
         <div className="cr-side" data-pet-spot="charts" data-pet-label="the column of charts beside the reactor">
           <div className="cr-panel tight">

@@ -17,6 +17,7 @@ import MCPView from "./views/MCPView";
 import RecordsView from "./views/RecordsView";
 import CanvasView from "./canvas/CanvasView";
 import DeskView from "./desk/DeskView";
+import DeskShell from "./desk/DeskShell";
 import { clientKind } from "./lib/hivelink";
 import { ScheduleRunToasts } from "./components/ScheduleRuns";
 import { Toaster } from "./components/Toaster";
@@ -119,6 +120,8 @@ export default function App() {
   const approvals = useToolApprovals();
 
   useEffect(() => {
+    // On the desktop the shell owns light and dark (the canvas theme).
+    if (clientKind() === "desktop") return;
     document.documentElement.dataset.theme = theme;
     localStorage.setItem("superai-theme", theme);
     // The window chrome is drawn by the OS, not by this stylesheet. Without
@@ -161,10 +164,63 @@ export default function App() {
   // Home is the canvas: the whole window, no sidebar and no status bar; the
   // other screens are a menu away. What needs you is on the canvas itself, so
   // the approval cards stay away from it.
+  const routes = (
+    <Routes>
+      <Route
+        path="/chat"
+        element={
+          <ChatView
+            status={status}
+            openSession={pendingSession}
+            onSessionOpened={() => setPendingSession("")}
+          />
+        }
+      />
+      <Route path="/stats" element={<StatsView />} />
+      {/* Everything under /hive is the Hive screen's own to route:
+          the overview, and one page per task. */}
+      <Route path="/hive/*" element={<HiveView />} />
+      <Route path="/agents" element={<StandingView />} />
+      <Route path="/coding" element={<AgentsView />} />
+      <Route path="/settings" element={<SettingsView onSaved={refreshStatus} status={status} />} />
+      <Route path="/knowledge" element={<KnowledgeView />} />
+      <Route path="/skills" element={<SkillsView />} />
+      <Route path="/mcp" element={<MCPView />} />
+      <Route
+        path="/records"
+        element={<RecordsView status={status} log={runs} onOpenConversation={openConversation} />}
+      />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+
+  // The desktop window: every page inside the same shell — the rail, the sky,
+  // the glass. Its home is the conversation with the queen beside the live
+  // hive, so a conversation opened from anywhere opens there.
+  if (clientKind() === "desktop") {
+    return (
+      <>
+        <DeskShell view={view} badges={{ records: runs.unseen }}>
+          {view === "home" || view === "chat" ? (
+            <DeskView approvals={approvals} openSession={pendingSession} onSessionOpened={() => setPendingSession("")} />
+          ) : routes}
+        </DeskShell>
+        {view !== "records" && <ScheduleRunToasts log={runs} onOpenConversation={openConversation} />}
+        <Toaster onOpenConversation={openConversation} />
+        <ToolApprovals
+          pending={view === "home" || view === "chat" ? [] : approvals.pending}
+          note={approvals.note}
+          onResolve={approvals.resolve}
+          onDismissNote={approvals.dismissNote}
+        />
+      </>
+    );
+  }
+
   if (view === "home") {
     return (
       <>
-        {clientKind() === "desktop" ? <DeskView approvals={approvals} /> : <CanvasView approvals={approvals} />}
+        <CanvasView approvals={approvals} />
         <ScheduleRunToasts log={runs} onOpenConversation={openConversation} />
         <Toaster onOpenConversation={openConversation} />
       </>
@@ -200,33 +256,7 @@ export default function App() {
             onOpenConversation={openConversation}
           />
           <div className="content">
-            <Routes>
-              <Route
-                path="/chat"
-                element={
-                  <ChatView
-                    status={status}
-                    openSession={pendingSession}
-                    onSessionOpened={() => setPendingSession("")}
-                  />
-                }
-              />
-              <Route path="/stats" element={<StatsView />} />
-              {/* Everything under /hive is the Hive screen's own to route:
-                  the overview, and one page per task. */}
-              <Route path="/hive/*" element={<HiveView />} />
-              <Route path="/agents" element={<StandingView />} />
-              <Route path="/coding" element={<AgentsView />} />
-              <Route path="/settings" element={<SettingsView onSaved={refreshStatus} status={status} />} />
-              <Route path="/knowledge" element={<KnowledgeView />} />
-              <Route path="/skills" element={<SkillsView />} />
-              <Route path="/mcp" element={<MCPView />} />
-              <Route
-                path="/records"
-                element={<RecordsView status={status} log={runs} onOpenConversation={openConversation} />}
-              />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
+            {routes}
           </div>
         </div>
       </div>

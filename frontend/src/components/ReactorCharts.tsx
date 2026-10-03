@@ -24,10 +24,10 @@ const MONO = "'Geist Mono Variable', ui-monospace, Menlo, monospace";
 function retheme() {
   DAY = document.documentElement.dataset.theme !== "dark";
   if (DAY) {
-    [CYAN, AMBER, LIME, ROSE, VIOLET, PINK, TEAL] = ["#1f5bff", "#b06a00", "#12805c", "#d0313f", "#6d3fd0", "#b8338f", "#0e7c92"];
+    [CYAN, AMBER, LIME, ROSE, VIOLET, PINK, TEAL] = ["#c98208", "#b06a00", "#12805c", "#d0313f", "#0f8a8a", "#cf3655", "#0e7c92"];
     [DIM, LINE, INK, PANEL, TIP] = ["#5b6973", "#e1e6ea", "#0e1a22", "#ffffff", "#ffffff"];
   } else {
-    [CYAN, AMBER, LIME, ROSE, VIOLET, PINK, TEAL] = ["#5ee0ff", "#ffb547", "#9dff6a", "#ff5c7a", "#b87aff", "#ff73d9", "#4dffdb"];
+    [CYAN, AMBER, LIME, ROSE, VIOLET, PINK, TEAL] = ["#f2a516", "#ffb547", "#9dff6a", "#ff5c7a", "#3fd0c9", "#ff7a93", "#4dffdb"];
     [DIM, LINE, INK, PANEL, TIP] = ["#6b7690", "#1a2340", "#e6ebf7", "#05070f", "#0c1120"];
   }
   base.textStyle = { fontFamily: MONO, color: DIM };

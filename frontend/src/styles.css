@@ -1454,8 +1454,8 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
      the one thing in here that looked printed by a different machine. */
   --cr-bg: #f4f6f8; --cr-panel: #ffffff; --cr-panel-2: #f8fafb; --cr-line: #e1e6ea; --cr-line-2: #c7d0d7;
   --cr-text: #0e1a22; --cr-dim: #5b6973; --cr-mute: #87939c;
-  --cr-cyan: #1f5bff; --cr-amber: #b06a00; --cr-rose: #d0313f; --cr-lime: #12805c;
-  --cr-cyan-rgb: 31,91,255; --cr-amber-rgb: 176,106,0; --cr-rose-rgb: 208,49,63; --cr-lime-rgb: 18,128,92;
+  --cr-cyan: #c98208; --cr-amber: #b06a00; --cr-rose: #d0313f; --cr-lime: #12805c;
+  --cr-cyan-rgb: 201,130,8; --cr-amber-rgb: 176,106,0; --cr-rose-rgb: 208,49,63; --cr-lime-rgb: 18,128,92;
   --cr-on-accent: #ffffff; --cr-glow: .25;
   --cr-mono: var(--font-mono);
   color: var(--cr-text);
@@ -1472,7 +1472,7 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
      stage, which is the one place in this app where that is the point. */
   --cr-bg: #0a1015; --cr-panel: #0f171d; --cr-panel-2: #141e25; --cr-line: #1f2c35; --cr-line-2: #2e3f4a;
   --cr-text: #e6ebf7; --cr-dim: #6b7690; --cr-mute: #3c4762;
-  --cr-cyan: #5ee0ff; --cr-amber: #ffb547; --cr-rose: #ff5c7a; --cr-lime: #9dff6a;
+  --cr-cyan: #f2a516; --cr-amber: #ffb547; --cr-rose: #ff5c7a; --cr-lime: #9dff6a;
   --cr-cyan-rgb: 94,224,255; --cr-amber-rgb: 255,181,71; --cr-rose-rgb: 255,92,122; --cr-lime-rgb: 157,255,106;
   --cr-on-accent: #04121a; --cr-glow: .45;
 }
@@ -2621,7 +2621,7 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
    bloom cannot be. */
 .rx-brain {
   position: absolute; border: 0; border-radius: 50%; overflow: hidden;
-  background: var(--cr-panel-2); box-shadow: 0 0 0 1px var(--cr-line), 0 0 40px rgba(31,91,255,.06);
+  background: var(--cr-panel-2); box-shadow: 0 0 0 1px var(--cr-line), 0 0 40px rgba(201,130,8,.06);
 }
 [data-theme="dark"] .rx-brain { background: #05070f; box-shadow: 0 0 60px rgba(94,224,255,.18), inset 0 0 80px rgba(5,7,15,.9); }
 
@@ -2679,7 +2679,7 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
 .rx-counters b { font-size: 14px; letter-spacing: 0; font-variant-numeric: tabular-nums; color: var(--cr-text); }
 .rx-counters .c-cyan b { color: var(--cr-cyan); } .rx-counters .c-amber b { color: var(--cr-amber); }
 .rx-counters .c-pink b { color: #ff73d9; } .rx-counters .c-teal b { color: #2fd9b8; } .rx-counters .c-rose b { color: var(--cr-rose); }
-.rx-counters .c-violet b { color: #a476ff; } .rx-counters .c-dim b { color: var(--cr-dim); }
+.rx-counters .c-violet b { color: #3fd0c9; } .rx-counters .c-dim b { color: var(--cr-dim); }
 
 /* Figures under the wheel. One table style for tools and turns. */
 .cr-table-wrap { flex: 1; overflow: auto; max-height: 260px; }
@@ -3622,11 +3622,11 @@ body.desktop-shell .sidebar.collapsed .nav-key { display: none; }
 .hive-stage canvas { display: block; }
 .hive-missions { display: flex; flex-direction: column; }
 .hive-mission { border-top: 1px solid var(--border); padding: 10px 4px; }
-/* Messages between members. The violet matches the beam on the stage. */
+/* Messages between members. The teal matches the beam on the stage. */
 .hive-mail { display: flex; flex-direction: column; }
 .hive-mail-row { display: grid; grid-template-columns: minmax(120px, 180px) 1fr auto; gap: 10px; align-items: baseline;
-  border-top: 1px solid var(--border); padding: 8px 4px 8px 10px; border-left: 2px solid #b18cff; font-size: 12.5px; }
-:root[data-theme="light"] .hive-mail-row { border-left-color: #7c4ddb; }
+  border-top: 1px solid var(--border); padding: 8px 4px 8px 10px; border-left: 2px solid #3fd0c9; font-size: 12.5px; }
+:root[data-theme="light"] .hive-mail-row { border-left-color: #0f8a8a; }
 .hive-mail-row.peer { opacity: 0.75; border-left-style: dashed; }
 .hive-mail-who { font-family: var(--mono, ui-monospace, monospace); color: var(--text-1, inherit); display: flex; gap: 6px; align-items: center; }
 .hive-mail-text { white-space: pre-wrap; word-break: break-word; }
@@ -3955,4 +3955,4 @@ code, kbd, pre, .mono { font-family: var(--font-mono); }
 :root:not([data-theme="dark"]) .rx-think-t { color: var(--cr-dim); }
 :root:not([data-theme="dark"]) .rx-counters .c-pink b { color: #b8338f; }
 :root:not([data-theme="dark"]) .rx-counters .c-teal b { color: #0e7c92; }
-:root:not([data-theme="dark"]) .rx-counters .c-violet b { color: #6d3fd0; }
+:root:not([data-theme="dark"]) .rx-counters .c-violet b { color: #0f8a8a; }
