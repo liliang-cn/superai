@@ -58,8 +58,8 @@ type hiveLinkState struct {
 	cancel context.CancelFunc
 	// done closes when the relay for the current link has stopped.
 	done chan struct{}
-	live   atomic.Bool
-	err    atomic.Value // string
+	live atomic.Bool
+	err  atomic.Value // string
 	// on is read by emit on every event, so it is an atomic of its own.
 	on atomic.Bool
 }
