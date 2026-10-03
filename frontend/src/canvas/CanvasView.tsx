@@ -9,6 +9,7 @@ import Sky, { Lane } from "./Sky";
 import { Bees, Cell, InFlight, Machines, NeedsYou, Queen, Today } from "./tiles";
 import { Hive, elapsed, isToday, oneLine, short, useBees, useHive } from "./data";
 import { GenSpec, loadSpecs, makeTile, saveSpecs } from "./generated";
+import { BASES, BaseName, COLORS, CanvasTheme, ColorName, DEFAULT_THEME, loadTheme, saveTheme, themeVars } from "./theme";
 import "./canvas.css";
 
 type Kind = "inFlight" | "machines" | "today" | "bees" | "queen" | "generated";
@@ -56,6 +57,9 @@ export default function CanvasView({ approvals }: { approvals: { pending: ToolAp
   const [adding, setAdding] = useState(false);
   const [menu, setMenu] = useState(false);
   const [attention, setAttention] = useState(false);
+  const [theming, setTheming] = useState(false);
+  const [theme, setThemeState] = useState<CanvasTheme>(loadTheme);
+  const setTheme = (t: CanvasTheme) => { setThemeState(t); saveTheme(t); };
   const [machine, setMachine] = useState<string | null>(null);
   const [replayAt, setReplayAt] = useState<Date | null>(null);
   const [order, setOrder] = useState("");
@@ -107,7 +111,8 @@ export default function CanvasView({ approvals }: { approvals: { pending: ToolAp
   };
 
   const lanes = useMemo<Lane[]>(() => {
-    const palette: [number, number, number][] = [[242, 165, 22], [255, 120, 90], [70, 180, 170], [140, 110, 230], [80, 150, 240]];
+    // The theme's colour leads; the others keep neighbouring trails apart.
+    const palette: [number, number, number][] = [COLORS[theme.color].rgb, [255, 120, 90], [70, 180, 170], [60, 170, 100], [80, 150, 240]];
     if (!hive.role) return Array.from({ length: 6 }, (_, i) => ({ key: `idle${i}`, busy: 0.15, rgb: palette[i % 5] }));
     const busy = new Set(hive.tasks.filter((t) => t.state === "running").map((t) => t.worker));
     const out = hive.members.filter((m) => m.state === "live").map((m, i) => {
@@ -117,7 +122,7 @@ export default function CanvasView({ approvals }: { approvals: { pending: ToolAp
     });
     out.push({ key: "queen", busy: pulse.live ? 0.9 : 0.3, rgb: [60, 52, 40] });
     return out;
-  }, [hive, pulse.live, replayAt]);
+  }, [hive, pulse.live, replayAt, theme.color]);
 
   const running = hive.tasks.filter((t) => t.state === "running");
   const live = hive.members.filter((m) => m.state === "live").length;
@@ -148,8 +153,8 @@ export default function CanvasView({ approvals }: { approvals: { pending: ToolAp
   };
 
   return (
-    <div className="cv-root">
-      <Sky at={replayAt ?? new Date()} lanes={lanes} />
+    <div className="cv-root" style={themeVars(theme)}>
+      <Sky at={replayAt ?? new Date()} lanes={lanes} base={theme.base} mode={theme.mode} />
       <div className="cv-scroll">
         <header className="cv-top">
           <div>
@@ -165,6 +170,7 @@ export default function CanvasView({ approvals }: { approvals: { pending: ToolAp
                   <button key={label} onClick={() => navigate(path)}>{label}</button>
                 ))}
                 <button onClick={() => { setMenu(false); setAttention(true); }}>Attention</button>
+                <button onClick={() => { setMenu(false); setTheming(true); }} data-testid="menu-theme">Theme</button>
               </div>
             )}
           </div>
@@ -236,6 +242,7 @@ export default function CanvasView({ approvals }: { approvals: { pending: ToolAp
       )}
       {machine && <MachineDrawer name={machine} hive={hive} onClose={() => setMachine(null)} />}
       {attention && <Attention onClose={() => setAttention(false)} />}
+      {theming && <ThemePanel theme={theme} onChange={setTheme} onClose={() => setTheming(false)} />}
     </div>
   );
 }
@@ -326,6 +333,71 @@ function MachineDrawer({ name, hive, onClose }: { name: string; hive: Hive; onCl
         ))}
         {mine.length === 0 && <p className="cv-quiet">No orders on this machine yet.</p>}
       </aside>
+    </div>
+  );
+}
+
+/** The look, chosen like shadcn's theme panel: every pick applies at once,
+ *  and the canvas behind the panel is the preview. */
+function ThemePanel({ theme, onChange, onClose }: { theme: CanvasTheme; onChange: (t: CanvasTheme) => void; onClose: () => void }) {
+  const set = <K extends keyof CanvasTheme>(k: K, v: CanvasTheme[K]) => onChange({ ...theme, [k]: v });
+  return (
+    <div className="cv-scrim" style={{ background: "transparent" }} onClick={onClose}>
+      <div className="cv-glass cv-sheet" onClick={(e) => e.stopPropagation()} data-testid="theme-panel">
+        <h3>Theme</h3>
+        <div className="cv-theme-row">
+          <label>Color</label>
+          <div className="cv-theme-opts">
+            {(Object.keys(COLORS) as ColorName[]).map((c) => (
+              <button key={c} className={`cv-opt${theme.color === c ? " on" : ""}`} onClick={() => set("color", c)}>
+                <i style={{ background: `rgb(${COLORS[c].rgb.join(",")})` }} />{COLORS[c].label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="cv-theme-row">
+          <label>Background</label>
+          <div className="cv-theme-opts">
+            <button className={`cv-opt${theme.base === "timelapse" ? " on" : ""}`} onClick={() => set("base", "timelapse")}><i className="sky" />Time-lapse</button>
+            {(Object.keys(BASES) as Exclude<BaseName, "timelapse">[]).map((b) => {
+              const [top, bottom] = BASES[b][theme.mode];
+              return (
+                <button key={b} className={`cv-opt${theme.base === b ? " on" : ""}`} onClick={() => set("base", b)}>
+                  <i style={{ background: `linear-gradient(rgb(${top}), rgb(${bottom}))`, boxShadow: "inset 0 0 0 1px rgba(0,0,0,.12)" }} />{BASES[b].label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <div className="cv-theme-row">
+          <label>Glass</label>
+          <div className="cv-theme-opts">
+            {(["clear", "frosted", "solid"] as const).map((g) => (
+              <button key={g} className={`cv-opt${theme.glass === g ? " on" : ""}`} onClick={() => set("glass", g)}>{g[0].toUpperCase() + g.slice(1)}</button>
+            ))}
+          </div>
+        </div>
+        <div className="cv-theme-row">
+          <label>Radius</label>
+          <div className="cv-theme-opts">
+            {([0, 0.5, 0.75, 1, 1.25] as const).map((r) => (
+              <button key={r} className={`cv-opt${theme.radius === r ? " on" : ""}`} onClick={() => set("radius", r)}>{r}</button>
+            ))}
+          </div>
+        </div>
+        <div className="cv-theme-row">
+          <label>Mode</label>
+          <div className="cv-theme-opts">
+            {(["light", "dark"] as const).map((m) => (
+              <button key={m} className={`cv-opt${theme.mode === m ? " on" : ""}`} onClick={() => set("mode", m)}>{m === "light" ? "Light" : "Dark"}</button>
+            ))}
+          </div>
+        </div>
+        <div className="cv-theme-foot">
+          <button className="cv-pill" onClick={() => onChange(DEFAULT_THEME)}>Reset</button>
+          <button className="cv-pill ink" onClick={onClose}>Done</button>
+        </div>
+      </div>
     </div>
   );
 }
