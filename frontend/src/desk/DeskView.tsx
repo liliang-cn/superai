@@ -244,6 +244,12 @@ export default function DeskView({ approvals, openSession, onSessionOpened }: {
         )}
         <button className="dk-grp" onClick={() => navigate(PATHS.records)}>Later<ChevronRightIcon size={14} /><span className="dk-more">{nextLabel(upcoming)}</span></button>
         <button className="dk-grp" onClick={() => navigate(PATHS.agents)}>Bees<ChevronRightIcon size={14} /><span className="dk-more">{bees.length || ""}</span></button>
+        {pins.length > 0 && <div className="dk-grp static">Pinned</div>}
+        {pins.slice(0, 6).map((d) => (
+          <button key={d.id} className={current === "dash:" + d.id ? "dk-rec on" : "dk-rec"} onClick={() => open("dash:" + d.id)}>
+            <LayoutDashboardIcon size={14} /><span>{d.name}</span>
+          </button>
+        ))}
         {recents.length > 0 && <div className="dk-grp static">Recents</div>}
         <div className="dk-recents">
           {recents.map((s) => {
@@ -376,23 +382,6 @@ export default function DeskView({ approvals, openSession, onSessionOpened }: {
       </section>
       )}
 
-      <footer className="cv-glass dk-dock">
-        {pins.length === 0 && runs.length === 0 && <span className="dk-dock-hint">Save an answer as a dashboard and it is pinned here.</span>}
-        {pins.slice(0, 8).map((d, i) => (
-          <button key={d.id} className={current === "dash:" + d.id ? "dk-pin on" : "dk-pin"} onClick={() => open("dash:" + d.id)}>
-            <span className={`dk-pin-ic ${PIN_COLORS[i % PIN_COLORS.length]}`}><LayoutDashboardIcon size={15} /></span>
-            <span className="dk-pin-name">{d.name}</span>
-            <em>{d.refreshed_at ? ago(String(d.refreshed_at), now) : ""}</em>
-          </button>
-        ))}
-        {runs.filter((r) => r.state !== "running").slice(0, Math.max(0, 4 - pins.length)).map((r) => (
-          <button key={r.id} className="dk-pin" onClick={() => open("run:" + r.id)}>
-            <span className="dk-pin-ic dk-a-code"><TerminalIcon size={15} /></span>
-            <span className="dk-pin-name">{r.prompt}</span>
-            <em>{ago(r.started, now)}</em>
-          </button>
-        ))}
-      </footer>
     </div>
   );
 }

@@ -18,7 +18,8 @@
   grid-column: 2; grid-row: 2; min-height: 0; min-width: 0;
   display: grid;
   grid-template-columns: 252px minmax(360px, 1fr) minmax(400px, 42%);
-  grid-template-rows: minmax(0, 1fr) 74px;
+  grid-template-rows: minmax(0, 1fr);
+  padding-bottom: 2px;
 }
 .dk.folded { grid-template-columns: 252px minmax(360px, 1fr) 58px; }
 .dk-live-strip { grid-column: 3; grid-row: 1; margin: 0 14px 12px 0; display: flex; justify-content: center; }
@@ -388,3 +389,17 @@ html[data-desk] body { background: transparent; }
 .dk-foryou .att-row { padding: 7px 6px; grid-template-columns: 24px minmax(0, 1fr); row-gap: 0; }
 .dk-foryou .att-row em { grid-column: 2; font-size: 11.5px; margin-top: -2px; }
 .dk-foryou .att-main b { font-size: 13.5px; }
+
+/* Quieter chrome: only the place you are in carries its colour; the rest of
+   the rail is outline, so the content is what the eye lands on. */
+.dk-rail .dk-app:not(.on) { background: rgba(var(--glass-rgb), .45) !important; color: var(--ink-2) !important;
+  box-shadow: inset 0 0 0 1px var(--line); }
+.dk-rail .dk-app:not(.on):hover { background: rgba(var(--glass-rgb), .8) !important; color: var(--ink) !important; transform: none; }
+.dk-rail .dk-app.on { box-shadow: inset 0 1px 0 rgba(255,255,255,.45), 0 3px 8px rgba(0,0,0,.12); }
+
+/* Conversation titles get two lines rather than an ellipsis. */
+.dk-rec { height: auto; min-height: 32px; padding: 6px 10px; align-items: flex-start; }
+.dk-rec span { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.35; }
+.dk-rec .dk-dot { margin-top: 6px; }
+.dk-rec em { margin-top: 2px; }
+.dk-rec > svg { flex: none; margin-top: 2px; color: var(--ink-3); }

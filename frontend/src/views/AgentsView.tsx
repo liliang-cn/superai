@@ -1,3 +1,5 @@
+import { useNavigate } from "react-router-dom";
+import { PATHS } from "../lib/routes";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SquareIcon, CornerDownLeftIcon, ChevronRightIcon } from "lucide-react";
 import {
@@ -5,6 +7,7 @@ import {
   CLIRuns,
   CancelCLIRun,
   ExternalAgentsStatus,
+  RemoteAgentNames,
   FollowUpCLIRun,
   StartCLIRun,
 } from "../../wailsjs/go/app/App";
@@ -65,11 +68,15 @@ export default function AgentsView() {
   const [selected, setSelected] = useState<string>("");
   const [events, setEvents] = useState<Record<string, Ev[]>>({});
   const [composing, setComposing] = useState(false);
+  // Coding CLIs on other machines this core can run: "claude.mac", …
+  const [remote, setRemote] = useState<string[]>([]);
+  const navigate = useNavigate();
 
   const load = useCallback(async () => {
-    const [list, st] = await Promise.all([CLIRuns(), ExternalAgentsStatus()]);
+    const [list, st, names] = await Promise.all([CLIRuns(), ExternalAgentsStatus(), RemoteAgentNames().catch(() => [])]);
     setRuns(list ?? []);
     setAgents((st ?? []).filter((a) => a.installed));
+    setRemote(((names ?? []) as { name?: string }[]).map((n) => n.name ?? "").filter((n) => n.includes(".")));
   }, []);
 
   useEffect(() => {
@@ -116,27 +123,43 @@ export default function AgentsView() {
     }
   }, [thread, events]);
 
+  // Where runs can go: this core's own CLIs, and each agent's.
+  const hosts = useMemo(() => {
+    const by = new Map<string, string[]>();
+    for (const n of remote) {
+      const i = n.indexOf(".");
+      const host = n.slice(i + 1), cli = n.slice(0, i);
+      by.set(host, [...(by.get(host) ?? []), cli]);
+    }
+    return [...by.entries()];
+  }, [remote]);
+  const choices = useMemo(() => [...agents.map((a) => a.name), ...remote], [agents, remote]);
+
   return (
     <div className="view agents-view">
       <div className="view-header with-action">
         <div>
           <div className="view-title">Coding</div>
-          <div className="view-desc">
-            {agents.length > 0
-              ? `Claude Code, Codex and the other agent CLIs on this machine. Type @${agents[0].name} in a conversation, or start one here.`
-              : "No agent CLI found. Install Claude Code or Codex, and switch on External agents in Settings."}
+          <div className="view-desc coding-where">
+            {agents.length > 0 && <span>Here: {agents.map((a) => a.name).join(", ")}</span>}
+            {hosts.map(([host, clis]) => <span key={host}>On {host}: {clis.join(", ")}</span>)}
+            {choices.length === 0 && <span>No coding CLI on this core or on any agent.</span>}
           </div>
         </div>
         <div className="vh-actions">
-          <button className="btn sm" disabled={agents.length === 0} onClick={() => setComposing((v) => !v)}>
-            {composing ? "Close" : "New run"}
-          </button>
+          {choices.length === 0 ? (
+            <button className="btn sm" onClick={() => navigate(PATHS.settings)}>Open Settings</button>
+          ) : (
+            <button className="btn sm" onClick={() => setComposing((v) => !v)}>
+              {composing ? "Close" : "New run"}
+            </button>
+          )}
         </div>
       </div>
 
       {composing && (
         <NewRun
-          agents={agents}
+          agents={choices}
           onStarted={(r) => {
             setComposing(false);
             setRuns((prev) => (prev.some((x) => x.id === r.id) ? prev : [r, ...prev]));
@@ -184,8 +207,18 @@ function dot(state: string) {
   return state === "running" ? "live" : state === "done" ? "ok" : state === "failed" ? "bad" : "unknown";
 }
 
-function NewRun({ agents, onStarted }: { agents: backend.ExternalAgentStatus[]; onStarted: (r: Run) => void }) {
-  const [agent, setAgent] = useState(agents[0]?.name ?? "claude");
+/** The choices by where they run: this core first, then each agent. */
+function groupsOf(names: string[]): [string, string[]][] {
+  const by = new Map<string, string[]>();
+  for (const n of names) {
+    const where = n.includes(".") ? n.slice(n.indexOf(".") + 1) : "This core";
+    by.set(where, [...(by.get(where) ?? []), n]);
+  }
+  return [...by.entries()];
+}
+
+function NewRun({ agents, onStarted }: { agents: string[]; onStarted: (r: Run) => void }) {
+  const [agent, setAgent] = useState(agents[0] ?? "claude");
   const [prompt, setPrompt] = useState("");
   const [cwd, setCwd] = useState("");
   const [ask, setAsk] = useState(true);
@@ -208,13 +241,13 @@ function NewRun({ agents, onStarted }: { agents: backend.ExternalAgentStatus[]; 
   return (
     <div className="card agents-new">
       <div className="agents-new-row">
-        <div className="seg">
-          {agents.map((a) => (
-            <button key={a.name} className={`seg-btn${a.name === agent ? " on" : ""}`} onClick={() => setAgent(a.name)}>
-              {a.name}
-            </button>
+        <select className="input agents-pick" value={agent} onChange={(e) => setAgent(e.target.value)}>
+          {groupsOf(agents).map(([where, names]) => (
+            <optgroup key={where} label={where}>
+              {names.map((n) => <option key={n} value={n}>{n.includes(".") ? `${n.split(".")[0]} on ${n.slice(n.indexOf(".") + 1)}` : n}</option>)}
+            </optgroup>
           ))}
-        </div>
+        </select>
         <input
           className="input"
           placeholder="Directory (blank: the workspace)"
