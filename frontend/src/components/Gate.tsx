@@ -20,6 +20,7 @@
 import { useEffect, useRef, useState } from "react";
 import Sky from "../canvas/Sky";
 import "../canvas/canvas.css";
+import { loadTheme, themeVars } from "../canvas/theme";
 
 // The door is the canvas's own sky with one pane of glass on it, so signing in
 // and arriving look like the same place.
@@ -27,7 +28,7 @@ const IDLE = [
   { key: "a", busy: 0.2, rgb: [242, 165, 22] as [number, number, number] },
   { key: "b", busy: 0.15, rgb: [255, 120, 90] as [number, number, number] },
   { key: "c", busy: 0.15, rgb: [70, 180, 170] as [number, number, number] },
-  { key: "d", busy: 0.15, rgb: [140, 110, 230] as [number, number, number] },
+  { key: "d", busy: 0.15, rgb: [60, 170, 100] as [number, number, number] },
 ];
 
 export default function Gate({ onEnter }: { onEnter: () => void }) {
@@ -36,6 +37,7 @@ export default function Gate({ onEnter }: { onEnter: () => void }) {
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const field = useRef<HTMLInputElement>(null);
+  const theme = loadTheme();
 
   useEffect(() => field.current?.focus(), []);
 
@@ -68,8 +70,8 @@ export default function Gate({ onEnter }: { onEnter: () => void }) {
   };
 
   return (
-    <div className="cv-root gate2">
-      <Sky at={new Date()} lanes={IDLE} />
+    <div className="cv-root gate2" style={themeVars(theme)}>
+      <Sky at={new Date()} lanes={IDLE} base={theme.base} mode={theme.mode} />
       <form className="cv-glass gate2-card" onSubmit={submit}>
         <h1>SuperAI</h1>
         <p>Your hive is behind this door.</p>
