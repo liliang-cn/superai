@@ -213,4 +213,6 @@ export function UnpairDevice(arg1:string):Promise<void>;
 
 export function UnreadNotifications():Promise<number>;
 
+export function Upcoming():Promise<Array<app.UpcomingItem>>;
+
 export function WakeStandingAgent(arg1:string,arg2:string):Promise<void>;

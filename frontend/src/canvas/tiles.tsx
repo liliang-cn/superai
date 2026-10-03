@@ -171,3 +171,83 @@ export function Queen({ messages }: { messages: ChatMessage[] }) {
     </div>
   );
 }
+
+export interface UpcomingItem {
+  kind: "schedule" | "bee";
+  id: string;
+  what: string;
+  when?: string;
+  next?: string;
+  enabled: boolean;
+  running: boolean;
+  bee?: string;
+  waitingFor?: string;
+}
+
+function whenLabel(iso: string | undefined, now: number): string {
+  if (!iso) return "On an event";
+  const d = new Date(iso);
+  const mins = Math.round((d.getTime() - now) / 60000);
+  const hm = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+  if (mins < 1) return "Now";
+  if (mins < 60) return `In ${mins} min`;
+  const today = new Date(now).toDateString() === d.toDateString();
+  const tomorrow = new Date(now + 86400000).toDateString() === d.toDateString();
+  return today ? hm : tomorrow ? `Tomorrow ${hm}` : d.toLocaleDateString([], { month: "short", day: "numeric" }) + ` ${hm}`;
+}
+
+/** Everything the hive will do without being asked, scheduled prompts and
+ *  bees alike, soonest first: one list, because they are one thing to whoever
+ *  is waiting on them. */
+export function Later({ items, open }: { items: UpcomingItem[]; open: (i: UpcomingItem) => void }) {
+  const now = useNow(30000);
+  if (items.length === 0) return <p className="cv-quiet">Nothing is scheduled. Ask below: “every weekday at 8, check the hive and tell me if anything is down”.</p>;
+  return (
+    <div className="cv-rows">
+      {items.slice(0, 6).map((i) => (
+        <button key={i.kind + i.id} className={`cv-row${i.enabled ? "" : " off"}`} onClick={() => open(i)}>
+          <Cell label={i.kind === "bee" ? (i.bee || "B").slice(0, 1).toUpperCase() : "⏱"} state={i.running ? "working" : i.enabled ? "done" : "resting"} size={24} />
+          <span className="cv-row-main">
+            <b>{i.kind === "bee" ? i.bee : oneLine(i.what)}</b>
+            <small>{i.kind === "bee" ? oneLine(i.what) : i.when}</small>
+          </span>
+          <span className={`cv-row-time${i.waitingFor ? " hot" : ""}`}>
+            {i.waitingFor ? "Needs you" : i.running ? "Running" : !i.enabled ? "Paused" : whenLabel(i.next, now)}
+          </span>
+        </button>
+      ))}
+      {items.length > 6 && <p className="cv-quiet">and {items.length - 6} more</p>}
+    </div>
+  );
+}
+
+export interface CodingRun {
+  id: string;
+  agent: string;
+  prompt: string;
+  state: string;
+  remote?: string;
+  started: string;
+  summary?: string;
+}
+
+/** The coding agents' sessions — Claude Code, Codex — here and on linked
+ *  machines, newest first. */
+export function Coding({ runs, open }: { runs: CodingRun[]; open: () => void }) {
+  const now = useNow();
+  if (runs.length === 0) return <p className="cv-quiet">No coding sessions yet. Write @claude or @claude.mac below to start one.</p>;
+  return (
+    <div className="cv-rows">
+      {runs.slice(0, 5).map((r) => (
+        <button key={r.id} className="cv-row" onClick={open}>
+          <Cell label={r.remote ? r.remote.slice(0, 3) : r.agent.slice(0, 1).toUpperCase()} state={r.state === "running" ? "working" : r.state === "failed" ? "lost" : "done"} size={24} />
+          <span className="cv-row-main">
+            <b>{oneLine(r.prompt)}</b>
+            <small>@{r.agent}{r.remote ? `.${r.remote}` : ""}{r.summary ? ` — ${oneLine(r.summary)}` : ""}</small>
+          </span>
+          <span className="cv-row-time">{r.state === "running" ? elapsed(r.started, now) : new Date(r.started).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false })}</span>
+        </button>
+      ))}
+    </div>
+  );
+}

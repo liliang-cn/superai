@@ -244,3 +244,4 @@
 .cv-queen :is(table, thead, tbody, tr, th, td) { background: transparent !important; color: inherit !important; border-color: var(--line) !important; }
 .cv-queen :is(code, pre) { background: rgba(var(--glass-rgb), 0.55) !important; color: inherit !important; border-color: var(--line) !important; }
 .cv-queen :is(p, li, h1, h2, h3, h4, strong, em, a) { color: inherit; }
+.cv-row.off { opacity: 0.55; }

@@ -43,7 +43,7 @@ const NAV: {
       { key: "chat", label: "Chat", Icon: MessageSquareIcon, shortcut: "1" },
       { key: "stats", label: "Stats", Icon: ChartColumnIcon, shortcut: "2" },
       { key: "hive", label: "Hive", Icon: HexagonIcon },
-      { key: "agents", label: "Agents", Icon: BotIcon },
+      { key: "agents", label: "Bees", Icon: BotIcon },
       { key: "coding", label: "Coding", Icon: TerminalIcon },
     ],
   },
