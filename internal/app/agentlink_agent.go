@@ -58,17 +58,31 @@ func (a *App) RunAgentLink(ctx context.Context, o AgentLinkOptions) {
 		h, _ := os.Hostname()
 		o.Name = strings.Split(h, ".")[0]
 	}
-	wait := time.Second
+	// Core may be given as several addresses (any node of a cluster that
+	// serves it): each failure moves on to the next.
+	var cores []string
+	for _, c := range strings.Split(o.Core, ",") {
+		if c = strings.TrimSpace(c); c != "" {
+			cores = append(cores, c)
+		}
+	}
+	if len(cores) == 0 {
+		return
+	}
+	wait, next := time.Second, 0
 	for ctx.Err() == nil {
+		one := o
+		one.Core = cores[next%len(cores)]
 		started := time.Now()
-		err := a.agentLinkOnce(ctx, o)
+		err := a.agentLinkOnce(ctx, one)
 		if ctx.Err() != nil {
 			return
 		}
+		next++
 		if time.Since(started) > time.Minute {
 			wait = time.Second // it was up a good while: this is a fresh drop
 		}
-		log.Printf("agent link to %s: %v; again in %s", o.Core, err, wait)
+		log.Printf("agent link to %s: %v; again in %s", one.Core, err, wait)
 		select {
 		case <-ctx.Done():
 			return
