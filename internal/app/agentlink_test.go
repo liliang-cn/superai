@@ -10,6 +10,7 @@ import (
 	"time"
 
 	agentlinkpb "github.com/liliang-cn/superai/internal/agentlink/pb"
+	"github.com/liliang-cn/superai/internal/backend"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
@@ -190,5 +191,22 @@ func TestAnAgentLinksToCoreAndAnswers(t *testing.T) {
 	la := core.LinkedAgents()
 	if len(la) != 1 || la[0].Version != "test" {
 		t.Fatalf("linked agents: %+v", la)
+	}
+}
+
+// An agent on the node an HA service lives on offers it only while it is
+// there, and runs it on its own machine.
+func TestALocalAgentIsOfferedOnlyWhileItIsHere(t *testing.T) {
+	ra := backend.RemoteAgent{Hosts: []string{backend.LocalHost}, Command: []string{"echo", "{prompt}"}}
+	ra.Probe = "true"
+	if !backend.ProbeLocal(context.Background(), ra) {
+		t.Fatal("a probe that succeeds said the agent is not here")
+	}
+	ra.Probe = "false"
+	if backend.ProbeLocal(context.Background(), ra) {
+		t.Fatal("a probe that fails said the agent is here")
+	}
+	if !onlyLocal([]string{"local"}) || onlyLocal([]string{"local", "sds@10.0.0.1"}) || onlyLocal(nil) {
+		t.Fatal("onlyLocal")
 	}
 }

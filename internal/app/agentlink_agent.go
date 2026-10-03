@@ -17,6 +17,7 @@ import (
 	"time"
 
 	agentlinkpb "github.com/liliang-cn/superai/internal/agentlink/pb"
+	"github.com/liliang-cn/superai/internal/backend"
 	"google.golang.org/grpc"
 	grpccreds "google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
@@ -88,12 +89,24 @@ func (a *App) agentHello(o AgentLinkOptions) *agentlinkpb.Hello {
 	cfg := a.remoteRunner().Config()
 	if cfg.Enabled {
 		for _, n := range cfg.Names() {
+			ra := cfg.Agents[n]
 			// Only what this machine runs itself; another SuperAI it reaches by
 			// URL is that SuperAI's business, not something to pass on.
-			if cfg.Agents[n].URL != "" {
+			if ra.URL != "" {
 				continue
 			}
-			h.Agents = append(h.Agents, &agentlinkpb.NamedAgent{Name: n, About: cfg.Agents[n].About})
+			// An agent run here (host "local") is offered only while it is
+			// here: an HA service that moved to another node is that node's
+			// agent's to offer, and core should not be sent here for it.
+			if onlyLocal(ra.Hosts) {
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				here := backend.ProbeLocal(ctx, ra)
+				cancel()
+				if !here {
+					continue
+				}
+			}
+			h.Agents = append(h.Agents, &agentlinkpb.NamedAgent{Name: n, About: ra.About})
 		}
 	}
 	return h
@@ -212,6 +225,18 @@ func (a *App) agentLinkOnce(ctx context.Context, o AgentLinkOptions) error {
 			}(k.Call)
 		}
 	}
+}
+
+func onlyLocal(hosts []string) bool {
+	if len(hosts) == 0 {
+		return false
+	}
+	for _, h := range hosts {
+		if !backend.IsLocalHost(h) {
+			return false
+		}
+	}
+	return true
 }
 
 // answerCall runs one of core's calls through the same dispatcher /api/rpc

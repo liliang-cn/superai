@@ -563,6 +563,23 @@ func remoteScript(a RemoteAgent, prompt string) (string, error) {
 	return b.String(), nil
 }
 
+// LocalHost is the host entry for "on this machine": an agent installed on
+// the node that runs the thing, with no ssh in between.
+const LocalHost = "local"
+
+// IsLocalHost reports whether a host entry means this machine.
+func IsLocalHost(host string) bool { return strings.TrimSpace(host) == LocalHost }
+
+// ProbeLocal runs an agent's probe on this machine and reports whether it
+// holds the agent now. True when there is no probe.
+func ProbeLocal(ctx context.Context, a RemoteAgent) bool {
+	if strings.TrimSpace(a.Probe) == "" {
+		return true
+	}
+	_, err := sshRun(ctx, LocalHost, a.Probe, remoteProbeTimeout)
+	return err == nil
+}
+
 // shellQuote wraps s so a POSIX shell reads it as one literal word.
 //
 // Single quotes protect everything except a single quote, which is closed,
@@ -587,6 +604,11 @@ func sshRun(ctx context.Context, host, script string, deadline time.Duration) (s
 	args = append(args, hostArgs(host)...)
 	args = append(args, script)
 	cmd := exec.CommandContext(ctx, "ssh", args...)
+	if IsLocalHost(host) {
+		// The agent is on this machine: an agent process installed beside it
+		// runs it directly, no ssh to itself.
+		cmd = exec.CommandContext(ctx, "sh", "-c", script)
+	}
 	cmd.Stdin = nil
 	// WaitDelay because ssh can leave the far side holding the pipes open: the
 	// context kills ssh, but a read on its stdout would go on waiting for a
