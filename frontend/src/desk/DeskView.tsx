@@ -12,7 +12,7 @@ import type { ToolApproval } from "../lib/useToolApprovals";
 import { PATHS } from "../lib/routes";
 import { withoutCallNotes } from "../lib/format";
 import { Response } from "@/components/ai-elements/response";
-import { Bee, QUEEN_SESSION, elapsed, short, useBees, useCodingRuns, useHive, useUpcoming } from "../canvas/data";
+import { Bee, QUEEN_SESSION, elapsed, short, useBees, useLinkedAgents, useCodingRuns, useHive, useUpcoming } from "../canvas/data";
 import type { CodingRun, UpcomingItem } from "../canvas/tiles";
 import { dashboards, Dashboard } from "../lib/dashboards";
 import {
@@ -114,6 +114,7 @@ export default function DeskView({ approvals, openSession, onSessionOpened }: {
   const bees = useBees();
   const upcoming = useUpcoming();
   const runs = useCodingRuns();
+  const linked = useLinkedAgents();
   const chat = useChat();
   const recents = useRecents(chat.sending);
   const link = useLink();
@@ -344,8 +345,8 @@ export default function DeskView({ approvals, openSession, onSessionOpened }: {
         </div>
         <div className="cv-glass dk-screen">
           <div className="dk-in">
-            {current === "hive" && <LiveHive hive={hive} runs={runs} theme={theme} now={now} />}
-            {current === "status" && <LiveStatus hive={hive} now={now} />}
+            {current === "hive" && <LiveHive hive={hive} runs={runs} agents={linked} now={now} />}
+            {current === "status" && <LiveStatus hive={hive} now={now} agents={linked} runs={runs} />}
             {current === "stats" && <LiveStats hive={hive} runs={runs} />}
             {current.startsWith("run:") && <RunTab id={current.slice(4)} now={now} />}
             {current.startsWith("dash:") && (

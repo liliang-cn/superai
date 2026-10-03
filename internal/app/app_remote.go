@@ -231,7 +231,7 @@ func (a *App) askAgent(ctx context.Context, name, prompt string) backend.RemoteR
 		if err := c.call(ctx, "AskRemoteAgent", []any{name, prompt}, &res); err != nil {
 			return backend.RemoteResult{Agent: name, Host: c.name(), Failed: true, Reason: err.Error()}
 		}
-		if res.Host == "" {
+		if res.Host == "" || backend.IsLocalHost(res.Host) || res.Host == "this machine" {
 			res.Host = c.name()
 		}
 		return res
