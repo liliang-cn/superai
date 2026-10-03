@@ -142,6 +142,10 @@ export function GraphView() {
   return window['go']['app']['App']['GraphView']();
 }
 
+export function HiveLinkStatus() {
+  return window['go']['app']['App']['HiveLinkStatus']();
+}
+
 export function HiveMembers() {
   return window['go']['app']['App']['HiveMembers']();
 }
@@ -184,6 +188,10 @@ export function InstallSkill(arg1, arg2) {
 
 export function Life() {
   return window['go']['app']['App']['Life']();
+}
+
+export function LinkHive(arg1, arg2) {
+  return window['go']['app']['App']['LinkHive'](arg1, arg2);
 }
 
 export function LinkSuperAI(arg1, arg2, arg3) {
@@ -284,6 +292,10 @@ export function ReadWorkspaceFileDataURL(arg1) {
 
 export function RefreshDashboard(arg1) {
   return window['go']['app']['App']['RefreshDashboard'](arg1);
+}
+
+export function Remote(arg1, arg2) {
+  return window['go']['app']['App']['Remote'](arg1, arg2);
 }
 
 export function RemoteAgentNames() {
@@ -394,6 +406,10 @@ export function StopYoloMode() {
   return window['go']['app']['App']['StopYoloMode']();
 }
 
+export function TakeOver(arg1, arg2, arg3) {
+  return window['go']['app']['App']['TakeOver'](arg1, arg2, arg3);
+}
+
 export function TestWebhook() {
   return window['go']['app']['App']['TestWebhook']();
 }
@@ -404,6 +420,10 @@ export function ToolApprovalInfo(arg1) {
 
 export function TraceLines(arg1, arg2) {
   return window['go']['app']['App']['TraceLines'](arg1, arg2);
+}
+
+export function UnlinkHive() {
+  return window['go']['app']['App']['UnlinkHive']();
 }
 
 export function UnlinkSuperAI(arg1) {

@@ -16,6 +16,8 @@ import SkillsView from "./views/SkillsView";
 import MCPView from "./views/MCPView";
 import RecordsView from "./views/RecordsView";
 import CanvasView from "./canvas/CanvasView";
+import DeskView from "./desk/DeskView";
+import { clientKind } from "./lib/hivelink";
 import { ScheduleRunToasts } from "./components/ScheduleRuns";
 import { Toaster } from "./components/Toaster";
 import { useBackendToasts } from "./lib/toasts";
@@ -162,7 +164,7 @@ export default function App() {
   if (view === "home") {
     return (
       <>
-        <CanvasView approvals={approvals} />
+        {clientKind() === "desktop" ? <DeskView approvals={approvals} /> : <CanvasView approvals={approvals} />}
         <ScheduleRunToasts log={runs} onOpenConversation={openConversation} />
         <Toaster onOpenConversation={openConversation} />
       </>

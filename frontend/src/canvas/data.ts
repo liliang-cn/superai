@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { EventsOn } from "../../wailsjs/runtime";
-import { HiveStatus, StandingAgents } from "../../wailsjs/go/app/App";
+import { CLIRuns, HiveStatus, StandingAgents, Upcoming } from "../../wailsjs/go/app/App";
+import type { CodingRun, UpcomingItem } from "./tiles";
 
 export interface HiveMember {
   name: string;
@@ -107,6 +108,9 @@ export function useBees(): Bee[] {
   return bees;
 }
 
+/** The one conversation with the queen that the home screens share. */
+export const QUEEN_SESSION = "hive-console-web";
+
 export const isToday = (iso?: string) => {
   if (!iso) return false;
   const d = new Date(iso);
@@ -128,3 +132,36 @@ export function elapsed(fromIso: string, now = Date.now()): string {
   const n = Math.max(0, Math.round((now - new Date(fromIso).getTime()) / 1000));
   return n < 60 ? `${n}s` : n < 3600 ? `${Math.floor(n / 60)}m` : `${Math.floor(n / 3600)}h ${Math.floor((n % 3600) / 60)}m`;
 }
+
+/** Everything the hive will do on its own, kept current. */
+export function useUpcoming(): UpcomingItem[] {
+  const [items, setItems] = useState<UpcomingItem[]>([]);
+  useEffect(() => {
+    let alive = true;
+    const load = () => Upcoming().then((l) => { if (alive) setItems((l ?? []) as unknown as UpcomingItem[]); }).catch(() => {});
+    load();
+    const t = window.setInterval(load, 60000);
+    const offs = ["agent:update", "schedule:changed", "schedule:run"].map((n) => EventsOn(n, load));
+    return () => { alive = false; window.clearInterval(t); offs.forEach((o) => typeof o === "function" && o()); };
+  }, []);
+  return items;
+}
+
+/** The coding agents' runs, newest first, kept current. */
+export function useCodingRuns(): CodingRun[] {
+  const [runs, setRuns] = useState<CodingRun[]>([]);
+  useEffect(() => {
+    let alive = true;
+    const load = () => CLIRuns().then((l) => {
+      if (!alive) return;
+      const list = ((l ?? []) as unknown as CodingRun[]).slice().sort((a, b) => new Date(b.started).getTime() - new Date(a.started).getTime());
+      setRuns(list);
+    }).catch(() => {});
+    load();
+    const off = EventsOn("cli:run", load);
+    const t = window.setInterval(load, 30000);
+    return () => { alive = false; window.clearInterval(t); if (typeof off === "function") off(); };
+  }, []);
+  return runs;
+}
+

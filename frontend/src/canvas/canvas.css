@@ -227,6 +227,10 @@
 .gate2-field button { border: 0; background: none; font: 600 13px var(--font-sans); color: var(--ink-2); cursor: pointer; padding: 8px 12px; }
 .gate2-go { height: 50px; margin-top: 10px; border-radius: calc(25px * var(--rs)); font-size: 16px; }
 .gate2-err { margin-top: 12px; font-size: 14px; color: var(--lost); text-align: center; }
+.gate2-field + .gate2-field { margin-top: 10px; }
+.gate2-card h1 + p { line-height: 1.45; }
+.gate2-alt { margin-top: 14px; border: 0; background: none; font: 500 14px var(--font-sans); color: var(--ink-2); cursor: pointer; padding: 6px; }
+.gate2-alt:hover { color: var(--ink); }
 
 /* the theme panel, shadcn's way: each choice a labelled button, applied as it
    is picked, the canvas behind it the preview */

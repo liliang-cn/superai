@@ -7,9 +7,8 @@ import type { ToolApproval } from "../lib/useToolApprovals";
 import { PATHS } from "../lib/routes";
 import Sky, { Lane } from "./Sky";
 import { Bees, Cell, Coding, CodingRun, InFlight, Later, Machines, NeedsYou, Queen, Today, UpcomingItem } from "./tiles";
-import { CLIRuns, Upcoming } from "../../wailsjs/go/app/App";
 import { EventsOn } from "../../wailsjs/runtime";
-import { Hive, elapsed, isToday, oneLine, short, useBees, useHive } from "./data";
+import { Hive, elapsed, isToday, oneLine, short, useBees, useCodingRuns, useHive, useUpcoming, QUEEN_SESSION } from "./data";
 import { GenSpec, loadSpecs, makeTile, saveSpecs } from "./generated";
 import { BASES, BaseName, COLORS, CanvasTheme, ColorName, DEFAULT_THEME, loadTheme, saveTheme, themeVars } from "./theme";
 import "./canvas.css";
@@ -50,39 +49,6 @@ function loadLayout(): Tile[] {
   }
 }
 
-/** Everything the hive will do on its own, kept current. */
-function useUpcoming(): UpcomingItem[] {
-  const [items, setItems] = useState<UpcomingItem[]>([]);
-  useEffect(() => {
-    let alive = true;
-    const load = () => Upcoming().then((l) => { if (alive) setItems((l ?? []) as unknown as UpcomingItem[]); }).catch(() => {});
-    load();
-    const t = window.setInterval(load, 60000);
-    const offs = ["agent:update", "schedule:changed", "schedule:run"].map((n) => EventsOn(n, load));
-    return () => { alive = false; window.clearInterval(t); offs.forEach((o) => typeof o === "function" && o()); };
-  }, []);
-  return items;
-}
-
-/** The coding agents' runs, newest first, kept current. */
-function useCodingRuns(): CodingRun[] {
-  const [runs, setRuns] = useState<CodingRun[]>([]);
-  useEffect(() => {
-    let alive = true;
-    const load = () => CLIRuns().then((l) => {
-      if (!alive) return;
-      const list = ((l ?? []) as unknown as CodingRun[]).slice().sort((a, b) => new Date(b.started).getTime() - new Date(a.started).getTime());
-      setRuns(list);
-    }).catch(() => {});
-    load();
-    const off = EventsOn("cli:run", load);
-    const t = window.setInterval(load, 30000);
-    return () => { alive = false; window.clearInterval(t); if (typeof off === "function") off(); };
-  }, []);
-  return runs;
-}
-
-const QUEEN_SESSION = "hive-console-web";
 
 /**
  * Home: one full screen, the AI's. What needs a person sits on top in honey
