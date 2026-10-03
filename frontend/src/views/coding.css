@@ -1,0 +1,94 @@
+/* Coding: runs on the left, one conversation with a CLI on the right.
+   A new run is the same input as a follow-up; @ in it picks the CLI and the
+   machine, and the chips under it say what each machine can run. */
+
+.cd { flex-direction: row; min-height: 0; height: 100%; }
+
+.cd-side { width: 290px; flex: none; display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--border); }
+.cd-side-h { display: flex; align-items: center; justify-content: space-between; padding: 18px 14px 10px 18px; }
+.cd-side-h > span { font-size: 17px; font-weight: 650; letter-spacing: -.01em; color: var(--text-0); }
+.cd-new { display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 11px; border-radius: 9px; border: 1px solid var(--border); background: var(--bg-1); color: var(--text-0); font: 500 12.5px var(--font-sans); cursor: pointer; }
+.cd-new:hover { border-color: var(--border-strong); }
+.cd-new.on { border-color: var(--accent-border); color: var(--accent); }
+.cd-list { flex: 1; min-height: 0; overflow-y: auto; padding: 2px 8px 12px; display: flex; flex-direction: column; gap: 1px; }
+.cd-none { padding: 14px 10px; font-size: 12.5px; line-height: 1.5; color: var(--text-2); }
+.cd-item { display: flex; flex-direction: column; gap: 4px; text-align: left; padding: 9px 10px; border-radius: 10px; border: 0; background: transparent; color: inherit; cursor: pointer; font: inherit; }
+.cd-item:hover { background: var(--bg-hover); }
+.cd-item.on { background: var(--bg-1); box-shadow: 0 0 0 1px var(--border); }
+.cd-item-top { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--text-2); min-width: 0; }
+.cd-item-top b { font-weight: 600; color: var(--text-0); }
+.cd-item-top time { margin-left: auto; white-space: nowrap; color: var(--text-3); }
+.cd-item-p { font-size: 13px; line-height: 1.45; color: var(--text-1); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+
+.cd-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--text-3); }
+.cd-dot.done { background: var(--green); }
+.cd-dot.failed, .cd-dot.error { background: var(--red); }
+.cd-dot.running { background: var(--accent); animation: cd-pulse 1.2s ease-in-out infinite; }
+@keyframes cd-pulse { 50% { opacity: .3; } }
+
+.cd-main { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+
+/* A new run: the input sits a little above the middle, like a blank page. */
+.cd-start { flex: 1; min-height: 0; overflow-y: auto; display: flex; padding: 0 28px; }
+.cd-start-in { width: 100%; max-width: 720px; margin: auto; padding: 40px 0 12vh; display: flex; flex-direction: column; gap: 14px; }
+.cd-start h2 { margin: 0 0 4px 4px; font-size: 24px; font-weight: 650; letter-spacing: -.02em; color: var(--text-0); }
+.cd-sub { margin: 0 4px; font-size: 13.5px; line-height: 1.6; color: var(--text-2); }
+.cd-sub code { font-family: var(--font-mono); font-size: 12.5px; }
+.cd-btn { align-self: flex-start; margin-left: 4px; height: 34px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg-1); color: var(--text-0); font: 500 13px var(--font-sans); cursor: pointer; }
+
+.cd-comp { position: relative; display: flex; flex-direction: column; background: var(--bg-1); backdrop-filter: blur(18px) saturate(1.3); -webkit-backdrop-filter: blur(18px) saturate(1.3); border: 1px solid var(--border); border-radius: 18px; box-shadow: 0 1px 2px rgba(15, 25, 35, .04), 0 8px 24px rgba(15, 25, 35, .06); transition: border-color .15s, box-shadow .15s; }
+.cd-comp:focus-within { border-color: var(--accent-border); box-shadow: 0 0 0 3px var(--accent-soft), 0 8px 24px rgba(15, 25, 35, .06); }
+.cd-comp.off { opacity: .75; }
+.cd-comp textarea { resize: none; border: 0; outline: none; background: none; padding: 14px 16px 6px; font: 14.5px/1.55 var(--font-sans); color: var(--text-0); min-height: 52px; max-height: 240px; field-sizing: content; }
+.cd-comp textarea::placeholder { color: var(--text-3); }
+.cd-comp-f { display: flex; align-items: center; gap: 6px; padding: 6px 8px 8px 10px; flex-wrap: wrap; }
+.cd-grow { flex: 1; }
+.cd-to, .cd-cwd, .cd-ask { display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 9px; border-radius: 8px; font-size: 12.5px; color: var(--text-2); }
+.cd-to { background: var(--accent-soft); color: var(--accent); }
+.cd-to b { font-weight: 600; }
+.cd-cwd { border: 1px solid transparent; cursor: text; }
+.cd-cwd:hover, .cd-cwd:focus-within { border-color: var(--border); }
+.cd-cwd input { width: 150px; border: 0; outline: none; background: none; font: 12.5px var(--font-mono); color: var(--text-0); padding: 0; }
+.cd-cwd input::placeholder { color: var(--text-3); font-family: var(--font-sans); }
+.cd-ask { cursor: pointer; user-select: none; }
+.cd-ask input { margin: 0; accent-color: var(--accent); }
+.cd-send { width: 32px; height: 32px; flex: none; border-radius: 50%; border: 0; display: inline-flex; align-items: center; justify-content: center; background: var(--text-0); color: var(--bg-1); cursor: pointer; transition: opacity .15s; }
+.cd-send:disabled { opacity: .2; cursor: default; }
+.cd-send.stop { background: var(--red); color: #fff; }
+
+.cd-menu { position: absolute; left: 8px; right: 8px; top: calc(100% + 6px); z-index: 30; max-height: 280px; overflow-y: auto; padding: 4px; background: var(--popover, var(--bg-1)); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 14px 36px rgba(15, 25, 35, .14); }
+.cd-follow .cd-menu { top: auto; bottom: calc(100% + 6px); }
+.cd-menu button { display: flex; align-items: baseline; gap: 10px; width: 100%; padding: 7px 10px; border: 0; border-radius: 8px; background: none; color: var(--text-0); text-align: left; cursor: pointer; font: inherit; }
+.cd-menu button.on, .cd-menu button:hover { background: var(--accent-soft); }
+.cd-menu b { font: 600 13px var(--font-mono); color: var(--accent); }
+.cd-menu span { font-size: 12px; color: var(--text-2); }
+
+/* What can run where: one line per machine, each CLI a chip that addresses the box. */
+.cd-where { display: flex; flex-direction: column; gap: 6px; padding: 4px 4px 0; }
+.cd-host { display: flex; align-items: baseline; gap: 12px; }
+.cd-host-n { width: 92px; flex: none; font-size: 12px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cd-host-c { display: flex; flex-wrap: wrap; gap: 4px; }
+.cd-host-c button { height: 24px; padding: 0 9px; border-radius: 7px; border: 1px solid var(--border); background: transparent; color: var(--text-1); font: 12px var(--font-mono); cursor: pointer; }
+.cd-host-c button:hover { border-color: var(--border-strong); color: var(--text-0); }
+.cd-host-c button.on { border-color: var(--accent-border); background: var(--accent-soft); color: var(--accent); }
+
+/* A run */
+.cd-thread { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.cd-thread-h { display: flex; align-items: center; gap: 7px; padding: 16px 24px 12px; font-size: 13px; color: var(--text-2); border-bottom: 1px solid var(--border); }
+.cd-thread-h svg { color: var(--text-2); }
+.cd-thread-h b { font-weight: 650; color: var(--text-0); }
+.cd-path { font-family: var(--font-mono); font-size: 12px; color: var(--text-2); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; padding-left: 6px; }
+.cd-meta { white-space: nowrap; color: var(--text-3); font-size: 12px; }
+.cd-log { flex: 1; min-height: 0; overflow-y: auto; padding: 20px 28px; }
+.cd-log-in { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px; }
+.cd-log .agents-you { border-radius: 14px 14px 4px 14px; padding: 9px 14px; font-size: 14px; line-height: 1.5; }
+.cd-log .agents-text { font-size: 14px; }
+.cd-follow { padding: 8px 28px 18px; }
+.cd-follow > .cd-comp { max-width: 760px; margin: 0 auto; }
+
+@media (max-width: 760px) {
+  .cd { flex-direction: column; }
+  .cd-side { width: auto; max-height: 40%; border-right: 0; border-bottom: 1px solid var(--border); }
+  .cd-start, .cd-log, .cd-follow { padding-left: 16px; padding-right: 16px; }
+  .cd-host-n { width: 64px; }
+}
