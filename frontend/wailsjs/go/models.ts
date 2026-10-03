@@ -522,6 +522,24 @@ export namespace app {
 		}
 	}
 	
+	export class HiveLinkInfo {
+	    linked: boolean;
+	    url?: string;
+	    live: boolean;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new HiveLinkInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.linked = source["linked"];
+	        this.url = source["url"];
+	        this.live = source["live"];
+	        this.error = source["error"];
+	    }
+	}
 	export class LinkedSuperAI {
 	    name: string;
 	    url: string;

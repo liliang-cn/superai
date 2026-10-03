@@ -75,6 +75,8 @@ export function GetStatus():Promise<Record<string, any>>;
 
 export function GraphView():Promise<Record<string, any>>;
 
+export function HiveLinkStatus():Promise<app.HiveLinkInfo>;
+
 export function HiveMembers():Promise<Array<backend.HiveMember>>;
 
 export function HiveRetire(arg1:number,arg2:boolean):Promise<Record<string, any>>;
@@ -96,6 +98,8 @@ export function InstallMCPServer(arg1:string,arg2:string,arg3:Array<string>,arg4
 export function InstallSkill(arg1:string,arg2:string):Promise<string>;
 
 export function Life():Promise<backend.LifeData>;
+
+export function LinkHive(arg1:string,arg2:string):Promise<app.HiveLinkInfo>;
 
 export function LinkSuperAI(arg1:string,arg2:string,arg3:string):Promise<string>;
 
@@ -146,6 +150,8 @@ export function ReadWorkspaceFile(arg1:string):Promise<string>;
 export function ReadWorkspaceFileDataURL(arg1:string):Promise<string>;
 
 export function RefreshDashboard(arg1:string):Promise<Record<string, any>>;
+
+export function Remote(arg1:string,arg2:Array<any>):Promise<any>;
 
 export function RemoteAgentNames():Promise<Array<Record<string, string>>>;
 
@@ -201,11 +207,15 @@ export function StartYoloMode():Promise<Record<string, any>>;
 
 export function StopYoloMode():Promise<Record<string, any>>;
 
+export function TakeOver(arg1:string,arg2:string,arg3:string):Promise<void>;
+
 export function TestWebhook():Promise<string>;
 
 export function ToolApprovalInfo(arg1:number):Promise<Record<string, any>>;
 
 export function TraceLines(arg1:string,arg2:number):Promise<Array<string>>;
+
+export function UnlinkHive():Promise<void>;
 
 export function UnlinkSuperAI(arg1:string):Promise<void>;
 

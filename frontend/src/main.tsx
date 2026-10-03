@@ -10,6 +10,9 @@ import '@fontsource-variable/geist-mono'
 import './styles.css'
 import App from './App'
 import Gate from './components/Gate'
+import LinkHive from './components/LinkHive'
+import {HiveLinkStatus} from '../wailsjs/go/app/App'
+import {installHiveBridge, setAlone, wantsAlone} from './lib/hivelink'
 
 /**
  * The password box, and only then the app.
@@ -45,8 +48,28 @@ function Root() {
             .catch(() => setAuthed(false))
     }, [served])
 
-    if (authed === null) return null
+    // The desktop window: onto the hive it is linked to, or asking which one.
+    // null = still finding out.
+    const [link, setLink] = useState<'linked' | 'alone' | 'ask' | null>(served ? 'alone' : null)
+    useEffect(() => {
+        if (served) return
+        HiveLinkStatus()
+            .then((s) => {
+                if (s?.linked) {
+                    installHiveBridge()
+                    setLink('linked')
+                } else setLink(wantsAlone() ? 'alone' : 'ask')
+            })
+            .catch(() => setLink('alone'))
+    }, [served])
+
+    if (authed === null || link === null) return null
     if (!authed) return <Gate onEnter={() => setAuthed(true)}/>
+    if (link === 'ask') {
+        return <LinkHive
+            onLinked={() => { installHiveBridge(); setLink('linked') }}
+            onAlone={() => { setAlone(true); setLink('alone') }}/>
+    }
     return (
         <HashRouter>
             <App/>

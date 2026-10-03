@@ -22,6 +22,8 @@ import (
 // from the React frontend.
 type App struct {
 	ctx context.Context
+	// The desktop window's link to a hive's queen. See app_hivelink.go.
+	hiveLink hiveLinkState
 
 	mu       sync.Mutex
 	svc      *backend.Service
@@ -168,6 +170,7 @@ func NewApp() *App {
 // GetStatus so the Settings page can fix the config and rebuild.
 func (a *App) Startup(ctx context.Context) {
 	a.ctx = ctx
+	a.startHiveLink()
 	a.boot()
 }
 
@@ -604,7 +607,7 @@ func (a *App) emit(name string, payload map[string]any) {
 	if hub := a.companionHub.Load(); hub != nil {
 		hub.broadcast(name, payload)
 	}
-	if a.ctx != nil {
+	if a.ctx != nil && !a.quietWhileLinked(name) {
 		windowEmit(a.ctx, name, payload)
 	}
 }
