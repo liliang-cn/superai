@@ -243,7 +243,7 @@ export function Coding({ runs, open }: { runs: CodingRun[]; open: () => void }) 
           <Cell label={r.remote ? r.remote.slice(0, 3) : r.agent.slice(0, 1).toUpperCase()} state={r.state === "running" ? "working" : r.state === "failed" ? "lost" : "done"} size={24} />
           <span className="cv-row-main">
             <b>{oneLine(r.prompt)}</b>
-            <small>@{r.agent}{r.remote ? `.${r.remote}` : ""}{r.summary ? ` — ${oneLine(r.summary)}` : ""}</small>
+            <small>@{r.agent.includes(".") || !r.remote ? r.agent : `${r.agent}.${r.remote}`}{r.summary ? ` — ${oneLine(r.summary)}` : ""}</small>
           </span>
           <span className="cv-row-time">{r.state === "running" ? elapsed(r.started, now) : new Date(r.started).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false })}</span>
         </button>
