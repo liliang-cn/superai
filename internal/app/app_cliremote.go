@@ -29,6 +29,9 @@ import (
 
 type cliRemote struct {
 	name, base, token string
+	// link, when set, is an agent connected over the agent link: calls and
+	// events travel on its stream instead of HTTP. See agentlink_core.go.
+	link *agentConn
 }
 
 var cliRemoteHTTP = &http.Client{Transport: &http.Transport{ResponseHeaderTimeout: 30 * time.Second}}
@@ -43,23 +46,30 @@ func splitRemoteCLI(name string) (agent, host string, ok bool) {
 	return name[:i], name[i+1:], true
 }
 
-// cliRemotes is every other SuperAI configured by URL.
+// cliRemotes is every other SuperAI configured by URL, and every agent
+// connected over the agent link. A connected agent wins over a URL of the
+// same name: it is the one that is certainly there.
 func (a *App) cliRemotes() map[string]cliRemote {
-	a.mu.Lock()
-	defer a.mu.Unlock()
 	out := map[string]cliRemote{}
-	if a.settings == nil || !a.settings.RemoteAgents.Enabled {
-		return out
-	}
-	for name, r := range a.settings.RemoteAgents.Agents {
-		if u := strings.TrimRight(strings.TrimSpace(r.URL), "/"); u != "" {
-			out[name] = cliRemote{name: name, base: u, token: r.Token}
+	a.mu.Lock()
+	if a.settings != nil && a.settings.RemoteAgents.Enabled {
+		for name, r := range a.settings.RemoteAgents.Agents {
+			if u := strings.TrimRight(strings.TrimSpace(r.URL), "/"); u != "" {
+				out[name] = cliRemote{name: name, base: u, token: r.Token}
+			}
 		}
+	}
+	a.mu.Unlock()
+	for _, c := range a.agents().list() {
+		out[c.name()] = cliRemote{name: c.name(), link: c}
 	}
 	return out
 }
 
 func (r cliRemote) rpc(ctx context.Context, method string, args []any, out any) error {
+	if r.link != nil {
+		return r.link.call(ctx, method, args, out)
+	}
 	body, _ := json.Marshal(args)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, r.base+"/api/rpc/"+method, bytes.NewReader(body))
 	if err != nil {
@@ -104,6 +114,12 @@ func (a *App) remoteCLIs() map[string][]string {
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	for _, r := range remotes {
+		if r.link != nil {
+			mu.Lock()
+			out[r.name] = append([]string{}, r.link.hello.GetClis()...)
+			mu.Unlock()
+			continue
+		}
 		wg.Add(1)
 		go func(r cliRemote) {
 			defer wg.Done()
@@ -171,19 +187,10 @@ func (a *App) startRemoteCLIRun(o cliStart, host string) (CLIRun, error) {
 	// The stream is opened before the run is started: a run that ends fast
 	// would otherwise finish before anyone here is listening.
 	ctx, stop := context.WithCancel(context.Background())
-	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, r.base+"/api/events", nil)
-	if r.token != "" {
-		req.Header.Set("Authorization", "Bearer "+r.token)
-	}
-	resp, err := cliRemoteHTTP.Do(req)
+	resp, err := r.events(ctx)
 	if err != nil {
 		stop()
-		return CLIRun{}, fmt.Errorf("cannot reach %s: %w", host, err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		resp.Body.Close()
-		stop()
-		return CLIRun{}, fmt.Errorf("%s refused its event stream: %s", host, resp.Status)
+		return CLIRun{}, err
 	}
 
 	var there CLIRun
@@ -231,6 +238,27 @@ func (a *App) startRemoteCLIRun(o cliStart, host string) (CLIRun, error) {
 		a.mirrorRemoteRun(ctx, r, run, there, resp.Body)
 	}()
 	return summaryOf(run), nil
+}
+
+// events opens the remote's event stream: SSE over HTTP, or the agent link's
+// events rendered the same way.
+func (r cliRemote) events(ctx context.Context) (*http.Response, error) {
+	if r.link != nil {
+		return &http.Response{StatusCode: http.StatusOK, Body: r.link.eventStream(ctx)}, nil
+	}
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, r.base+"/api/events", nil)
+	if r.token != "" {
+		req.Header.Set("Authorization", "Bearer "+r.token)
+	}
+	resp, err := cliRemoteHTTP.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("cannot reach %s: %w", r.name, err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		resp.Body.Close()
+		return nil, fmt.Errorf("%s refused its event stream: %s", r.name, resp.Status)
+	}
+	return resp, nil
 }
 
 // mirrorRemoteRun copies one remote run's events here until it ends.

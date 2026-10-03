@@ -35,6 +35,7 @@ import (
 	"os"
 	"os/signal"
 	"reflect"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -146,12 +147,6 @@ func rpcCall(app *App, w http.ResponseWriter, r *http.Request) {
 		http.Error(w, name+": "+reason, http.StatusNotFound)
 		return
 	}
-	m := reflect.ValueOf(app).MethodByName(name)
-	if !m.IsValid() {
-		http.Error(w, "no such method: "+name, http.StatusNotFound)
-		return
-	}
-
 	body, err := io.ReadAll(io.LimitReader(r.Body, 32<<20))
 	if err != nil {
 		http.Error(w, "read body: "+err.Error(), http.StatusBadRequest)
@@ -164,17 +159,46 @@ func rpcCall(app *App, w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	result, err := callMethod(app, name, raw)
+	if err != nil {
+		code := http.StatusInternalServerError
+		var ce *callError
+		if errors.As(err, &ce) {
+			code = ce.status
+		}
+		http.Error(w, err.Error(), code)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(result)
+}
+
+// callError is a call that never reached the method: no such method, or
+// arguments that do not fit it. Status is what HTTP says about it.
+type callError struct {
+	status int
+	msg    string
+}
+
+func (e *callError) Error() string { return e.msg }
+
+// callMethod runs one App method by name with its arguments as JSON — the one
+// dispatcher behind /api/rpc and behind the calls core makes on an agent over
+// the agent link, so the two can never disagree about a method.
+func callMethod(app *App, name string, raw []json.RawMessage) (any, error) {
+	m := reflect.ValueOf(app).MethodByName(name)
+	if !m.IsValid() {
+		return nil, &callError{http.StatusNotFound, "no such method: " + name}
+	}
 	mt := m.Type()
 	if mt.NumIn() != len(raw) {
-		http.Error(w, fmt.Sprintf("%s takes %d argument(s), got %d", name, mt.NumIn(), len(raw)), http.StatusBadRequest)
-		return
+		return nil, &callError{http.StatusBadRequest, fmt.Sprintf("%s takes %d argument(s), got %d", name, mt.NumIn(), len(raw))}
 	}
 	args := make([]reflect.Value, len(raw))
 	for i := range raw {
 		v := reflect.New(mt.In(i))
 		if err := json.Unmarshal(raw[i], v.Interface()); err != nil {
-			http.Error(w, fmt.Sprintf("argument %d: %v", i, err), http.StatusBadRequest)
-			return
+			return nil, &callError{http.StatusBadRequest, fmt.Sprintf("argument %d: %v", i, err)}
 		}
 		args[i] = v.Elem()
 	}
@@ -182,7 +206,7 @@ func rpcCall(app *App, w http.ResponseWriter, r *http.Request) {
 	out := m.Call(args)
 
 	// Wails semantics: a trailing error return rejects the promise; everything
-	// before it resolves it. Mirror that as 500-with-message vs 200-with-JSON.
+	// before it resolves it.
 	//
 	// Which return is the error is decided by the method's signature and not by
 	// the value in it. Asking the value — `o.Interface().(error)` — gets it
@@ -194,15 +218,13 @@ func rpcCall(app *App, w http.ResponseWriter, r *http.Request) {
 	for i, o := range out {
 		if mt.Out(i) == errorType {
 			if err, _ := o.Interface().(error); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
+				return nil, err
 			}
 			continue
 		}
 		result = o.Interface()
 	}
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(result)
+	return result, nil
 }
 
 // spaHandler serves the embedded frontend build, falling back to index.html
@@ -275,11 +297,18 @@ func newAPIMux(app *App, hub *eventHub, creds *credentials, handoff *handoffStor
 	return mux, nil
 }
 
+func envInt(name string) int {
+	n, _ := strconv.Atoi(strings.TrimSpace(os.Getenv(name)))
+	return n
+}
+
 // serveMain is the `superai serve` entry point.
 func ServeMain(argv []string) {
 	fl := flag.NewFlagSet("serve", flag.ExitOnError)
 	port := fl.Int("port", 43117, "listen on <bind>:<port>")
 	bind := fl.String("bind", "127.0.0.1", "address to listen on; anything but loopback exposes the API to the network, so only do it behind the login gate (a container needs 0.0.0.0)")
+	agentPort := fl.Int("agent-port", envInt("SUPERAI_AGENT_PORT"), "listen for agents on <bind>:<agent-port> (gRPC); 0 is off (env SUPERAI_AGENT_PORT)")
+	lf := addAgentLinkFlags(fl)
 	_ = fl.Parse(argv)
 
 	log.SetPrefix("superai-serve ")
@@ -305,6 +334,22 @@ func ServeMain(argv []string) {
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
+
+	// Core: agents dial in here.
+	if *agentPort > 0 {
+		agentAddr := net.JoinHostPort(*bind, fmt.Sprint(*agentPort))
+		go func() {
+			if err := ServeAgentLink(ctx, app, agentAddr, credentialsCheck(creds)); err != nil {
+				log.Printf("agent link: %v", err)
+			}
+		}()
+	}
+	// Agent: this instance also dials a core (a node that keeps its own web
+	// surface, like the Mac's).
+	if o, ok := lf.options(); ok {
+		go app.RunAgentLink(ctx, o)
+	}
+
 	go func() {
 		<-ctx.Done()
 		shutCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

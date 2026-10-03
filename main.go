@@ -29,6 +29,12 @@ func main() {
 		app.ServeMain(os.Args[2:])
 		return
 	}
+	// This machine as an agent of a core, over the agent link
+	// (internal/app/agentlink_main.go).
+	if len(os.Args) > 1 && os.Args[1] == "agent" {
+		app.AgentMain(os.Args[2:])
+		return
+	}
 	// This machine as an agent node another SuperAI drives (internal/app/node.go).
 	if len(os.Args) > 1 && os.Args[1] == "node" {
 		app.NodeMain(os.Args[2:])

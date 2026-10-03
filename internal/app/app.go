@@ -24,6 +24,11 @@ type App struct {
 	ctx context.Context
 	// The desktop window's link to a hive's queen. See app_hivelink.go.
 	hiveLink hiveLinkState
+	// Agents connected to this core over the agent link, and, on an agent,
+	// where its events go up the link. See agentlink_core.go / _agent.go.
+	agentHubOnce sync.Once
+	agentHubV    *agentHub
+	agentTap     atomic.Pointer[func(string, map[string]any)]
 
 	mu       sync.Mutex
 	svc      *backend.Service
@@ -606,6 +611,9 @@ func (a *App) emit(name string, payload map[string]any) {
 	}
 	if hub := a.companionHub.Load(); hub != nil {
 		hub.broadcast(name, payload)
+	}
+	if tap := a.agentTap.Load(); tap != nil {
+		(*tap)(name, payload)
 	}
 	if a.ctx != nil && !a.quietWhileLinked(name) {
 		windowEmit(a.ctx, name, payload)
