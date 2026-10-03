@@ -152,6 +152,9 @@ func (a *App) addressable(name string) bool {
 	if a.isRemoteCLI(name) {
 		return true
 	}
+	if a.agents().serving(name) != nil {
+		return true
+	}
 	if a.remoteRunner().Config().Has(name) {
 		return true
 	}
@@ -184,6 +187,25 @@ func (a *App) RemoteAgentNames() []map[string]string {
 		}
 		out = append(out, map[string]string{"name": c.Name, "about": about})
 	}
+	// What agents connected over the agent link can reach, through them.
+	for _, c := range a.agents().list() {
+		for _, n := range c.hello.GetAgents() {
+			about := n.GetAbout()
+			if about == "" {
+				about = n.GetName()
+			}
+			about += " (via " + c.name() + ")"
+			replaced := false
+			for _, e := range out {
+				if e["name"] == n.GetName() {
+					e["about"], replaced = about, true
+				}
+			}
+			if !replaced {
+				out = append(out, map[string]string{"name": n.GetName(), "about": about})
+			}
+		}
+	}
 	return append(out, a.remoteCLINames()...)
 }
 
@@ -202,6 +224,18 @@ func (a *App) AskRemoteAgent(name, prompt string) backend.RemoteResult {
 // askAgent sends a question to whichever kind of agent the name belongs to.
 func (a *App) askAgent(ctx context.Context, name, prompt string) backend.RemoteResult {
 	name = strings.TrimSpace(name)
+	// An agent connected over the agent link that can reach it goes first:
+	// it is there, and it is where the thing actually runs.
+	if c := a.agents().serving(name); c != nil {
+		var res backend.RemoteResult
+		if err := c.call(ctx, "AskRemoteAgent", []any{name, prompt}, &res); err != nil {
+			return backend.RemoteResult{Agent: name, Host: c.name(), Failed: true, Reason: err.Error()}
+		}
+		if res.Host == "" {
+			res.Host = c.name()
+		}
+		return res
+	}
 	if a.remoteRunner().Config().Has(name) {
 		res, err := a.remoteRunner().Run(ctx, name, prompt)
 		if err != nil {

@@ -1,0 +1,95 @@
+syntax = "proto3";
+
+// How an agent reaches core.
+//
+// The agent dials core and holds one stream open; everything else travels on
+// it, in both directions. Core never has to reach the agent — the agent may be
+// behind NAT, in a VM, or on a machine core has no ssh to — so the direction
+// of the connection is the agent's, and the direction of the work is core's.
+//
+// Over the stream core calls the agent's own methods (the same ones a browser
+// reaches at /api/rpc/<Method>, as far as the agent allows), and the agent
+// sends back the replies and everything its event bus says.
+package superai.agentlink.v1;
+
+option go_package = "github.com/liliang-cn/superai/internal/agentlink/pb;agentlinkpb";
+
+service AgentLink {
+  // Connect is the agent's one stream. Its first frame is a Hello.
+  rpc Connect(stream AgentFrame) returns (stream CoreFrame);
+}
+
+// What the agent sends.
+message AgentFrame {
+  oneof kind {
+    Hello hello = 1;
+    Reply reply = 2;
+    Event event = 3;
+    Pong pong = 4;
+  }
+}
+
+// What core sends.
+message CoreFrame {
+  oneof kind {
+    Welcome welcome = 1;
+    Call call = 2;
+    Ping ping = 3;
+  }
+}
+
+// Hello says who the agent is and what it can run. Sent first, and again
+// whenever that changes; each one replaces the last.
+message Hello {
+  // The name core addresses it by: "claude.<name>", and the hive view.
+  string name = 1;
+  string host = 2;
+  string os = 3;
+  string arch = 4;
+  string version = 5;
+  // Coding CLIs installed there: "claude", "codex", ...
+  repeated string clis = 6;
+  // Other agents it can reach and run for core: openclaw, hermes, ...
+  repeated NamedAgent agents = 7;
+}
+
+message NamedAgent {
+  string name = 1;
+  string about = 2;
+}
+
+message Welcome {
+  // The name core has it under.
+  string name = 1;
+}
+
+// Call runs one of the agent's methods. Arguments and result are the JSON the
+// method takes and returns over /api/rpc, so the two surfaces cannot differ.
+message Call {
+  string id = 1;
+  string method = 2;
+  // A JSON array, one element per argument.
+  string args_json = 3;
+}
+
+message Reply {
+  string id = 1;
+  string result_json = 2;
+  // Set when the method failed; result_json is then empty.
+  string error = 3;
+}
+
+// Event is one thing the agent's event bus said (cli:run, cli:event,
+// tool:approval, ...), as name and JSON payload.
+message Event {
+  string name = 1;
+  string payload_json = 2;
+}
+
+message Ping {
+  int64 at_unix_ms = 1;
+}
+
+message Pong {
+  int64 at_unix_ms = 1;
+}
