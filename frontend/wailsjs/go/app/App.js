@@ -130,6 +130,10 @@ export function FollowUpCLIRun(arg1, arg2) {
   return window['go']['app']['App']['FollowUpCLIRun'](arg1, arg2);
 }
 
+export function ForgetHive(arg1) {
+  return window['go']['app']['App']['ForgetHive'](arg1);
+}
+
 export function GetSettings() {
   return window['go']['app']['App']['GetSettings']();
 }
@@ -144,6 +148,10 @@ export function GraphView() {
 
 export function HiveLinkStatus() {
   return window['go']['app']['App']['HiveLinkStatus']();
+}
+
+export function HiveLinks() {
+  return window['go']['app']['App']['HiveLinks']();
 }
 
 export function HiveMembers() {
@@ -440,6 +448,10 @@ export function UnreadNotifications() {
 
 export function Upcoming() {
   return window['go']['app']['App']['Upcoming']();
+}
+
+export function UseHive(arg1) {
+  return window['go']['app']['App']['UseHive'](arg1);
 }
 
 export function WakeStandingAgent(arg1, arg2) {

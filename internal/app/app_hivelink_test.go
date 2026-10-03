@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 )
@@ -135,5 +136,76 @@ func TestTheDesktopWindowSeesTheHiveOnceLinked(t *testing.T) {
 	}
 	if loadHiveLink() != nil {
 		t.Fatal("the link file survived unlinking")
+	}
+}
+
+func TestTheDesktopWindowSwitchesBetweenHives(t *testing.T) {
+	t.Setenv("SUPERAI_HOME", t.TempDir())
+	prev := windowEmit
+	windowEmit = func(context.Context, string, map[string]any) {}
+	t.Cleanup(func() { windowEmit = prev })
+
+	// A file from before there could be several: one link, in use.
+	q0 := fakeQueen(t)
+	old, _ := json.Marshal(map[string]any{"url": q0.URL, "token": "tok-1", "device_id": "d0"})
+	if err := os.WriteFile(hiveLinkPath(), old, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	a := &App{ctx: context.Background()}
+	t.Cleanup(func() { a.useHiveLink(nil) })
+	a.startHiveLink()
+	if st := a.HiveLinkStatus(); !st.Linked || st.URL != q0.URL {
+		t.Fatalf("the old link was not picked up: %+v", st)
+	}
+
+	q1, q2 := fakeQueen(t), fakeQueen(t)
+	for _, q := range []string{q1.URL, q2.URL} {
+		if _, err := a.LinkHive(q, "123456"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	links := a.HiveLinks()
+	if len(links) != 3 || !links[2].Active || links[0].Active {
+		t.Fatalf("saved hives: %+v", links)
+	}
+	if st := a.HiveLinkStatus(); st.URL != q2.URL {
+		t.Fatalf("pairing did not switch to the new hive: %+v", st)
+	}
+
+	if err := a.UseHive(q1.URL); err != nil {
+		t.Fatal(err)
+	}
+	if st := a.HiveLinkStatus(); st.URL != q1.URL {
+		t.Fatalf("switched to %+v", st)
+	}
+	if _, err := a.Remote("HiveStatus", nil); err != nil {
+		t.Fatalf("calls after switching: %v", err)
+	}
+
+	// This Mac on its own, the hives still saved.
+	if err := a.UseHive(""); err != nil {
+		t.Fatal(err)
+	}
+	if a.HiveLinkStatus().Linked || len(a.HiveLinks()) != 3 {
+		t.Fatal("this Mac alone should keep the saved hives and use none")
+	}
+	if err := a.UseHive("http://nowhere"); err == nil {
+		t.Fatal("switched to a hive never saved")
+	}
+
+	// Forgetting the one in use goes back to this Mac.
+	_ = a.UseHive(q2.URL)
+	if err := a.ForgetHive(q2.URL); err != nil {
+		t.Fatal(err)
+	}
+	if a.HiveLinkStatus().Linked || len(a.HiveLinks()) != 2 {
+		t.Fatalf("after forgetting: %+v", a.HiveLinks())
+	}
+	// A fresh start keeps what is left, and that none is in use.
+	b := &App{ctx: context.Background()}
+	t.Cleanup(func() { b.useHiveLink(nil) })
+	b.startHiveLink()
+	if b.HiveLinkStatus().Linked || len(b.HiveLinks()) != 2 {
+		t.Fatal("the book did not survive a restart")
 	}
 }

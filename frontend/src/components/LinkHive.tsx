@@ -18,7 +18,9 @@ const IDLE = [
   { key: "d", busy: 0.15, rgb: [60, 170, 100] as [number, number, number] },
 ];
 
-export default function LinkHive({ onLinked, onAlone }: { onLinked: () => void; onAlone: () => void }) {
+/** The pairing form. First run: with a way to stay on this Mac. From the
+ *  backend switcher: with a way back. */
+export default function LinkHive({ onLinked, onAlone, onCancel }: { onLinked: () => void; onAlone?: () => void; onCancel?: () => void }) {
   const [address, setAddress] = useState("");
   const [code, setCode] = useState("");
   const [err, setErr] = useState("");
@@ -44,10 +46,10 @@ export default function LinkHive({ onLinked, onAlone }: { onLinked: () => void; 
   };
 
   return (
-    <div className="cv-root gate2" style={themeVars(theme)}>
+    <div className={onCancel ? "cv-root gate2 gate2-over" : "cv-root gate2"} style={themeVars(theme)}>
       <Sky at={new Date()} lanes={IDLE} base={theme.base} mode={theme.mode} />
       <form className="cv-glass gate2-card" onSubmit={submit}>
-        <h1>Link this Mac to your hive</h1>
+        <h1>{onCancel ? "Add a hive" : "Link this Mac to your hive"}</h1>
         <p>On your hive's web page, open Settings and pair a device. Enter its address and the code it shows.</p>
         <div className="gate2-field">
           <input ref={field} value={address} placeholder="Address, like ai.example.com" autoCapitalize="off" spellCheck={false}
@@ -61,7 +63,11 @@ export default function LinkHive({ onLinked, onAlone }: { onLinked: () => void; 
           {busy ? "Linking…" : "Link"}
         </button>
         {err && <div className="gate2-err">{err}</div>}
-        <button type="button" className="gate2-alt" onClick={onAlone}>Use this Mac on its own</button>
+        {onCancel ? (
+          <button type="button" className="gate2-alt" onClick={onCancel}>Cancel</button>
+        ) : onAlone && (
+          <button type="button" className="gate2-alt" onClick={onAlone}>Use this Mac on its own</button>
+        )}
       </form>
     </div>
   );

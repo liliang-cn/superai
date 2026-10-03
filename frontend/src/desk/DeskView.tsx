@@ -14,10 +14,10 @@ import { Bee, QUEEN_SESSION, elapsed, useBees, useCodingRuns, useHive, useUpcomi
 import type { CodingRun, UpcomingItem } from "../canvas/tiles";
 import { dashboards, Dashboard } from "../lib/dashboards";
 import {
-  CancelAllChats, CancelCLIRun, ChatSessions, HiveLinkStatus, TakeOver, UnlinkHive,
+  CancelAllChats, CancelCLIRun, ChatSessions, HiveLinkStatus, TakeOver,
 } from "../../wailsjs/go/app/App";
 import { EventsOn } from "../../wailsjs/runtime";
-import { setAlone } from "../lib/hivelink";
+import { openSwitcher } from "../lib/hivelink";
 import LiveHive from "./LiveHive";
 import LiveRun, { useRun } from "./LiveRun";
 import { useDeskTheme } from "./DeskShell";
@@ -116,7 +116,6 @@ export default function DeskView({ approvals, openSession, onSessionOpened }: {
   const [opened, setOpened] = useState<TabKey[]>([]);
   const [closed, setClosed] = useState<Set<TabKey>>(new Set());
   const [active, setActive] = useState<TabKey>("hive");
-  const [menu, setMenu] = useState(false);
   const needsRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -213,22 +212,13 @@ export default function DeskView({ approvals, openSession, onSessionOpened }: {
           })}
         </div>
         <div className="dk-foot">
-          <button className="dk-link" onClick={() => setMenu((m) => !m)}>
+          <button className="dk-link" onClick={() => openSwitcher()} title="Switch backend">
             <span className="dk-qhex small">{link.linked ? "Q" : "M"}</span>
             <span>
               {link.linked ? (link.url || "").replace(/^https?:\/\//, "") : "This Mac only"}
               <small><i className={link.live ? "dk-ok" : "dk-off"} />{link.linked ? (link.live ? "Linked" : "Reconnecting") : "Not in a hive"}</small>
             </span>
           </button>
-          {menu && !served && (
-            <div className="cv-glass dk-menu">
-              {link.linked ? (
-                <button onClick={async () => { await UnlinkHive().catch(() => {}); setAlone(false); location.reload(); }}>Unlink from this hive</button>
-              ) : (
-                <button onClick={() => { setAlone(false); location.reload(); }}>Link to a hive</button>
-              )}
-            </div>
-          )}
         </div>
       </aside>
 

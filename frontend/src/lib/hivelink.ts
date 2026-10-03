@@ -13,6 +13,9 @@ const LOCAL = new Set([
   "LinkHive",
   "UnlinkHive",
   "HiveLinkStatus",
+  "HiveLinks",
+  "UseHive",
+  "ForgetHive",
   "Remote",
   "SetWindowTheme",
   "PickFiles",
@@ -67,9 +70,20 @@ export function graphSrc(): string | null {
 export interface HiveLinkInfo {
   linked: boolean;
   url?: string;
+  name?: string;
   live: boolean;
   error?: string;
 }
+
+export interface HiveLinkEntry {
+  id: string;
+  name: string;
+  url: string;
+  active: boolean;
+}
+
+/** Asks anything on screen that shows the backend switcher to open it. */
+export const openSwitcher = () => window.dispatchEvent(new Event("superai:switcher"));
 
 /** "Use this Mac on its own" — remembered so the question is asked once. */
 const ALONE_KEY = "superai-desktop-alone";
