@@ -10,6 +10,8 @@ import { Bees, Cell, Coding, CodingRun, InFlight, Later, Machines, NeedsYou, Que
 import { EventsOn } from "../../wailsjs/runtime";
 import { Hive, elapsed, isToday, oneLine, short, useBees, useCodingRuns, useHive, useUpcoming, useLinkedAgents, QUEEN_SESSION } from "./data";
 import { GenSpec, loadSpecs, makeTile, saveSpecs } from "./generated";
+import { AttentionItem, AttentionList, useAttention } from "./attention";
+import { taskPath } from "../lib/routes";
 import { BASES, BaseName, COLORS, CanvasTheme, ColorName, DEFAULT_THEME, loadTheme, saveTheme, themeVars } from "./theme";
 import "./canvas.css";
 import { Response } from "@/components/ai-elements/response";
@@ -70,6 +72,27 @@ export default function CanvasView({ approvals }: { approvals: { pending: ToolAp
   const upcoming = useUpcoming();
   const codingRuns = useCodingRuns();
   const linked = useLinkedAgents();
+  const attentionItems = useAttention();
+  const openItem = (it: AttentionItem) => {
+    if (it.open === "hive" && it.kind === "failed" && it.ref) navigate(taskPath(it.ref));
+    else if (it.open === "hive") navigate(PATHS.hive);
+    else if (it.open === "agents") navigate(PATHS.agents);
+    else if (it.open === "coding") navigate(PATHS.coding);
+    else if (it.open === "records") navigate(PATHS.records);
+  };
+  // What the For you card shows besides the approval card above it.
+  const feed = attentionItems.filter((i) => i.kind !== "approval");
+  const forYou = (
+    <>
+      {(approvals.pending.length > 0 || feed.length === 0) && <NeedsYou pending={approvals.pending} resolve={approvals.resolve} bees={bees} />}
+      {feed.length > 0 && (
+        <section className="cv-glass cv-tile cv-foryou" data-testid="for-you">
+          <h2>For you</h2>
+          <AttentionList items={feed} onOpen={openItem} />
+        </section>
+      )}
+    </>
+  );
   const wide = useWide();
   const chat = useChat();
   const [tiles, setTiles] = useState<Tile[]>(loadLayout);
@@ -219,7 +242,7 @@ export default function CanvasView({ approvals }: { approvals: { pending: ToolAp
               </div>
             </section>
             <aside className="cv-side">
-              <NeedsYou pending={approvals.pending} resolve={approvals.resolve} bees={bees} />
+              {forYou}
               {tiles.filter((t) => t.kind !== "queen").map((t) => (
                 <section
                   key={t.id}
@@ -246,7 +269,7 @@ export default function CanvasView({ approvals }: { approvals: { pending: ToolAp
           </div>
         ) : (
         <>
-        <NeedsYou pending={approvals.pending} resolve={approvals.resolve} bees={bees} />
+        {forYou}
 
         <div className="cv-grid">
           {tiles.map((t) => (

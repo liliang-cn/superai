@@ -12,6 +12,8 @@ export function AddSchedule(arg1:string,arg2:string,arg3:string,arg4:Array<strin
 
 export function AskRemoteAgent(arg1:string,arg2:string):Promise<backend.RemoteResult>;
 
+export function Attention():Promise<Array<app.AttentionItem>>;
+
 export function CLIProxyAccounts():Promise<Array<backend.CLIProxyAccount>>;
 
 export function CLIProxyLogin(arg1:string,arg2:string):Promise<string>;

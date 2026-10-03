@@ -8,6 +8,8 @@ import {
 import { useChat } from "../lib/useChat";
 import { AgentInfo, useAgentMentions } from "../lib/useAgentMentions";
 import { AgentMenu } from "../components/AgentMenu";
+import { AttentionItem, AttentionList, useAttention } from "../canvas/attention";
+import { taskPath } from "../lib/routes";
 import type { ToolApproval } from "../lib/useToolApprovals";
 import { PATHS } from "../lib/routes";
 import { withoutCallNotes } from "../lib/format";
@@ -118,6 +120,7 @@ export default function DeskView({ approvals, openSession, onSessionOpened }: {
   const chat = useChat();
   const recents = useRecents(chat.sending);
   const link = useLink();
+  const attention = useAttention();
   const [draft, setDraft] = useState("");
   const composerRef = useRef<HTMLTextAreaElement>(null);
   // @ offers the agents the core knows (hermes, pi, claude.mac, …) and the
@@ -158,7 +161,17 @@ export default function DeskView({ approvals, openSession, onSessionOpened }: {
   useEffect(() => { endRef.current?.scrollIntoView({ block: "end" }); }, [msgs.length, lastText.length]);
 
   const waiting: Bee[] = bees.filter((b) => b.waitingFor && !b.paused);
-  const needs = approvals.pending.length + waiting.length;
+  // Approvals and waiting bees are answered in the conversation (the cards);
+  // the rest of what needs you, and what is coming up, sits in the sidebar.
+  const needs = attention.filter((i) => i.level === "needs").length;
+  const feed = attention.filter((i) => i.kind !== "approval" && i.kind !== "bee");
+  const openItem = (it: AttentionItem) => {
+    if (it.open === "hive" && it.kind === "failed" && it.ref) navigate(taskPath(it.ref));
+    else if (it.open === "hive") navigate(PATHS.hive);
+    else if (it.open === "coding") navigate(PATHS.coding);
+    else if (it.open === "records") navigate(PATHS.records);
+    else if (it.open === "agents") navigate(PATHS.agents);
+  };
 
   // The tabs: the hive, its status and the figures always; every coding run
   // that is going; and whatever was opened.
@@ -224,6 +237,11 @@ export default function DeskView({ approvals, openSession, onSessionOpened }: {
         )}
         <button className="dk-row" onClick={() => { chat.newSession(); setOnQueen(false); }}><SquarePenIcon size={17} />New chat</button>
         <button className={onQueen ? "dk-row on" : "dk-row"} onClick={() => pickSession(QUEEN_SESSION)}><span className="dk-qhex">Q</span>The queen</button>
+        {feed.length > 0 && (
+          <div className="dk-foryou">
+            <AttentionList items={feed} onOpen={openItem} limit={5} />
+          </div>
+        )}
         <button className="dk-grp" onClick={() => navigate(PATHS.records)}>Later<ChevronRightIcon size={14} /><span className="dk-more">{nextLabel(upcoming)}</span></button>
         <button className="dk-grp" onClick={() => navigate(PATHS.agents)}>Bees<ChevronRightIcon size={14} /><span className="dk-more">{bees.length || ""}</span></button>
         {recents.length > 0 && <div className="dk-grp static">Recents</div>}

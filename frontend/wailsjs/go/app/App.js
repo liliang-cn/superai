@@ -14,6 +14,10 @@ export function AskRemoteAgent(arg1, arg2) {
   return window['go']['app']['App']['AskRemoteAgent'](arg1, arg2);
 }
 
+export function Attention() {
+  return window['go']['app']['App']['Attention']();
+}
+
 export function CLIProxyAccounts() {
   return window['go']['app']['App']['CLIProxyAccounts']();
 }
