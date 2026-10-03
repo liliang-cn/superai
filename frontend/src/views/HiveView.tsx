@@ -1,3 +1,4 @@
+import { useAttention } from "../canvas/attention";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { HiveRetire, HiveSpawn, HiveStatus } from "../../wailsjs/go/app/App";
 import { EventsOn } from "../../wailsjs/runtime";
@@ -68,6 +69,9 @@ function ago(iso: string, now: number): string {
 
 export default function HiveView() {
   const navigate = useNavigate();
+  // The swarm view folds away and stays the way it was left.
+  const [swarmOpen, setSwarmOpenState] = useState(() => { try { return localStorage.getItem("superai-hive-swarm") !== "0"; } catch { return true; } });
+  const setSwarmOpen = (on: boolean) => { setSwarmOpenState(on); try { localStorage.setItem("superai-hive-swarm", on ? "1" : "0"); } catch { /* fine */ } };
   const [st, setSt] = useState<Status | null>(null);
   const [err, setErr] = useState("");
   const [now, setNow] = useState(Date.now());
@@ -182,6 +186,7 @@ export default function HiveView() {
 
   const members = st?.members ?? [];
   const running = tasks.filter((t) => t.state === "running").length;
+  const waiting = useAttention().filter((i) => i.kind === "approval" || i.kind === "bee").length;
   const ordered = [...tasks].sort(
     (a, b) =>
       Number(b.state === "running") - Number(a.state === "running") ||
@@ -209,7 +214,71 @@ export default function HiveView() {
         {err && <div className="hint err">{err}</div>}
         {st && (
           <>
-            <HiveStageView ref={stage} role={st.role} self={st.name} workers={members} tasks={tasks} ready={ready} />
+            {/* First what needs reading: who is up, who is busy, who is not
+                answering, what waits on you — then what is running. The
+                swarm is below, and folds away. */}
+            {st.role !== "" && (
+              <div className="hive-sum">
+                <div><b>{live}<small>/{members.length}</small></b><span>online</span></div>
+                <div className={running > 0 ? "busy" : ""}><b>{new Set(tasks.filter((t) => t.state === "running").map((t) => t.worker)).size}</b><span>busy</span></div>
+                <div className={members.length - live > 0 ? "bad" : ""}><b>{members.length - live}</b><span>not answering</span></div>
+                <div className={waiting > 0 ? "wait" : ""}><b>{waiting}</b><span>waiting for you</span></div>
+              </div>
+            )}
+            {st.role !== "" && (
+              <div className="card">
+                <div className="card-title">
+                  Missions{running > 0 ? ` · ${running} running` : ""}
+                </div>
+                {ordered.length === 0 ? (
+                  <div className="hive-dim">
+                    {st.role === "queen"
+                      ? "Nothing has been ordered yet. Ask this queen to have the workers do something and it appears here as it happens."
+                      : "No orders received yet. When the queen sends this worker something, it appears here as it happens."}
+                  </div>
+                ) : (
+                  <div className="hive-missions">
+                    {ordered.map((t) => (
+                      <div className="hive-mission" key={t.id}>
+                        <div className="hive-m-head" onClick={() => navigate(taskPath(t.id))}>
+                          <span className={`hive-live-dot ${t.state}`} title={t.state} />
+                          <span className="hive-m-who">{t.dir === "peer"
+                              ? `${(t.from ?? "").replace(/^superai-/, "")} ⇄ ${t.worker.replace(/^superai-/, "")}`
+                              : t.dir === "out"
+                                ? `→ ${t.worker.replace(/^superai-/, "")}`
+                                : "← queen"}</span>
+                          <span className="hive-m-prompt" title={t.prompt}>{t.prompt}</span>
+                          <span className="hive-m-phase">
+                            {t.state === "running"
+                              ? t.phase === "tool"
+                                ? `⚙ ${t.tool || "tool"}`
+                                : t.phase === "writing"
+                                  ? "writing…"
+                                  : "thinking…"
+                              : t.state}
+                            {t.tools > 0 ? ` · ${t.tools} tool${t.tools === 1 ? "" : "s"}` : ""}
+                          </span>
+                          <span className="hive-m-meta">
+                            <Link to={taskPath(t.id)} className="hive-uuid" onClick={(e) => e.stopPropagation()} title={t.id}>
+                              {t.id.slice(0, 8)}
+                            </Link>{" "}
+                            {elapsed(t)}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="card hive-swarm">
+              <button className="hive-swarm-head" onClick={() => setSwarmOpen(!swarmOpen)}>
+                <span className="card-title">The swarm</span>
+                <span className="hive-dim">{swarmOpen ? "Hide" : "Show"}</span>
+              </button>
+              {swarmOpen && <HiveStageView ref={stage} role={st.role} self={st.name} workers={members} tasks={tasks} ready={ready} />}
+            </div>
 
             <div className="card hive-self">
               <span className={`hive-role ${st.role || "alone"}`}>{st.role || "standalone"}</span>
@@ -300,53 +369,6 @@ export default function HiveView() {
                   {st.interval_ms ? ` (${Math.round((st.interval_ms * 3) / 1000)}s)` : ""} is marked lost and is not
                   given orders; it returns to live by speaking again.
                 </div>
-              </div>
-            )}
-
-            {st.role !== "" && (
-              <div className="card">
-                <div className="card-title">
-                  Missions{running > 0 ? ` · ${running} running` : ""}
-                </div>
-                {ordered.length === 0 ? (
-                  <div className="hive-dim">
-                    {st.role === "queen"
-                      ? "Nothing has been ordered yet. Ask this queen to have the workers do something and it appears here as it happens."
-                      : "No orders received yet. When the queen sends this worker something, it appears here as it happens."}
-                  </div>
-                ) : (
-                  <div className="hive-missions">
-                    {ordered.map((t) => (
-                      <div className="hive-mission" key={t.id}>
-                        <div className="hive-m-head" onClick={() => navigate(taskPath(t.id))}>
-                          <span className={`hive-live-dot ${t.state}`} title={t.state} />
-                          <span className="hive-m-who">{t.dir === "peer"
-                              ? `${(t.from ?? "").replace(/^superai-/, "")} ⇄ ${t.worker.replace(/^superai-/, "")}`
-                              : t.dir === "out"
-                                ? `→ ${t.worker.replace(/^superai-/, "")}`
-                                : "← queen"}</span>
-                          <span className="hive-m-prompt" title={t.prompt}>{t.prompt}</span>
-                          <span className="hive-m-phase">
-                            {t.state === "running"
-                              ? t.phase === "tool"
-                                ? `⚙ ${t.tool || "tool"}`
-                                : t.phase === "writing"
-                                  ? "writing…"
-                                  : "thinking…"
-                              : t.state}
-                            {t.tools > 0 ? ` · ${t.tools} tool${t.tools === 1 ? "" : "s"}` : ""}
-                          </span>
-                          <span className="hive-m-meta">
-                            <Link to={taskPath(t.id)} className="hive-uuid" onClick={(e) => e.stopPropagation()} title={t.id}>
-                              {t.id.slice(0, 8)}
-                            </Link>{" "}
-                            {elapsed(t)}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
             )}
 

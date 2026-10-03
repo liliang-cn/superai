@@ -3956,3 +3956,22 @@ code, kbd, pre, .mono { font-family: var(--font-mono); }
 :root:not([data-theme="dark"]) .rx-counters .c-pink b { color: #b8338f; }
 :root:not([data-theme="dark"]) .rx-counters .c-teal b { color: #0e7c92; }
 :root:not([data-theme="dark"]) .rx-counters .c-violet b { color: #0f8a8a; }
+
+/* Hive: the figures first. */
+.hive-sum { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; }
+.hive-sum > div { padding: 14px 16px; border-radius: var(--radius-lg); background: var(--bg-1); border: 1px solid var(--border); }
+.hive-sum b { display: block; font-size: 28px; font-weight: 650; letter-spacing: -.02em; color: var(--text-0); }
+.hive-sum b small { font-size: 15px; font-weight: 500; color: var(--text-3); margin-left: 2px; }
+.hive-sum span { font-size: 13px; color: var(--text-2); }
+.hive-sum .busy b { color: var(--accent); }
+.hive-sum .bad b { color: var(--red); }
+.hive-sum .wait { border-color: var(--accent-border); background: var(--accent-soft); }
+.hive-sum .wait b { color: var(--accent); }
+.hive-swarm { padding-bottom: 6px; }
+.hive-swarm-head { width: 100%; display: flex; align-items: center; justify-content: space-between; background: none; border: 0; padding: 0 0 8px; cursor: pointer; color: inherit; }
+@media (max-width: 720px) { .hive-sum { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Coding: where runs can go. */
+.coding-where { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.coding-where span { white-space: nowrap; }
+.agents-pick { width: auto; min-width: 180px; }
