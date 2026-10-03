@@ -1,0 +1,74 @@
+<!doctype html><html><head><style>html,body{margin:0;background:transparent}canvas{display:block}</style>
+<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.168.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.168.0/examples/jsm/"}}</script>
+</head><body>
+<script type="module">
+import * as THREE from "three";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+const P = new URLSearchParams(location.search);
+const S = 1024, mode = P.get("mode") || "ios";
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1); renderer.setSize(S, S);
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 0.85;
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const pm = new THREE.PMREMGenerator(renderer);
+scene.environment = pm.fromScene(new RoomEnvironment(), 0.04).texture;
+
+// The ground: daylight, pale sky above, warm cream below (a big plane under the comb).
+const cv = document.createElement("canvas"); cv.width = cv.height = 512;
+const g = cv.getContext("2d");
+const lg = g.createLinearGradient(0, 0, 0, 512);
+lg.addColorStop(0, "#c6ddf1"); lg.addColorStop(0.5, "#e9eef0"); lg.addColorStop(1, "#f8eedc");
+g.fillStyle = lg; g.fillRect(0, 0, 512, 512);
+const rg = g.createRadialGradient(150, 120, 0, 150, 120, 380);
+rg.addColorStop(0, "rgba(255,247,226,0.95)"); rg.addColorStop(1, "rgba(255,247,226,0)");
+g.fillStyle = rg; g.fillRect(0, 0, 512, 512);
+const bgTex = new THREE.CanvasTexture(cv); bgTex.colorSpace = THREE.SRGBColorSpace;
+scene.background = mode === "ios" ? bgTex : null;
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.ShadowMaterial({ opacity: 0.22 }));
+ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
+
+const camera = new THREE.PerspectiveCamera(26, 1, 0.1, 100);
+camera.position.set(0, 11.6, 10.6); camera.lookAt(0, 0.3, 0.3);
+
+scene.add(new THREE.HemisphereLight(0xfff3df, 0xb9c6d2, 0.55));
+const sun = new THREE.DirectionalLight(0xfff8ee, 2.6);
+sun.position.set(-5, 8, 3); sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048); sun.shadow.radius = 9; sun.shadow.blurSamples = 20;
+Object.assign(sun.shadow.camera, { left: -5, right: 5, top: 5, bottom: -5 });
+scene.add(sun);
+
+function hexShape(r) {
+  const s = new THREE.Shape();
+  for (let i = 0; i < 6; i++) {
+    const a = Math.PI / 6 + (Math.PI / 3) * i;   // pointy top when seen from above
+    const x = r * Math.cos(a), y = r * Math.sin(a);
+    i ? s.lineTo(x, y) : s.moveTo(x, y);
+  }
+  s.closePath();
+  return s;
+}
+function cell(x, z, h, mat) {
+  const geo = new THREE.ExtrudeGeometry(hexShape(0.82), { depth: h, bevelEnabled: true, bevelThickness: 0.12, bevelSize: 0.11, bevelSegments: 8, curveSegments: 1 });
+  const m = new THREE.Mesh(geo, mat);
+  m.rotation.x = -Math.PI / 2; m.position.set(x, 0, z);
+  m.castShadow = true; m.receiveShadow = true;
+  scene.add(m);
+  return m;
+}
+const porcelain = new THREE.MeshPhysicalMaterial({ color: 0xf3ede3, roughness: 0.45, clearcoat: 0.45, clearcoatRoughness: 0.3, envMapIntensity: 0.7 });
+const honey = new THREE.MeshPhysicalMaterial({ color: 0xe08600, roughness: 0.42, clearcoat: 0.35, clearcoatRoughness: 0.2, emissive: 0xa04800, emissiveIntensity: 0.35, envMapIntensity: 0.2 });
+const ink = new THREE.MeshPhysicalMaterial({ color: 0x1d1a16, roughness: 0.22, clearcoat: 1, clearcoatRoughness: 0.06, metalness: 0.1, envMapIntensity: 0.9 });
+
+const d = Math.sqrt(3) * 0.82 + 0.42;           // centre to centre, with a gap
+const ring = [0, 60, 120, 180, 240, 300].map((a) => [d * Math.cos((a * Math.PI) / 180), d * Math.sin((a * Math.PI) / 180)]);
+cell(0, 0, 1.25, ink);                          // the queen, a little taller
+const lit = new Set([0, 3 + 1]);                // two workers busy
+ring.forEach(([x, z], i) => cell(x, z, lit.has(i) ? 0.8 : 0.5, lit.has(i) ? honey : porcelain));
+// warm light thrown by the busy ones
+
+
+renderer.render(scene, camera);
+window.__done = true;
+</script></body></html>
