@@ -3,7 +3,7 @@ import { useChat } from "../lib/useChat";
 import { useRoom } from "../lib/useViewport";
 import { useAttachments } from "../lib/useAttachments";
 import { AppStatus, ChatMessage } from "../lib/types";
-import { copyText } from "../lib/format";
+import { copyText, withoutCallNotes } from "../lib/format";
 import AttachmentChips from "../components/AttachmentChips";
 import { AgentMenu, AddressedBanner } from "../components/AgentMenu";
 import { useAgentMentions } from "../lib/useAgentMentions";
@@ -284,7 +284,7 @@ export default function ChatView({
                                   />
                                 )}
                                 {m.content ? (
-                                  <Response>{m.content}</Response>
+                                  <Response>{withoutCallNotes(m.content)}</Response>
                                 ) : m.streaming ? (
                                   // The progress block carries its own spinner, so
                                   // the caret is only needed before the first sign
@@ -312,7 +312,7 @@ export default function ChatView({
                               </>
                             ) : (
                               <span style={{ whiteSpace: "pre-wrap" }}>
-                                {m.content}
+                                {withoutCallNotes(m.content)}
                               </span>
                             )}
                           </MessageContent>

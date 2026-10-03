@@ -136,3 +136,10 @@ export function visibleAnswer(raw: string): string {
   out = out.replace(/\n?[ \t]*MOOD:[^\n]{0,20}[ \t]*$/, "");
   return out.trim();
 }
+
+/** What a person should see of a message: without the note a phone call adds
+ *  to its first turn, or the marker the queen ends a call with. */
+export function withoutCallNotes(text: string): string {
+  const i = text.indexOf("\n\n(This is a voice call:");
+  return (i >= 0 ? text.slice(0, i) : text).split("[end call]").join("").trim();
+}
