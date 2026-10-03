@@ -78,7 +78,7 @@ export default function BackendSwitcher() {
       </button>
       {open && (
         <>
-          <div className="dk-be-scrim" onClick={() => { setOpen(false); setForgetting(""); }} />
+          <div className="dk-be-scrim" style={noDrag} onClick={() => { setOpen(false); setForgetting(""); }} />
           <div className="cv-glass dk-be" style={noDrag} role="dialog" aria-label="Backend">
             <b className="dk-be-h">Backend</b>
             {saved.map((h) => (

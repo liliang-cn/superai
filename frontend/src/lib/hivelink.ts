@@ -21,6 +21,7 @@ const LOCAL = new Set([
   "PickFiles",
   "OpenInBrowser",
   "TakeOver",
+  "TitleBarDoubleClick",
 ]);
 
 type Bound = Record<string, (...args: unknown[]) => Promise<unknown>>;
@@ -93,3 +94,19 @@ export const wantsAlone = () => {
 export const setAlone = (on: boolean) => {
   try { on ? localStorage.setItem(ALONE_KEY, "1") : localStorage.removeItem(ALONE_KEY); } catch { /* fine */ }
 };
+
+/** A double-click on any strip the window is dragged by acts as the title
+ *  bar's would (zoom, minimize or nothing, as System Settings says). The
+ *  strips are marked with --wails-draggable: drag, set inline or in CSS. */
+export function installTitleBarDoubleClick(onDouble: () => void) {
+  document.addEventListener("dblclick", (e) => {
+    let el = e.target as HTMLElement | null;
+    if (el?.closest("button, a, input, textarea, select, [contenteditable]")) return;
+    while (el && el !== document.documentElement) {
+      const v = getComputedStyle(el).getPropertyValue("--wails-draggable").trim();
+      if (v === "drag") { onDouble(); return; }
+      if (v === "no-drag") return;
+      el = el.parentElement;
+    }
+  });
+}

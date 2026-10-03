@@ -422,6 +422,10 @@ export function TestWebhook() {
   return window['go']['app']['App']['TestWebhook']();
 }
 
+export function TitleBarDoubleClick() {
+  return window['go']['app']['App']['TitleBarDoubleClick']();
+}
+
 export function ToolApprovalInfo(arg1) {
   return window['go']['app']['App']['ToolApprovalInfo'](arg1);
 }

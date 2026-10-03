@@ -215,6 +215,8 @@ export function TakeOver(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function TestWebhook():Promise<string>;
 
+export function TitleBarDoubleClick():Promise<void>;
+
 export function ToolApprovalInfo(arg1:number):Promise<Record<string, any>>;
 
 export function TraceLines(arg1:string,arg2:number):Promise<Array<string>>;
