@@ -38,6 +38,7 @@ const seedOf = (s: string) => ([...s].reduce((h, c) => (h * 31 + c.charCodeAt(0)
  * The canvas's ground: the hive's day as a time-lapse. The light follows the
  * hour being shown, and every member draws a trail that lingers like a long
  * exposure — bright and quick while it works, faint and slow at rest.
+ * (Drawn as drifting patches of light: the line trails read as caterpillars.)
  */
 export default function Sky({ at, lanes, base = "timelapse", mode = "light" }: { at: Date; lanes: Lane[]; base?: BaseName; mode?: "light" | "dark" }) {
   const ref = useRef<HTMLCanvasElement>(null);
@@ -99,29 +100,25 @@ export default function Sky({ at, lanes, base = "timelapse", mode = "light" }: {
         ctx.fillRect(0, 0, W, H);
       }
 
-      lanesRef.current.forEach((L, i) => {
+      // The members as light, not lines: each a soft patch drifting across
+      // the sky, larger, brighter and quicker while it works, faint and slow
+      // at rest — the way light moves over a room in a time-lapse.
+      const span = Math.max(W, H);
+      lanesRef.current.slice(0, 8).forEach((L, i) => {
         const seed = seedOf(L.key);
-        const y0 = H * (0.1 + 0.8 * ((i * 0.618 + seed) % 1));
-        const amp = 40 + 90 * seed;
-        const speed = 0.04 + 0.11 * L.busy;
-        const head = ((t * speed + seed) % 1.25) - 0.1;
-        const tail = 0.22 + 0.35 * L.busy;
-        const alpha = 0.3 + 0.55 * L.busy;
-        const pt = (x: number) => [x * W, y0 + Math.sin(x * 3.1 + seed * 6.2 + t * 0.12) * amp * 0.6 + Math.sin(x * 7.3 + seed * 11) * amp * 0.22];
-        const n = 34;
-        let prev = pt(head - tail);
-        ctx.lineCap = "round";
-        for (let k = 1; k <= n; k++) {
-          const f = k / n;
-          const q = pt(head - tail + tail * f);
-          ctx.strokeStyle = `rgba(${L.rgb},${alpha * f * 0.28})`;
-          ctx.lineWidth = 7 + 6 * L.busy;
-          ctx.beginPath(); ctx.moveTo(prev[0], prev[1]); ctx.lineTo(q[0], q[1]); ctx.stroke();
-          ctx.strokeStyle = `rgba(${L.rgb},${alpha * f})`;
-          ctx.lineWidth = 1.4 + 2 * L.busy;
-          ctx.beginPath(); ctx.moveTo(prev[0], prev[1]); ctx.lineTo(q[0], q[1]); ctx.stroke();
-          prev = q;
-        }
+        const pace = 0.018 + 0.05 * L.busy;
+        const ph = t * pace + seed * 6.283;
+        const x = W * (0.5 + 0.42 * Math.sin(ph + i * 1.7) * Math.cos(ph * 0.37 + seed * 3));
+        const y = H * (0.5 + 0.36 * Math.sin(ph * 0.71 + i * 2.3 + seed * 5));
+        const breathe = 1 + 0.06 * Math.sin(t * (0.6 + L.busy) + seed * 9);
+        const r = span * (0.16 + 0.12 * L.busy) * breathe;
+        const a = (dark ? 0.08 : 0.13) + (dark ? 0.12 : 0.2) * L.busy;
+        const glow = ctx.createRadialGradient(x, y, 0, x, y, r);
+        glow.addColorStop(0, `rgba(${L.rgb},${a})`);
+        glow.addColorStop(0.45, `rgba(${L.rgb},${a * 0.45})`);
+        glow.addColorStop(1, `rgba(${L.rgb},0)`);
+        ctx.fillStyle = glow;
+        ctx.fillRect(x - r, y - r, r * 2, r * 2);
       });
       if (!still) raf = requestAnimationFrame(frame);
     };
