@@ -1,3 +1,4 @@
+import { translate } from "./i18n";
 import { Dashboards, DeleteDashboard, RefreshDashboard, RenameDashboard, SaveDashboard, SetDashboardCron } from "../../wailsjs/go/app/App";
 import { backend } from "../../wailsjs/go/models";
 
@@ -92,12 +93,12 @@ export const dashboards = {
  */
 export function ageLabel(iso: string): string {
   const then = new Date(iso).getTime();
-  if (!then || Number.isNaN(then)) return "unknown age";
+  if (!then || Number.isNaN(then)) return translate("unknown age");
   const mins = Math.max(0, Math.round((Date.now() - then) / 60000));
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins} min ago`;
+  if (mins < 1) return translate("just now");
+  if (mins < 60) return translate("{count} min ago",{count:mins});
   const hours = Math.round(mins / 60);
-  if (hours < 24) return `${hours} h ago`;
+  if (hours < 24) return translate("{count} h ago",{count:hours});
   const days = Math.round(hours / 24);
   return `${days} d ago`;
 }

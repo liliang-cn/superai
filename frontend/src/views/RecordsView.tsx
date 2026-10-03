@@ -1,3 +1,4 @@
+import { useSearchParams } from "react-router-dom";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Life } from "../../wailsjs/go/app/App";
 import { backend } from "../../wailsjs/go/models";
@@ -112,7 +113,9 @@ export default function RecordsView({
   const [data, setData] = useState<backend.LifeData | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string>("");
-  const [tab, setTab] = useState<TabKey>("schedules");
+  const [params] = useSearchParams();
+  const [tab, setTab] = useState<TabKey>(() => params.get("tab") === "reminders" ? "reminders" : "schedules");
+  useEffect(() => { if (params.get("tab") === "reminders") setTab("reminders"); }, [params]);
   // The scheduler's own count, reported by the view that owns it. Life() has a
   // schedules field too, but it is a second answer to the same question and the
   // two drift.

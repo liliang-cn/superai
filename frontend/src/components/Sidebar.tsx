@@ -1,5 +1,8 @@
+import { useI18n } from "../lib/i18n";
 import React, { useEffect } from "react";
 import {
+  LayoutDashboardIcon,
+  ListTodoIcon,
   BrainIcon,
   ChartColumnIcon,
   HexagonIcon,
@@ -8,7 +11,6 @@ import {
   BotIcon,
   TerminalIcon,
   MessageSquareIcon,
-  NotebookTabsIcon,
   PanelLeftCloseIcon,
   PanelLeftOpenIcon,
   PlugIcon,
@@ -40,6 +42,8 @@ const NAV: {
     section: "Workspace",
     items: [
       { key: "home", label: "Home", Icon: LayoutGridIcon },
+      { key: "dashboards", label: "Dashboards", Icon: LayoutDashboardIcon },
+      { key: "tasks", label: "Needs your attention", Icon: ListTodoIcon },
       { key: "chat", label: "Chat", Icon: MessageSquareIcon, shortcut: "1" },
       { key: "stats", label: "Stats", Icon: ChartColumnIcon, shortcut: "2" },
       { key: "hive", label: "Hive", Icon: HexagonIcon },
@@ -55,7 +59,6 @@ const NAV: {
       { key: "knowledge", label: "Knowledge", Icon: BrainIcon },
       { key: "skills", label: "Skills", Icon: PuzzleIcon },
       { key: "mcp", label: "MCP", Icon: PlugIcon },
-      { key: "records", label: "Records", Icon: NotebookTabsIcon, shortcut: "3" },
     ],
   },
   {
@@ -91,6 +94,7 @@ export default function Sidebar({
   open: boolean;
   onToggle: () => void;
 }) {
+  const { t } = useI18n();
   // "Collapsed" means two different things depending on how much room there is,
   // and the component used to only know the desktop one. On a desktop it is the
   // 60px icon rail: navigation stays one click away, it just stops spending
@@ -165,8 +169,8 @@ export default function Sidebar({
       </div>
       <nav className="nav">
         {NAV.map((group) => (
-          <div key={group.section}>
-            {labels && <div className="nav-section">{group.section}</div>}
+          <div key={t(group.section)}>
+            {labels && <div className="nav-section">{t(group.section)}</div>}
             {group.items.map((it) => {
               const badge = badges?.[it.key] ?? 0;
               const Icon = it.Icon;
@@ -175,9 +179,9 @@ export default function Sidebar({
                   key={it.key}
                   className={`nav-item${current === it.key ? " active" : ""}`}
                   data-pet-spot={`nav-${it.key}`}
-                  data-pet-label={`the ${it.label} link in the left sidebar`}
+                  data-pet-label={`the ${t(it.label)} link in the left sidebar`}
                   onClick={() => onNavigate(it.key)}
-                  title={labels ? undefined : it.label}
+                  title={labels ? undefined : t(it.label)}
                 >
                   <span className="ic">
                     <Icon className="size-4" />
@@ -187,7 +191,7 @@ export default function Sidebar({
                       used to reach the right edge with margin-left:auto, which
                       works for exactly one such thing — two of them split the
                       free space and both end up floating in the middle. */}
-                  {labels && <span className="nav-label">{it.label}</span>}
+                  {labels && <span className="nav-label">{t(it.label)}</span>}
                   {/* A desktop app should show its own breathing. Hidden off
                       the desktop build by CSS, not here: in a browser tab
                       these keys belong to the browser. */}

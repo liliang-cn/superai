@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { translate, useI18n } from "../lib/i18n";
+import LanguageSettings from "../components/LanguageSettings";
 import AvatarSection from "./AvatarSection";
 import PairPhoneCard from "../components/PairPhoneCard";
 import LinkSuperAICard from "../components/LinkSuperAICard";
@@ -538,6 +540,7 @@ export default function SettingsView({
   // Only the avatar section needs it, for the port the bridge is listening on.
   status: AppStatus | null;
 }) {
+  const { t } = useI18n();
   const [s, setS] = useState<backend.Settings | null>(null);
   const [saving, setSaving] = useState(false);
   // Which group of settings is on screen. Not in the URL and not persisted:
@@ -748,7 +751,7 @@ export default function SettingsView({
     return (
       <div className="view">
         <div className="view-header">
-          <div className="view-title">Settings</div>
+          <div className="view-title">{t("Settings")}</div>
         </div>
         <div className="loading-row"><span className="spinner" style={{ borderTopColor: "var(--accent)" }} /> Loading settings…</div>
       </div>
@@ -757,9 +760,9 @@ export default function SettingsView({
 
   return (
     <div className="view">
-      <div className="view-header">
-        <div className="view-title">Settings</div>
-        <div className="view-desc">Configure providers and runtime. Saving persists and rebuilds the backend.</div>
+      <div className="view-header with-action">
+        <div className="view-title">{t("Settings")}</div>
+        <div className="vh-actions"><LanguageSettings /></div>
       </div>
       <div
         className={`settings-tabs${tabsAtEnd ? " at-end" : ""}`}
@@ -776,7 +779,7 @@ export default function SettingsView({
             className={`settings-tab${section === t.id ? " active" : ""}`}
             onClick={() => setSection(t.id)}
           >
-            {t.label}
+            {translate(t.label)}
           </button>
         ))}
       </div>

@@ -1,0 +1,40 @@
+/* The live turn card: a turn's clock, tokens and tool calls as they happen. */
+.lt { margin: 0 0 10px; border-radius: calc(16px * var(--rs)); background: rgba(var(--glass-rgb), .55); box-shadow: inset 0 0 0 1px var(--line); overflow: hidden; }
+.lt.on { box-shadow: inset 0 0 0 1px rgba(var(--honey-rgb), .45), 0 6px 18px rgba(var(--honey-rgb), .12); }
+.lt-head { width: 100%; display: flex; align-items: center; gap: 12px; padding: 9px 14px; font-size: 12.5px; color: var(--ink-2); text-align: left; }
+.lt-head:disabled { cursor: default; }
+.lt-what { font-weight: 650; color: var(--ink); }
+.lt-n { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.lt-n b { font-weight: 650; color: var(--ink); }
+.lt-up { margin-left: auto; transform: rotate(180deg); }
+.lt-pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-3); flex: none; }
+.lt.on .lt-pulse { background: var(--honey); box-shadow: 0 0 0 0 rgba(var(--honey-rgb), .5); animation: lt-ping 1.4s ease-out infinite; }
+@keyframes lt-ping { to { box-shadow: 0 0 0 7px rgba(var(--honey-rgb), 0); } }
+
+.lt-steps { list-style: none; margin: 0; padding: 4px 14px 10px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 2px; }
+.lt-step { display: flex; align-items: baseline; gap: 9px; min-width: 0; padding: 4px 0; font-size: 12.5px; animation: lt-in .28s cubic-bezier(.2, .8, .2, 1) both; }
+@keyframes lt-in { from { opacity: 0; transform: translateY(4px); } }
+.lt-mark { width: 16px; height: 16px; flex: none; display: inline-grid; place-items: center; border-radius: 50%; align-self: center; font-size: 11px; color: var(--ink-3); }
+.lt-step.ok .lt-mark { background: rgba(34, 160, 98, .14); color: #15803d; }
+.lt-step.fail .lt-mark { background: rgba(220, 60, 70, .14); color: #c0262f; }
+.lt-step code { font: 600 12px var(--font-mono); color: var(--ink); flex: none; }
+.lt-step.running code { color: var(--honey-deep); }
+.lt-args { color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.lt-step.thought .lt-mark { color: var(--honey); }
+.lt-spin { width: 11px; height: 11px; border-radius: 50%; border: 2px solid rgba(var(--honey-rgb), .25); border-top-color: var(--honey); animation: lt-rot .8s linear infinite; }
+@keyframes lt-rot { to { transform: rotate(360deg); } }
+.lt-shimmer { color: var(--ink-2); font-style: italic; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+  background: linear-gradient(90deg, var(--ink-3) 0%, var(--ink) 45%, var(--ink-3) 90%); background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; animation: lt-sheen 2.2s linear infinite; }
+@keyframes lt-sheen { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+
+.lt-fold { display: inline-flex; align-items: center; gap: 10px; margin: 0 0 8px; padding: 3px 10px; border-radius: 999px; font-size: 12px; color: var(--ink-3); }
+.lt-fold:hover { background: rgba(var(--glass-rgb), .6); color: var(--ink-2); }
+.lt-fold .lt-n b { color: var(--ink-2); }
+
+@media (prefers-reduced-motion: reduce) { .lt-step, .lt-spin, .lt.on .lt-pulse, .lt-shimmer { animation: none; } }
+
+/* What the turn wrote down, kept in view after the card folds. */
+.lt-saved { list-style: none; margin: 0 0 10px; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.lt .lt-saved { margin: 0; padding: 8px 14px 10px; border-top: 1px solid var(--line); }
+.lt-saved li { display: flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 550; color: var(--honey-deep); }
+.lt-saved svg { flex: none; }

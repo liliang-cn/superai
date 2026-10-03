@@ -128,3 +128,34 @@ func TestLifeWritesOnUnbuiltService(t *testing.T) {
 		t.Error("expected an error from a nil service")
 	}
 }
+
+func TestForgetRemovesOnlyWhatWasNamed(t *testing.T) {
+	s := testLifeService(t)
+	a, _ := s.AddSchedule("standup", "2026-10-06T09:00:00+02:00", "", nil)
+	b, _ := s.AddSchedule("weekly", "2026-10-08T13:30:00+02:00", "Zoom", nil)
+	n, _ := s.AddRecord("note", "", "GUI ships next week", nil, "")
+	s.store.Persons["Rene"] = map[string]any{"role": "colleague"}
+
+	if err := s.Forget("schedule", a["id"].(string)); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Forget("record", n["id"].(string)); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Forget("person", "Rene"); err != nil {
+		t.Fatal(err)
+	}
+	life := s.Life()
+	if len(life.Schedules) != 1 || life.Schedules[0]["id"] != b["id"] {
+		t.Fatalf("schedules left: %v", life.Schedules)
+	}
+	if len(life.Records) != 0 || len(life.Persons) != 0 {
+		t.Fatalf("left behind: %v %v", life.Records, life.Persons)
+	}
+	if err := s.Forget("schedule", "nope"); err == nil {
+		t.Fatal("forgetting what is not there succeeded")
+	}
+	if err := s.Forget("reminder", "x"); err == nil {
+		t.Fatal("a kind with no delete was accepted")
+	}
+}

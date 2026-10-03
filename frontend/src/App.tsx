@@ -10,10 +10,14 @@ import StatsView from "./views/StatsView";
 import HiveView from "./views/HiveView";
 import AgentsView from "./views/AgentsView";
 import StandingView from "./views/StandingView";
+import SchedulesView from "./views/SchedulesView";
 import SettingsView from "./views/SettingsView";
 import KnowledgeView from "./views/KnowledgeView";
 import SkillsView from "./views/SkillsView";
 import MCPView from "./views/MCPView";
+import { useAttentionState } from "./canvas/attention";
+import DashboardsPanel from "./components/DashboardsPanel";
+import TasksView from "./views/TasksView";
 import RecordsView from "./views/RecordsView";
 import CanvasView from "./canvas/CanvasView";
 import DeskView from "./desk/DeskView";
@@ -118,6 +122,7 @@ export default function App() {
   // find the user wherever they are — including on the Settings page they went
   // to in order to look at the audit log.
   const approvals = useToolApprovals();
+  const attention = useAttentionState();
 
   useEffect(() => {
     // On the desktop the shell owns light and dark (the canvas theme).
@@ -176,11 +181,13 @@ export default function App() {
           />
         }
       />
+      <Route path="/dashboards" element={<div className="dashboards-view"><DashboardsPanel /></div>} />
+      <Route path="/tasks" element={<TasksView attention={attention} approvals={approvals.pending} onOpenConversation={openConversation} />} />
       <Route path="/stats" element={<StatsView />} />
       {/* Everything under /hive is the Hive screen's own to route:
           the overview, and one page per task. */}
       <Route path="/hive/*" element={<HiveView />} />
-      <Route path="/agents" element={<StandingView />} />
+      <Route path="/agents" element={<StandingView><SchedulesView embedded status={status} log={runs} onOpenConversation={openConversation} /></StandingView>} />
       <Route path="/coding" element={<AgentsView />} />
       <Route path="/settings" element={<SettingsView onSaved={refreshStatus} status={status} />} />
       <Route path="/knowledge" element={<KnowledgeView />} />
@@ -200,15 +207,15 @@ export default function App() {
   if (clientKind() === "desktop") {
     return (
       <>
-        <DeskShell view={view} badges={{ records: runs.unseen }}>
+        <DeskShell view={view} badges={{ records: runs.unseen, tasks: attention.items.filter(i => i.level === "needs").length }} onOpenConversation={openConversation}>
           {view === "home" || view === "chat" ? (
-            <DeskView approvals={approvals} openSession={pendingSession} onSessionOpened={() => setPendingSession("")} />
+            <DeskView attentionItems={attention.items} attentionError={attention.error} approvals={approvals} openSession={pendingSession} onSessionOpened={() => setPendingSession("")} />
           ) : routes}
         </DeskShell>
         {view !== "records" && <ScheduleRunToasts log={runs} onOpenConversation={openConversation} />}
         <Toaster onOpenConversation={openConversation} />
         <ToolApprovals
-          pending={view === "home" || view === "chat" ? [] : approvals.pending}
+          pending={view === "home" || view === "chat" || view === "tasks" ? [] : approvals.pending}
           note={approvals.note}
           onResolve={approvals.resolve}
           onDismissNote={approvals.dismissNote}
@@ -238,7 +245,7 @@ export default function App() {
             // has to close it or the destination is behind it.
             if (window.matchMedia("(max-width: 640px)").matches) setNavOpen(false);
           }}
-          badges={{ records: runs.unseen }}
+          badges={{ records: runs.unseen, tasks: attention.items.filter(i => i.level === "needs").length }}
           open={navOpen && room !== "narrow"}
           onToggle={() => setNavOpen((v) => !v)}
         />

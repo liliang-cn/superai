@@ -17,6 +17,8 @@ export const PATHS: Record<ViewKey, string> = {
   hive: "/hive",
   agents: "/agents",
   coding: "/coding",
+  tasks: "/tasks",
+  dashboards: "/dashboards",
   knowledge: "/knowledge",
   skills: "/skills",
   mcp: "/mcp",

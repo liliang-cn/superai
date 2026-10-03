@@ -101,9 +101,9 @@ type Service struct {
 	// inbox keeps every notice, so there is somewhere to look afterwards.
 	inbox *Inbox
 
-	// SuppressedMCPServers names the MCP servers that were left unmounted
-	// because they route to the same store the memory backend already owns.
-	SuppressedMCPServers []string
+	// SharedMemoryMCP names the MCP servers that route to the same store the
+	// memory backend already owns; their memory tools are kept out of runs.
+	SharedMemoryMCP []string
 }
 
 // NewService builds the full SuperAI agent service from the provided settings.
@@ -298,10 +298,10 @@ func NewService(s *Settings) (*Service, error) {
 	// documented path is now read; the older one still is too, so an install
 	// made back when it was the only one that counted keeps working.
 	mcpOpts := []agent.MCPOption{}
-	var droppedMCP []string
+	var sharedMCP []string
 	// One capability, one route: if the memory backend now owns an endpoint,
-	// an MCP server pointed at that same endpoint is a second name for the
-	// same store, and gets left out of the tool surface.
+	// an MCP server pointed at that same endpoint stays mounted for what else
+	// it offers, but its memory tools are withheld (chatRunOptions).
 	owned := ""
 	if useShared {
 		owned = cfg.Memory.DSN
@@ -311,18 +311,16 @@ func NewService(s *Settings) (*Service, error) {
 		if _, statErr := os.Stat(src); statErr != nil {
 			continue
 		}
-		dir, base := filepath.Split(src)
-		effectivePath, dropped, ferr := resolveMCPConfigPath(
-			src, filepath.Join(dir, strings.TrimSuffix(base, ".json")+".effective.json"), owned)
+		shared, ferr := serversSharingMemory(src, owned)
 		if ferr != nil {
-			log.Printf("superai: mcp config filter (%s): %v", src, ferr)
+			log.Printf("superai: mcp config (%s): %v", src, ferr)
 		}
-		droppedMCP = append(droppedMCP, dropped...)
-		if len(dropped) > 0 {
-			log.Printf("superai: memory backend owns %s; not mounting MCP server(s) %v that route to the same store",
-				owned, dropped)
+		if len(shared) > 0 {
+			log.Printf("superai: memory backend owns %s; MCP server(s) %v share it, their memory tools are withheld",
+				owned, shared)
 		}
-		mcpPaths = append(mcpPaths, effectivePath)
+		sharedMCP = append(sharedMCP, shared...)
+		mcpPaths = append(mcpPaths, src)
 	}
 	if len(mcpPaths) > 0 {
 		mcpOpts = append(mcpOpts, agent.WithMCPConfigPaths(mcpPaths...))
@@ -338,7 +336,7 @@ func NewService(s *Settings) (*Service, error) {
 	out := &Service{
 		svc: svc, sb: sb, settings: s, MemoryMode: memMode, dataDir: cfg.DataDir(),
 		claims: newScheduleClaims(),
-		brain:  brain, SuppressedMCPServers: droppedMCP,
+		brain:  brain, SharedMemoryMCP: sharedMCP,
 		gate: gate, plans: planStore,
 	}
 	// Token accounting for the dashboard: one observer sees every model turn,
@@ -422,7 +420,14 @@ func NewService(s *Settings) (*Service, error) {
 		// memory path, the one that reconciles and writes to the configured
 		// store. user_id fills the remaining CortexDB tools that take one:
 		// this is a single-user app with no per-run memory user.
-		if _, e := cortexbridge.Register(svc, db,
+		// The knowledge and graph tools work on this file. When an MCP server
+		// already reaches the shared brain the memory lives in, they would be
+		// a second knowledge_save, into a private copy nobody else reads: in a
+		// hive, three workers each "saving to the shared brain" into their own
+		// pod. Then the shared one is the only one.
+		if len(sharedMCP) > 0 {
+			log.Printf("superai: knowledge and graph tools come from %v (the shared brain), not the local file", sharedMCP)
+		} else if _, e := cortexbridge.Register(svc, db,
 			cortexbridge.WithArgDefaults(map[string]interface{}{"user_id": singleUserID}),
 		); e != nil {
 			log.Printf("superai: graphrag tools skipped: %v", e)
@@ -498,6 +503,11 @@ func (s *Service) chatRunOptions(sessionID string, imagePaths []string) []agent.
 	// tenant so all orders stop together, and without the automatic memory
 	// write — the queen already remembered giving the order, and N workers
 	// given it would otherwise write N extractions into the memory they share.
+	if len(s.SharedMemoryMCP) > 0 && s.svc != nil {
+		if deny := memoryRouteDenylist(s.SharedMemoryMCP, s.svc.GetToolRegistry().Names()); len(deny) > 0 {
+			opts = append(opts, agent.WithToolDenylist(deny))
+		}
+	}
 	if id, ok := TaskIDFromSession(sessionID); ok {
 		opts = append(opts,
 			agent.WithTaskID(id),

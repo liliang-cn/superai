@@ -1,3 +1,4 @@
+import { getLanguage, translate } from "../lib/i18n";
 import { useEffect, useState } from "react";
 import { AlertTriangleIcon, BellIcon, CalendarIcon, CircleSlashIcon, TerminalIcon, BotIcon } from "lucide-react";
 import { Attention } from "../../wailsjs/go/app/App";
@@ -15,23 +16,36 @@ export interface AttentionItem {
   open?: string;
 }
 
-const TRIGGERS = ["hive:task", "cli:run", "agent:update", "schedule:changed", "schedule:run", "tool:approval", "tool:approval:resolved", "agents:changed"];
+const TRIGGERS = ["hive:task", "cli:run", "agent:update", "schedule:changed", "schedule:run", "tool:approval", "tool:approval:resolved", "tool:approval:closed", "agents:changed"];
 
 /** What needs the person, then what is coming up — the core's one answer,
  *  kept current by the events that change it and a minute's clock. */
-export function useAttention(): AttentionItem[] {
+export function useAttentionState() {
   const [items, setItems] = useState<AttentionItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [revision, setRevision] = useState(0);
   useEffect(() => {
     let alive = true;
     let timer = 0;
-    const load = () => Attention().then((l) => { if (alive) setItems((l ?? []) as unknown as AttentionItem[]); }).catch(() => {});
-    const soon = () => { window.clearTimeout(timer); timer = window.setTimeout(load, 400); };
-    load();
-    const offs = TRIGGERS.map((n) => EventsOn(n, soon));
-    const t = window.setInterval(load, 60000);
-    return () => { alive = false; window.clearInterval(t); window.clearTimeout(timer); offs.forEach((o) => typeof o === "function" && o()); };
-  }, []);
-  return items;
+    const load = () => Attention().then((list) => {
+      if (alive) { setItems((list ?? []) as unknown as AttentionItem[]); setError(""); }
+    }).catch(() => { if (alive) setError("Could not load items that need your attention."); })
+      .finally(() => { if (alive) setLoading(false); });
+    const soon = () => { window.clearTimeout(timer); timer = window.setTimeout(load, 250); };
+    void load();
+    const offs = TRIGGERS.map(n => EventsOn(n, soon));
+    const poll = window.setInterval(load, 15000);
+    return () => { alive = false; window.clearInterval(poll); window.clearTimeout(timer); offs.forEach(o => typeof o === "function" && o()); };
+  }, [revision]);
+  return { items, loading, error, refresh: () => setRevision(n => n + 1) };
+}
+export function useAttention(): AttentionItem[] { return useAttentionState().items; }
+
+export function attentionTitle(it: AttentionItem) {
+  const suffixes: Record<string,string> = {approval:" asks to run something",bee:" is waiting for you",failed:" could not finish an order",lost:" is not answering",run:" stopped with an error"};
+  const suffix = suffixes[it.kind];
+  return suffix && it.title.endsWith(suffix) ? translate("{name}" + suffix, {name:it.title.slice(0,-suffix.length)}) : it.title;
 }
 
 const DAY = 24 * 3600 * 1000;
@@ -41,17 +55,17 @@ const DAY = 24 * 3600 * 1000;
 export function whenOf(it: AttentionItem, now = new Date()): string {
   if (!it.at) return "";
   const d = new Date(it.at);
-  const hm = (x: Date) => x.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+  const hm = (x: Date) => x.toLocaleTimeString(getLanguage(), { hour: "2-digit", minute: "2-digit", hour12: false });
   const start = new Date(now); start.setHours(0, 0, 0, 0);
   const days = Math.floor((d.getTime() - start.getTime()) / DAY);
   let day: string;
   if (it.level === "needs") {
     const mins = Math.round((now.getTime() - d.getTime()) / 60000);
-    return mins < 60 ? `${Math.max(1, mins)}m ago` : mins < 1440 ? `${Math.round(mins / 60)}h ago` : `${Math.round(mins / 1440)}d ago`;
+    return mins < 60 ? translate("{count}m ago", {count:Math.max(1,mins)}) : mins < 1440 ? translate("{count}h ago", {count:Math.round(mins/60)}) : translate("{count}d ago", {count:Math.round(mins/1440)});
   }
-  if (days === 0) day = "Today";
-  else if (days === 1) day = "Tomorrow";
-  else day = d.toLocaleDateString([], { weekday: "short" });
+  if (days === 0) day = translate("Today");
+  else if (days === 1) day = translate("Tomorrow");
+  else day = d.toLocaleDateString(getLanguage(), { weekday: "short" });
   let out = `${day} ${hm(d)}`;
   if (it.zone) {
     const [sign, h, m] = [it.zone[0] === "-" ? -1 : 1, Number(it.zone.slice(1, 3)), Number(it.zone.slice(4, 6))];
@@ -83,7 +97,7 @@ export function AttentionList({ items, onOpen, skip = [], limit = 8 }: { items: 
       <button key={`${it.kind}-${it.ref}-${i}`} className={`att-row ${it.level}`} onClick={() => onOpen?.(it)}>
         <span className="att-ic"><Icon size={15} /></span>
         <span className="att-main">
-          <b>{it.title}</b>
+          <b>{attentionTitle(it)}</b>
           {it.detail && <small>{it.detail}</small>}
         </span>
         <em>{whenOf(it, now)}</em>

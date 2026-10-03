@@ -366,6 +366,10 @@ func (s *agentLinkServer) Connect(stream agentlinkpb.AgentLink_ConnectServer) er
 				ch <- k.Reply
 			}
 		case *agentlinkpb.AgentFrame_Event:
+			if k.Event.GetName() == "agent:pulse" {
+				s.app.notePulse(c.name(), k.Event.GetPayloadJson())
+				break
+			}
 			c.mu.Lock()
 			for _, ch := range c.subs {
 				select {

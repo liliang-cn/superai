@@ -12,7 +12,9 @@ import { Hive, elapsed, isToday, oneLine, short, useBees, useCodingRuns, useHive
 import { GenSpec, loadSpecs, makeTile, saveSpecs } from "./generated";
 import { AttentionItem, AttentionList, useAttention } from "./attention";
 import { taskPath } from "../lib/routes";
-import { BASES, BaseName, COLORS, CanvasTheme, ColorName, DEFAULT_THEME, loadTheme, saveTheme, themeVars } from "./theme";
+import { COLORS, CanvasTheme, loadTheme, saveTheme, themeVars } from "./theme";
+import ThemePanel from "./ThemePanel";
+import EventSheet from "../components/EventSheet";
 import "./canvas.css";
 import { Response } from "@/components/ai-elements/response";
 import { withoutCallNotes } from "../lib/format";
@@ -73,12 +75,13 @@ export default function CanvasView({ approvals }: { approvals: { pending: ToolAp
   const codingRuns = useCodingRuns();
   const linked = useLinkedAgents();
   const attentionItems = useAttention();
+  const [sheet, setSheet] = useState<AttentionItem | null>(null);
   const openItem = (it: AttentionItem) => {
     if (it.open === "hive" && it.kind === "failed" && it.ref) navigate(taskPath(it.ref));
     else if (it.open === "hive") navigate(PATHS.hive);
     else if (it.open === "agents") navigate(PATHS.agents);
     else if (it.open === "coding") navigate(PATHS.coding);
-    else if (it.open === "records") navigate(PATHS.records);
+    else if (it.kind === "event" || it.kind === "reminder") setSheet(it);
   };
   // What the For you card shows besides the approval card above it.
   const feed = attentionItems.filter((i) => i.kind !== "approval");
@@ -192,7 +195,7 @@ export default function CanvasView({ approvals }: { approvals: { pending: ToolAp
       case "machines": return <Machines hive={hive} open={setMachine} agents={linked} />;
       case "today": return <Today hive={hive} pulse={pulse} />;
       case "bees": return <Bees bees={bees} open={() => navigate(PATHS.agents)} />;
-      case "later": return <Later items={upcoming} open={(i) => navigate(i.kind === "bee" ? PATHS.agents : PATHS.records)} />;
+      case "later": return <Later items={upcoming} open={() => navigate(PATHS.agents)} />;
       case "coding": return <Coding runs={codingRuns} open={() => navigate(PATHS.coding)} />;
       case "queen": return <div ref={queenRef}><Queen messages={chat.messages} /></div>;
       case "generated": return <Generated spec={specs[t.id]} busy={making.has(t.id)} onRefresh={() => refresh(t.id)} />;
@@ -213,7 +216,7 @@ export default function CanvasView({ approvals }: { approvals: { pending: ToolAp
             <button className="cv-pill glassy round" onClick={() => setMenu((m) => !m)} aria-label="Menu" data-testid="canvas-menu"><MenuIcon size={17} /></button>
             {menu && (
               <div className="cv-menu cv-glass" onMouseLeave={() => setMenu(false)}>
-                {([["Conversations", PATHS.chat], ["Bees", PATHS.agents], ["Hive", PATHS.hive], ["Coding", PATHS.coding], ["Stats", PATHS.stats], ["Knowledge", PATHS.knowledge], ["Skills", PATHS.skills], ["MCP", PATHS.mcp], ["Records", PATHS.records], ["Settings", PATHS.settings]] as const).map(([label, path]) => (
+                {([["Conversations", PATHS.chat], ["Bees", PATHS.agents], ["Hive", PATHS.hive], ["Coding", PATHS.coding], ["Stats", PATHS.stats], ["Knowledge", PATHS.knowledge], ["Skills", PATHS.skills], ["MCP", PATHS.mcp], ["Settings", PATHS.settings]] as const).map(([label, path]) => (
                   <button key={label} onClick={() => navigate(path)}>{label}</button>
                 ))}
                 <button onClick={() => { setMenu(false); setAttention(true); }}>Attention</button>
@@ -339,6 +342,7 @@ export default function CanvasView({ approvals }: { approvals: { pending: ToolAp
       )}
       {machine && <MachineDrawer name={machine} hive={hive} onClose={() => setMachine(null)} />}
       {attention && <Attention onClose={() => setAttention(false)} />}
+      {sheet && <EventSheet item={sheet} onClose={() => setSheet(null)} />}
       {theming && <ThemePanel theme={theme} onChange={setTheme} onClose={() => setTheming(false)} />}
     </div>
   );
@@ -477,71 +481,6 @@ function MachineDrawer({ name, hive, onClose }: { name: string; hive: Hive; onCl
         ))}
         {mine.length === 0 && <p className="cv-quiet">No orders on this machine yet.</p>}
       </aside>
-    </div>
-  );
-}
-
-/** The look, chosen like shadcn's theme panel: every pick applies at once,
- *  and the canvas behind the panel is the preview. */
-function ThemePanel({ theme, onChange, onClose }: { theme: CanvasTheme; onChange: (t: CanvasTheme) => void; onClose: () => void }) {
-  const set = <K extends keyof CanvasTheme>(k: K, v: CanvasTheme[K]) => onChange({ ...theme, [k]: v });
-  return (
-    <div className="cv-scrim" style={{ background: "transparent" }} onClick={onClose}>
-      <div className="cv-glass cv-sheet" onClick={(e) => e.stopPropagation()} data-testid="theme-panel">
-        <h3>Theme</h3>
-        <div className="cv-theme-row">
-          <label>Color</label>
-          <div className="cv-theme-opts">
-            {(Object.keys(COLORS) as ColorName[]).map((c) => (
-              <button key={c} className={`cv-opt${theme.color === c ? " on" : ""}`} onClick={() => set("color", c)}>
-                <i style={{ background: `rgb(${COLORS[c].rgb.join(",")})` }} />{COLORS[c].label}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="cv-theme-row">
-          <label>Background</label>
-          <div className="cv-theme-opts">
-            <button className={`cv-opt${theme.base === "timelapse" ? " on" : ""}`} onClick={() => set("base", "timelapse")}><i className="sky" />Time-lapse</button>
-            {(Object.keys(BASES) as Exclude<BaseName, "timelapse">[]).map((b) => {
-              const [top, bottom] = BASES[b][theme.mode];
-              return (
-                <button key={b} className={`cv-opt${theme.base === b ? " on" : ""}`} onClick={() => set("base", b)}>
-                  <i style={{ background: `linear-gradient(rgb(${top}), rgb(${bottom}))`, boxShadow: "inset 0 0 0 1px rgba(0,0,0,.12)" }} />{BASES[b].label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-        <div className="cv-theme-row">
-          <label>Glass</label>
-          <div className="cv-theme-opts">
-            {(["clear", "frosted", "solid"] as const).map((g) => (
-              <button key={g} className={`cv-opt${theme.glass === g ? " on" : ""}`} onClick={() => set("glass", g)}>{g[0].toUpperCase() + g.slice(1)}</button>
-            ))}
-          </div>
-        </div>
-        <div className="cv-theme-row">
-          <label>Radius</label>
-          <div className="cv-theme-opts">
-            {([0, 0.5, 0.75, 1, 1.25] as const).map((r) => (
-              <button key={r} className={`cv-opt${theme.radius === r ? " on" : ""}`} onClick={() => set("radius", r)}>{r}</button>
-            ))}
-          </div>
-        </div>
-        <div className="cv-theme-row">
-          <label>Mode</label>
-          <div className="cv-theme-opts">
-            {(["light", "dark"] as const).map((m) => (
-              <button key={m} className={`cv-opt${theme.mode === m ? " on" : ""}`} onClick={() => set("mode", m)}>{m === "light" ? "Light" : "Dark"}</button>
-            ))}
-          </div>
-        </div>
-        <div className="cv-theme-foot">
-          <button className="cv-pill" onClick={() => onChange(DEFAULT_THEME)}>Reset</button>
-          <button className="cv-pill ink" onClick={onClose}>Done</button>
-        </div>
-      </div>
     </div>
   );
 }

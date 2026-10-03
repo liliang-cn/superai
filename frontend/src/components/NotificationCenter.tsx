@@ -1,3 +1,4 @@
+import { translate, useI18n } from "../lib/i18n";
 import React, { useEffect, useRef, useState } from "react";
 import {
   AlertTriangleIcon,
@@ -39,18 +40,21 @@ function ago(at: string): string {
   const t = new Date(at).getTime();
   if (!Number.isFinite(t)) return "";
   const secs = Math.max(0, Math.round((Date.now() - t) / 1000));
-  if (secs < 60) return "just now";
-  if (secs < 3600) return `${Math.floor(secs / 60)}m ago`;
-  if (secs < 86400) return `${Math.floor(secs / 3600)}h ago`;
-  if (secs < 172800) return "yesterday";
-  return `${Math.floor(secs / 86400)}d ago`;
+  if (secs < 60) return translate("just now");
+  if (secs < 3600) return translate("{count}m ago", {count:Math.floor(secs/60)});
+  if (secs < 86400) return translate("{count}h ago", {count:Math.floor(secs/3600)});
+  if (secs < 172800) return translate("yesterday");
+  return translate("{count}d ago", {count:Math.floor(secs/86400)});
 }
 
 export default function NotificationCenter({
   onOpenConversation,
+  variant = "default",
 }: {
+  variant?: "default" | "desk";
   onOpenConversation?: (session: string) => void;
 }) {
+  const { t } = useI18n();
   const unread = useUnreadNotifications();
   const [open, setOpen] = useState(false);
   const { items, loading, markAllRead, clear } = useNotificationList(open);
@@ -74,7 +78,7 @@ export default function NotificationCenter({
     place();
     window.addEventListener("resize", place);
     return () => window.removeEventListener("resize", place);
-  }, [open]);
+  }, [open, variant]);
 
   // Which rows to keep showing as new for as long as this panel is open. Taken
   // once per opening, before the read-marking lands.
@@ -112,16 +116,16 @@ export default function NotificationCenter({
   }, [open]);
 
   return (
-    <div className="notif" ref={wrap}>
+    <div className={`notif${variant === "desk" ? " dk-notif" : ""}`} ref={wrap} style={variant === "desk" ? { "--wails-draggable": "no-drag" } as React.CSSProperties : undefined}>
       <button
         type="button"
-        className={`pill-btn icon-only notif-bell${open ? " on" : ""}`}
+        className={`${variant === "desk" ? "dk-icon dk-bell" : "pill-btn icon-only"} notif-bell${open ? " on" : ""}`}
         onClick={() => setOpen((v) => !v)}
-        title={unread > 0 ? `${unread} unread` : "Notifications"}
-        aria-label="Notifications"
+        title={unread > 0 ? t("{count} unread",{count:unread}) : t("Notifications")}
+        aria-label={t("Notifications")}
         aria-expanded={open}
       >
-        <BellIcon className="size-4" />
+        <BellIcon size={variant === "desk" ? 18 : 16} />
         {unread > 0 && <span className="notif-badge">{unread > 99 ? "99+" : unread}</span>}
       </button>
 
@@ -129,20 +133,20 @@ export default function NotificationCenter({
         <div
           className="notif-panel"
           role="dialog"
-          aria-label="Notifications"
+          aria-label={t("Notifications")}
           style={{ top: pos.top, left: pos.left, width: pos.width }}
         >
           <div className="notif-head">
-            <span className="notif-title">Notifications</span>
+            <span className="notif-title">{t("Notifications")}</span>
             {items.length > 0 && (
               <button className="notif-action" onClick={() => void clear()}>
-                Clear all
+                {t("Clear all")}
               </button>
             )}
           </div>
           <div className="notif-list">
             {items.length === 0 && (
-              <div className="notif-empty">{loading ? "Loading…" : "Nothing yet."}</div>
+              <div className="notif-empty">{t(loading ? "Loading…" : "Nothing yet.")}</div>
             )}
             {items.map((n) => {
               const Icon = ICONS[n.level] ?? InfoIcon;

@@ -642,7 +642,7 @@ class Wheel {
 // The component
 // ---------------------------------------------------------------------------
 
-export default function Reactor({ snap, pillars, brain }: { snap: Snap; pillars: Pillar[]; brain?: string | null }) {
+export default function Reactor({ snap, pillars, brain, inside }: { snap: Snap; pillars: Pillar[]; brain?: string | null; inside?: React.ReactNode }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const tipsRef = useRef<HTMLDivElement>(null);
@@ -723,7 +723,11 @@ export default function Reactor({ snap, pillars, brain }: { snap: Snap; pillars:
           data-pet-spot="brain"
           data-pet-label="the knowledge graph at the centre of the reactor — a sphere the character can walk on"
           data-pet-surface="sphere"
-          style={{ left: disc.left, top: disc.top, width: disc.size, height: disc.size }} />
+          style={{ left: disc.left, top: disc.top, width: disc.size, height: disc.size, opacity: inside ? 0.35 : 1 }} />
+      )}
+      {/* What sits in the disc over the graph: the hive, when there is one. */}
+      {inside && disc && (
+        <div className="rx-inside" style={{ left: disc.left, top: disc.top, width: disc.size, height: disc.size, fontSize: disc.size / 30 }}>{inside}</div>
       )}
       <canvas ref={canvasRef} className="rx-canvas" />
       <div className="rx-tips" ref={tipsRef} />
