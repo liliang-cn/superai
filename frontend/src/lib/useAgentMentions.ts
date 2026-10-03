@@ -18,6 +18,8 @@ import { RemoteAgentNames } from "../../wailsjs/go/app/App";
 export interface AgentInfo {
   name: string;
   about: string;
+  /** A short name that also finds it — "w3" for superai-worker-3. */
+  alias?: string;
 }
 
 /** What the composer is in the middle of typing, if anything. */
@@ -79,8 +81,13 @@ function queryAt(value: string, caret: number): Query | null {
 export function useAgentMentions(
   value: string,
   setValue: (v: string) => void,
+  /** More names to offer beside the agents — the hive's workers, say. */
+  extra: AgentInfo[] = [],
 ): AgentMentions {
-  const [agents, setAgents] = useState<AgentInfo[]>([]);
+  const [own, setAgents] = useState<AgentInfo[]>([]);
+  const extraKey = extra.map((a) => a.name + a.about).join("|");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const agents = useMemo(() => [...own, ...extra.filter((x) => !own.some((a) => a.name === x.name))], [own, extraKey]);
   const [query, setQuery] = useState<Query | null>(null);
   const [active, setActive] = useState(0);
   // The caret the last update reported, so accept() can find the word again
@@ -111,7 +118,7 @@ export function useAgentMentions(
   const matches = useMemo(() => {
     if (!query || agents.length === 0) return [];
     const w = query.word.toLowerCase();
-    const hits = agents.filter((a) => a.name.toLowerCase().startsWith(w));
+    const hits = agents.filter((a) => a.name.toLowerCase().startsWith(w) || (a.alias ?? "").toLowerCase().startsWith(w));
     // An exact and only match is not a menu, it is a label over what has
     // already been typed.
     if (hits.length === 1 && hits[0].name.toLowerCase() === w) return [];

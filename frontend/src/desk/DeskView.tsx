@@ -6,11 +6,13 @@ import {
   LayoutDashboardIcon,
 } from "lucide-react";
 import { useChat } from "../lib/useChat";
+import { AgentInfo, useAgentMentions } from "../lib/useAgentMentions";
+import { AgentMenu } from "../components/AgentMenu";
 import type { ToolApproval } from "../lib/useToolApprovals";
 import { PATHS } from "../lib/routes";
 import { withoutCallNotes } from "../lib/format";
 import { Response } from "@/components/ai-elements/response";
-import { Bee, QUEEN_SESSION, elapsed, useBees, useCodingRuns, useHive, useUpcoming } from "../canvas/data";
+import { Bee, QUEEN_SESSION, elapsed, short, useBees, useCodingRuns, useHive, useUpcoming } from "../canvas/data";
 import type { CodingRun, UpcomingItem } from "../canvas/tiles";
 import { dashboards, Dashboard } from "../lib/dashboards";
 import {
@@ -109,9 +111,20 @@ export default function DeskView({ approvals, openSession, onSessionOpened }: {
   const chat = useChat();
   const recents = useRecents(chat.sending);
   const link = useLink();
+  const [draft, setDraft] = useState("");
+  const composerRef = useRef<HTMLTextAreaElement>(null);
+  // @ offers the agents the core knows (hermes, pi, claude.mac, …) and the
+  // hive's workers, found by their short names too; a worker's message goes
+  // to the queen, who hands it on.
+  const workerNames = useMemo<AgentInfo[]>(() => hive.members
+    .filter((m) => !/queen/.test(m.name))
+    .map((m) => {
+      const t = hive.tasks.find((x) => x.worker === m.name && x.state === "running");
+      return { name: m.name, alias: short(m.name), about: `Hive worker ${short(m.name)}${m.state === "lost" ? ", not answering" : t ? ", busy" : ", idle"}` };
+    }), [hive]);
+  const mentions = useAgentMentions(draft, setDraft, workerNames);
   const { theme } = useDeskTheme();
   const [pins, setPins] = useState<Dashboard[]>([]);
-  const [draft, setDraft] = useState("");
   const [onQueen, setOnQueen] = useState(true);
   const [opened, setOpened] = useState<TabKey[]>([]);
   const [closed, setClosed] = useState<Set<TabKey>>(new Set());
@@ -266,10 +279,23 @@ export default function DeskView({ approvals, openSession, onSessionOpened }: {
           <div ref={endRef} />
         </div>
         <form className="dk-comp" onSubmit={(e) => { e.preventDefault(); send(); }}>
+          <AgentMenu
+            matches={mentions.matches}
+            active={mentions.active}
+            onPick={(a) => {
+              const next = mentions.accept(a);
+              if (next) requestAnimationFrame(() => { composerRef.current?.focus(); composerRef.current?.setSelectionRange(next.caret, next.caret); });
+            }}
+          />
           <textarea
-            name="message" rows={1} value={draft} placeholder="Ask the queen, or give the hive an order"
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(); } }}
+            ref={composerRef}
+            name="message" rows={1} value={draft} placeholder="Ask the queen, or give the hive an order. @ for an agent or a worker"
+            onChange={(e) => { setDraft(e.target.value); mentions.update(e.target.value, e.target.selectionStart ?? e.target.value.length); }}
+            onKeyDown={(e) => {
+              if (mentions.onKeyDown(e)) return;
+              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(); }
+            }}
+            onBlur={mentions.close}
           />
           {chat.sending && !draft.trim() ? (
             <button type="button" className="dk-send stop" title="Stop" onClick={() => chat.cancel()}><SquareIcon size={14} fill="currentColor" /></button>
