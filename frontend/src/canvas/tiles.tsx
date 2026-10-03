@@ -4,6 +4,7 @@ import type { ToolApproval } from "../lib/useToolApprovals";
 import type { Snap } from "../components/Reactor";
 import type { ChatMessage } from "../lib/types";
 import { Bee, Hive, elapsed, isToday, oneLine, short } from "./data";
+import { withoutCallNotes } from "../lib/format";
 
 /** A tick every second, for clocks that count up. */
 function useNow(ms = 1000) {
@@ -160,11 +161,11 @@ export function Queen({ messages }: { messages: ChatMessage[] }) {
   if (!you) return <p className="cv-quiet">Orders you give below go to the queen; her answer shows here.</p>;
   return (
     <div className="cv-queen">
-      <div className="cv-queen-you"><b>You</b>{you.content}</div>
+      <div className="cv-queen-you"><b>You</b>{withoutCallNotes(you.content)}</div>
       {her && (
         <div className="cv-queen-her">
           <b>Queen</b>
-          {her.content ? <Response>{her.content}</Response> : <span className="cv-quiet">…</span>}
+          {her.content ? <Response>{withoutCallNotes(her.content)}</Response> : <span className="cv-quiet">…</span>}
         </div>
       )}
       {!her && <div className="cv-queen-her"><b>Queen</b><span className="cv-quiet">Working on it…</span></div>}
