@@ -204,11 +204,14 @@
 .cv-earlier em.failed { color: var(--lost); }
 
 /* a phone: two columns, the strip above the input */
+/* below the wide layout: one column, every tile its own height, no holes */
+@media (max-width: 1099px) {
+  .cv-grid { grid-template-columns: minmax(0, 1fr); }
+  .span-2, .span-3, .span-4, .span-6 { grid-column: auto; }
+}
 @media (max-width: 720px) {
   .cv-scroll { padding-left: 12px; padding-right: 12px; }
-  .cv-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-  .span-3, .span-4, .span-6 { grid-column: span 2; }
-  .span-2 { grid-column: span 1; }
+  .cv-grid { gap: 10px; }
   .cv-bottom { grid-template-columns: 1fr; padding-left: 12px; padding-right: 12px; gap: 8px; }
   .cv-top h1 { font-size: 28px; }
   .cv-needs-q { font-size: 20px; }
@@ -251,3 +254,36 @@
 .cv-queen :is(code, pre) { background: rgba(var(--glass-rgb), 0.55) !important; color: inherit !important; border-color: var(--line) !important; }
 .cv-queen :is(p, li, h1, h2, h3, h4, strong, em, a) { color: inherit; }
 .cv-row.off { opacity: 0.55; }
+
+/* Wide screens: the conversation with the queen on the left, one stack of
+   tiles on the right — no grid, so no holes between tiles of different
+   heights. */
+.cv-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(340px, 400px); gap: 14px; align-items: start; }
+.cv-convo { position: sticky; top: 0; height: calc(100vh - 128px); display: flex; flex-direction: column; padding: 16px 18px 14px; }
+.cv-convo > h2 { font-size: 13px; font-weight: 600; color: var(--ink-2); margin-bottom: 8px; }
+.cv-conv { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 4px 2px 10px;
+  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 18px); mask-image: linear-gradient(180deg, transparent 0, #000 18px); }
+.cv-conv > * { flex-shrink: 0; }
+.cv-conv-in { display: flex; flex-direction: column; gap: 10px; }
+.cv-conv-empty { margin: auto; text-align: center; max-width: 320px; }
+.cv-conv-you { align-self: flex-end; max-width: 78%; white-space: pre-wrap; padding: 9px 14px; border-radius: calc(18px * var(--rs)) calc(18px * var(--rs)) 6px calc(18px * var(--rs));
+  background: linear-gradient(180deg, rgba(var(--honey-rgb), .92), var(--honey)); color: #fff; font-size: 15px; line-height: 1.45; box-shadow: 0 3px 10px rgba(var(--honey-rgb), .25); }
+.cv-conv-her { align-self: flex-start; max-width: 92%; padding: 10px 14px; border-radius: calc(18px * var(--rs)) calc(18px * var(--rs)) calc(18px * var(--rs)) 6px;
+  background: rgba(var(--glass-rgb), calc(var(--ga) + .4)); box-shadow: inset 0 1px 0 rgba(255,255,255,var(--hl)); font-size: 15px; line-height: 1.55; overflow-x: auto; }
+.cv-conv-her.bad { box-shadow: inset 0 0 0 1px rgba(214,69,50,.4); }
+.cv-conv-err { color: var(--lost); font-size: 13px; margin-top: 4px; }
+.cv-conv-her :is(table, thead, tbody, tr, th, td) { background: transparent !important; color: inherit !important; border-color: var(--line) !important; }
+.cv-conv-her :is(th, td) { white-space: nowrap; padding: 4px 12px 4px 0; border-bottom: 1px solid var(--line); text-align: left; }
+.cv-conv-her :is(code, pre) { background: rgba(var(--glass-rgb), .55) !important; color: inherit !important; }
+.cv-conv-her p { margin: 0 0 .5em; } .cv-conv-her p:last-child { margin-bottom: 0; }
+.cv-say.inner { margin-top: 8px; background: rgba(var(--glass-rgb), calc(var(--ga) + .4)); box-shadow: inset 0 0 0 1px var(--line); }
+.cv-side { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.cv-side .cv-tile { padding: 14px 16px 15px; }
+.cv-side .cv-add { padding: 14px; }
+
+/* the machines core can run things on, under the comb */
+.cv-agents { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
+.cv-agent { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; border-radius: 14px; font-size: 13px; font-weight: 550;
+  background: rgba(var(--glass-rgb), .55); box-shadow: inset 0 0 0 1px var(--line); }
+.cv-agent i { width: 7px; height: 7px; border-radius: 50%; background: #2fb36d; }
+.cv-agent small { font-size: 11.5px; font-weight: 450; color: var(--ink-3); }
