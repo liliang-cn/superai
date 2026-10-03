@@ -46,8 +46,11 @@ export default function LinkHive({ onLinked, onAlone, onCancel }: { onLinked: ()
   };
 
   return (
-    <div className={onCancel ? "cv-root gate2 gate2-over" : "cv-root gate2"} style={themeVars(theme)}>
+    <div className={onCancel ? "cv-root gate2 gate2-over" : "cv-root gate2"}
+      style={{ ...themeVars(theme), "--wails-draggable": "no-drag" } as React.CSSProperties}>
       <Sky at={new Date()} lanes={IDLE} base={theme.base} mode={theme.mode} />
+      {/* The window has no title bar of its own: this strip moves it. */}
+      <div className="gate2-drag" style={{ "--wails-draggable": "drag" } as React.CSSProperties} />
       <form className="cv-glass gate2-card" onSubmit={submit}>
         <h1>{onCancel ? "Add a hive" : "Link this Mac to your hive"}</h1>
         <p>On your hive's web page, open Settings and pair a device. Enter its address and the code it shows.</p>

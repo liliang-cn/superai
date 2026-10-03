@@ -58,6 +58,7 @@ func main() {
 		// The paper this app is printed on, so a cold frame never flashes behind
 		// the page while the webview is still coming up.
 		BackgroundColour: &options.RGBA{R: 244, G: 241, B: 234, A: 1},
+		Menu:             app.AppMenu(a),
 		// The window is part of the design, not a frame the OS wraps around it.
 		// A stock title bar spends 28px of every screen on the word "SuperAI",
 		// which the sidebar already says, in a strip that cannot hold anything

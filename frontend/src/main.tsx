@@ -11,8 +11,8 @@ import './styles.css'
 import App from './App'
 import Gate from './components/Gate'
 import LinkHive from './components/LinkHive'
-import {HiveLinkStatus, HiveLinks} from '../wailsjs/go/app/App'
-import {installHiveBridge, setAlone, wantsAlone} from './lib/hivelink'
+import {HiveLinkStatus, HiveLinks, TitleBarDoubleClick} from '../wailsjs/go/app/App'
+import {installHiveBridge, installTitleBarDoubleClick, setAlone, wantsAlone} from './lib/hivelink'
 
 /**
  * The password box, and only then the app.
@@ -77,6 +77,11 @@ function Root() {
             <App/>
         </HashRouter>
     )
+}
+
+// The desktop window's drag strips behave like a Mac title bar.
+if (!(window as unknown as Record<string, unknown>).superaiServed) {
+    installTitleBarDoubleClick(() => { void TitleBarDoubleClick().catch(() => {}) })
 }
 
 const container = document.getElementById('root')

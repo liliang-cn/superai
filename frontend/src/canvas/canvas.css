@@ -232,6 +232,7 @@
 .gate2-alt { margin-top: 14px; border: 0; background: none; font: 500 14px var(--font-sans); color: var(--ink-2); cursor: pointer; padding: 6px; }
 .gate2-alt:hover { color: var(--ink); }
 .gate2-over { z-index: 200; }
+.gate2-drag { position: absolute; left: 0; right: 0; top: 0; height: 44px; z-index: 2; }
 
 /* the theme panel, shadcn's way: each choice a labelled button, applied as it
    is picked, the canvas behind it the preview */
