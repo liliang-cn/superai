@@ -418,6 +418,10 @@ export function UnreadNotifications() {
   return window['go']['app']['App']['UnreadNotifications']();
 }
 
+export function Upcoming() {
+  return window['go']['app']['App']['Upcoming']();
+}
+
 export function WakeStandingAgent(arg1, arg2) {
   return window['go']['app']['App']['WakeStandingAgent'](arg1, arg2);
 }

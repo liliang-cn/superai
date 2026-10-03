@@ -314,6 +314,7 @@ func (a *App) rebuild() {
 	// the runner can never describe two different sets.
 	a.registerRemoteTools(svc, cfg.RemoteAgents)
 	a.registerCodingAgentTools(svc, cfg)
+	a.registerScheduleTools(svc)
 	a.registerHiveTools(svc, cfg)
 }
 

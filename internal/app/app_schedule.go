@@ -292,6 +292,7 @@ func (a *App) SchedulePrompt(prompt, cronExpr, note, session string) string {
 	if _, err := sch.Schedule(prompt, cronExpr, note, session); err != nil {
 		return err.Error()
 	}
+	a.emit("schedule:changed", nil)
 	return "ok"
 }
 
@@ -306,6 +307,7 @@ func (a *App) SetScheduledPromptEnabled(id string, enabled bool) string {
 	if err := sch.SetEnabled(id, enabled); err != nil {
 		return err.Error()
 	}
+	a.emit("schedule:changed", nil)
 	return "ok"
 }
 
@@ -320,6 +322,7 @@ func (a *App) DeleteScheduledPrompt(id string) string {
 	if err := sch.Delete(id); err != nil {
 		return err.Error()
 	}
+	a.emit("schedule:changed", nil)
 	return "ok"
 }
 

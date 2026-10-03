@@ -6,17 +6,19 @@ import { usePulse } from "../components/Reactor";
 import type { ToolApproval } from "../lib/useToolApprovals";
 import { PATHS } from "../lib/routes";
 import Sky, { Lane } from "./Sky";
-import { Bees, Cell, InFlight, Machines, NeedsYou, Queen, Today } from "./tiles";
+import { Bees, Cell, Coding, CodingRun, InFlight, Later, Machines, NeedsYou, Queen, Today, UpcomingItem } from "./tiles";
+import { CLIRuns, Upcoming } from "../../wailsjs/go/app/App";
+import { EventsOn } from "../../wailsjs/runtime";
 import { Hive, elapsed, isToday, oneLine, short, useBees, useHive } from "./data";
 import { GenSpec, loadSpecs, makeTile, saveSpecs } from "./generated";
 import { BASES, BaseName, COLORS, CanvasTheme, ColorName, DEFAULT_THEME, loadTheme, saveTheme, themeVars } from "./theme";
 import "./canvas.css";
 
-type Kind = "inFlight" | "machines" | "today" | "bees" | "queen" | "generated";
+type Kind = "inFlight" | "machines" | "today" | "bees" | "later" | "coding" | "queen" | "generated";
 interface Tile { id: string; kind: Kind; span: 2 | 3 | 4 | 6 }
 
 const TITLES: Record<Kind, string> = {
-  inFlight: "In flight", machines: "Machines", today: "Today", bees: "Bees", queen: "The queen", generated: "Made for you",
+  inFlight: "In flight", machines: "Machines", today: "Today", bees: "Bees", later: "Later", coding: "Coding runs", queen: "The queen", generated: "Made for you",
 };
 
 const LAYOUT_KEY = "superai-canvas-layout";
@@ -25,16 +27,59 @@ const DEFAULT: Tile[] = [
   { id: "t-today", kind: "today", span: 2 },
   { id: "t-machines", kind: "machines", span: 2 },
   { id: "t-bees", kind: "bees", span: 4 },
+  { id: "t-later", kind: "later", span: 3 },
+  { id: "t-coding", kind: "coding", span: 3 },
   { id: "t-queen", kind: "queen", span: 6 },
 ];
 
 function loadLayout(): Tile[] {
   try {
-    const t = JSON.parse(localStorage.getItem(LAYOUT_KEY) || "null");
-    return Array.isArray(t) && t.length ? t : DEFAULT;
+    const t = JSON.parse(localStorage.getItem(LAYOUT_KEY) || "null") as Tile[] | null;
+    if (!Array.isArray(t) || !t.length) return DEFAULT;
+    // Later and Coding runs came after the first layouts were saved: they are
+    // offered once, before the queen, and stay gone if removed after that.
+    if (!localStorage.getItem("superai-canvas-v2")) {
+      localStorage.setItem("superai-canvas-v2", "1");
+      const add = DEFAULT.filter((d) => (d.kind === "later" || d.kind === "coding") && !t.some((x) => x.kind === d.kind));
+      const q = t.findIndex((x) => x.kind === "queen");
+      return q < 0 ? [...t, ...add] : [...t.slice(0, q), ...add, ...t.slice(q)];
+    }
+    return t;
   } catch {
     return DEFAULT;
   }
+}
+
+/** Everything the hive will do on its own, kept current. */
+function useUpcoming(): UpcomingItem[] {
+  const [items, setItems] = useState<UpcomingItem[]>([]);
+  useEffect(() => {
+    let alive = true;
+    const load = () => Upcoming().then((l) => { if (alive) setItems((l ?? []) as unknown as UpcomingItem[]); }).catch(() => {});
+    load();
+    const t = window.setInterval(load, 60000);
+    const offs = ["agent:update", "schedule:changed", "schedule:run"].map((n) => EventsOn(n, load));
+    return () => { alive = false; window.clearInterval(t); offs.forEach((o) => typeof o === "function" && o()); };
+  }, []);
+  return items;
+}
+
+/** The coding agents' runs, newest first, kept current. */
+function useCodingRuns(): CodingRun[] {
+  const [runs, setRuns] = useState<CodingRun[]>([]);
+  useEffect(() => {
+    let alive = true;
+    const load = () => CLIRuns().then((l) => {
+      if (!alive) return;
+      const list = ((l ?? []) as unknown as CodingRun[]).slice().sort((a, b) => new Date(b.started).getTime() - new Date(a.started).getTime());
+      setRuns(list);
+    }).catch(() => {});
+    load();
+    const off = EventsOn("cli:run", load);
+    const t = window.setInterval(load, 30000);
+    return () => { alive = false; window.clearInterval(t); if (typeof off === "function") off(); };
+  }, []);
+  return runs;
 }
 
 const QUEEN_SESSION = "hive-console-web";
@@ -49,6 +94,8 @@ export default function CanvasView({ approvals }: { approvals: { pending: ToolAp
   const hive = useHive();
   const bees = useBees();
   const pulse = usePulse();
+  const upcoming = useUpcoming();
+  const codingRuns = useCodingRuns();
   const chat = useChat();
   const [tiles, setTiles] = useState<Tile[]>(loadLayout);
   const [specs, setSpecs] = useState<Record<string, GenSpec>>(loadSpecs);
@@ -147,6 +194,8 @@ export default function CanvasView({ approvals }: { approvals: { pending: ToolAp
       case "machines": return <Machines hive={hive} open={setMachine} />;
       case "today": return <Today hive={hive} pulse={pulse} />;
       case "bees": return <Bees bees={bees} open={() => navigate(PATHS.agents)} />;
+      case "later": return <Later items={upcoming} open={(i) => navigate(i.kind === "bee" ? PATHS.agents : PATHS.records)} />;
+      case "coding": return <Coding runs={codingRuns} open={() => navigate(PATHS.coding)} />;
       case "queen": return <div ref={queenRef}><Queen messages={chat.messages} /></div>;
       case "generated": return <Generated spec={specs[t.id]} busy={making.has(t.id)} onRefresh={() => refresh(t.id)} />;
     }
@@ -225,7 +274,7 @@ export default function CanvasView({ approvals }: { approvals: { pending: ToolAp
       {adding && (
         <AddTile
           present={new Set(tiles.map((t) => t.kind))}
-          onPick={(kind) => { setTiles((ts) => [...ts, { id: `t-${kind}-${Date.now()}`, kind, span: kind === "queen" ? 6 : kind === "today" || kind === "machines" ? 2 : 4 }]); setAdding(false); }}
+          onPick={(kind) => { setTiles((ts) => [...ts, { id: `t-${kind}-${Date.now()}`, kind, span: kind === "queen" ? 6 : kind === "today" || kind === "machines" ? 2 : kind === "later" || kind === "coding" ? 3 : 4 }]); setAdding(false); }}
           onDescribe={(prompt) => {
             const id = `g-${Date.now().toString(36)}`;
             setSpecs((s) => ({ ...s, [id]: { prompt } }));

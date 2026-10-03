@@ -174,7 +174,7 @@ export default function StandingView() {
     <div className="view wt-view">
       <div className="view-header with-action">
         <div>
-          <div className="view-title">Agents</div>
+          <div className="view-title">Bees</div>
           <div className="view-desc">
             {agents.length === 0
               ? "Agents that keep something true, and tell you only what is worth knowing."
