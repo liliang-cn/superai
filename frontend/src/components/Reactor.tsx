@@ -477,7 +477,7 @@ class Wheel {
     const day = this.light;
     g.fillStyle = day ? "rgba(244,246,248,0.94)" : "rgba(6,10,24,0.78)";
     g.fillRect(0, 0, BAND_W, BAND_H);
-    g.strokeStyle = day ? "rgba(31,91,255,0.35)" : "rgba(94,224,255,0.35)";
+    g.strokeStyle = day ? "rgba(201,130,8,0.35)" : "rgba(242,165,22,0.35)";
     g.lineWidth = 2;
     const frac = nowSec % 10;
     for (let t = 10 - frac; t < WINDOW; t += 10) {
@@ -500,7 +500,7 @@ class Wheel {
       row++;
       const label = e.kind === "model" ? `${fmtK(e.n ?? 0)} tok` : e.kind === "think" ? e.text.slice(0, 40) : e.name;
       g.fillStyle = day
-        ? (e.bad ? "#d0313f" : e.kind === "model" ? "#1f5bff" : e.kind === "think" ? "#12805c" : e.kind === "compact" ? "#6d3fd0" : "#b06a00")
+        ? (e.bad ? "#d0313f" : e.kind === "model" ? "#c98208" : e.kind === "think" ? "#12805c" : e.kind === "compact" ? "#0f8a8a" : "#b06a00")
         : e.bad ? "rgba(255,92,122,0.95)" :
         e.kind === "model" ? "rgba(120,225,255,0.95)" :
         e.kind === "think" ? "rgba(157,255,106,0.8)" :

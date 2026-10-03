@@ -19,6 +19,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -309,4 +311,40 @@ var localWhileLinked = map[string]bool{"open:conversation": true, "hivelink:stat
 // window, which shows the hive's events instead.
 func (a *App) quietWhileLinked(name string) bool {
 	return a.hiveLink.on.Load() && !localWhileLinked[name]
+}
+
+// AssetMiddleware is the desktop window's asset server: no caching for the
+// shell, and, while linked, the queen's knowledge-graph view under /graph/ —
+// the same path the browser reaches her graph by, carried with this Mac's
+// token instead of a session cookie.
+func (a *App) AssetMiddleware(next http.Handler) http.Handler {
+	next = NoCache(next)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.HasPrefix(r.URL.Path, "/graph/") {
+			next.ServeHTTP(w, r)
+			return
+		}
+		a.hiveLink.mu.Lock()
+		l := a.hiveLink.link
+		a.hiveLink.mu.Unlock()
+		if l == nil {
+			next.ServeHTTP(w, r)
+			return
+		}
+		target, err := url.Parse(l.URL)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+		proxy := &httputil.ReverseProxy{
+			Rewrite: func(pr *httputil.ProxyRequest) {
+				pr.SetURL(target)
+				pr.Out.Host = target.Host
+				pr.Out.Header.Set("Authorization", "Bearer "+l.Token)
+				pr.Out.Header.Del("Cookie")
+			},
+			FlushInterval: -1,
+		}
+		proxy.ServeHTTP(w, r)
+	})
 }

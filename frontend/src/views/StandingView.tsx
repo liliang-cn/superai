@@ -63,11 +63,12 @@ interface Report {
   at: string;
 }
 
-/** Identity hues. Deliberately not the signal blue: that means "needs you". */
+/** Identity hues. Deliberately not the signal blue, and never purple: a bee
+ *  saved as "violet" before that rule is drawn in amber. */
 const HUES: Record<string, string> = {
   cyan: "#0e7c92",
-  blue: "#3d4db7",
-  violet: "#6d3fd0",
+  blue: "#2f7fa3",
+  violet: "#c2410c",
   rose: "#b8265f",
   orange: "#b35a00",
   green: "#12805c",

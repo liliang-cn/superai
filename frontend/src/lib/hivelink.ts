@@ -56,6 +56,14 @@ export function installHiveBridge() {
 
 export const isBridged = () => bridged;
 
+/** Where the knowledge graph's live view is: the server's /graph/ in a
+ *  browser, and in a linked desktop window the same path, which the Go side
+ *  forwards to the queen. Null means "ask GraphView for a local address". */
+export function graphSrc(): string | null {
+  const w = window as unknown as Record<string, unknown>;
+  return w.superaiServed || bridged ? "/graph/" : null;
+}
+
 export interface HiveLinkInfo {
   linked: boolean;
   url?: string;

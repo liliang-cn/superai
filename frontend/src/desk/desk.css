@@ -1,20 +1,34 @@
 /* The desktop home: rail, sidebar, the queen's conversation, the live pane,
    the dock — glass over the hive's sky. Colours come from the canvas theme. */
-.dk {
+/* The shell: bar across the top, rail down the left, the page in the rest. */
+.dk-shell {
   display: grid;
-  grid-template-columns: 76px 252px minmax(380px, 1fr) minmax(420px, 42%);
-  grid-template-rows: 52px minmax(0, 1fr) 74px;
+  grid-template-columns: 76px minmax(0, 1fr);
+  grid-template-rows: 44px minmax(0, 1fr);
   font-size: 14px;
 }
-.dk > * { position: relative; z-index: 1; }
-.dk > .cv-sky { position: absolute; z-index: 0; }
-.dk :where(button) { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
-.dk .dk-icon { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 10px; color: var(--ink-2); }
-.dk .dk-icon:hover { background: rgba(var(--glass-rgb), 0.5); color: var(--ink); }
+.dk-shell > * { position: relative; z-index: 1; }
+.dk-shell > .cv-sky { position: absolute; z-index: 0; }
+:where(.dk-shell button) { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
 
-/* The top bar: the window moves by it; the tabs over the live pane sit in it. */
-.dk-bar { grid-column: 1 / -1; grid-row: 1; display: grid; grid-template-columns: subgrid; align-items: center; }
-.dk-bar-tabs { grid-column: 4; display: flex; align-items: center; gap: 6px; padding-right: 14px; min-width: 0; overflow: hidden; }
+/* The home: sidebar, conversation, live pane; the dock under them. */
+.dk {
+  grid-column: 2; grid-row: 2; min-height: 0; min-width: 0;
+  display: grid;
+  grid-template-columns: 252px minmax(360px, 1fr) minmax(400px, 42%);
+  grid-template-rows: minmax(0, 1fr) 74px;
+}
+
+/* Any other page: one pane of glass. */
+.dk-page { grid-column: 2; grid-row: 2; margin: 0 14px 14px 0; min-height: 0; min-width: 0; overflow: hidden; display: flex; border-radius: calc(22px * var(--rs)); }
+.dk-page > .content { flex: 1; min-width: 0; min-height: 0; display: flex; background: transparent; }
+.dk-shell .dk-icon { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 10px; color: var(--ink-2); }
+.dk-shell .dk-icon:hover { background: rgba(var(--glass-rgb), 0.5); color: var(--ink); }
+
+/* The top bar: the window moves by it. */
+.dk-bar { grid-column: 1 / -1; grid-row: 1; display: flex; align-items: center; padding-left: 90px; }
+.dk-bar-title { font-size: 15px; font-weight: 650; letter-spacing: -.01em; }
+.dk-tabs { height: 42px; flex: none; display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; }
 .dk-tab { height: 34px; display: inline-flex; align-items: center; gap: 8px; padding: 0 12px; border-radius: calc(11px * var(--rs)); color: var(--ink-2); font-weight: 500; font-size: 13.5px; white-space: nowrap; min-width: 0; }
 .dk-tab span { overflow: hidden; text-overflow: ellipsis; max-width: 160px; }
 .dk-tab.on { color: var(--ink); background: rgba(var(--glass-rgb), calc(var(--ga) + 0.35)); box-shadow: inset 0 1px 0 rgba(255,255,255,var(--hl)), 0 1px 3px rgba(0,0,0,.06); }
@@ -24,7 +38,7 @@
 @keyframes dk-pulse { 50% { box-shadow: 0 0 0 5px rgba(var(--honey-rgb), .08); } }
 
 /* The rail: one coloured app per place. */
-.dk-rail { grid-column: 1; grid-row: 2 / 4; display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 4px 0 18px; }
+.dk-rail { grid-column: 1; grid-row: 2; display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 4px 0 18px; }
 .dk-sp { flex: 1; }
 .dk-app { width: 46px; height: 46px; border-radius: calc(14px * var(--rs)); display: grid; place-items: center; color: #fff !important; position: relative;
   box-shadow: inset 0 1px 0 rgba(255,255,255,.45), inset 0 -2px 0 rgba(0,0,0,.08), 0 4px 10px rgba(0,0,0,.12); transition: transform .15s; }
@@ -39,10 +53,12 @@
 .dk-a-know { background: linear-gradient(160deg, #f27b4b, #d4521d); }
 .dk-a-stats { background: linear-gradient(160deg, #f0697f, #cf3655); }
 .dk-a-rec { background: linear-gradient(160deg, #e6c534, #c19c06); }
-.dk-a-set { background: linear-gradient(160deg, #eef0f2, #cfd4d9); color: #3d4045 !important; }
+.dk-a-set, .dk-a-mode { background: linear-gradient(160deg, #eef0f2, #cfd4d9); color: #3d4045 !important; }
+.dk-a-mcp { background: linear-gradient(160deg, #5aa7c8, #2f7fa3); }
+.dk-app.on::before { background: var(--ink); }
 
 /* The sidebar. */
-.dk-side { grid-column: 2; grid-row: 2; margin: 0 8px 12px 0; padding: 14px 10px 10px; display: flex; flex-direction: column; gap: 2px; min-height: 0; }
+.dk-side { grid-column: 1; grid-row: 1; margin: 0 8px 12px 0; padding: 14px 10px 10px; display: flex; flex-direction: column; gap: 2px; min-height: 0; }
 .dk-ws { padding: 2px 8px 12px; }
 .dk-ws b { font-size: 19px; font-weight: 650; letter-spacing: -.01em; }
 .dk-row { display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px; border-radius: calc(11px * var(--rs)); font-weight: 450; text-align: left; }
@@ -82,7 +98,7 @@
 .dk-menu button:hover { background: rgba(var(--glass-rgb), .6); }
 
 /* The conversation. */
-.dk-chat { grid-column: 3; grid-row: 2; margin: 0 10px 12px 0; display: grid; grid-template-rows: 58px minmax(0, 1fr) auto; min-height: 0; overflow: hidden; }
+.dk-chat { grid-column: 2; grid-row: 1; margin: 0 10px 12px 0; display: grid; grid-template-rows: 58px minmax(0, 1fr) auto; min-height: 0; overflow: hidden; }
 .dk-chead { display: flex; align-items: center; gap: 12px; padding: 0 18px; border-bottom: 1px solid var(--line); }
 .dk-chead b { font-size: 15px; font-weight: 600; }
 .dk-msgs { overflow-y: auto; padding: 18px 22px 8px; display: flex; flex-direction: column; gap: 8px;
@@ -115,21 +131,21 @@
 .dk-card code { font-family: var(--font-mono); font-size: 12.5px; background: rgba(29,26,22,.06); padding: 1px 5px; border-radius: 5px; }
 .dk-card-btns { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
 .dk-card-btns small { margin-left: auto; color: var(--ink-3); font-size: 12px; }
-.dk .dk-btn { height: 32px; padding: 0 14px; border-radius: calc(10px * var(--rs)); font-weight: 550; font-size: 13.5px; display: inline-flex; align-items: center; gap: 6px;
+.dk-shell .dk-btn { height: 32px; padding: 0 14px; border-radius: calc(10px * var(--rs)); font-weight: 550; font-size: 13.5px; display: inline-flex; align-items: center; gap: 6px;
   background: rgba(var(--glass-rgb), .8); box-shadow: inset 0 0 0 1px var(--line); }
-.dk .dk-btn.pri { background: var(--ink); color: #fff; box-shadow: none; }
+.dk-shell .dk-btn.pri { background: var(--ink); color: #fff; box-shadow: none; }
 .dk-dark .dk-btn.pri { color: #1d1a16; }
 .dk-comp { margin: 6px 14px 14px; min-height: 52px; border-radius: calc(26px * var(--rs)); display: flex; align-items: flex-end; gap: 8px; padding: 7px 7px 7px 20px;
   background: rgba(var(--glass-rgb), calc(var(--ga) + .4)); box-shadow: inset 0 1px 0 rgba(255,255,255,var(--hl)), inset 0 0 0 1px rgba(255,255,255,calc(var(--hl) * .5)), 0 6px 18px rgba(40,60,80,.08); }
 .dk-comp textarea { flex: 1; resize: none; border: 0; outline: none; background: none; font: 14.5px/1.5 var(--font-sans); color: var(--ink); padding: 8px 0; max-height: 150px; field-sizing: content; }
 .dk-comp textarea::placeholder { color: var(--ink-3); }
-.dk .dk-send { width: 38px; height: 38px; flex: none; border-radius: 50%; background: var(--honey); color: #fff; display: grid; place-items: center; box-shadow: 0 3px 10px rgba(var(--honey-rgb), .35); }
-.dk .dk-send:disabled { opacity: .45; box-shadow: none; cursor: default; }
-.dk .dk-send.stop { background: var(--ink); }
+.dk-shell .dk-send { width: 38px; height: 38px; flex: none; border-radius: 50%; background: var(--honey); color: #fff; display: grid; place-items: center; box-shadow: 0 3px 10px rgba(var(--honey-rgb), .35); }
+.dk-shell .dk-send:disabled { opacity: .45; box-shadow: none; cursor: default; }
+.dk-shell .dk-send.stop { background: var(--ink); }
 .dk-dark .dk-send.stop { color: #1d1a16; }
 
 /* The live pane: a framed screen and who is driving it. */
-.dk-live { grid-column: 4; grid-row: 2; margin: 0 14px 12px 0; display: flex; flex-direction: column; min-height: 0; }
+.dk-live { grid-column: 3; grid-row: 1; margin: -42px 14px 12px 0; display: flex; flex-direction: column; min-height: 0; }
 .dk-screen { flex: 1; min-height: 0; border-radius: calc(22px * var(--rs)); padding: 12px; position: relative;
   background: linear-gradient(160deg, rgba(var(--honey-rgb), .95), var(--honey-deep)); box-shadow: 0 18px 40px rgba(var(--honey-rgb), .22), inset 0 1px 0 rgba(255,255,255,.45); }
 .dk-in { position: absolute; inset: 12px; border-radius: calc(13px * var(--rs)); overflow: hidden; background: rgb(244, 241, 231); box-shadow: 0 6px 20px rgba(80,40,0,.22); }
@@ -139,9 +155,9 @@
 .dk-live-empty span { max-width: 300px; line-height: 1.5; }
 .dk-ctl { height: 62px; flex: none; display: flex; align-items: center; justify-content: center; gap: 12px; font-size: 15px; position: relative; }
 .dk-ctl > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dk .dk-ctl .dk-btn { height: 38px; padding: 0 18px; border-radius: 19px; font-size: 14px; }
-.dk .dk-ctl .dk-btn.light { background: #fff; color: #1d1a16; box-shadow: 0 2px 8px rgba(0,0,0,.08), inset 0 0 0 1px rgba(0,0,0,.04); }
-.dk .dk-ctl .dk-btn.ghost { background: transparent; color: var(--ink-2); }
+.dk-shell .dk-ctl .dk-btn { height: 38px; padding: 0 18px; border-radius: 19px; font-size: 14px; }
+.dk-shell .dk-ctl .dk-btn.light { background: #fff; color: #1d1a16; box-shadow: 0 2px 8px rgba(0,0,0,.08), inset 0 0 0 1px rgba(0,0,0,.04); }
+.dk-shell .dk-ctl .dk-btn.ghost { background: transparent; color: var(--ink-2); }
 .dk-ctl-err { position: absolute; bottom: -6px; left: 0; right: 0; text-align: center; font-style: normal; font-size: 12px; color: var(--lost); }
 
 /* The hive, on the screen. */
@@ -203,7 +219,7 @@
 .dk-dash { position: absolute; inset: 0; overflow-y: auto; padding: 16px 18px; background: rgba(var(--glass-rgb), .6); }
 
 /* The dock. */
-.dk-dock { grid-column: 2 / -1; grid-row: 3; margin: 0 14px 14px 0; display: flex; align-items: center; gap: 10px; padding: 0 12px; min-width: 0; }
+.dk-dock { grid-column: 1 / -1; grid-row: 2; margin: 0 14px 14px 0; display: flex; align-items: center; gap: 10px; padding: 0 12px; min-width: 0; }
 .dk-dock-hint { color: var(--ink-3); font-size: 13px; padding-left: 6px; }
 .dk-pin { flex: 1 1 0; min-width: 0; max-width: 240px; height: 44px; display: flex; align-items: center; gap: 10px; padding: 0 12px 0 8px; border-radius: calc(13px * var(--rs));
   background: rgba(var(--glass-rgb), .55); box-shadow: inset 0 1px 0 rgba(255,255,255,var(--hl)), 0 1px 3px rgba(0,0,0,.05); font-size: 13.5px; font-weight: 500; text-align: left; }
@@ -214,3 +230,88 @@
 
 /* In the desktop window the traffic lights sit over the rail's first row. */
 body.desktop-shell .dk-rail { padding-top: 4px; }
+
+/* ---------------------------------------------------------------------------
+   The older screens, inside the shell. They paint with the app-wide tokens;
+   while the desktop shell is up those tokens are the hive's: honey for the
+   accent, ink for text, translucent panels over the sky. Popovers and dialogs
+   render outside the shell, so the tokens sit on the root, and the popover
+   colours stay solid.
+--------------------------------------------------------------------------- */
+html[data-desk][data-theme] {
+  --accent: var(--desk-accent, #b86e05);
+  --accent-hover: #9a5c06;
+  --accent-alt: #c98208;
+  --on-accent: #ffffff;
+  --accent-soft: rgba(242, 165, 22, 0.14);
+  --accent-border: rgba(242, 165, 22, 0.45);
+  --accent-glow: rgba(242, 165, 22, 0.3);
+  --radius: 12px;
+  --radius-lg: 18px;
+}
+html[data-desk][data-theme="light"] {
+  --bg-0: transparent;
+  --bg-1: rgba(255, 255, 255, 0.62);
+  --bg-2: rgba(255, 255, 255, 0.42);
+  --bg-3: rgba(29, 26, 22, 0.06);
+  --bg-hover: rgba(255, 255, 255, 0.72);
+  --border: rgba(29, 26, 22, 0.09);
+  --border-strong: rgba(29, 26, 22, 0.18);
+  --text-0: #1d1a16;
+  --text-1: rgba(29, 26, 22, 0.82);
+  --text-2: rgba(29, 26, 22, 0.62);
+  --text-3: rgba(29, 26, 22, 0.42);
+  --shadow: 0 1px 2px rgba(40, 30, 10, 0.05), 0 10px 28px rgba(40, 30, 10, 0.08);
+  --background: transparent;
+  --foreground: var(--text-0);
+  --card: var(--bg-1);
+  --card-foreground: var(--text-0);
+  --popover: #fbfaf7;
+  --popover-foreground: var(--text-0);
+  --primary: var(--accent);
+  --primary-foreground: var(--on-accent);
+  --secondary: var(--bg-2);
+  --secondary-foreground: var(--text-0);
+  --muted: var(--bg-2);
+  --muted-foreground: var(--text-2);
+  --accent-color: var(--accent-soft);
+  --accent-foreground: var(--accent);
+  --border-color: var(--border);
+  --input: var(--border);
+  --ring: var(--accent);
+}
+html[data-desk][data-theme="dark"] {
+  --accent: #f2a516;
+  --accent-hover: #f6b73f;
+  --on-accent: #1d1a16;
+  --bg-0: transparent;
+  --bg-1: rgba(40, 42, 46, 0.62);
+  --bg-2: rgba(40, 42, 46, 0.42);
+  --bg-3: rgba(255, 255, 255, 0.06);
+  --bg-hover: rgba(255, 255, 255, 0.08);
+  --border: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.18);
+  --text-0: #f2f1ee;
+  --text-1: rgba(242, 241, 238, 0.84);
+  --text-2: rgba(242, 241, 238, 0.64);
+  --text-3: rgba(242, 241, 238, 0.42);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 32px rgba(0, 0, 0, 0.35);
+  --background: transparent;
+  --foreground: var(--text-0);
+  --card: var(--bg-1);
+  --card-foreground: var(--text-0);
+  --popover: #24262a;
+  --popover-foreground: var(--text-0);
+  --primary: var(--accent);
+  --primary-foreground: var(--on-accent);
+  --secondary: var(--bg-2);
+  --secondary-foreground: var(--text-0);
+  --muted: var(--bg-2);
+  --muted-foreground: var(--text-2);
+  --accent-color: var(--accent-soft);
+  --accent-foreground: var(--accent);
+  --border-color: var(--border);
+  --input: var(--border);
+  --ring: var(--accent);
+}
+html[data-desk] body { background: transparent; }

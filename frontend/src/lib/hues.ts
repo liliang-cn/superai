@@ -10,5 +10,8 @@
 export function hueFor(id: string): number {
   let h = 0;
   for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
-  return h % 360;
+  // Purple (roughly 250°–330°) is skipped: the rest of the wheel is enough to
+  // tell two tasks apart.
+  const n = h % 280;
+  return n < 250 ? n : n + 80;
 }

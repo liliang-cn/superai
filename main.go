@@ -53,7 +53,7 @@ func main() {
 		MinHeight: 600,
 		AssetServer: &assetserver.Options{
 			Assets:     assets,
-			Middleware: app.NoCache,
+			Middleware: a.AssetMiddleware,
 		},
 		// The paper this app is printed on, so a cold frame never flashes behind
 		// the page while the webview is still coming up.
