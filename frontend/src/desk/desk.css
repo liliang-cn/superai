@@ -20,6 +20,11 @@
   grid-template-columns: 252px minmax(360px, 1fr) minmax(400px, 42%);
   grid-template-rows: minmax(0, 1fr) 74px;
 }
+.dk.folded { grid-template-columns: 252px minmax(360px, 1fr) 58px; }
+.dk-live-strip { grid-column: 3; grid-row: 1; margin: 0 14px 12px 0; display: flex; justify-content: center; }
+.dk-unfold { position: relative; width: 44px; height: 44px; border-radius: calc(14px * var(--rs)); display: grid; place-items: center; color: var(--ink-2); }
+.dk-unfold:hover { color: var(--ink); }
+.dk-unfold .dk-livedot { position: absolute; top: 7px; right: 7px; }
 
 /* Any other page: one pane of glass. */
 .dk-page { grid-column: 2; grid-row: 2; margin: 0 14px 14px 0; min-height: 0; min-width: 0; overflow: hidden; display: flex; border-radius: calc(22px * var(--rs)); }
@@ -31,6 +36,7 @@
 .dk-bar { grid-column: 1 / -1; grid-row: 1; display: flex; align-items: center; padding-left: 90px; }
 .dk-bar-title { font-size: 15px; font-weight: 650; letter-spacing: -.01em; }
 .dk-tabs { height: 42px; flex: none; display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; }
+.dk-tabs .dk-fold { margin-left: auto; }
 .dk-tab { height: 34px; display: inline-flex; align-items: center; gap: 8px; padding: 0 12px; border-radius: calc(11px * var(--rs)); color: var(--ink-2); font-weight: 500; font-size: 13.5px; white-space: nowrap; min-width: 0; }
 .dk-tab span { overflow: hidden; text-overflow: ellipsis; max-width: 160px; }
 .dk-tab.on { color: var(--ink); background: rgba(var(--glass-rgb), calc(var(--ga) + 0.35)); box-shadow: inset 0 1px 0 rgba(255,255,255,var(--hl)), 0 1px 3px rgba(0,0,0,.06); }
@@ -148,10 +154,9 @@
 
 /* The live pane: a framed screen and who is driving it. */
 .dk-live { grid-column: 3; grid-row: 1; margin: -42px 14px 12px 0; display: flex; flex-direction: column; min-height: 0; }
-.dk-screen { flex: 1; min-height: 0; border-radius: calc(22px * var(--rs)); padding: 12px; position: relative;
-  background: linear-gradient(160deg, rgba(var(--honey-rgb), .95), var(--honey-deep)); box-shadow: 0 18px 40px rgba(var(--honey-rgb), .22), inset 0 1px 0 rgba(255,255,255,.45); }
-.dk-in { position: absolute; inset: 12px; border-radius: calc(13px * var(--rs)); overflow: hidden; background: rgb(244, 241, 231); box-shadow: 0 6px 20px rgba(80,40,0,.22); }
-.dk-dark .dk-in { background: #1c1f24; }
+/* The screen is a pane of glass like the others; what it shows sits on it. */
+.dk-screen { flex: 1; min-height: 0; position: relative; overflow: hidden; border-radius: calc(22px * var(--rs)); }
+.dk-in { position: absolute; inset: 0; overflow: hidden; }
 .dk-live-empty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 30px; text-align: center; color: var(--ink-2); }
 .dk-live-empty b { color: var(--ink); font-size: 15px; }
 .dk-live-empty span { max-width: 300px; line-height: 1.5; }
@@ -351,3 +356,30 @@ html[data-desk] body { background: transparent; }
 .dk-comp .agent-opt.active, .dk-comp .agent-opt:hover { background: rgba(var(--honey-rgb), .16); }
 .dk-comp .agent-name { color: var(--honey-deep); font-size: 13px; }
 .dk-comp .agent-about { color: var(--ink-2); font-size: 12.5px; }
+
+/* Status: the members, one row each. */
+.dk-status { position: absolute; inset: 0; display: flex; flex-direction: column; padding: 16px 16px 12px; gap: 14px; }
+.dk-status-sum { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.dk-status-sum div { padding: 12px 14px; border-radius: calc(14px * var(--rs)); background: rgba(var(--glass-rgb), .5); box-shadow: inset 0 0 0 1px var(--line); }
+.dk-status-sum b { display: block; font-size: 26px; font-weight: 650; letter-spacing: -.02em; }
+.dk-status-sum span { font-size: 12.5px; color: var(--ink-2); }
+.dk-status-rows { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+.dk-st { display: grid; grid-template-columns: 10px 34px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 10px; font-size: 13.5px; }
+.dk-st:hover { background: rgba(var(--glass-rgb), .45); }
+.dk-st i { width: 8px; height: 8px; border-radius: 50%; background: #2fb36d; }
+.dk-st.busy i { background: var(--honey); box-shadow: 0 0 0 3px rgba(var(--honey-rgb), .22); }
+.dk-st.lost i { background: var(--lost); }
+.dk-st b { font-family: var(--font-mono); font-size: 12.5px; }
+.dk-st-what { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-2); }
+.dk-st.busy .dk-st-what { color: var(--ink); }
+.dk-st em { font-style: normal; font-family: var(--font-mono); font-size: 12px; color: var(--ink-3); }
+
+/* Stats: the figures. */
+.dk-stats { position: absolute; inset: 0; padding: 16px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
+.dk-stats-head { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-2); font-weight: 550; }
+.dk-stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.dk-fig { padding: 14px 16px; border-radius: calc(14px * var(--rs)); background: rgba(var(--glass-rgb), .5); box-shadow: inset 0 0 0 1px var(--line); }
+.dk-fig b { display: block; font-size: 24px; font-weight: 650; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.dk-fig span { font-size: 12.5px; color: var(--ink-2); }
+.dk-fig.big { grid-column: 1 / -1; }
+.dk-fig.big b { font-size: 40px; color: var(--honey-deep); }

@@ -86,7 +86,6 @@ export default function LiveHive({ hive, runs, theme, now }: { hive: Hive; runs:
 
   return (
     <div className="dk-hive">
-      <Sky at={now} lanes={lanes} base={theme.base} mode={theme.mode} />
       <div className="dk-hud">
         <b>The hive</b>
         <span>{workers.length + 1} members, {busyBy.size} working</span>
