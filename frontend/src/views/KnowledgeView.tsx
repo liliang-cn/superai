@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { graphSrc } from "../lib/hivelink";
+import { graphLook, recolorGraph } from "../lib/graphframe";
 import { ClipboardSetText } from "../../wailsjs/runtime";
 import { GraphView as startGraphView, MemoryRecall } from "../../wailsjs/go/app/App";
 import { openExternal } from "../lib/openExternal";
@@ -13,7 +14,7 @@ import { useDaylight } from "../lib/useDaylight";
 // which works because the viewer is served from this origin (/graph/). A
 // viewer on another origin keeps its own look; reading its document throws
 // and the frame is left alone.
-const DAY_BG = "f8fafb";
+const DAY_BG = "f6f4ef";
 const DAY_CSS = `
 html,body,#boot{background:#${DAY_BG}!important;color:#33424d}
 .panel{background:rgba(255,255,255,.92)!important;border-color:#e1e6ea!important;
@@ -38,10 +39,6 @@ button.fold{background:none!important;border:none!important;color:#9aa6af!import
 #boot span{color:#6b7a85!important}
 `;
 
-function withBg(src: string | undefined, day: boolean): string | undefined {
-  if (!src || !day) return src;
-  return `${src}${src.includes("?") ? "&" : "?"}bg=${DAY_BG}`;
-}
 
 function dress(frame: HTMLIFrameElement | null, day: boolean) {
   if (!frame || !day) return;
@@ -402,10 +399,8 @@ export default function KnowledgeView() {
           key={`${graphSrc() ?? status?.url}#${nonce}#${day}`}
           ref={frameRef}
           className="graph-frame"
-          // Always on its own dark ground: CortexDB's live view draws with
-          // additive glow, which leaves nothing visible on a light one.
-          src={withBg(graphSrc() ?? status?.url, false)}
-          onLoad={(e) => dress(e.currentTarget, false)}
+          src={(graphSrc() ?? status?.url) ? graphLook((graphSrc() ?? status?.url)!, day) : undefined}
+          onLoad={(e) => { dress(e.currentTarget, day); recolorGraph(e.currentTarget, day); }}
           title="CortexDB knowledge graph"
         />
         <div className="graph-foot">
