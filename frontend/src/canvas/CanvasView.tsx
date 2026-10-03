@@ -8,10 +8,13 @@ import { PATHS } from "../lib/routes";
 import Sky, { Lane } from "./Sky";
 import { Bees, Cell, Coding, CodingRun, InFlight, Later, Machines, NeedsYou, Queen, Today, UpcomingItem } from "./tiles";
 import { EventsOn } from "../../wailsjs/runtime";
-import { Hive, elapsed, isToday, oneLine, short, useBees, useCodingRuns, useHive, useUpcoming, QUEEN_SESSION } from "./data";
+import { Hive, elapsed, isToday, oneLine, short, useBees, useCodingRuns, useHive, useUpcoming, useLinkedAgents, QUEEN_SESSION } from "./data";
 import { GenSpec, loadSpecs, makeTile, saveSpecs } from "./generated";
 import { BASES, BaseName, COLORS, CanvasTheme, ColorName, DEFAULT_THEME, loadTheme, saveTheme, themeVars } from "./theme";
 import "./canvas.css";
+import { Response } from "@/components/ai-elements/response";
+import { withoutCallNotes } from "../lib/format";
+import type { ChatMessage } from "../lib/types";
 
 type Kind = "inFlight" | "machines" | "today" | "bees" | "later" | "coding" | "queen" | "generated";
 interface Tile { id: string; kind: Kind; span: 2 | 3 | 4 | 6 }
@@ -25,7 +28,6 @@ const DEFAULT: Tile[] = [
   { id: "t-inflight", kind: "inFlight", span: 4 },
   { id: "t-today", kind: "today", span: 2 },
   { id: "t-machines", kind: "machines", span: 2 },
-  { id: "t-bees", kind: "bees", span: 4 },
   { id: "t-later", kind: "later", span: 3 },
   { id: "t-coding", kind: "coding", span: 3 },
   { id: "t-queen", kind: "queen", span: 6 },
@@ -42,6 +44,11 @@ function loadLayout(): Tile[] {
       const add = DEFAULT.filter((d) => (d.kind === "later" || d.kind === "coding") && !t.some((x) => x.kind === d.kind));
       const q = t.findIndex((x) => x.kind === "queen");
       return q < 0 ? [...t, ...add] : [...t.slice(0, q), ...add, ...t.slice(q)];
+    }
+    // Bees came off the defaults (Later lists them): taken off once.
+    if (!localStorage.getItem("superai-canvas-v3")) {
+      localStorage.setItem("superai-canvas-v3", "1");
+      return t.filter((x) => x.kind !== "bees");
     }
     return t;
   } catch {
@@ -62,6 +69,8 @@ export default function CanvasView({ approvals }: { approvals: { pending: ToolAp
   const pulse = usePulse();
   const upcoming = useUpcoming();
   const codingRuns = useCodingRuns();
+  const linked = useLinkedAgents();
+  const wide = useWide();
   const chat = useChat();
   const [tiles, setTiles] = useState<Tile[]>(loadLayout);
   const [specs, setSpecs] = useState<Record<string, GenSpec>>(loadSpecs);
@@ -157,7 +166,7 @@ export default function CanvasView({ approvals }: { approvals: { pending: ToolAp
   const body = (t: Tile) => {
     switch (t.kind) {
       case "inFlight": return <InFlight hive={hive} open={setMachine} />;
-      case "machines": return <Machines hive={hive} open={setMachine} />;
+      case "machines": return <Machines hive={hive} open={setMachine} agents={linked} />;
       case "today": return <Today hive={hive} pulse={pulse} />;
       case "bees": return <Bees bees={bees} open={() => navigate(PATHS.agents)} />;
       case "later": return <Later items={upcoming} open={(i) => navigate(i.kind === "bee" ? PATHS.agents : PATHS.records)} />;
@@ -191,6 +200,52 @@ export default function CanvasView({ approvals }: { approvals: { pending: ToolAp
           </div>
         </header>
 
+        {wide ? (
+          <div className="cv-split">
+            <section className="cv-glass cv-convo">
+              <h2>The queen</h2>
+              <Conversation messages={chat.messages} />
+              <div className="cv-say inner">
+                <input
+                  value={order}
+                  onChange={(e) => setOrder(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) { e.preventDefault(); send(); } }}
+                  placeholder="Ask, order, or change this screen"
+                  data-testid="canvas-say"
+                />
+                <button className="cv-go" onClick={() => (chat.sending ? chat.cancel() : send())} disabled={!chat.sending && !order.trim()} aria-label={chat.sending ? "Stop" : "Send"} data-testid="canvas-send">
+                  {chat.sending ? <SquareIcon size={14} fill="currentColor" /> : <ArrowUpIcon size={18} />}
+                </button>
+              </div>
+            </section>
+            <aside className="cv-side">
+              <NeedsYou pending={approvals.pending} resolve={approvals.resolve} bees={bees} />
+              {tiles.filter((t) => t.kind !== "queen").map((t) => (
+                <section
+                  key={t.id}
+                  className={`cv-glass cv-tile${editing ? " editing" : ""}`}
+                  draggable={editing}
+                  onDragStart={() => { dragged.current = t.id; }}
+                  onDragOver={(e) => { if (editing) e.preventDefault(); }}
+                  onDrop={() => { if (dragged.current) move(dragged.current, t.id); dragged.current = null; }}
+                >
+                  {t.kind !== "generated" && <h2>{TITLES[t.kind]}</h2>}
+                  {editing && (
+                    <div className="cv-handles">
+                      <button className="ink" onClick={() => setTiles((ts) => ts.filter((x) => x.id !== t.id))} aria-label="Remove"><MinusIcon size={13} /></button>
+                    </div>
+                  )}
+                  {body(t)}
+                </section>
+              ))}
+              {editing && (
+                <button className="cv-glass cv-add" onClick={() => setAdding(true)} data-testid="add-tile"><PlusIcon size={16} /> Add a tile</button>
+              )}
+              <Replay hive={hive} at={replayAt} onScrub={setReplayAt} />
+            </aside>
+          </div>
+        ) : (
+        <>
         <NeedsYou pending={approvals.pending} resolve={approvals.resolve} bees={bees} />
 
         <div className="cv-grid">
@@ -219,8 +274,11 @@ export default function CanvasView({ approvals }: { approvals: { pending: ToolAp
             <button className="cv-glass cv-add span-6" onClick={() => setAdding(true)} data-testid="add-tile"><PlusIcon size={16} /> Add a tile</button>
           )}
         </div>
+        </>
+        )}
       </div>
 
+      {!wide && (
       <footer className="cv-bottom">
         <Replay hive={hive} at={replayAt} onScrub={setReplayAt} />
         <div className="cv-glass cv-say">
@@ -236,6 +294,7 @@ export default function CanvasView({ approvals }: { approvals: { pending: ToolAp
           </button>
         </div>
       </footer>
+      )}
 
       {adding && (
         <AddTile
@@ -258,6 +317,53 @@ export default function CanvasView({ approvals }: { approvals: { pending: ToolAp
       {machine && <MachineDrawer name={machine} hive={hive} onClose={() => setMachine(null)} />}
       {attention && <Attention onClose={() => setAttention(false)} />}
       {theming && <ThemePanel theme={theme} onChange={setTheme} onClose={() => setTheming(false)} />}
+    </div>
+  );
+}
+
+/** Wide enough for the conversation beside the tiles. */
+function useWide() {
+  const q = "(min-width: 1100px)";
+  const [wide, setWide] = useState(() => window.matchMedia(q).matches);
+  useEffect(() => {
+    const m = window.matchMedia(q);
+    const on = () => setWide(m.matches);
+    m.addEventListener("change", on);
+    return () => m.removeEventListener("change", on);
+  }, []);
+  return wide;
+}
+
+/** The whole conversation with the queen, newest at the bottom. */
+function Conversation({ messages }: { messages: ChatMessage[] }) {
+  const box = useRef<HTMLDivElement>(null);
+  const inner = useRef<HTMLDivElement>(null);
+  const pinned = useRef(true);
+  const shown = messages.filter((m) => m.kind !== "context");
+  // Newest at the bottom, in view — and kept there while replies render
+  // (tables and markdown grow after they arrive), unless you scrolled up.
+  useEffect(() => {
+    const el = box.current, content = inner.current;
+    if (!el || !content) return;
+    const stick = () => { if (pinned.current) el.scrollTop = el.scrollHeight; };
+    const ro = new ResizeObserver(stick);
+    ro.observe(content);
+    stick();
+    return () => ro.disconnect();
+  }, [shown.length]);
+  if (!shown.length) return <div className="cv-conv"><p className="cv-quiet cv-conv-empty">Orders you give below go to the queen; her answers show here.</p></div>;
+  return (
+    <div className="cv-conv" ref={box} onScroll={(e) => { const el = e.currentTarget; pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60; }}>
+      <div className="cv-conv-in" ref={inner}>
+      {shown.map((m) => m.role === "user" ? (
+        <div key={m.id} className="cv-conv-you">{withoutCallNotes(m.content)}</div>
+      ) : (
+        <div key={m.id} className={m.error ? "cv-conv-her bad" : "cv-conv-her"}>
+          {m.content ? <Response>{withoutCallNotes(m.content)}</Response> : <span className="cv-quiet">{m.streaming ? "Working on it…" : m.cancelled ? "Stopped." : ""}</span>}
+          {m.error && <p className="cv-conv-err">{m.error}</p>}
+        </div>
+      ))}
+      </div>
     </div>
   );
 }

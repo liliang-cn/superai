@@ -3,7 +3,7 @@ import { Response } from "@/components/ai-elements/response";
 import type { ToolApproval } from "../lib/useToolApprovals";
 import type { Snap } from "../components/Reactor";
 import type { ChatMessage } from "../lib/types";
-import { Bee, Hive, elapsed, isToday, oneLine, short } from "./data";
+import { Bee, Hive, LinkedAgent, elapsed, isToday, oneLine, short } from "./data";
 import { withoutCallNotes } from "../lib/format";
 
 /** A tick every second, for clocks that count up. */
@@ -102,19 +102,30 @@ export function InFlight({ hive, open }: { hive: Hive; open: (worker: string) =>
   );
 }
 
-export function Machines({ hive, open }: { hive: Hive; open: (name: string) => void }) {
+export function Machines({ hive, open, agents = [] }: { hive: Hive; open: (name: string) => void; agents?: LinkedAgent[] }) {
   if (hive.loaded && !hive.role) return <p className="cv-quiet">This SuperAI is not in a hive.</p>;
   const busy = new Set(hive.tasks.filter((t) => t.state === "running").map((t) => t.worker));
   const recent = new Set(hive.tasks.slice(0, 30).filter((t) => t.state === "done").map((t) => t.worker));
   const center = hive.role === "queen" ? hive.name : "queen";
   return (
-    <div className="cv-comb">
-      <Cell label="Q" state="queen" onClick={() => open(center)} />
-      {hive.members.filter((m) => m.name !== center).map((m) => (
-        <Cell key={m.name} label={short(m.name)} onClick={() => open(m.name)}
-          state={m.state !== "live" ? "lost" : busy.has(m.name) ? "working" : recent.has(m.name) ? "done" : "resting"} />
-      ))}
-    </div>
+    <>
+      <div className="cv-comb">
+        <Cell label="Q" state="queen" onClick={() => open(center)} />
+        {hive.members.filter((m) => m.name !== center).map((m) => (
+          <Cell key={m.name} label={short(m.name)} onClick={() => open(m.name)}
+            state={m.state !== "live" ? "lost" : busy.has(m.name) ? "working" : recent.has(m.name) ? "done" : "resting"} />
+        ))}
+      </div>
+      {agents.length > 0 && (
+        <div className="cv-agents">
+          {agents.map((a) => (
+            <span key={a.name} className="cv-agent" title={`${a.host} · ${a.os}/${a.arch}${a.clis.length ? " · " + a.clis.join(", ") : ""}`}>
+              <i />{a.name}{a.clis.length > 0 && <small>{a.clis.length} CLIs</small>}{(a.agents ?? []).length > 0 && <small>{(a.agents ?? []).map((x) => x.name).join(", ")}</small>}
+            </span>
+          ))}
+        </div>
+      )}
+    </>
   );
 }
 
