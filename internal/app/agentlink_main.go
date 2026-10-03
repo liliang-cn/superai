@@ -50,7 +50,17 @@ func (f agentLinkFlags) options() (AgentLinkOptions, bool) {
 	if strings.TrimSpace(*f.core) == "" {
 		return AgentLinkOptions{}, false
 	}
-	return AgentLinkOptions{Core: strings.TrimSpace(*f.core), Token: strings.TrimSpace(*f.token), Name: strings.TrimSpace(*f.name),
+	token := strings.TrimSpace(*f.token)
+	// Or from a file only its owner can read, so the token is not in a unit
+	// file or a launchd plist for everyone on the machine to see.
+	if p := strings.TrimSpace(os.Getenv("SUPERAI_CORE_TOKEN_FILE")); token == "" && p != "" {
+		if b, err := os.ReadFile(p); err == nil {
+			token = strings.TrimSpace(string(b))
+		} else {
+			log.Printf("agent link: reading %s: %v", p, err)
+		}
+	}
+	return AgentLinkOptions{Core: strings.TrimSpace(*f.core), Token: token, Name: strings.TrimSpace(*f.name),
 		TLS: *f.tls, Version: buildVersion()}, true
 }
 
@@ -66,7 +76,7 @@ func AgentMain(argv []string) {
 		os.Exit(2)
 	}
 	if o.Token == "" {
-		fmt.Fprintln(os.Stderr, "superai agent: -core-token is required (or SUPERAI_CORE_TOKEN)")
+		fmt.Fprintln(os.Stderr, "superai agent: -core-token is required (or SUPERAI_CORE_TOKEN, or SUPERAI_CORE_TOKEN_FILE)")
 		os.Exit(2)
 	}
 	log.SetPrefix("superai-agent ")
