@@ -137,7 +137,7 @@
   background: rgba(var(--glass-rgb), .8); box-shadow: inset 0 0 0 1px var(--line); }
 .dk-shell .dk-btn.pri { background: var(--ink); color: #fff; box-shadow: none; }
 .dk-dark .dk-btn.pri { color: #1d1a16; }
-.dk-comp { margin: 6px 14px 14px; min-height: 52px; border-radius: calc(26px * var(--rs)); display: flex; align-items: flex-end; gap: 8px; padding: 7px 7px 7px 20px;
+.dk-comp { position: relative; margin: 6px 14px 14px; min-height: 52px; border-radius: calc(26px * var(--rs)); display: flex; align-items: flex-end; gap: 8px; padding: 7px 7px 7px 20px;
   background: rgba(var(--glass-rgb), calc(var(--ga) + .4)); box-shadow: inset 0 1px 0 rgba(255,255,255,var(--hl)), inset 0 0 0 1px rgba(255,255,255,calc(var(--hl) * .5)), 0 6px 18px rgba(40,60,80,.08); }
 .dk-comp textarea { flex: 1; resize: none; border: 0; outline: none; background: none; font: 14.5px/1.5 var(--font-sans); color: var(--ink); padding: 8px 0; max-height: 150px; field-sizing: content; }
 .dk-comp textarea::placeholder { color: var(--ink-3); }
@@ -343,3 +343,11 @@ html[data-desk] body { background: transparent; }
 .dk-be-add { display: flex; align-items: center; gap: 8px; padding: 9px 10px; margin-top: 4px; border-top: 1px solid var(--line); font-weight: 550; font-size: 14px; color: var(--honey-deep); text-align: left; }
 .dk-be-note, .dk-be-err { margin: 4px 8px 0; font-size: 12px; color: var(--ink-3); }
 .dk-be-err { color: var(--lost); }
+
+/* The @ menu, over the composer. */
+.dk-comp .agent-menu { left: 8px; right: 8px; bottom: calc(100% + 8px); max-width: none; margin: 0; border-radius: 14px;
+  background: rgba(var(--glass-rgb), .94); border: 0; box-shadow: inset 0 0 0 1px var(--line), 0 14px 36px rgba(40, 30, 10, .16); }
+.dk-comp .agent-opt { padding: 8px 10px; border-radius: 9px; }
+.dk-comp .agent-opt.active, .dk-comp .agent-opt:hover { background: rgba(var(--honey-rgb), .16); }
+.dk-comp .agent-name { color: var(--honey-deep); font-size: 13px; }
+.dk-comp .agent-about { color: var(--ink-2); font-size: 12.5px; }
