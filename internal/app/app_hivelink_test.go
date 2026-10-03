@@ -34,6 +34,13 @@ func fakeQueen(t *testing.T) *httptest.Server {
 		_ = json.NewDecoder(r.Body).Decode(&args)
 		_, _ = fmt.Fprintf(w, `{"role":"queen","args":%d}`, len(args))
 	})
+	mux.HandleFunc("/graph/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer tok-1" || r.Header.Get("Cookie") != "" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		_, _ = w.Write([]byte("queen graph " + r.URL.Path))
+	})
 	mux.HandleFunc("/api/events", func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Authorization") != "Bearer tok-1" {
 			w.WriteHeader(http.StatusUnauthorized)
@@ -94,6 +101,22 @@ func TestTheDesktopWindowSeesTheHiveOnceLinked(t *testing.T) {
 	}
 	if !a.quietWhileLinked("chat:event") || a.quietWhileLinked("open:conversation") {
 		t.Fatal("a linked window should hear the hive, not this machine's engine")
+	}
+
+	// The window's /graph/ is the queen's, carried with the token.
+	local := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte("local " + r.URL.Path)) })
+	mw := AssetMiddleware(a)(local)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/graph/index.js", nil)
+	req.Header.Set("Cookie", "superai_session=x")
+	mw.ServeHTTP(rec, req)
+	if got := rec.Body.String(); got != "queen graph /graph/index.js" {
+		t.Fatalf("/graph/ answered %q", got)
+	}
+	rec = httptest.NewRecorder()
+	mw.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/index.html", nil))
+	if got := rec.Body.String(); got != "local /index.html" {
+		t.Fatalf("the shell answered %q", got)
 	}
 
 	// A fresh start finds the link on disk.

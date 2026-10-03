@@ -316,8 +316,13 @@ func (a *App) quietWhileLinked(name string) bool {
 // AssetMiddleware is the desktop window's asset server: no caching for the
 // shell, and, while linked, the queen's knowledge-graph view under /graph/ —
 // the same path the browser reaches her graph by, carried with this Mac's
-// token instead of a session cookie.
-func (a *App) AssetMiddleware(next http.Handler) http.Handler {
+// token instead of a session cookie. A function rather than a method, so it
+// is neither bound into the window nor callable over /api/rpc.
+func AssetMiddleware(a *App) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler { return a.assetMiddleware(next) }
+}
+
+func (a *App) assetMiddleware(next http.Handler) http.Handler {
 	next = NoCache(next)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !strings.HasPrefix(r.URL.Path, "/graph/") {
