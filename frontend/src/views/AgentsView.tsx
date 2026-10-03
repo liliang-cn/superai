@@ -1,7 +1,8 @@
 import { useNavigate } from "react-router-dom";
 import { PATHS } from "../lib/routes";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { SquareIcon, CornerDownLeftIcon, ChevronRightIcon } from "lucide-react";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { SquareIcon, ChevronRightIcon, PlusIcon, ArrowUpIcon, TerminalIcon, FolderIcon } from "lucide-react";
+import "./coding.css";
 import {
   CLIRunDetail,
   CLIRuns,
@@ -11,7 +12,7 @@ import {
   FollowUpCLIRun,
   StartCLIRun,
 } from "../../wailsjs/go/app/App";
-import { app, backend } from "../../wailsjs/go/models";
+import { app } from "../../wailsjs/go/models";
 import { EventsOn } from "../../wailsjs/runtime";
 import { fromNow, parseTime } from "../lib/format";
 import { useImeGuard } from "@/lib/ime";
@@ -56,27 +57,53 @@ const shortPath = (p: string) => {
 
 const cost = (n: number) => (n > 0 ? `$${n.toFixed(n < 1 ? 3 : 2)}` : "");
 
+/** "claude.mac" → { cli: "claude", host: "mac" }; a bare name runs on core. */
+const partsOf = (n: string) => {
+  const i = n.indexOf(".");
+  return i < 0 ? { cli: n, host: "" } : { cli: n.slice(0, i), host: n.slice(i + 1) };
+};
+const whereOf = (n: string) => partsOf(n).host || "core";
+
+/** The @word the caret is in, if any: same rule as the chat composer. */
+function mentionAt(value: string, caret: number): { word: string; at: number } | null {
+  const before = value.slice(0, caret);
+  const at = before.lastIndexOf("@");
+  if (at < 0 || (at > 0 && !/\s/.test(before[at - 1]))) return null;
+  const word = before.slice(at + 1);
+  return /^[\p{L}\p{N}._-]*$/u.test(word) ? { word, at } : null;
+}
+
+/** "@claude.mac fix the tests" → ["claude.mac", "fix the tests"]. */
+function addressOf(value: string, names: string[]): [string, string] {
+  const m = /^\s*@([\p{L}\p{N}._-]+)\s+/u.exec(value);
+  if (m && names.includes(m[1])) return [m[1], value.slice(m[0].length)];
+  return ["", value];
+}
+
+const LAST = "superai-coding-agent";
+const lastAgent = () => {
+  try { return localStorage.getItem(LAST) ?? ""; } catch { return ""; }
+};
+
 /**
- * Agent CLIs on this machine, driven from here: start Claude Code or Codex on
- * a task, watch every tool call and what came back, answer its permission
- * prompts on the approval cards, send a follow-up into the same session, stop
- * it. Runs started by "@claude" in a conversation show up here too.
+ * Coding CLIs on core and on every linked agent, driven from here: start one
+ * on a task, watch every tool call and what came back, answer its permission
+ * prompts, send a follow-up into the same session, stop it. Runs started by
+ * "@claude" in a conversation show up here too.
  */
 export default function AgentsView() {
   const [runs, setRuns] = useState<Run[]>([]);
-  const [agents, setAgents] = useState<backend.ExternalAgentStatus[]>([]);
   const [selected, setSelected] = useState<string>("");
   const [events, setEvents] = useState<Record<string, Ev[]>>({});
-  const [composing, setComposing] = useState(false);
-  // Coding CLIs on other machines this core can run: "claude.mac", …
-  const [remote, setRemote] = useState<string[]>([]);
-  const navigate = useNavigate();
+  // Every coding CLI this core can start: its own ("claude") and each agent's ("claude.mac").
+  const [choices, setChoices] = useState<string[] | null>(null);
 
   const load = useCallback(async () => {
     const [list, st, names] = await Promise.all([CLIRuns(), ExternalAgentsStatus(), RemoteAgentNames().catch(() => [])]);
     setRuns(list ?? []);
-    setAgents((st ?? []).filter((a) => a.installed));
-    setRemote(((names ?? []) as { name?: string }[]).map((n) => n.name ?? "").filter((n) => n.includes(".")));
+    const here = (st ?? []).filter((a) => a.installed).map((a) => a.name);
+    const there = ((names ?? []) as { name?: string }[]).map((n) => n.name ?? "").filter((n) => n.includes("."));
+    setChoices([...here, ...there]);
   }, []);
 
   useEffect(() => {
@@ -123,113 +150,78 @@ export default function AgentsView() {
     }
   }, [thread, events]);
 
-  // Where runs can go: this core's own CLIs, and each agent's.
-  const hosts = useMemo(() => {
-    const by = new Map<string, string[]>();
-    for (const n of remote) {
-      const i = n.indexOf(".");
-      const host = n.slice(i + 1), cli = n.slice(0, i);
-      by.set(host, [...(by.get(host) ?? []), cli]);
-    }
-    return [...by.entries()];
-  }, [remote]);
-  const choices = useMemo(() => [...agents.map((a) => a.name), ...remote], [agents, remote]);
-
   return (
-    <div className="view agents-view">
-      <div className="view-header with-action">
-        <div>
-          <div className="view-title">Coding</div>
-          <div className="view-desc coding-where">
-            {agents.length > 0 && <span>Here: {agents.map((a) => a.name).join(", ")}</span>}
-            {hosts.map(([host, clis]) => <span key={host}>On {host}: {clis.join(", ")}</span>)}
-            {choices.length === 0 && <span>No coding CLI on this core or on any agent.</span>}
-          </div>
+    <div className="view cd">
+      <aside className="cd-side">
+        <div className="cd-side-h">
+          <span>Coding</span>
+          <button className={`cd-new${thread ? "" : " on"}`} onClick={() => setSelected("")}>
+            <PlusIcon size={14} /> New run
+          </button>
         </div>
-        <div className="vh-actions">
-          {choices.length === 0 ? (
-            <button className="btn sm" onClick={() => navigate(PATHS.settings)}>Open Settings</button>
-          ) : (
-            <button className="btn sm" onClick={() => setComposing((v) => !v)}>
-              {composing ? "Close" : "New run"}
-            </button>
-          )}
-        </div>
-      </div>
-
-      {composing && (
-        <NewRun
-          agents={choices}
-          onStarted={(r) => {
-            setComposing(false);
-            setRuns((prev) => (prev.some((x) => x.id === r.id) ? prev : [r, ...prev]));
-            setSelected(r.thread);
-          }}
-        />
-      )}
-
-      <div className="agents-split">
-        <div className="agents-list">
-          {threads.length === 0 && <div className="inline-empty"><div className="ie-hint">No runs yet.</div></div>}
-          {threads.map((t) => (
-            <button
-              key={t.id}
-              className={`agents-item${t.id === selected ? " on" : ""}`}
-              onClick={() => setSelected(t.id)}
-            >
-              <span className={`status-dot ${dot(t.latest.state)}`} />
-              <span className="ai-body">
-                <span className="ai-top">
-                  <span className="ai-agent">@{t.agent}</span>
-                  {t.runs.length > 1 && <span className="ai-turns">{t.runs.length} turns</span>}
-                  <span className="ai-when">{fromNow(parseTime(t.latest.started) ?? new Date())}</span>
+        <div className="cd-list">
+          {threads.length === 0 && <div className="cd-none">Runs you start, and ones the queen starts, show up here.</div>}
+          {threads.map((t) => {
+            const { cli, host } = partsOf(t.agent);
+            return (
+              <button key={t.id} className={`cd-item${t.id === selected ? " on" : ""}`} onClick={() => setSelected(t.id)}>
+                <span className="cd-item-top">
+                  <i className={`cd-dot ${t.latest.state}`} />
+                  <b>{cli}</b>
+                  <span>{host || "core"}</span>
+                  {t.runs.length > 1 && <span>· {t.runs.length} turns</span>}
+                  <time>{fromNow(parseTime(t.latest.started) ?? new Date())}</time>
                 </span>
-                <span className="ai-prompt">{t.runs[0].prompt}</span>
-              </span>
-            </button>
-          ))}
+                <span className="cd-item-p">{t.runs[0].prompt}</span>
+              </button>
+            );
+          })}
         </div>
-        <div className="agents-detail">
-          {thread ? (
-            <ThreadView thread={thread} events={events} />
-          ) : (
-            <div className="inline-empty">
-              <div className="ie-hint">Pick a run to see what it did.</div>
-            </div>
-          )}
-        </div>
-      </div>
+      </aside>
+      <main className="cd-main">
+        {thread ? (
+          <ThreadView thread={thread} events={events} />
+        ) : (
+          <Start
+            choices={choices}
+            onStarted={(r) => {
+              setRuns((prev) => (prev.some((x) => x.id === r.id) ? prev : [r, ...prev]));
+              setSelected(r.thread);
+            }}
+          />
+        )}
+      </main>
     </div>
   );
 }
 
-function dot(state: string) {
-  return state === "running" ? "live" : state === "done" ? "ok" : state === "failed" ? "bad" : "unknown";
-}
-
-/** The choices by where they run: this core first, then each agent. */
-function groupsOf(names: string[]): [string, string[]][] {
-  const by = new Map<string, string[]>();
-  for (const n of names) {
-    const where = n.includes(".") ? n.slice(n.indexOf(".") + 1) : "This core";
-    by.set(where, [...(by.get(where) ?? []), n]);
-  }
-  return [...by.entries()];
-}
-
-function NewRun({ agents, onStarted }: { agents: string[]; onStarted: (r: Run) => void }) {
-  const [agent, setAgent] = useState(agents[0] ?? "claude");
-  const [prompt, setPrompt] = useState("");
+/** A new run: one box, @ picks which CLI and where. */
+function Start({ choices, onStarted }: { choices: string[] | null; onStarted: (r: Run) => void }) {
+  const navigate = useNavigate();
+  const [text, setText] = useState("");
   const [cwd, setCwd] = useState("");
   const [ask, setAsk] = useState(true);
   const [busy, setBusy] = useState(false);
-  const ime = useImeGuard();
+  const [fallback, setFallback] = useState(lastAgent);
+  const box = useRef<HTMLTextAreaElement>(null);
+  const names = choices ?? [];
+  const [addressed, task] = addressOf(text, names);
+  const agent = addressed || (names.includes(fallback) ? fallback : names[0] ?? "");
+
+  // Grouped by machine: this is the answer to "what can run where".
+  const machines = useMemo(() => {
+    const by = new Map<string, string[]>();
+    for (const n of names) by.set(whereOf(n), [...(by.get(whereOf(n)) ?? []), n]);
+    return [...by.entries()].sort(([a], [b]) => (a === "core" ? -1 : b === "core" ? 1 : a.localeCompare(b)));
+  }, [names]);
 
   const start = async () => {
-    if (!prompt.trim() || busy) return;
+    if (!task.trim() || !agent || busy) return;
     setBusy(true);
     try {
-      const r = await StartCLIRun(agent, prompt, cwd, "", ask);
+      const r = await StartCLIRun(agent, task.trim(), cwd, "", ask);
+      try { localStorage.setItem(LAST, agent); } catch { /* remembered for this visit only */ }
+      setFallback(agent);
       onStarted(r);
     } catch (e) {
       toast.error(String(e));
@@ -238,41 +230,180 @@ function NewRun({ agents, onStarted }: { agents: string[]; onStarted: (r: Run) =
     }
   };
 
-  return (
-    <div className="card agents-new">
-      <div className="agents-new-row">
-        <select className="input agents-pick" value={agent} onChange={(e) => setAgent(e.target.value)}>
-          {groupsOf(agents).map(([where, names]) => (
-            <optgroup key={where} label={where}>
-              {names.map((n) => <option key={n} value={n}>{n.includes(".") ? `${n.split(".")[0]} on ${n.slice(n.indexOf(".") + 1)}` : n}</option>)}
-            </optgroup>
-          ))}
-        </select>
-        <input
-          className="input"
-          placeholder="Directory (blank: the workspace)"
-          value={cwd}
-          onChange={(e) => setCwd(e.target.value)}
-        />
-        <label className="agents-ask" title="Off: the CLI runs its tools without asking">
-          <input type="checkbox" checked={ask} onChange={(e) => setAsk(e.target.checked)} /> Ask before tools run
-        </label>
+  // Clicking a CLI addresses the message to it, keeping what was typed.
+  const pick = (n: string) => {
+    const rest = addressOf(text, names)[1];
+    const next = `@${n} ${rest}`;
+    setText(next);
+    requestAnimationFrame(() => { box.current?.focus(); box.current?.setSelectionRange(next.length, next.length); });
+  };
+
+  if (choices && choices.length === 0) {
+    return (
+      <div className="cd-start">
+        <div className="cd-start-in">
+          <h2>No coding CLI to run</h2>
+          <p className="cd-sub">Core has none installed and no linked agent offers one. Install Claude Code or Codex on core, or run <code>superai agent</code> on a machine that has them.</p>
+          <button className="cd-btn" onClick={() => navigate(PATHS.settings)}>Open Settings</button>
+        </div>
       </div>
+    );
+  }
+
+  return (
+    <div className="cd-start">
+      <div className="cd-start-in">
+        <h2>New run</h2>
+        <Composer
+          boxRef={box}
+          value={text}
+          onChange={setText}
+          names={names}
+          placeholder={agent ? `Tell ${partsOf(agent).cli} on ${whereOf(agent)} what to do. @ for another CLI or machine` : "Loading…"}
+          onSend={start}
+          sendable={!!task.trim() && !!agent && !busy}
+          foot={
+            <>
+              {agent && (
+                <span className="cd-to" title="Who gets this run. Type @ to change it.">
+                  <TerminalIcon size={13} /> <b>{partsOf(agent).cli}</b> on {whereOf(agent)}
+                </span>
+              )}
+              <label className="cd-cwd" title="The directory it works in, on that machine">
+                <FolderIcon size={13} />
+                <input value={cwd} placeholder="workspace" onChange={(e) => setCwd(e.target.value)} spellCheck={false} />
+              </label>
+              <label className="cd-ask" title="Off: the CLI runs its tools without asking">
+                <input type="checkbox" checked={ask} onChange={(e) => setAsk(e.target.checked)} /> Ask before tools run
+              </label>
+            </>
+          }
+        />
+        <div className="cd-where">
+          {machines.map(([host, list]) => (
+            <div key={host} className="cd-host">
+              <span className="cd-host-n">{host === "core" ? "Core" : host}</span>
+              <span className="cd-host-c">
+                {list.map((n) => (
+                  <button key={n} className={n === agent ? "on" : ""} onClick={() => pick(n)}>{partsOf(n).cli}</button>
+                ))}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The input both for a new run and for a follow-up: a textarea with a footer
+ * of settings and the send button. With `names`, @ completes coding CLIs.
+ */
+function Composer({
+  value, onChange, names = [], placeholder, onSend, sendable, disabled, foot, action, boxRef,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  names?: string[];
+  placeholder: string;
+  onSend: () => void;
+  sendable: boolean;
+  disabled?: boolean;
+  foot?: React.ReactNode;
+  action?: React.ReactNode;
+  boxRef?: React.RefObject<HTMLTextAreaElement | null>;
+}) {
+  const own = useRef<HTMLTextAreaElement>(null);
+  const ref = boxRef ?? own;
+  const ime = useImeGuard();
+  const [q, setQ] = useState<{ word: string; at: number } | null>(null);
+  const [active, setActive] = useState(0);
+  // Where the caret goes once a picked name is in: set in the same frame as
+  // the new text, so nothing typed in between lands in front of it.
+  const caretTo = useRef<number | null>(null);
+  useLayoutEffect(() => {
+    if (caretTo.current == null) return;
+    ref.current?.focus();
+    ref.current?.setSelectionRange(caretTo.current, caretTo.current);
+    caretTo.current = null;
+  }, [value, ref]);
+  const matches = useMemo(() => {
+    if (!q) return [];
+    const w = q.word.toLowerCase();
+    const hits = names.filter((n) => n.toLowerCase().startsWith(w) || whereOf(n).toLowerCase().startsWith(w));
+    return hits.length === 1 && hits[0].toLowerCase() === w ? [] : hits;
+  }, [q, names]);
+
+  const accept = (n: string) => {
+    if (!q) return;
+    const caret = ref.current?.selectionStart ?? value.length;
+    const ins = `@${n} `;
+    const next = value.slice(0, q.at) + ins + value.slice(caret);
+    caretTo.current = q.at + ins.length;
+    onChange(next);
+    setQ(null);
+  };
+
+  return (
+    <div className={`cd-comp${disabled ? " off" : ""}`}>
+      {matches.length > 0 && (
+        <div className="cd-menu" role="listbox">
+          {matches.map((n, i) => (
+            <button
+              key={n}
+              role="option"
+              aria-selected={i === active}
+              className={i === active ? "on" : ""}
+              onMouseDown={(e) => { e.preventDefault(); accept(n); }}
+            >
+              <b>@{n}</b>
+              <span>{partsOf(n).cli} on {whereOf(n)}</span>
+            </button>
+          ))}
+        </div>
+      )}
       <textarea
-        className="input agents-prompt"
-        placeholder={`What should ${agent} do?`}
-        value={prompt}
-        rows={3}
-        onChange={(e) => setPrompt(e.target.value)}
+        ref={ref}
+        rows={2}
+        value={value}
+        placeholder={placeholder}
+        disabled={disabled}
+        onChange={(e) => {
+          onChange(e.target.value);
+          setQ(names.length ? mentionAt(e.target.value, e.target.selectionStart ?? e.target.value.length) : null);
+          setActive(0);
+        }}
+        onBlur={() => setQ(null)}
         {...ime.handlers}
         onKeyDown={(e) => {
-          if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && !ime.composing(e)) start();
+          if (matches.length > 0) {
+            if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+              e.preventDefault();
+              setActive((i) => (i + (e.key === "ArrowDown" ? 1 : matches.length - 1)) % matches.length);
+              return;
+            }
+            if ((e.key === "Enter" || e.key === "Tab") && !ime.composing(e)) {
+              e.preventDefault();
+              accept(matches[active]);
+              return;
+            }
+            if (e.key === "Escape") { e.preventDefault(); setQ(null); return; }
+          }
+          if (e.key === "Enter" && !e.shiftKey && !ime.composing(e)) {
+            e.preventDefault();
+            if (sendable) onSend();
+          }
         }}
       />
-      <div className="agents-new-row end">
-        <button className="btn" onClick={start} disabled={!prompt.trim() || busy}>
-          {busy ? "Starting…" : `Start ${agent}`}
-        </button>
+      <div className="cd-comp-f">
+        {foot}
+        <span className="cd-grow" />
+        {action ?? (
+          <button className="cd-send" onClick={onSend} disabled={!sendable} aria-label="Send">
+            <ArrowUpIcon size={16} />
+          </button>
+        )}
       </div>
     </div>
   );
@@ -283,9 +414,9 @@ function ThreadView({ thread, events }: { thread: Thread; events: Record<string,
   const [sending, setSending] = useState(false);
   const end = useRef<HTMLDivElement>(null);
   const running = thread.latest.state === "running";
-  const ime = useImeGuard();
   const total = thread.runs.reduce((n, r) => n + r.costUsd, 0);
   const count = thread.runs.reduce((n, r) => n + (events[r.id]?.length ?? 0), 0);
+  const { cli, host } = partsOf(thread.agent);
 
   useEffect(() => {
     end.current?.scrollIntoView({ block: "end" });
@@ -305,45 +436,41 @@ function ThreadView({ thread, events }: { thread: Thread; events: Record<string,
   };
 
   return (
-    <div className="agents-thread">
-      <div className="agents-thread-head">
-        <span className="ai-agent">@{thread.agent}</span>
-        <span className="agents-cwd" title={thread.latest.cwd}>{shortPath(thread.latest.cwd)}</span>
-        <span className="agents-meta">
-          {thread.latest.ask ? "asks" : "unattended"}
+    <div className="cd-thread">
+      <div className="cd-thread-h">
+        <TerminalIcon size={15} />
+        <b>{cli}</b>
+        <span>on {host || "core"}</span>
+        <span className="cd-path" title={thread.latest.cwd}>{shortPath(thread.latest.cwd)}</span>
+        <span className="cd-meta">
+          {thread.latest.ask ? "asks before tools" : "unattended"}
           {total > 0 && ` · ${cost(total)}`}
         </span>
-        {running && (
-          <button className="btn ghost sm" onClick={() => CancelCLIRun(thread.latest.id)}>
-            <SquareIcon size={12} /> Stop
-          </button>
-        )}
       </div>
-      <div className="agents-log">
-        {thread.runs.map((r) => (
-          <RunBlock key={r.id} run={r} events={events[r.id] ?? []} />
-        ))}
-        <div ref={end} />
+      <div className="cd-log">
+        <div className="cd-log-in">
+          {thread.runs.map((r) => (
+            <RunBlock key={r.id} run={r} events={events[r.id] ?? []} />
+          ))}
+          <div ref={end} />
+        </div>
       </div>
-      <div className="agents-follow">
-        <textarea
-          className="input"
-          rows={2}
-          placeholder={running ? `${thread.agent} is working…` : `Continue with ${thread.agent}`}
+      <div className="cd-follow">
+        <Composer
           value={follow}
+          onChange={setFollow}
+          placeholder={running ? `${cli} is working…` : `Continue with ${cli}`}
+          onSend={send}
+          sendable={!running && !sending && !!follow.trim()}
           disabled={running}
-          onChange={(e) => setFollow(e.target.value)}
-          {...ime.handlers}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey && !ime.composing(e)) {
-              e.preventDefault();
-              send();
-            }
-          }}
+          action={
+            running ? (
+              <button className="cd-send stop" onClick={() => CancelCLIRun(thread.latest.id)} aria-label="Stop" title="Stop">
+                <SquareIcon size={12} fill="currentColor" />
+              </button>
+            ) : undefined
+          }
         />
-        <button className="btn" onClick={send} disabled={running || sending || !follow.trim()} aria-label="Send">
-          <CornerDownLeftIcon size={15} />
-        </button>
       </div>
     </div>
   );
