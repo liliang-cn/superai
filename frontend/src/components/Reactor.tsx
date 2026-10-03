@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { recolorGraph } from "../lib/graphframe";
 import * as THREE from "three";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
@@ -721,7 +720,6 @@ export default function Reactor({ snap, pillars, brain }: { snap: Snap; pillars:
     <div className="rx" ref={hostRef}>
       {brain && disc && (
         <iframe className="rx-brain" src={brain} title="knowledge graph"
-          onLoad={(e) => recolorGraph(e.currentTarget, document.documentElement.dataset.theme !== "dark")}
           data-pet-spot="brain"
           data-pet-label="the knowledge graph at the centre of the reactor — a sphere the character can walk on"
           data-pet-surface="sphere"
