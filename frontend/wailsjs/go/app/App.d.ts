@@ -69,6 +69,8 @@ export function ExternalAgentsStatus():Promise<Array<backend.ExternalAgentStatus
 
 export function FollowUpCLIRun(arg1:string,arg2:string):Promise<app.CLIRun>;
 
+export function ForgetHive(arg1:string):Promise<void>;
+
 export function GetSettings():Promise<backend.Settings>;
 
 export function GetStatus():Promise<Record<string, any>>;
@@ -76,6 +78,8 @@ export function GetStatus():Promise<Record<string, any>>;
 export function GraphView():Promise<Record<string, any>>;
 
 export function HiveLinkStatus():Promise<app.HiveLinkInfo>;
+
+export function HiveLinks():Promise<Array<app.HiveLinkEntry>>;
 
 export function HiveMembers():Promise<Array<backend.HiveMember>>;
 
@@ -224,5 +228,7 @@ export function UnpairDevice(arg1:string):Promise<void>;
 export function UnreadNotifications():Promise<number>;
 
 export function Upcoming():Promise<Array<app.UpcomingItem>>;
+
+export function UseHive(arg1:string):Promise<void>;
 
 export function WakeStandingAgent(arg1:string,arg2:string):Promise<void>;

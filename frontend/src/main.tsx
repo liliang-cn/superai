@@ -11,7 +11,7 @@ import './styles.css'
 import App from './App'
 import Gate from './components/Gate'
 import LinkHive from './components/LinkHive'
-import {HiveLinkStatus} from '../wailsjs/go/app/App'
+import {HiveLinkStatus, HiveLinks} from '../wailsjs/go/app/App'
 import {installHiveBridge, setAlone, wantsAlone} from './lib/hivelink'
 
 /**
@@ -53,12 +53,14 @@ function Root() {
     const [link, setLink] = useState<'linked' | 'alone' | 'ask' | null>(served ? 'alone' : null)
     useEffect(() => {
         if (served) return
-        HiveLinkStatus()
-            .then((s) => {
+        // Linked: onto that hive. Not linked but with hives saved, or told
+        // once to stay on its own: this Mac. Otherwise ask.
+        Promise.all([HiveLinkStatus(), HiveLinks().catch(() => [])])
+            .then(([s, saved]) => {
                 if (s?.linked) {
                     installHiveBridge()
                     setLink('linked')
-                } else setLink(wantsAlone() ? 'alone' : 'ask')
+                } else setLink(wantsAlone() || (saved ?? []).length > 0 ? 'alone' : 'ask')
             })
             .catch(() => setLink('alone'))
     }, [served])

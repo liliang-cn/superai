@@ -10,6 +10,7 @@ import { useCodingRuns } from "../canvas/data";
 import { PATHS } from "../lib/routes";
 import { ViewKey } from "../lib/types";
 import { SetWindowTheme } from "../../wailsjs/go/app/App";
+import BackendSwitcher from "./BackendSwitcher";
 import "../canvas/canvas.css";
 import "./desk.css";
 
@@ -86,6 +87,7 @@ export default function DeskShell({ view, badges, children }: { view: ViewKey; b
             </button>
           ))}
           <span className="dk-sp" />
+          <BackendSwitcher />
           <button title={theme.mode === "dark" ? "Light" : "Dark"} style={noDrag} className="dk-app dk-a-mode"
             onClick={() => setTheme({ ...theme, mode: theme.mode === "dark" ? "light" : "dark" })}>
             {theme.mode === "dark" ? <SunIcon size={19} /> : <MoonIcon size={19} />}

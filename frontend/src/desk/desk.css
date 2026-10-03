@@ -9,6 +9,8 @@
 }
 .dk-shell > * { position: relative; z-index: 1; }
 .dk-shell > .cv-sky { position: absolute; z-index: 0; }
+/* Above the page, so what opens from the rail (the backend switcher) is too. */
+.dk-shell > .dk-rail { z-index: 4; }
 :where(.dk-shell button) { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
 
 /* The home: sidebar, conversation, live pane; the dock under them. */
@@ -315,3 +317,29 @@ html[data-desk][data-theme="dark"] {
   --ring: var(--accent);
 }
 html[data-desk] body { background: transparent; }
+
+/* The backend switcher, at the foot of the rail. */
+.dk-a-backend { background: linear-gradient(160deg, #eef0f2, #cfd4d9); color: #3d4045 !important; }
+.dk-be-dot { position: absolute; right: 5px; bottom: 5px; width: 9px; height: 9px; border-radius: 50%; background: #9aa3ab; box-shadow: 0 0 0 2px #fff; }
+.dk-be-dot.on { background: #2fb36d; }
+.dk-be-dot.off { background: #e0a106; }
+.dk-be-scrim { position: fixed; inset: 0; z-index: 90; }
+.dk-be { position: fixed; left: 84px; bottom: 74px; z-index: 91; width: 320px; padding: 12px; border-radius: calc(18px * var(--rs)); display: flex; flex-direction: column; gap: 4px;
+  background: rgba(var(--glass-rgb), .88); color: var(--ink); }
+.dk-be-h { font-size: 13px; font-weight: 650; color: var(--ink-2); padding: 2px 8px 6px; }
+.dk-be-row { display: flex; align-items: center; border-radius: 12px; }
+.dk-be-row.on { background: rgba(var(--honey-rgb), .14); box-shadow: inset 0 0 0 1px rgba(var(--honey-rgb), .35); }
+.dk-be-row:not(.on):hover { background: rgba(var(--glass-rgb), .6); }
+.dk-be-pick { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 9px 10px; text-align: left; font-weight: 550; font-size: 14px; }
+.dk-be-pick > svg:first-child { color: var(--ink-2); flex: none; }
+.dk-be-pick span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dk-be-pick small { display: block; font-size: 12px; font-weight: 450; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; }
+.dk-be-check { color: var(--honey-deep); flex: none; }
+.dk-be-x { width: 28px; height: 28px; margin-right: 6px; border-radius: 8px; display: grid; place-items: center; color: var(--ink-3); flex: none; }
+.dk-be-x:hover { background: rgba(214, 69, 50, .1); color: var(--lost); }
+.dk-be-confirm { display: flex; gap: 4px; margin-right: 6px; font-size: 12.5px; }
+.dk-be-confirm button { padding: 4px 8px; border-radius: 7px; font-weight: 550; color: var(--ink-2); }
+.dk-be-confirm .dk-be-forget { background: var(--lost); color: #fff; }
+.dk-be-add { display: flex; align-items: center; gap: 8px; padding: 9px 10px; margin-top: 4px; border-top: 1px solid var(--line); font-weight: 550; font-size: 14px; color: var(--honey-deep); text-align: left; }
+.dk-be-note, .dk-be-err { margin: 4px 8px 0; font-size: 12px; color: var(--ink-3); }
+.dk-be-err { color: var(--lost); }

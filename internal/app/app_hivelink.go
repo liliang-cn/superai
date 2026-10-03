@@ -9,6 +9,8 @@ package app
 //
 // The link is a paired device like a phone: a code shown by the queen,
 // exchanged once for a token, kept in hive-link.json beside the settings.
+// Several can be kept — the hive over the internet, the same queen on the
+// LAN, another hive — with one in use at a time, or none: this Mac alone.
 
 import (
 	"bufio"
@@ -38,19 +40,48 @@ const hiveLinkFile = "hive-link.json"
 var errOnlyInTheWindow = errors.New("only the desktop window can do this")
 
 type hiveLink struct {
+	// ID is the address it was paired at: one link per queen.
+	ID       string    `json:"id"`
+	Name     string    `json:"name"`
 	URL      string    `json:"url"`
 	Token    string    `json:"token"`
 	DeviceID string    `json:"device_id"`
 	LinkedAt time.Time `json:"linked_at"`
 }
 
+// hiveBook is every hive this window has been paired with, and which one it
+// is looking at now ("" is this Mac on its own).
+type hiveBook struct {
+	Active string     `json:"active"`
+	Links  []hiveLink `json:"links"`
+}
+
+func (b *hiveBook) find(id string) int {
+	for i := range b.Links {
+		if b.Links[i].ID == id {
+			return i
+		}
+	}
+	return -1
+}
+
 // HiveLinkInfo is the link as the window sees it, without the token.
 type HiveLinkInfo struct {
 	Linked bool   `json:"linked"`
 	URL    string `json:"url,omitempty"`
+	Name   string `json:"name,omitempty"`
 	// Live is true while the queen's event stream is connected.
 	Live  bool   `json:"live"`
 	Error string `json:"error,omitempty"`
+}
+
+// HiveLinkEntry is one saved hive, for the switcher.
+type HiveLinkEntry struct {
+	ID       string    `json:"id"`
+	Name     string    `json:"name"`
+	URL      string    `json:"url"`
+	Active   bool      `json:"active"`
+	LinkedAt time.Time `json:"linkedAt"`
 }
 
 // hiveLinkState is the App's hold on the link and its relay.
@@ -64,22 +95,59 @@ type hiveLinkState struct {
 	err  atomic.Value // string
 	// on is read by emit on every event, so it is an atomic of its own.
 	on atomic.Bool
+	// book guards hive-link.json against two switches at once.
+	book sync.Mutex
 }
 
 func hiveLinkPath() string { return filepath.Join(backend.DataDir(), hiveLinkFile) }
 
 var hiveLinkHTTP = &http.Client{Timeout: 5 * time.Minute}
 
-func loadHiveLink() *hiveLink {
-	b, err := os.ReadFile(hiveLinkPath())
+// loadHiveBook reads the saved hives. A file from before there could be more
+// than one — a single link — becomes a book holding it, active.
+func loadHiveBook() hiveBook {
+	raw, err := os.ReadFile(hiveLinkPath())
 	if err != nil {
+		return hiveBook{}
+	}
+	var b hiveBook
+	if json.Unmarshal(raw, &b) == nil && len(b.Links) > 0 {
+		return b
+	}
+	var one hiveLink
+	if json.Unmarshal(raw, &one) == nil && one.URL != "" && one.Token != "" {
+		one.ID, one.Name = one.URL, hostOf(one.URL)
+		return hiveBook{Active: one.ID, Links: []hiveLink{one}}
+	}
+	return hiveBook{}
+}
+
+func saveHiveBook(b hiveBook) error {
+	if len(b.Links) == 0 {
+		if err := os.Remove(hiveLinkPath()); err != nil && !os.IsNotExist(err) {
+			return err
+		}
 		return nil
 	}
-	var l hiveLink
-	if json.Unmarshal(b, &l) != nil || l.URL == "" || l.Token == "" {
-		return nil
+	raw, _ := json.MarshalIndent(b, "", "  ")
+	return os.WriteFile(hiveLinkPath(), raw, 0o600)
+}
+
+// loadHiveLink is the active link, if the window is looking at a hive.
+func loadHiveLink() *hiveLink {
+	b := loadHiveBook()
+	if i := b.find(b.Active); i >= 0 {
+		l := b.Links[i]
+		return &l
 	}
-	return &l
+	return nil
+}
+
+func hostOf(u string) string {
+	if p, err := url.Parse(u); err == nil && p.Host != "" {
+		return p.Host
+	}
+	return u
 }
 
 // startHiveLink picks up a saved link at startup. Desktop only: a served
@@ -120,7 +188,8 @@ func (a *App) useHiveLink(l *hiveLink) {
 }
 
 // LinkHive pairs this window with the queen at address, using a code the queen
-// is showing (Settings → Pair a device on any of her screens).
+// is showing (Settings → Pair a device on any of her screens), and switches to
+// her. Pairing again with a queen already saved replaces her token.
 func (a *App) LinkHive(address, code string) (HiveLinkInfo, error) {
 	if a.ctx == nil {
 		return HiveLinkInfo{}, errOnlyInTheWindow
@@ -151,22 +220,107 @@ func (a *App) LinkHive(address, code string) (HiveLinkInfo, error) {
 		}
 		return HiveLinkInfo{}, errors.New(out.Error)
 	}
-	l := &hiveLink{URL: base, Token: out.Token, DeviceID: out.DeviceID, LinkedAt: time.Now().UTC()}
-	raw, _ := json.MarshalIndent(l, "", "  ")
-	if err := os.WriteFile(hiveLinkPath(), raw, 0o600); err != nil {
+	l := hiveLink{ID: base, Name: hostOf(base), URL: base, Token: out.Token, DeviceID: out.DeviceID, LinkedAt: time.Now().UTC()}
+	a.hiveLink.book.Lock()
+	b := loadHiveBook()
+	if i := b.find(l.ID); i >= 0 {
+		b.Links[i] = l
+	} else {
+		b.Links = append(b.Links, l)
+	}
+	b.Active = l.ID
+	err = saveHiveBook(b)
+	a.hiveLink.book.Unlock()
+	if err != nil {
 		return HiveLinkInfo{}, err
 	}
-	a.useHiveLink(l)
+	a.useHiveLink(&l)
 	return a.HiveLinkStatus(), nil
 }
 
-// UnlinkHive forgets the link; the window goes back to this Mac alone.
-func (a *App) UnlinkHive() error {
-	a.useHiveLink(nil)
-	if err := os.Remove(hiveLinkPath()); err != nil && !os.IsNotExist(err) {
+// HiveLinks lists the saved hives, the one in use marked.
+func (a *App) HiveLinks() []HiveLinkEntry {
+	b := loadHiveBook()
+	out := make([]HiveLinkEntry, 0, len(b.Links))
+	for _, l := range b.Links {
+		out = append(out, HiveLinkEntry{ID: l.ID, Name: l.Name, URL: l.URL, Active: l.ID == b.Active, LinkedAt: l.LinkedAt})
+	}
+	return out
+}
+
+// UseHive switches the window to a saved hive, or with "" to this Mac on its
+// own. The window reloads afterwards so every screen starts on the new one.
+func (a *App) UseHive(id string) error {
+	if a.ctx == nil {
+		return errOnlyInTheWindow
+	}
+	a.hiveLink.book.Lock()
+	b := loadHiveBook()
+	var next *hiveLink
+	if id != "" {
+		i := b.find(id)
+		if i < 0 {
+			a.hiveLink.book.Unlock()
+			return errors.New("no such hive saved here")
+		}
+		l := b.Links[i]
+		next = &l
+	}
+	b.Active = id
+	err := saveHiveBook(b)
+	a.hiveLink.book.Unlock()
+	if err != nil {
 		return err
 	}
+	a.useHiveLink(next)
 	return nil
+}
+
+// ForgetHive removes a saved hive and asks her to forget this Mac too, so its
+// token stops working there. If it was the one in use, the window goes back
+// to this Mac.
+func (a *App) ForgetHive(id string) error {
+	if a.ctx == nil {
+		return errOnlyInTheWindow
+	}
+	a.hiveLink.book.Lock()
+	b := loadHiveBook()
+	i := b.find(id)
+	if i < 0 {
+		a.hiveLink.book.Unlock()
+		return nil
+	}
+	gone := b.Links[i]
+	b.Links = append(b.Links[:i], b.Links[i+1:]...)
+	wasActive := b.Active == id
+	if wasActive {
+		b.Active = ""
+	}
+	err := saveHiveBook(b)
+	a.hiveLink.book.Unlock()
+	if err != nil {
+		return err
+	}
+	if wasActive {
+		a.useHiveLink(nil)
+	}
+	// Best effort: an unreachable queen keeps a dead device in her list,
+	// which she can remove herself.
+	if gone.DeviceID != "" {
+		_, _ = callQueen(gone, "UnpairDevice", []any{gone.DeviceID})
+	}
+	return nil
+}
+
+// UnlinkHive forgets the hive in use; the window goes back to this Mac.
+func (a *App) UnlinkHive() error {
+	a.hiveLink.mu.Lock()
+	l := a.hiveLink.link
+	a.hiveLink.mu.Unlock()
+	if l == nil {
+		return nil
+	}
+	return a.ForgetHive(l.ID)
 }
 
 // HiveLinkStatus reports whether this window is linked, and to where.
@@ -179,7 +333,7 @@ func (a *App) HiveLinkStatus() HiveLinkInfo {
 		return HiveLinkInfo{}
 	}
 	e, _ := hl.err.Load().(string)
-	return HiveLinkInfo{Linked: true, URL: l.URL, Live: hl.live.Load(), Error: e}
+	return HiveLinkInfo{Linked: true, URL: l.URL, Name: l.Name, Live: hl.live.Load(), Error: e}
 }
 
 // Remote makes one call on the queen: the same method the window would call
@@ -188,13 +342,16 @@ func (a *App) Remote(method string, args []any) (any, error) {
 	if a.ctx == nil {
 		return nil, errOnlyInTheWindow
 	}
-	hl := &a.hiveLink
-	hl.mu.Lock()
-	l := hl.link
-	hl.mu.Unlock()
+	a.hiveLink.mu.Lock()
+	l := a.hiveLink.link
+	a.hiveLink.mu.Unlock()
 	if l == nil {
 		return nil, errors.New("not linked to a hive")
 	}
+	return callQueen(*l, method, args)
+}
+
+func callQueen(l hiveLink, method string, args []any) (any, error) {
 	if args == nil {
 		args = []any{}
 	}
