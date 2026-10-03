@@ -61,17 +61,10 @@ func GraphSource(s *Settings) (*liveview.Source, error) {
 		if addr == "" {
 			return nil, errors.New("shared memory is selected but no endpoint is set (Settings → Memory)")
 		}
-		token := s.SharedMemoryTokenResolved()
-		return &liveview.Source{
-			Describe: "shared brain " + addr,
-			Read: func(ctx context.Context) ([]liveview.Node, []liveview.Edge, error) {
-				// limit 0 asks for the server's own cap; quiet because this
-				// runs on a two-second timer and the truncation note would
-				// become the only thing in the log.
-				return liveview.LoadRemote(ctx, addr, token, 0, true)
-			},
-			Close: func() error { return nil },
-		}, nil
+		// The full remote source, not a Read over LoadRemote: that drew the
+		// graph and nothing else — no find, ask or Cypher across the store, no
+		// expanding a node, no inspector. Every hook it adds is read-only.
+		return liveview.RemoteSource(addr, s.SharedMemoryTokenResolved()), nil
 	}
 
 	path := LocalBrainPath()
@@ -82,13 +75,12 @@ func GraphSource(s *Settings) (*liveview.Source, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open %s: %w", path, err)
 	}
-	return &liveview.Source{
-		Describe: path,
-		Read: func(ctx context.Context) ([]liveview.Node, []liveview.Edge, error) {
-			return liveview.LoadLocal(ctx, db.SQL())
-		},
-		Close: db.Close,
-	}, nil
+	// SourceFor answers everything the view can ask a local brain (find, ask,
+	// Cypher, the inspector, the past) but leaves the DB to whoever opened it;
+	// this function did, so closing the view closes it.
+	src := liveview.SourceFor(db, path)
+	src.Close = db.Close
+	return src, nil
 }
 
 // graphKey names the brain a view was started against.
