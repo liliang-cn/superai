@@ -1,8 +1,7 @@
 import { useMemo } from "react";
-import Sky, { Lane } from "../canvas/Sky";
 import type { CanvasTheme } from "../canvas/theme";
 import type { CodingRun } from "../canvas/tiles";
-import { Hive, HiveTask, oneLine, short } from "../canvas/data";
+import { Hive, HiveTask, LinkedAgent, oneLine, short } from "../canvas/data";
 
 const R = 34; // a cell's radius
 const SQ3 = Math.sqrt(3);
@@ -48,31 +47,29 @@ function doing(t: HiveTask): string {
  * agents sit outside the comb, linked to her. Under it, the last few things
  * that happened.
  */
-export default function LiveHive({ hive, runs, theme, now }: { hive: Hive; runs: CodingRun[]; theme: CanvasTheme; now: Date }) {
+export default function LiveHive({ hive, runs, agents, now }: { hive: Hive; runs: CodingRun[]; agents: LinkedAgent[]; theme?: CanvasTheme; now: Date }) {
   const workers = hive.members.filter((m) => !/queen/.test(m.name));
   const running = hive.tasks.filter((t) => t.state === "running");
   const busyBy = new Map<string, HiveTask>();
   running.forEach((t) => { if (!busyBy.has(t.worker)) busyBy.set(t.worker, t); });
   const cells = useMemo(() => spiral(workers.length), [workers.length]);
+  // The machines core can run things on: its linked agents (or, before any
+  // linked, wherever coding runs have run).
   const machines = useMemo(() => {
+    if (agents.length) return agents.map((a) => a.name).slice(0, 8);
     const names = new Set<string>();
     runs.forEach((r) => names.add(r.remote || "this Mac"));
     return [...names].slice(0, 3);
-  }, [runs]);
+  }, [runs, agents]);
   const machineBusy = (m: string) => runs.some((r) => (r.remote || "this Mac") === m && r.state === "running");
 
-  const lanes = useMemo<Lane[]>(() => {
-    const palette: [number, number, number][] = [[242, 165, 22], [255, 120, 90], [70, 180, 170], [60, 170, 100], [80, 150, 240]];
-    return workers.slice(0, 8).map((m, i) => ({ key: m.name, busy: busyBy.has(m.name) ? 1 : 0.12, rgb: palette[i % 5] }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hive]);
 
   const recent = hive.tasks.filter((t) => t.state !== "running").slice(0, 3);
   const span = Math.max(130, ...cells.map(([x, y]) => Math.max(Math.abs(x), Math.abs(y)) + R + 6));
   // Room for the labels either side, and for the machines under the comb.
-  const reach = machines.length ? span * 0.5 + (machines.length - 1) * 96 + 50 : 0;
+  const reach = machines.length ? 1.5 * 104 + 50 : 0;
   const w = Math.max(span + (busyBy.size ? 200 : 20), reach);
-  const top = -span - 16, height = span * 2 + 16 + (machines.length ? 120 : 30);
+  const top = -span - 16, height = span * 2 + 16 + (machines.length ? 120 + Math.floor((machines.length - 1) / 4) * 92 : 30);
 
   if (!hive.loaded) return <div className="dk-live-empty">Finding the hive…</div>;
   if (!hive.role) {
@@ -160,5 +157,6 @@ export default function LiveHive({ hive, runs, theme, now }: { hive: Hive; runs:
 
 /** Where the n-th machine sits: below the comb, spread to the right. */
 function machineAt(i: number, span: number): [number, number] {
-  return [span * 0.5 + i * 96, span + 52];
+  const row = Math.floor(i / 4), col = i % 4;
+  return [(col - 1.5) * 104, span + 52 + row * 92];
 }

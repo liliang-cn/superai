@@ -364,7 +364,7 @@ html[data-desk] body { background: transparent; }
 .dk-status-sum b { display: block; font-size: 26px; font-weight: 650; letter-spacing: -.02em; }
 .dk-status-sum span { font-size: 12.5px; color: var(--ink-2); }
 .dk-status-rows { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
-.dk-st { display: grid; grid-template-columns: 10px 34px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 10px; font-size: 13.5px; }
+.dk-st { display: grid; grid-template-columns: 10px 92px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 10px; font-size: 13.5px; }
 .dk-st:hover { background: rgba(var(--glass-rgb), .45); }
 .dk-st i { width: 8px; height: 8px; border-radius: 50%; background: #2fb36d; }
 .dk-st.busy i { background: var(--honey); box-shadow: 0 0 0 3px rgba(var(--honey-rgb), .22); }
@@ -383,3 +383,4 @@ html[data-desk] body { background: transparent; }
 .dk-fig span { font-size: 12.5px; color: var(--ink-2); }
 .dk-fig.big { grid-column: 1 / -1; }
 .dk-fig.big b { font-size: 40px; color: var(--honey-deep); }
+.dk-st-h { font-size: 12px; font-weight: 650; color: var(--ink-3); padding: 10px 10px 2px; }

@@ -184,6 +184,26 @@ export namespace agent {
 
 export namespace app {
 	
+	export class AgentLinkOptions {
+	    Core: string;
+	    Token: string;
+	    Name: string;
+	    TLS: boolean;
+	    Version: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AgentLinkOptions(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Core = source["Core"];
+	        this.Token = source["Token"];
+	        this.Name = source["Name"];
+	        this.TLS = source["TLS"];
+	        this.Version = source["Version"];
+	    }
+	}
 	export class AgentReport {
 	    push: boolean;
 	    telegram: boolean;
@@ -580,6 +600,54 @@ export namespace app {
 	        this.live = source["live"];
 	        this.error = source["error"];
 	    }
+	}
+	export class LinkedAgent {
+	    name: string;
+	    host: string;
+	    os: string;
+	    arch: string;
+	    version: string;
+	    clis: string[];
+	    agents: any[];
+	    // Go type: time
+	    connected: any;
+	    // Go type: time
+	    lastSeen: any;
+	
+	    static createFrom(source: any = {}) {
+	        return new LinkedAgent(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.host = source["host"];
+	        this.os = source["os"];
+	        this.arch = source["arch"];
+	        this.version = source["version"];
+	        this.clis = source["clis"];
+	        this.agents = source["agents"];
+	        this.connected = this.convertValues(source["connected"], null);
+	        this.lastSeen = this.convertValues(source["lastSeen"], null);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class LinkedSuperAI {
 	    name: string;

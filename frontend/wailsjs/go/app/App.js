@@ -206,6 +206,10 @@ export function LinkSuperAI(arg1, arg2, arg3) {
   return window['go']['app']['App']['LinkSuperAI'](arg1, arg2, arg3);
 }
 
+export function LinkedAgents() {
+  return window['go']['app']['App']['LinkedAgents']();
+}
+
 export function LinkedSuperAIs() {
   return window['go']['app']['App']['LinkedSuperAIs']();
 }
@@ -328,6 +332,10 @@ export function ResolveToolApproval(arg1, arg2) {
 
 export function ResumeStandingAgent(arg1) {
   return window['go']['app']['App']['ResumeStandingAgent'](arg1);
+}
+
+export function RunAgentLink(arg1, arg2) {
+  return window['go']['app']['App']['RunAgentLink'](arg1, arg2);
 }
 
 export function RunScheduledPromptNow(arg1) {

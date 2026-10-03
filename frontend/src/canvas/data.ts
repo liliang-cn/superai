@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { EventsOn } from "../../wailsjs/runtime";
-import { CLIRuns, HiveStatus, StandingAgents, Upcoming } from "../../wailsjs/go/app/App";
+import { CLIRuns, HiveStatus, LinkedAgents, StandingAgents, Upcoming } from "../../wailsjs/go/app/App";
 import type { CodingRun, UpcomingItem } from "./tiles";
 
 export interface HiveMember {
@@ -168,3 +168,32 @@ export function useCodingRuns(): CodingRun[] {
   return runs;
 }
 
+
+export interface LinkedAgent {
+  name: string;
+  host: string;
+  os: string;
+  arch: string;
+  version: string;
+  clis: string[];
+  agents?: { name: string; about: string }[];
+  connected: string;
+  lastSeen: string;
+}
+
+/** The agents connected to core over the agent link — the machines it can
+ *  run things on — without the hive's own workers, which are listed as such. */
+export function useLinkedAgents(): LinkedAgent[] {
+  const [list, setList] = useState<LinkedAgent[]>([]);
+  useEffect(() => {
+    let alive = true;
+    const load = () => LinkedAgents().then((l) => {
+      if (alive) setList(((l ?? []) as unknown as LinkedAgent[]).filter((a) => !a.name.startsWith("superai-worker-")));
+    }).catch(() => {});
+    load();
+    const off = EventsOn("agents:changed", load);
+    const t = window.setInterval(load, 30000);
+    return () => { alive = false; window.clearInterval(t); if (typeof off === "function") off(); };
+  }, []);
+  return list;
+}

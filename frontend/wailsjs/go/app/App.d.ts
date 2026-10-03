@@ -4,6 +4,7 @@ import {backend} from '../models';
 import {app} from '../models';
 import {agent} from '../models';
 import {mcp} from '../models';
+import {context} from '../models';
 
 export function AddRecord(arg1:string,arg2:string,arg3:string,arg4:Array<string>,arg5:string):Promise<Record<string, any>>;
 
@@ -107,6 +108,8 @@ export function LinkHive(arg1:string,arg2:string):Promise<app.HiveLinkInfo>;
 
 export function LinkSuperAI(arg1:string,arg2:string,arg3:string):Promise<string>;
 
+export function LinkedAgents():Promise<Array<app.LinkedAgent>>;
+
 export function LinkedSuperAIs():Promise<Array<app.LinkedSuperAI>>;
 
 export function LongRunList():Promise<Array<backend.TaskSummary>>;
@@ -168,6 +171,8 @@ export function RenameDashboard(arg1:string,arg2:string):Promise<Record<string, 
 export function ResolveToolApproval(arg1:string,arg2:boolean):Promise<string>;
 
 export function ResumeStandingAgent(arg1:string):Promise<void>;
+
+export function RunAgentLink(arg1:context.Context,arg2:app.AgentLinkOptions):Promise<void>;
 
 export function RunScheduledPromptNow(arg1:string):Promise<string>;
 
