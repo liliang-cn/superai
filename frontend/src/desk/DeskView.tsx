@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   ArrowUpIcon, HexagonIcon, 
   PlusIcon, SquareIcon, SquarePenIcon, TerminalIcon, TriangleAlertIcon, XIcon, ChevronRightIcon,
-  LayoutDashboardIcon,
+  LayoutDashboardIcon, PanelRightCloseIcon, PanelRightOpenIcon, ActivityIcon, GaugeIcon,
 } from "lucide-react";
 import { useChat } from "../lib/useChat";
 import { AgentInfo, useAgentMentions } from "../lib/useAgentMentions";
@@ -22,6 +22,8 @@ import { EventsOn } from "../../wailsjs/runtime";
 import { openSwitcher } from "../lib/hivelink";
 import LiveHive from "./LiveHive";
 import LiveRun, { useRun } from "./LiveRun";
+import LiveStatus from "./LiveStatus";
+import LiveStats from "./LiveStats";
 import { useDeskTheme } from "./DeskShell";
 
 type TabKey = string; // "hive" | "run:<id>" | "dash:<id>"
@@ -88,6 +90,10 @@ function useLink() {
 }
 
 
+/** The tabs the right pane always has. */
+const FIXED: TabKey[] = ["hive", "status", "stats"];
+const FOLD_KEY = "superai-desk-live-folded";
+
 const PIN_COLORS = ["dk-a-later", "dk-a-hive", "dk-a-code", "dk-a-bees", "dk-a-know", "dk-a-stats", "dk-a-rec"];
 
 /**
@@ -153,10 +159,11 @@ export default function DeskView({ approvals, openSession, onSessionOpened }: {
   const waiting: Bee[] = bees.filter((b) => b.waitingFor && !b.paused);
   const needs = approvals.pending.length + waiting.length;
 
-  // The tabs: the hive always, every coding run that is going, and whatever was opened.
+  // The tabs: the hive, its status and the figures always; every coding run
+  // that is going; and whatever was opened.
   const liveRuns = runs.filter((r) => r.state === "running");
   const tabs: TabKey[] = useMemo(() => {
-    const out: TabKey[] = ["hive"];
+    const out: TabKey[] = [...FIXED];
     liveRuns.forEach((r) => { const k = "run:" + r.id; if (!closed.has(k)) out.push(k); });
     opened.forEach((k) => { if (!out.includes(k)) out.push(k); });
     return out;
@@ -172,11 +179,16 @@ export default function DeskView({ approvals, openSession, onSessionOpened }: {
     setClosed((c) => new Set(c).add(k));
     if (current === k) setActive("hive");
   };
+  // The right pane folds away to a strip, and stays the way it was left.
+  const [folded, setFolded] = useState(() => { try { return localStorage.getItem(FOLD_KEY) === "1"; } catch { return false; } });
+  const fold = (on: boolean) => { setFolded(on); try { localStorage.setItem(FOLD_KEY, on ? "1" : "0"); } catch { /* fine */ } };
 
   const runOf = (k: TabKey) => runs.find((r) => "run:" + r.id === k);
   const dashOf = (k: TabKey) => pins.find((d) => "dash:" + d.id === k);
   const tabLabel = (k: TabKey) => {
     if (k === "hive") return "The hive";
+    if (k === "status") return "Status";
+    if (k === "stats") return "Stats";
     const r = runOf(k);
     if (r) return runName(r);
     return dashOf(k)?.name ?? "…";
@@ -201,7 +213,7 @@ export default function DeskView({ approvals, openSession, onSessionOpened }: {
   const title = onQueen ? "The queen" : recents.find((s) => s.id === chat.sessionId)?.title || "Conversation";
 
   return (
-    <div className="dk">
+    <div className={folded ? "dk folded" : "dk"}>
       <aside className="cv-glass dk-side">
         <div className="dk-ws"><b>SuperAI</b></div>
         {needs > 0 && (
@@ -305,6 +317,14 @@ export default function DeskView({ approvals, openSession, onSessionOpened }: {
         </form>
       </section>
 
+      {folded ? (
+        <section className="dk-live-strip">
+          <button className="cv-glass dk-unfold" title="Show the hive" onClick={() => fold(false)}>
+            <PanelRightOpenIcon size={18} />
+            {busyWorkers > 0 && <i className="dk-livedot" />}
+          </button>
+        </section>
+      ) : (
       <section className="dk-live">
         <div className="dk-tabs">
           {tabs.map((k) => {
@@ -313,25 +333,29 @@ export default function DeskView({ approvals, openSession, onSessionOpened }: {
             const liveDot = k === "hive" ? busyWorkers > 0 : r?.state === "running";
             return (
               <button key={k} className={on ? "dk-tab on" : "dk-tab"} onClick={() => setActive(k)}>
-                {liveDot ? <i className="dk-livedot" /> : k.startsWith("run:") ? <TerminalIcon size={14} /> : k.startsWith("dash:") ? <LayoutDashboardIcon size={14} /> : <HexagonIcon size={14} />}
+                {liveDot ? <i className="dk-livedot" /> : k.startsWith("run:") ? <TerminalIcon size={14} /> : k.startsWith("dash:") ? <LayoutDashboardIcon size={14} /> : k === "status" ? <ActivityIcon size={14} /> : k === "stats" ? <GaugeIcon size={14} /> : <HexagonIcon size={14} />}
                 <span>{tabLabel(k)}</span>
-                {k !== "hive" && <XIcon size={13} className="dk-tab-x" onClick={(e) => { e.stopPropagation(); close(k); }} />}
+                {!FIXED.includes(k) && <XIcon size={13} className="dk-tab-x" onClick={(e) => { e.stopPropagation(); close(k); }} />}
               </button>
             );
           })}
           <button className="dk-icon" title="Open a coding run" onClick={() => navigate(PATHS.coding)}><PlusIcon size={17} /></button>
+          <button className="dk-icon dk-fold" title="Hide this pane" onClick={() => fold(true)}><PanelRightCloseIcon size={17} /></button>
         </div>
-        <div className="dk-screen">
+        <div className="cv-glass dk-screen">
           <div className="dk-in">
             {current === "hive" && <LiveHive hive={hive} runs={runs} theme={theme} now={now} />}
+            {current === "status" && <LiveStatus hive={hive} now={now} />}
+            {current === "stats" && <LiveStats hive={hive} runs={runs} />}
             {current.startsWith("run:") && <RunTab id={current.slice(4)} now={now} />}
             {current.startsWith("dash:") && (
               <div className="dk-dash">{dashOf(current) ? <Response>{dashOf(current)!.source}</Response> : "Gone."}</div>
             )}
           </div>
         </div>
-        <Controls current={current} run={runOf(current)} dash={dashOf(current)} busy={busyWorkers} onOpenHive={() => navigate(PATHS.hive)} />
+        <Controls current={current} run={runOf(current)} dash={dashOf(current)} busy={busyWorkers} onOpenHive={() => navigate(PATHS.hive)} onOpenStats={() => navigate(PATHS.stats)} />
       </section>
+      )}
 
       <footer className="cv-glass dk-dock">
         {pins.length === 0 && runs.length === 0 && <span className="dk-dock-hint">Save an answer as a dashboard and it is pinned here.</span>}
@@ -360,11 +384,18 @@ function RunTab({ id, now }: { id: string; now: Date }) {
 }
 
 /** Under the screen: who is driving, and how to step in. */
-function Controls({ current, run, dash, busy, onOpenHive }: { current: TabKey; run?: CodingRun; dash?: Dashboard; busy: number; onOpenHive: () => void }) {
+function Controls({ current, run, dash, busy, onOpenHive, onOpenStats }: { current: TabKey; run?: CodingRun; dash?: Dashboard; busy: number; onOpenHive: () => void; onOpenStats: () => void }) {
   const [err, setErr] = useState("");
   useEffect(() => { setErr(""); }, [current]);
   const detail = useRunSession(run?.id);
-  if (current === "hive") {
+  if (current === "stats") {
+    return (
+      <div className="dk-ctl">
+        <button className="dk-btn light" onClick={onOpenStats}>Open Stats</button>
+      </div>
+    );
+  }
+  if (current === "hive" || current === "status") {
     return (
       <div className="dk-ctl">
         <span>{busy > 0 ? "The queen has the hive" : "The hive is resting"}</span>

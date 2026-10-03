@@ -7,6 +7,9 @@ export interface HiveMember {
   name: string;
   state: "live" | "lost";
   engine?: string;
+  version?: string;
+  last_seen?: string;
+  started_at?: string;
 }
 
 export interface HiveTask {
