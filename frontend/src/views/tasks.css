@@ -1,0 +1,33 @@
+.attention-view { flex:1; min-width:0; overflow:auto; padding:28px; color:var(--text-0); }
+.attention-heading { display:flex; align-items:center; gap:14px; margin-bottom:28px; }
+.attention-heading h1 { font-size:28px; font-weight:650; margin:0; }
+.attention-heading p { margin:6px 0 0; color:var(--text-2); }
+.attention-symbol { width:52px; height:52px; display:grid; place-items:center; background:var(--bg-2); color:var(--text-2); border-radius:16px; flex:none; }
+.attention-symbol.urgent { background:var(--accent-soft); color:var(--accent); }
+.attention-refresh { margin-left:auto; }
+.attention-view button { display:inline-flex; align-items:center; justify-content:center; gap:8px; cursor:pointer; border-radius:10px; padding:10px 14px; color:var(--text-1); background:var(--bg-2); border:1px solid var(--border); font:inherit; }
+.attention-view :focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+.attention-cards { display:flex; flex-direction:column; gap:14px; }
+.attention-card { display:flex; align-items:center; gap:18px; padding:22px; background:var(--bg-1); border:1px solid var(--border); border-left:4px solid var(--accent); border-radius:14px; }
+.attention-card.failed,.attention-card.run,.attention-card.lost { border-left-color:var(--red); }
+.attention-card-icon { color:var(--accent); flex:none; align-self:flex-start; margin-top:4px; }
+.attention-card.failed .attention-card-icon,.attention-card.run .attention-card-icon,.attention-card.lost .attention-card-icon { color:var(--red); }
+.attention-card-content { flex:1; min-width:0; }
+.attention-category { font-size:12px; font-weight:650; color:var(--accent); }
+.attention-card h2 { font-size:17px; font-weight:600; margin:6px 0; overflow-wrap:anywhere; }
+.attention-card p { margin:6px 0; color:var(--text-1); overflow-wrap:anywhere; }
+.attention-card small { display:block; color:var(--text-2); margin-top:10px; }
+.attention-card pre { white-space:pre-wrap; overflow-wrap:anywhere; padding:12px; background:var(--bg-2); border-radius:8px; font:12px/1.6 var(--font-mono); }
+.attention-view .attention-action { color:var(--on-accent); background:var(--accent); border-color:var(--accent); flex:none; }
+.attention-empty { padding:64px 20px; text-align:center; color:var(--text-2); max-width:620px; margin:auto; }
+.attention-empty svg { margin:auto; }
+.attention-empty h2 { font-size:20px; font-weight:550; color:var(--text-1); margin:18px 0 10px; }
+.attention-empty p { line-height:1.7; }
+.attention-error { padding:14px; margin-bottom:16px; color:var(--red); border:1px solid var(--border); border-radius:12px; }
+@media(max-width:700px) { .attention-view { padding:16px; } .attention-heading { flex-wrap:wrap; } .attention-heading h1 { font-size:22px; } .attention-card { flex-wrap:wrap; padding:16px; gap:12px; } .attention-card-content { flex-basis:75%; } .attention-action { margin-left:34px; } }
+
+.attention-section-title { font-size:15px; font-weight:600; margin:18px 0 12px; color:var(--text-1); }
+.attention-section-title span { font-size:12px; margin-left:8px; color:var(--text-2); }
+.attention-card.reminder { border-left-color:var(--text-2); }
+.attention-card.reminder .attention-card-icon,.attention-card.reminder .attention-category { color:var(--text-2); }
+.attention-reminder-time { font-weight:600; }

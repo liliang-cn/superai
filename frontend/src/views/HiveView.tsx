@@ -200,7 +200,7 @@ export default function HiveView() {
   const live = members.filter((m) => m.state === "live").length;
 
   const overview = (
-    <div className="view">
+    <div className="view hive-page">
       <div className="view-header with-action">
         <div>
           <div className="view-title">Hive</div>

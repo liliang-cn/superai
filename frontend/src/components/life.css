@@ -1,0 +1,35 @@
+/* A meeting or reminder, opened from "Coming up". */
+.ev-sheet { width: min(440px, 100%); }
+.ev-sheet h3 { font-size: 20px; margin-bottom: 14px; }
+.ev-rows { display: grid; grid-template-columns: 22px 1fr; gap: 10px 8px; margin: 0; font-size: 14px; color: var(--ink, var(--text-0)); }
+.ev-rows dt { color: var(--ink-3, var(--text-3)); padding-top: 2px; }
+.ev-rows dd { margin: 0; }
+.ev-rows small { display: block; margin-top: 2px; font-size: 12.5px; color: var(--ink-3, var(--text-3)); }
+.ev-foot { display: flex; align-items: center; gap: 8px; margin-top: 20px; }
+.ev-foot > span { flex: 1; font-size: 12.5px; color: var(--ink-3, var(--text-3)); }
+.ev-del { background: #d0313f; color: #fff; }
+
+/* What SuperAI knows about you, beside the graph. */
+.kn-view { position: relative; }
+.ay { position: absolute; top: 76px; right: 16px; bottom: 16px; width: min(380px, calc(100% - 32px)); z-index: 5; display: flex; flex-direction: column;
+  background: var(--popover, var(--bg-1)); border: 1px solid var(--border); border-radius: var(--radius-lg, 18px); box-shadow: 0 18px 48px rgba(20, 20, 30, .14); overflow: hidden; }
+.ay-h { display: flex; align-items: center; justify-content: space-between; padding: 14px 14px 10px 18px; border-bottom: 1px solid var(--border); }
+.ay-h b { font-size: 15px; }
+.ay-body { flex: 1; overflow-y: auto; padding: 6px 10px 14px; }
+.ay-body h4 { display: flex; gap: 6px; align-items: baseline; margin: 14px 8px 6px; font-size: 12px; font-weight: 600; color: var(--text-2); }
+.ay-body h4 span { color: var(--text-3); font-weight: 500; }
+.ay-none { margin: 0 8px; font-size: 13px; color: var(--text-3); }
+.ay-row { display: flex; align-items: flex-start; gap: 8px; padding: 8px; border-radius: 10px; }
+.ay-row:hover { background: var(--bg-hover); }
+.ay-row > div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ay-row b { font-size: 13.5px; font-weight: 600; color: var(--text-0); }
+.ay-row small { font-size: 13px; line-height: 1.45; color: var(--text-1); overflow-wrap: anywhere; }
+.ay-row em { font-style: normal; font-size: 11.5px; color: var(--text-3); }
+.ay-del { flex: none; height: 26px; min-width: 26px; padding: 0 6px; border: 0; border-radius: 8px; background: none; color: var(--text-3); cursor: pointer; display: inline-grid; place-items: center; font: 600 12px var(--font-sans); opacity: 0; }
+.ay-row:hover .ay-del, .ay-del.sure, .ay-del:focus-visible { opacity: 1; }
+.ay-del:hover { color: #d0313f; background: rgba(208, 49, 63, .08); }
+.ay-del.sure { color: #fff; background: #d0313f; }
+
+/* The Bees page: what else runs on its own, below the bees. */
+.wt-routines { margin: 32px 32px 0; }
+.wt-routines > h2 { font-size: 15px; font-weight: 650; margin: 0 0 10px; color: var(--text-0); }

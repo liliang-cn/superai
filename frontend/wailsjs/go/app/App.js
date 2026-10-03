@@ -138,6 +138,10 @@ export function ForgetHive(arg1) {
   return window['go']['app']['App']['ForgetHive'](arg1);
 }
 
+export function ForgetLife(arg1, arg2) {
+  return window['go']['app']['App']['ForgetLife'](arg1, arg2);
+}
+
 export function GetSettings() {
   return window['go']['app']['App']['GetSettings']();
 }
@@ -160,6 +164,10 @@ export function HiveLinks() {
 
 export function HiveMembers() {
   return window['go']['app']['App']['HiveMembers']();
+}
+
+export function HivePulse() {
+  return window['go']['app']['App']['HivePulse']();
 }
 
 export function HiveRetire(arg1, arg2) {

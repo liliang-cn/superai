@@ -16,7 +16,8 @@ COPY . .
 COPY --from=web /src/frontend/dist ./frontend/dist
 RUN go build -trimpath -ldflags "-s -w" -o /out/superai . \
  && go build -trimpath -ldflags "-s -w" -o /out/superai-daemon ./cmd/superai-daemon \
- && go build -trimpath -ldflags "-s -w" -o /out/superai-hive-worker ./cmd/superai-hive-worker
+ && go build -trimpath -ldflags "-s -w" -o /out/superai-hive-worker ./cmd/superai-hive-worker \
+ && go build -trimpath -ldflags "-s -w" -o /out/cortexdb-mcp-stdio github.com/liliang-cn/cortexdb/v2/cmd/cortexdb-mcp-stdio
 
 FROM alpine:3.21 AS kubectl
 ARG TARGETARCH

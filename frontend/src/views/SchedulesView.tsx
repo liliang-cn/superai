@@ -240,7 +240,7 @@ export default function SchedulesView({
           setComposing((v) => !v);
         }}
       >
-        {composing ? "Close" : "+ New schedule"}
+        {composing ? "Close" : "+ New routine"}
       </button>
       {/* Wrapped rather than passed directly: onClick would hand load()
           the click event as its `quiet` argument. */}
@@ -260,7 +260,7 @@ export default function SchedulesView({
     <>
         {composing && (
           <div className="card" style={{ marginBottom: 14 }}>
-            <div className="card-title">New schedule</div>
+            <div className="card-title">New routine</div>
             <div className="card-desc">
               Say what SuperAI should do and when, in one sentence. It works out the timing itself
               and the answers land in a conversation you can open afterwards.
@@ -335,10 +335,9 @@ export default function SchedulesView({
         {!loading && list.length === 0 && (
           <div className="inline-empty">
             <AlarmClockIcon className="ie-icon" size={22} strokeWidth={1.6} />
-            <div>Nothing is scheduled.</div>
+            <div>No routines.</div>
             <div className="ie-hint">
-              Use “+ New schedule” to have SuperAI do something every morning, every weekday, or
-              every few hours.
+              Something SuperAI does on its own every morning, every weekday, or every few hours.
             </div>
           </div>
         )}

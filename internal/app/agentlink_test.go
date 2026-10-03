@@ -210,3 +210,34 @@ func TestALocalAgentIsOfferedOnlyWhileItIsHere(t *testing.T) {
 		t.Fatal("onlyLocal")
 	}
 }
+
+// A linked agent's meter reaches core, and the hive's total includes it.
+func TestALinkedAgentCountsInTheHiveMeter(t *testing.T) {
+	core := NewApp()
+	addr := startCore(t, core)
+	agent := NewApp()
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		agent.RunAgentLink(ctx, AgentLinkOptions{Core: addr, Token: "tok", Name: "w1", Version: "test"})
+		close(done)
+	}()
+	t.Cleanup(func() { cancel(); <-done })
+
+	waitFor(t, "the agent's meter", func() bool {
+		for _, m := range core.HivePulse().Members {
+			if m.Name == "w1" {
+				return true
+			}
+		}
+		return false
+	})
+	hp := core.HivePulse()
+	if len(hp.Members) != 2 || hp.Total.Name != "hive" {
+		t.Fatalf("hive meter: %+v", hp)
+	}
+
+	cancel()
+	<-done
+	waitFor(t, "the agent to leave the meter", func() bool { return len(core.HivePulse().Members) == 1 })
+}

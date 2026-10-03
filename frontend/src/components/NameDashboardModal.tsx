@@ -1,3 +1,4 @@
+import { useI18n } from "../lib/i18n";
 import React, { useEffect, useRef, useState } from "react";
 
 /**
@@ -23,6 +24,7 @@ export default function NameDashboardModal({
   onCancel: () => void;
   onSave: (name: string) => void;
 }) {
+  const { t } = useI18n();
   const [name, setName] = useState(suggested);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -48,16 +50,16 @@ export default function NameDashboardModal({
 
   return (
     <div className="modal-overlay" onClick={onCancel}>
-      <div className="modal nd-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Name this dashboard">
+      <div className="modal nd-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-label={t("Name this dashboard")}>
         <div className="modal-head">
-          <span className="modal-title">Save as dashboard</span>
-          <button className="modal-close" onClick={onCancel} aria-label="Cancel">
+          <span className="modal-title">{t("Save as dashboard")}</span>
+          <button className="modal-close" onClick={onCancel} aria-label={t("Cancel")}>
             ×
           </button>
         </div>
         <div className="nd-body">
           <label className="nd-label" htmlFor="nd-name">
-            Name
+            {t("Name")}
           </label>
           <input
             id="nd-name"
@@ -72,22 +74,21 @@ export default function NameDashboardModal({
           />
           {prompt ? (
             <>
-              <div className="nd-label">Refreshes by re-asking</div>
+              <div className="nd-label">{t("Refreshes by re-asking")}</div>
               <div className="nd-prompt">{prompt}</div>
             </>
           ) : (
             <div className="nd-note">
-              No question sits behind this reply, so the dashboard will keep what
-              it has and cannot refresh itself.
+              {t("Saved without a question, so it cannot refresh itself — it stays as it was.")}
             </div>
           )}
         </div>
         <div className="nd-foot">
           <button className="btn ghost" onClick={onCancel}>
-            Cancel
+            {t("Cancel")}
           </button>
           <button className="btn" onClick={submit} disabled={!name.trim()}>
-            Save
+            {t("Save")}
           </button>
         </div>
       </div>

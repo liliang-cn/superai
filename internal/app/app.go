@@ -29,6 +29,8 @@ type App struct {
 	agentHubOnce sync.Once
 	agentHubV    *agentHub
 	agentTap     atomic.Pointer[func(string, map[string]any)]
+	// memberPulses is the latest meter summary from each linked agent.
+	memberPulses sync.Map
 
 	mu       sync.Mutex
 	svc      *backend.Service
@@ -324,6 +326,7 @@ func (a *App) rebuild() {
 	a.registerCodingAgentTools(svc, cfg)
 	a.registerScheduleTools(svc)
 	a.registerHiveTools(svc, cfg)
+	a.registerLongTaskTools(svc, cfg)
 }
 
 // restartScheduler rebinds the timers to the current service. Callers must not
@@ -1204,6 +1207,23 @@ func (a *App) Life() backend.LifeData {
 		return backend.LifeData{Persons: map[string]map[string]any{}}
 	}
 	return svc.Life()
+}
+
+// ForgetLife deletes one calendar entry ("schedule"), note ("record") or
+// person ("person", by name) that SuperAI got wrong.
+func (a *App) ForgetLife(kind, key string) error {
+	a.mu.Lock()
+	svc := a.svc
+	a.mu.Unlock()
+	if svc == nil {
+		return errors.New("not running yet")
+	}
+	if err := svc.Forget(kind, key); err != nil {
+		return err
+	}
+	// What lists "coming up" refreshes on this.
+	a.emit("schedule:changed", map[string]any{"forgot": kind, "key": key})
+	return nil
 }
 
 // AddSchedule and AddRecord are the life-assistant writes a rendered `ui` block

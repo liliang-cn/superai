@@ -200,6 +200,7 @@ func (a *App) agentLinkOnce(ctx context.Context, o AgentLinkOptions) error {
 	}
 	a.agentTap.Store(&tap)
 	defer a.agentTap.Store(nil)
+	go a.sendPulseSummaries(sctx, hello.GetName(), tap)
 
 	// A changed set of CLIs or agents is said again, so core's menus follow.
 	go func() {

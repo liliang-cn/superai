@@ -124,7 +124,9 @@ function until(ms: number) {
  * it spoke, and who is waiting for you. The track is the page; everything
  * else is quiet.
  */
-export default function StandingView() {
+/** `children` is what else runs on its own: the recurring routines, drawn by
+ *  their own view and passed in by the app, which holds what they need. */
+export default function StandingView({ children }: { children?: React.ReactNode }) {
   const [agents, setAgents] = useState<View[]>([]);
   const [wakes, setWakes] = useState<Mark[]>([]);
   const [reports, setReports] = useState<Report[]>([]);
@@ -232,6 +234,13 @@ export default function StandingView() {
             </React.Fragment>
           ))}
         </div>
+      )}
+
+      {children && (
+        <section className="wt-routines">
+          <h2>Routines</h2>
+          {children}
+        </section>
       )}
 
       {editing && (
@@ -664,40 +673,30 @@ function Editor({ spec, onClose, onSaved }: { spec: Spec; onClose: () => void; o
 
           <section>
             <h3>Wakes</h3>
-            <div className="ed-wakes">
-              <label>
-                Every
-                <input type="number" min={0} value={s.everyMinutes || ""} onChange={(e) => set("everyMinutes", Number(e.target.value) || 0)} placeholder="—" />
-                min
-              </label>
-              <label>
-                On the schedule
+            <div className="ed-grid">
+              <span>Every</span>
+              <div>
+                <input type="number" min={0} value={s.everyMinutes || ""} onChange={(e) => set("everyMinutes", Number(e.target.value) || 0)} placeholder="—" /> min
+                <em>or on</em>
                 <input className="ed-cron" value={s.cron ?? ""} onChange={(e) => set("cron", e.target.value)} placeholder="0 9 * * 1-5" />
-              </label>
-              <label>
-                Looks around every
-                <input type="number" min={0} value={s.scanEveryMinutes || ""} onChange={(e) => set("scanEveryMinutes", Number(e.target.value) || 0)} placeholder="—" />
-                min
-              </label>
+              </div>
+              <span>Glances every</span>
+              <div>
+                <input type="number" min={0} value={s.scanEveryMinutes || ""} onChange={(e) => set("scanEveryMinutes", Number(e.target.value) || 0)} placeholder="—" /> min
+                <em>reading only, between wakes</em>
+              </div>
+              <span>At most</span>
+              <div>
+                <input type="number" min={0} value={s.maxWakesPerDay || ""} onChange={(e) => set("maxWakesPerDay", Number(e.target.value) || 0)} placeholder="24" /> wakes
+                <em>and</em>
+                $<input type="number" min={0} step="0.1" value={s.maxCostPerDayUsd || ""} onChange={(e) => set("maxCostPerDayUsd", Number(e.target.value) || 0)} placeholder="—" /> a day
+              </div>
             </div>
-            <p className="ed-hint">Also whenever it asks to, when you tell it something, and when its webhook is called.</p>
-            <div className="ed-wakes">
-              <label>
-                At most
-                <input type="number" min={0} value={s.maxWakesPerDay || ""} onChange={(e) => set("maxWakesPerDay", Number(e.target.value) || 0)} placeholder="24" />
-                wakes a day
-              </label>
-              <label>
-                Spends at most $
-                <input type="number" min={0} step="0.1" value={s.maxCostPerDayUsd || ""} onChange={(e) => set("maxCostPerDayUsd", Number(e.target.value) || 0)} placeholder="—" />
-                a day
-              </label>
-            </div>
+            <p className="ed-hint">Also wakes when it asks to, when you tell it something, and when its webhook is called.</p>
           </section>
 
           <section>
             <h3>Reports</h3>
-            <p className="ed-hint">Always here and on your phone.</p>
             <div className="ed-reports">
               <label className="ed-check">
                 <input type="checkbox" checked={s.report.push} onChange={(e) => set("report", { ...s.report, push: e.target.checked })} /> Push notification

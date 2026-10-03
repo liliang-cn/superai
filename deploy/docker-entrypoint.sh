@@ -26,5 +26,12 @@ if [ -n "${SUPERAI_SETTINGS_JSON:-}" ]; then
   printf '%s' "$SUPERAI_SETTINGS_JSON" > "$home/settings.json"
 fi
 
+# MCP servers the cluster provides. SuperAI reads two files; this is the one
+# under data/, so what the UI or the agent installs (the other) is left alone.
+if [ -n "${SUPERAI_MCP_JSON:-}" ]; then
+  mkdir -p "$home/data"
+  printf '%s' "$SUPERAI_MCP_JSON" > "$home/data/mcpServers.json"
+fi
+
 chown -R superai:superai "$home"
 exec su-exec superai "$@"

@@ -92,6 +92,11 @@ spec:
             - {name: SUPERAI_AGENT_PORT, value: "43120"}
             - {name: CORTEXDB_GRPC_TOKEN, valueFrom: {secretKeyRef: {name: superai-hive, key: cortexdb_token}}}
             - {name: SUPERAI_SETTINGS_JSON, valueFrom: {secretKeyRef: {name: superai-hive, key: settings-queen.json}}}
+            # The shared brain's MCP server (knowledge graph, ontologies, graph
+            # search). Its endpoint is written in the entry so SuperAI sees it is
+            # the store its memory already uses and withholds the duplicate memory
+            # tools; the token comes from CORTEXDB_GRPC_TOKEN above.
+            - {name: SUPERAI_MCP_JSON, value: '{"mcpServers":{"cortexdb":{"type":"stdio","command":"cortexdb-mcp-stdio","env":{"CORTEXDB_REMOTE":"192.168.123.252:47821"}}}}'}
           readinessProbe:
             httpGet: {path: /api/session, port: 43117}
           volumeMounts: [{name: data, mountPath: /data}]
@@ -127,6 +132,16 @@ spec:
     metadata: {labels: {app: superai-worker}}
     spec:
       serviceAccountName: superai
+      # One worker per node while there are nodes to spare: a node going down
+      # takes one worker with it, not three. Preferred, not required, so the
+      # queen can still grow the hive past the node count.
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector: {matchLabels: {app: superai-worker}}
       containers:
         - name: superai
           image: superai:hive
@@ -144,6 +159,11 @@ spec:
             - {name: SUPERAI_AGENT_NAME, value: "$(POD_NAME)"}
             - {name: CORTEXDB_GRPC_TOKEN, valueFrom: {secretKeyRef: {name: superai-hive, key: cortexdb_token}}}
             - {name: SUPERAI_SETTINGS_JSON, valueFrom: {secretKeyRef: {name: superai-hive, key: settings-worker.json}}}
+            # The shared brain's MCP server (knowledge graph, ontologies, graph
+            # search). Its endpoint is written in the entry so SuperAI sees it is
+            # the store its memory already uses and withholds the duplicate memory
+            # tools; the token comes from CORTEXDB_GRPC_TOKEN above.
+            - {name: SUPERAI_MCP_JSON, value: '{"mcpServers":{"cortexdb":{"type":"stdio","command":"cortexdb-mcp-stdio","env":{"CORTEXDB_REMOTE":"192.168.123.252:47821"}}}}'}
           readinessProbe:
             httpGet: {path: /api/session, port: 43117}
           volumeMounts: [{name: data, mountPath: /data}]

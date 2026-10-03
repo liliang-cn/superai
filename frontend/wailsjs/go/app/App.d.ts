@@ -74,6 +74,8 @@ export function FollowUpCLIRun(arg1:string,arg2:string):Promise<app.CLIRun>;
 
 export function ForgetHive(arg1:string):Promise<void>;
 
+export function ForgetLife(arg1:string,arg2:string):Promise<void>;
+
 export function GetSettings():Promise<backend.Settings>;
 
 export function GetStatus():Promise<Record<string, any>>;
@@ -85,6 +87,8 @@ export function HiveLinkStatus():Promise<app.HiveLinkInfo>;
 export function HiveLinks():Promise<Array<app.HiveLinkEntry>>;
 
 export function HiveMembers():Promise<Array<backend.HiveMember>>;
+
+export function HivePulse():Promise<app.HivePulse>;
 
 export function HiveRetire(arg1:number,arg2:boolean):Promise<Record<string, any>>;
 

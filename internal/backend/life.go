@@ -78,6 +78,44 @@ func (s *Service) AddRecord(kind, title, body string, tags []string, project str
 	return rec, nil
 }
 
+// Forget removes one entry the person says is wrong: a calendar entry or a
+// note by id, a person by name. It is the only delete there is; the agent's
+// tools only ever add, so a mistake it wrote stays until someone removes it.
+func (s *Service) Forget(kind, key string) error {
+	if s == nil || s.store == nil {
+		return errors.New("life store is unavailable")
+	}
+	key = strings.TrimSpace(key)
+	drop := func(rows []map[string]any) ([]map[string]any, bool) {
+		for i, r := range rows {
+			if id, _ := r["id"].(string); id == key {
+				return append(rows[:i:i], rows[i+1:]...), true
+			}
+		}
+		return rows, false
+	}
+	s.store.mu.Lock()
+	found := false
+	switch kind {
+	case "schedule":
+		s.store.Schedules, found = drop(s.store.Schedules)
+	case "record":
+		s.store.Records, found = drop(s.store.Records)
+	case "person":
+		_, found = s.store.Persons[key]
+		delete(s.store.Persons, key)
+	default:
+		s.store.mu.Unlock()
+		return errors.New("nothing of kind " + kind + " can be forgotten")
+	}
+	s.store.mu.Unlock()
+	if !found {
+		return errors.New("no such " + kind + ": " + key)
+	}
+	s.store.save()
+	return nil
+}
+
 // trimmed drops blank entries and surrounding space, and never returns nil:
 // the rows are serialized to JSON, and a nil slice becomes `null` where every
 // reader expects a list.

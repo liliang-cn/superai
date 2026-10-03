@@ -1,14 +1,18 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowUpIcon, HexagonIcon, 
-  PlusIcon, SquareIcon, SquarePenIcon, TerminalIcon, TriangleAlertIcon, XIcon, ChevronRightIcon,
-  LayoutDashboardIcon, PanelRightCloseIcon, PanelRightOpenIcon, ActivityIcon, GaugeIcon,
+  PlusIcon, SquareIcon, SquarePenIcon, CalendarIcon, AlarmClockIcon, TerminalIcon, TriangleAlertIcon, XIcon, ChevronRightIcon,
+  LayoutDashboardIcon, ChartColumnIcon, PanelRightCloseIcon, PanelRightOpenIcon, ActivityIcon, GaugeIcon,
 } from "lucide-react";
+import { useI18n } from "../lib/i18n";
 import { useChat } from "../lib/useChat";
+import { usePulse } from "../components/Reactor";
+import LiveTurn from "./LiveTurn";
+import EventSheet from "../components/EventSheet";
 import { AgentInfo, useAgentMentions } from "../lib/useAgentMentions";
 import { AgentMenu } from "../components/AgentMenu";
-import { AttentionItem, AttentionList, useAttention } from "../canvas/attention";
+import { attentionTitle, AttentionItem } from "../canvas/attention";
 import { taskPath } from "../lib/routes";
 import type { ToolApproval } from "../lib/useToolApprovals";
 import { PATHS } from "../lib/routes";
@@ -16,7 +20,8 @@ import { withoutCallNotes } from "../lib/format";
 import { Response } from "@/components/ai-elements/response";
 import { Bee, QUEEN_SESSION, elapsed, short, useBees, useLinkedAgents, useCodingRuns, useHive, useUpcoming } from "../canvas/data";
 import type { CodingRun, UpcomingItem } from "../canvas/tiles";
-import { dashboards, Dashboard } from "../lib/dashboards";
+import NameDashboardModal from "../components/NameDashboardModal";
+import { dashboards, hasRenderableBlock, suggestName, Dashboard } from "../lib/dashboards";
 import {
   CancelAllChats, CancelCLIRun, ChatSessions, HiveLinkStatus, TakeOver,
 } from "../../wailsjs/go/app/App";
@@ -47,6 +52,16 @@ interface Session { id: string; title: string; updated_at: string }
  *  themselves: the queen's own, the tiles', and the bees' wake-ups (whose
  *  first message is the standing-agent preamble, not something you said).
  *  The phone's calls with the queen (hive-console-<id>) are kept. */
+/** "Tue 15:00", "Today 09:00": when a coming-up item is, in one short line. */
+function shortWhen(at: string | undefined, now: Date | number, t: (k: string) => string): string {
+  if (!at) return "";
+  const d = new Date(at);
+  const start = new Date(now); start.setHours(0, 0, 0, 0);
+  const days = Math.floor((d.getTime() - start.getTime()) / 86400000);
+  const day = days === 0 ? t("Today") : days === 1 ? t("Tomorrow") : d.toLocaleDateString(undefined, { weekday: "short" });
+  return `${day} ${d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false })}`;
+}
+
 function useRecents(sending: boolean): Session[] {
   const [list, setList] = useState<Session[]>([]);
   useEffect(() => {
@@ -104,13 +119,31 @@ const PIN_COLORS = ["dk-a-later", "dk-a-hive", "dk-a-code", "dk-a-bees", "dk-a-k
  * the comb, or a coding agent's session as it types — with a way to take
  * over; along the bottom, what you pinned.
  */
-export default function DeskView({ approvals, openSession, onSessionOpened }: {
+export default function DeskView({ approvals, openSession, onSessionOpened, attentionItems, attentionError }: {
+  attentionItems: AttentionItem[];
+  attentionError?: string;
   approvals: { pending: ToolApproval[]; resolve: (id: string, allow: boolean) => void };
   /** A conversation to open on arrival — a notification's, a scheduled run's. */
   openSession?: string;
   onSessionOpened?: () => void;
 }) {
+  const { t } = useI18n();
   const navigate = useNavigate();
+  const [folded, setFolded] = useState(() => { try { return localStorage.getItem(FOLD_KEY) === "1"; } catch { return false; } });
+  const layoutRef = useRef<HTMLDivElement>(null);
+  const [sideWidth, setSideWidth] = useState(() => {
+    try { const n = Number(localStorage.getItem("superai-desk-side-width")); return Number.isFinite(n) && n >= 200 ? Math.min(480, n) : 252; } catch { return 252; }
+  });
+  const [resizing, setResizing] = useState(false);
+  const clampWidth = (n: number) => Math.round(Math.max(200, Math.min(480, (layoutRef.current?.clientWidth ?? 1200) - (folded ? 418 : 760), n)));
+  const resizeSide = (n: number) => setSideWidth(clampWidth(n));
+  useEffect(() => { try { localStorage.setItem("superai-desk-side-width", String(sideWidth)); } catch { /* private window */ } }, [sideWidth]);
+  useEffect(() => {
+    const fit = () => setSideWidth((n) => clampWidth(n));
+    window.addEventListener("resize", fit);
+    fit();
+    return () => window.removeEventListener("resize", fit);
+  }, [folded]);
   const now = useNow();
   const hive = useHive();
   const bees = useBees();
@@ -118,9 +151,10 @@ export default function DeskView({ approvals, openSession, onSessionOpened }: {
   const runs = useCodingRuns();
   const linked = useLinkedAgents();
   const chat = useChat();
+  const pulse = usePulse();
   const recents = useRecents(chat.sending);
   const link = useLink();
-  const attention = useAttention();
+  const attention = attentionItems;
   const [draft, setDraft] = useState("");
   const composerRef = useRef<HTMLTextAreaElement>(null);
   // @ offers the agents the core knows (hermes, pi, claude.mac, …) and the
@@ -134,6 +168,8 @@ export default function DeskView({ approvals, openSession, onSessionOpened }: {
     }), [hive]);
   const mentions = useAgentMentions(draft, setDraft, workerNames);
   const { theme } = useDeskTheme();
+  const [naming, setNaming] = useState<{content:string; prompt:string} | null>(null);
+  const [saveError, setSaveError] = useState("");
   const [pins, setPins] = useState<Dashboard[]>([]);
   const [onQueen, setOnQueen] = useState(true);
   const [opened, setOpened] = useState<TabKey[]>([]);
@@ -156,6 +192,12 @@ export default function DeskView({ approvals, openSession, onSessionOpened }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openSession]);
 
+  useEffect(() => {
+    const load = () => dashboards.list().then(list => setPins(list ?? [])).catch(() => {});
+    const offs = ["dashboard:updated", "dashboard:refreshing"].map(name => EventsOn(name, load));
+    return () => offs.forEach(off => typeof off === "function" && off());
+  }, []);
+
   const msgs = chat.messages.filter((m) => m.kind !== "context");
   const lastText = msgs.length ? msgs[msgs.length - 1].content : "";
   useEffect(() => { endRef.current?.scrollIntoView({ block: "end" }); }, [msgs.length, lastText.length]);
@@ -164,12 +206,13 @@ export default function DeskView({ approvals, openSession, onSessionOpened }: {
   // Approvals and waiting bees are answered in the conversation (the cards);
   // the rest of what needs you, and what is coming up, sits in the sidebar.
   const needs = attention.filter((i) => i.level === "needs").length;
-  const feed = attention.filter((i) => i.kind !== "approval" && i.kind !== "bee");
+  const feed = attention.filter((i) => i.level === "soon");
+  const [sheet, setSheet] = useState<AttentionItem | null>(null);
   const openItem = (it: AttentionItem) => {
     if (it.open === "hive" && it.kind === "failed" && it.ref) navigate(taskPath(it.ref));
     else if (it.open === "hive") navigate(PATHS.hive);
     else if (it.open === "coding") navigate(PATHS.coding);
-    else if (it.open === "records") navigate(PATHS.records);
+    else if (it.kind === "event" || it.kind === "reminder") setSheet(it);
     else if (it.open === "agents") navigate(PATHS.agents);
   };
 
@@ -187,6 +230,7 @@ export default function DeskView({ approvals, openSession, onSessionOpened }: {
     setClosed((c) => { const n = new Set(c); n.delete(k); return n; });
     setOpened((o) => (o.includes(k) ? o : [...o, k]));
     setActive(k);
+    fold(false);
   };
   const close = (k: TabKey) => {
     setOpened((o) => o.filter((x) => x !== k));
@@ -194,7 +238,6 @@ export default function DeskView({ approvals, openSession, onSessionOpened }: {
     if (current === k) setActive("hive");
   };
   // The right pane folds away to a strip, and stays the way it was left.
-  const [folded, setFolded] = useState(() => { try { return localStorage.getItem(FOLD_KEY) === "1"; } catch { return false; } });
   const fold = (on: boolean) => { setFolded(on); try { localStorage.setItem(FOLD_KEY, on ? "1" : "0"); } catch { /* fine */ } };
 
   const runOf = (k: TabKey) => runs.find((r) => "run:" + r.id === k);
@@ -223,55 +266,81 @@ export default function DeskView({ approvals, openSession, onSessionOpened }: {
   const busyWorkers = new Set(hive.tasks.filter((t) => t.state === "running").map((t) => t.worker)).size;
   const live = hive.members.filter((m) => m.state === "live" && !/queen/.test(m.name)).length;
   const workers = hive.members.filter((m) => !/queen/.test(m.name)).length;
-  const status = !hive.loaded ? "Finding the hive…" : !hive.role ? "This Mac on its own" : `${live} of ${workers} workers up, ${busyWorkers} busy`;
-  const title = onQueen ? "The queen" : recents.find((s) => s.id === chat.sessionId)?.title || "Conversation";
+  const status = !hive.loaded ? t("Finding the hive…") : !hive.role ? t("This Mac on its own") : `${live} of ${workers} workers up, ${busyWorkers} busy`;
+  const title = onQueen ? t("The queen") : recents.find((s) => s.id === chat.sessionId)?.title || t("Conversation");
 
   return (
-    <div className={folded ? "dk folded" : "dk"}>
-      <aside className="cv-glass dk-side">
-        <div className="dk-ws"><b>SuperAI</b></div>
-        {needs > 0 && (
-          <button className="dk-row need" onClick={() => needsRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })}>
-            <TriangleAlertIcon size={17} />Needs you<span className="dk-n">{needs}</span>
+    <div ref={layoutRef} className={`${folded ? "dk folded" : "dk"}${resizing ? " dk-resizing" : ""}`} style={{ "--dk-side-width": `${sideWidth}px` } as CSSProperties}>
+      <aside id="desk-sidebar" className="cv-glass dk-side">
+        <div className="dk-ws">
+          <b>SuperAI</b>
+          <button className="dk-icon" title={t("New chat")} aria-label={t("New chat")} onClick={() => { chat.newSession(); setOnQueen(false); }}><SquarePenIcon size={17} /></button>
+        </div>
+        <button className={onQueen ? "dk-row on" : "dk-row"} onClick={() => pickSession(QUEEN_SESSION)}><span className="dk-qhex">Q</span>{t("The queen")}</button>
+        {(needs > 0 || attentionError) && (
+          <button className="dk-row need" onClick={() => navigate(PATHS.tasks)} title={attention.filter((i) => i.level === "needs").slice(0, 3).map(attentionTitle).join("\n")}>
+            <TriangleAlertIcon size={16} />
+            <span className="dk-row-t">{attentionError ? t("Could not check pending items") : t("{count} items waiting for you", { count: needs })}</span>
+            {needs > 0 && <span className="dk-n">{needs}</span>}
           </button>
         )}
-        <button className="dk-row" onClick={() => { chat.newSession(); setOnQueen(false); }}><SquarePenIcon size={17} />New chat</button>
-        <button className={onQueen ? "dk-row on" : "dk-row"} onClick={() => pickSession(QUEEN_SESSION)}><span className="dk-qhex">Q</span>The queen</button>
-        {feed.length > 0 && (
-          <div className="dk-foryou">
-            <AttentionList items={feed} onOpen={openItem} limit={5} />
-          </div>
-        )}
-        <button className="dk-grp" onClick={() => navigate(PATHS.records)}>Later<ChevronRightIcon size={14} /><span className="dk-more">{nextLabel(upcoming)}</span></button>
-        <button className="dk-grp" onClick={() => navigate(PATHS.agents)}>Bees<ChevronRightIcon size={14} /><span className="dk-more">{bees.length || ""}</span></button>
-        {pins.length > 0 && <div className="dk-grp static">Pinned</div>}
+
+        {feed.length > 0 && <div className="dk-sec">{t("Coming up")}</div>}
+        {feed.slice(0, 4).map((it, i) => (
+          <button key={`${it.kind}-${it.ref}-${i}`} className="dk-rec" onClick={() => openItem(it)} title={[it.title, it.detail, it.place].filter(Boolean).join(" · ")}>
+            {it.kind === "reminder" ? <AlarmClockIcon size={14} /> : <CalendarIcon size={14} />}
+            <span>{it.title}</span><em>{shortWhen(it.at, now, t)}</em>
+          </button>
+        ))}
+
+        {pins.length > 0 && <div className="dk-sec">{t("Pinned")}</div>}
         {pins.slice(0, 6).map((d) => (
           <button key={d.id} className={current === "dash:" + d.id ? "dk-rec on" : "dk-rec"} onClick={() => open("dash:" + d.id)}>
             <LayoutDashboardIcon size={14} /><span>{d.name}</span>
           </button>
         ))}
-        {recents.length > 0 && <div className="dk-grp static">Recents</div>}
+
+        {recents.length > 0 && <div className="dk-sec">{t("Recents")}</div>}
         <div className="dk-recents">
           {recents.map((s) => {
             const going = s.id === chat.sessionId && chat.sending;
             return (
-              <button key={s.id} className={s.id === chat.sessionId && !onQueen ? "dk-rec on" : "dk-rec"} onClick={() => pickSession(s.id)}>
-                <i className={going ? "dk-dot on" : "dk-dot"} /><span>{s.title || "Untitled"}</span><em>{ago(s.updated_at, now)}</em>
+              <button key={s.id} className={s.id === chat.sessionId && !onQueen ? "dk-rec dk-hist on" : "dk-rec dk-hist"} onClick={() => pickSession(s.id)}>
+                <span>{s.title || t("Untitled")}</span>{going ? <i className="dk-livedot" /> : <em>{ago(s.updated_at, now)}</em>}
               </button>
             );
           })}
         </div>
         <div className="dk-foot">
-          <button className="dk-link" onClick={() => openSwitcher()} title="Switch backend">
+          <button className="dk-link" onClick={() => openSwitcher()} title={t("Switch backend")}>
             <span className="dk-qhex small">{link.linked ? "Q" : "M"}</span>
             <span>
-              {link.linked ? (link.url || "").replace(/^https?:\/\//, "") : "This Mac only"}
-              <small><i className={link.live ? "dk-ok" : "dk-off"} />{link.linked ? (link.live ? "Linked" : "Reconnecting") : "Not in a hive"}</small>
+              {link.linked ? (link.url || "").replace(/^https?:\/\//, "") : t("This Mac only")}
+              <small><i className={link.live ? "dk-ok" : "dk-off"} />{link.linked ? (link.live ? t("Linked") : t("Reconnecting")) : t("Not in a hive")}</small>
             </span>
           </button>
         </div>
       </aside>
 
+      <div className="dk-side-resizer" role="separator" tabIndex={0}
+        aria-label={t("Resize sidebar")} aria-orientation="vertical" aria-controls="desk-sidebar"
+        aria-valuemin={200} aria-valuemax={480} aria-valuenow={sideWidth}
+        title={t("Drag to resize · double-click to reset")}
+        onDoubleClick={() => resizeSide(252)}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowLeft" || e.key === "ArrowRight") { e.preventDefault(); resizeSide(sideWidth + (e.key === "ArrowRight" ? 16 : -16)); }
+          if (e.key === "Home") { e.preventDefault(); resizeSide(252); }
+        }}
+        onPointerDown={(e) => {
+          if (e.button !== 0) return;
+          e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); setResizing(true);
+        }}
+        onPointerMove={(e) => {
+          if (e.currentTarget.hasPointerCapture(e.pointerId)) resizeSide(e.clientX - (layoutRef.current?.getBoundingClientRect().left ?? 0));
+        }}
+        onPointerUp={(e) => { if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId); setResizing(false); }}
+        onLostPointerCapture={() => setResizing(false)}
+      />
       <section className="cv-glass dk-chat">
         <header className="dk-chead">
           <span className="dk-qhex big">Q</span>
@@ -281,35 +350,40 @@ export default function DeskView({ approvals, openSession, onSessionOpened }: {
           {msgs.length === 0 && (
             <div className="dk-empty">Ask the queen anything, or give the hive an order: “check disk on every worker and tell me the fullest”.</div>
           )}
-          {msgs.map((m) =>
+          {msgs.map((m, index) =>
             m.role === "user" ? (
               <div key={m.id} className="dk-u">{withoutCallNotes(m.content)}</div>
             ) : (
               <div key={m.id} className={m.error ? "dk-q bad" : "dk-q"}>
+                <LiveTurn m={m} trace={chat.trace} pulse={pulse} session={chat.sessionId} />
                 {m.content ? <Response>{withoutCallNotes(m.content)}</Response>
-                  : m.streaming ? <span className="dk-thinking">{m.progress?.[m.progress.length - 1]?.text || "Thinking…"}</span>
-                  : m.cancelled ? <span className="dk-thinking">Stopped.</span> : null}
+                  : m.cancelled ? <span className="dk-thinking">{t("Stopped.")}</span> : null}
                 {m.error && <div className="dk-err">{m.error}</div>}
+                {!m.streaming && !m.error && hasRenderableBlock(m.content) && <button className="dk-save-dashboard" onClick={() => {
+                  const prompt = [...msgs.slice(0, index)].reverse().find(message => message.role === "user")?.content ?? "";
+                  setSaveError(""); setNaming({content:m.content,prompt});
+                }}><LayoutDashboardIcon size={14}/>{t("Save as dashboard")}</button>}
+
               </div>
             ),
           )}
           <div ref={needsRef} className="dk-needs">
             {approvals.pending.map((a) => (
               <div key={a.id} className="dk-card">
-                <div className="dk-card-t"><TriangleAlertIcon size={15} />Needs you</div>
+                <div className="dk-card-t"><TriangleAlertIcon size={15} />{t("Needs you")}</div>
                 <p>{a.by ? `${a.by} wants` : "The hive wants"} to run <code>{a.command || a.tool}</code></p>
                 <div className="dk-card-btns">
-                  <button className="dk-btn pri" onClick={() => approvals.resolve(a.id, true)}>Allow once</button>
-                  <button className="dk-btn" onClick={() => approvals.resolve(a.id, false)}>Deny</button>
+                  <button className="dk-btn pri" onClick={() => approvals.resolve(a.id, true)}>{t("Allow once")}</button>
+                  <button className="dk-btn" onClick={() => approvals.resolve(a.id, false)}>{t("Deny")}</button>
                   {a.expiresAt && <small>denied on its own in {elapsed(new Date().toISOString(), new Date(a.expiresAt).getTime())}</small>}
                 </div>
               </div>
             ))}
             {waiting.map((b) => (
               <div key={b.id} className="dk-card">
-                <div className="dk-card-t"><TriangleAlertIcon size={15} />Needs you</div>
+                <div className="dk-card-t"><TriangleAlertIcon size={15} />{t("Needs you")}</div>
                 <p><b>{b.name}</b> is waiting: {b.waitingFor}</p>
-                <div className="dk-card-btns"><button className="dk-btn pri" onClick={() => navigate(PATHS.agents)}>Open Bees</button></div>
+                <div className="dk-card-btns"><button className="dk-btn pri" onClick={() => navigate(PATHS.agents)}>{t("Open Bees")}</button></div>
               </div>
             ))}
           </div>
@@ -326,7 +400,7 @@ export default function DeskView({ approvals, openSession, onSessionOpened }: {
           />
           <textarea
             ref={composerRef}
-            name="message" rows={1} value={draft} placeholder="Ask the queen, or give the hive an order. @ for an agent or a worker"
+            name="message" rows={1} value={draft} placeholder={t("Ask the queen, or give the hive an order. @ for an agent or a worker")}
             onChange={(e) => { setDraft(e.target.value); mentions.update(e.target.value, e.target.selectionStart ?? e.target.value.length); }}
             onKeyDown={(e) => {
               if (mentions.onKeyDown(e)) return;
@@ -335,18 +409,31 @@ export default function DeskView({ approvals, openSession, onSessionOpened }: {
             onBlur={mentions.close}
           />
           {chat.sending && !draft.trim() ? (
-            <button type="button" className="dk-send stop" title="Stop" onClick={() => chat.cancel()}><SquareIcon size={14} fill="currentColor" /></button>
+            <button type="button" className="dk-send stop" title={t("Stop")} onClick={() => chat.cancel()}><SquareIcon size={14} fill="currentColor" /></button>
           ) : (
-            <button type="submit" className="dk-send" title="Send" disabled={!draft.trim()}><ArrowUpIcon size={18} /></button>
+            <button type="submit" className="dk-send" title={t("Send")} disabled={!draft.trim()}><ArrowUpIcon size={18} /></button>
           )}
         </form>
       </section>
+      {sheet && <EventSheet item={sheet} onClose={() => setSheet(null)} />}
+      {naming && <NameDashboardModal suggested={suggestName(naming.prompt)} prompt={naming.prompt} onCancel={() => setNaming(null)} onSave={async name => {
+        const saved = naming; setNaming(null);
+        try { await dashboards.save(name, saved.content, saved.prompt); setPins(await dashboards.list()); }
+        catch (error) { setSaveError(String(error instanceof Error ? error.message : error)); }
+      }} />}
+      {saveError && <div className="dk-dashboard-error" role="alert">{saveError}<button onClick={() => setSaveError("")} aria-label={t("Close")}><XIcon size={16}/></button></div>}
 
       {folded ? (
         <section className="dk-live-strip">
-          <button className="cv-glass dk-unfold" title="Show the hive" onClick={() => fold(false)}>
+          <button className="cv-glass dk-unfold" title={t("Show the hive")} onClick={() => fold(false)}>
             <PanelRightOpenIcon size={18} />
             {busyWorkers > 0 && <i className="dk-livedot" />}
+          </button>
+          <button className="cv-glass dk-unfold" title={t("Dashboards")} onClick={() => navigate(PATHS.dashboards)}>
+            <LayoutDashboardIcon size={18} />
+          </button>
+          <button className="cv-glass dk-unfold" title={t("Stats")} onClick={() => navigate(PATHS.stats)}>
+            <ChartColumnIcon size={18} />
           </button>
         </section>
       ) : (
@@ -365,7 +452,9 @@ export default function DeskView({ approvals, openSession, onSessionOpened }: {
             );
           })}
           <button className="dk-icon" title="Open a coding run" onClick={() => navigate(PATHS.coding)}><PlusIcon size={17} /></button>
-          <button className="dk-icon dk-fold" title="Hide this pane" onClick={() => fold(true)}><PanelRightCloseIcon size={17} /></button>
+          <button className="dk-icon dk-fold" title={t("Dashboards")} onClick={() => navigate(PATHS.dashboards)}><LayoutDashboardIcon size={17} /></button>
+          <button className="dk-icon" title={t("Stats")} onClick={() => navigate(PATHS.stats)}><ChartColumnIcon size={17} /></button>
+          <button className="dk-icon" title={t("Hide this pane")} onClick={() => fold(true)}><PanelRightCloseIcon size={17} /></button>
         </div>
         <div className="cv-glass dk-screen">
           <div className="dk-in">

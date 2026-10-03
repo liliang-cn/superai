@@ -1,7 +1,6 @@
 package backend
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -30,75 +29,45 @@ func writeConfig(t *testing.T, body string) string {
 	return path
 }
 
-// TestResolveMCPConfigDropsTheDuplicateRoute is the whole point: once the
-// memory backend owns an endpoint, an MCP server pointed at that same endpoint
-// is the same store under a second name, and must not be mounted.
-func TestResolveMCPConfigDropsTheDuplicateRoute(t *testing.T) {
+// The server that shares the memory backend's store is found, and only its
+// memory tools are withheld; the rest of what it offers stays.
+func TestTheSharedServerKeepsAllButItsMemoryTools(t *testing.T) {
 	src := writeConfig(t, twoRouteConfig)
-	filtered := filepath.Join(filepath.Dir(src), "mcpServers.effective.json")
-
-	path, dropped, err := resolveMCPConfigPath(src, filtered, "192.168.123.252:47821")
-	if err != nil {
-		t.Fatalf("resolveMCPConfigPath() error = %v", err)
-	}
-	if path != filtered {
-		t.Errorf("path = %q, want the filtered copy %q", path, filtered)
-	}
-	if len(dropped) != 1 || dropped[0] != "cortexdb" {
-		t.Fatalf("dropped = %v, want [cortexdb]", dropped)
-	}
-
-	raw, err := os.ReadFile(filtered)
-	if err != nil {
-		t.Fatalf("read filtered config: %v", err)
-	}
-	var parsed mcpServersFile
-	if err := json.Unmarshal(raw, &parsed); err != nil {
-		t.Fatalf("filtered config is not valid JSON: %v", err)
-	}
-	if _, still := parsed.MCPServers["cortexdb"]; still {
-		t.Error("the duplicate route survived into the filtered config")
-	}
-	if _, kept := parsed.MCPServers["playwright"]; !kept {
-		t.Error("an unrelated MCP server was dropped; only the duplicate route should go")
-	}
-
-	// The user's own file is never rewritten.
-	original, err := os.ReadFile(src)
+	shared, err := serversSharingMemory(src, "192.168.123.252:47821")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(original) != twoRouteConfig {
-		t.Error("resolveMCPConfigPath() modified the user's mcpServers.json")
+	if len(shared) != 1 || shared[0] != "cortexdb" {
+		t.Fatalf("shared = %v, want [cortexdb]", shared)
+	}
+	tools := []string{
+		"memory_save", "mcp_cortexdb_memory_save", "mcp_cortexdb_memory_search",
+		"mcp_cortexdb_knowledge_memory_recall", "mcp_cortexdb_knowledge_save",
+		"mcp_cortexdb_expand_graph", "mcp_playwright_browser_navigate",
+	}
+	deny := memoryRouteDenylist(shared, tools)
+	want := map[string]bool{"mcp_cortexdb_memory_save": true, "mcp_cortexdb_memory_search": true, "mcp_cortexdb_knowledge_memory_recall": true}
+	if len(deny) != len(want) {
+		t.Fatalf("deny = %v", deny)
+	}
+	for _, d := range deny {
+		if !want[d] {
+			t.Errorf("%s withheld; only the shared server's memory tools should be", d)
+		}
 	}
 }
 
-// TestResolveMCPConfigLocalBackendKeepsEverything pins the default: on local
-// memory nothing is owned, so nothing is filtered and no file is written.
-func TestResolveMCPConfigLocalBackendKeepsEverything(t *testing.T) {
-	src := writeConfig(t, twoRouteConfig)
-	filtered := filepath.Join(filepath.Dir(src), "mcpServers.effective.json")
-
-	path, dropped, err := resolveMCPConfigPath(src, filtered, "")
-	if err != nil {
-		t.Fatalf("resolveMCPConfigPath() error = %v", err)
-	}
-	if path != src {
-		t.Errorf("path = %q, want the original %q", path, src)
-	}
-	if len(dropped) != 0 {
-		t.Errorf("dropped = %v, want nothing", dropped)
-	}
-	if _, err := os.Stat(filtered); !os.IsNotExist(err) {
-		t.Error("a filtered config was written even though nothing was filtered")
+// On local memory nothing is owned, so nothing is withheld.
+func TestALocalBackendSharesNothing(t *testing.T) {
+	shared, err := serversSharingMemory(writeConfig(t, twoRouteConfig), "")
+	if err != nil || len(shared) != 0 {
+		t.Fatalf("shared = %v, %v", shared, err)
 	}
 }
 
-// TestResolveMCPConfigMatchesByEndpointNotByName is the red line: the duplicate
-// is found because it routes to the same address, not because it is called
-// something memory-ish. A server renamed to anything at all is still caught,
-// and a server that merely sounds like a memory server is left alone.
-func TestResolveMCPConfigMatchesByEndpointNotByName(t *testing.T) {
+// The red line: the server is found because it routes to the same address,
+// not because it is called something memory-ish.
+func TestTheSharedServerIsFoundByEndpointNotByName(t *testing.T) {
 	src := writeConfig(t, `{
   "mcpServers": {
     "some-unrelated-name": {
@@ -111,14 +80,12 @@ func TestResolveMCPConfigMatchesByEndpointNotByName(t *testing.T) {
     }
   }
 }`)
-	filtered := filepath.Join(filepath.Dir(src), "mcpServers.effective.json")
-
-	_, dropped, err := resolveMCPConfigPath(src, filtered, "10.0.0.9:47821")
+	shared, err := serversSharingMemory(src, "10.0.0.9:47821")
 	if err != nil {
-		t.Fatalf("resolveMCPConfigPath() error = %v", err)
+		t.Fatal(err)
 	}
-	if len(dropped) != 1 || dropped[0] != "some-unrelated-name" {
-		t.Fatalf("dropped = %v, want [some-unrelated-name] — matching is by endpoint, not by name", dropped)
+	if len(shared) != 1 || shared[0] != "some-unrelated-name" {
+		t.Fatalf("shared = %v, want [some-unrelated-name]", shared)
 	}
 }
 

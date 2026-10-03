@@ -4,75 +4,74 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
+	"sort"
 	"strings"
 )
 
 // One capability, one route.
 //
 // When the shared CortexDB becomes SuperAI's memory backend, the built-in
-// memory_* tools already reach it. If an MCP server in mcpServers.json is
-// *also* pointed at that same server, the model sees two names for one store
-// and — observed in practice — calls both and then reports "not found".
+// memory_* tools already reach it. An MCP server in mcpServers.json pointed at
+// that same server offers memory a second time — and, observed in practice,
+// the model then calls both and reports "not found". But the same server also
+// offers what the built-in tools do not: the knowledge graph, ontologies,
+// SPARQL, graph search. So the server stays mounted, and only its own memory
+// tools are withheld from each run (memoryRouteDenylist).
 //
-// The duplicate is identified structurally, by endpoint: a server whose command
-// line or environment carries the very address the memory backend now owns is
-// the same store by definition. It is not identified by name, and there is no
-// list of "memory-ish" server names anywhere here — such a list would only ever
-// cover the servers somebody thought to enumerate.
+// The server is identified structurally, by endpoint: one whose command line
+// or environment carries the very address the memory backend owns is the same
+// store by definition. It is not identified by name, and there is no list of
+// "memory-ish" server names anywhere here — such a list would only ever cover
+// the servers somebody thought to enumerate.
 
 // mcpServerEntry mirrors the Claude-style mcpServers.json entry shape closely
-// enough to re-serialise a filtered file without losing fields.
+// enough to read every string in it.
 type mcpServerEntry map[string]any
 
 type mcpServersFile struct {
 	MCPServers map[string]mcpServerEntry `json:"mcpServers"`
 }
 
-// resolveMCPConfigPath returns the config path to hand agent-go, plus the names
-// of any servers that were dropped because they route to ownedEndpoint.
-//
-// With no endpoint to own, or nothing matching it, srcPath is returned
-// unchanged and nothing is written. Otherwise a filtered copy is written next
-// to it and that path is returned; the user's own file is never modified.
-func resolveMCPConfigPath(srcPath, filteredPath, ownedEndpoint string) (string, []string, error) {
+// serversSharingMemory names the servers in srcPath that route to
+// ownedEndpoint. With no endpoint owned there are none.
+func serversSharingMemory(srcPath, ownedEndpoint string) ([]string, error) {
 	ownedEndpoint = strings.TrimSpace(ownedEndpoint)
 	if ownedEndpoint == "" {
-		return srcPath, nil, nil
+		return nil, nil
 	}
 	raw, err := os.ReadFile(srcPath)
 	if err != nil {
-		return srcPath, nil, err
+		return nil, err
 	}
 	var parsed mcpServersFile
 	if err := json.Unmarshal(raw, &parsed); err != nil {
-		return srcPath, nil, fmt.Errorf("parse %s: %w", srcPath, err)
+		return nil, fmt.Errorf("parse %s: %w", srcPath, err)
 	}
-
-	kept := map[string]mcpServerEntry{}
-	var dropped []string
+	var shared []string
 	for name, entry := range parsed.MCPServers {
 		if mcpEntryRoutesTo(entry, ownedEndpoint) {
-			dropped = append(dropped, name)
-			continue
+			shared = append(shared, name)
 		}
-		kept[name] = entry
 	}
-	if len(dropped) == 0 {
-		return srcPath, nil, nil
-	}
+	sort.Strings(shared)
+	return shared, nil
+}
 
-	out, err := json.MarshalIndent(mcpServersFile{MCPServers: kept}, "", "  ")
-	if err != nil {
-		return srcPath, dropped, err
+// memoryRouteDenylist is what a run must not be offered: the memory tools of
+// the servers that share the memory backend's store. tools is every tool name
+// the agent has; agent-go names an MCP tool mcp_<server>_<tool>.
+func memoryRouteDenylist(shared, tools []string) []string {
+	var deny []string
+	for _, server := range shared {
+		for _, prefix := range []string{"mcp_" + server + "_memory_", "mcp_" + server + "_knowledge_memory_"} {
+			for _, t := range tools {
+				if strings.HasPrefix(t, prefix) {
+					deny = append(deny, t)
+				}
+			}
+		}
 	}
-	if err := os.MkdirAll(filepath.Dir(filteredPath), 0o755); err != nil {
-		return srcPath, dropped, err
-	}
-	if err := os.WriteFile(filteredPath, out, 0o600); err != nil {
-		return srcPath, dropped, err
-	}
-	return filteredPath, dropped, nil
+	return deny
 }
 
 // mcpEntryRoutesTo reports whether an MCP server entry is configured to talk to

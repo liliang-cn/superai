@@ -1,13 +1,16 @@
-import React, { useCallback, useEffect, useState } from "react";
+import { useI18n } from "../lib/i18n";
+import { createPortal } from "react-dom";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowLeftIcon,
   ClockIcon,
+  ChevronDownIcon,
   Maximize2Icon,
   RefreshCwIcon,
   Trash2Icon,
   XIcon,
 } from "lucide-react";
-import { EventsOff, EventsOn } from "../../wailsjs/runtime/runtime";
+import { EventsOn } from "../../wailsjs/runtime/runtime";
 import { Response } from "@/components/ai-elements/response";
 import { Dashboard, ageLabel, dashboards } from "../lib/dashboards";
 import { describeCron } from "../lib/cron";
@@ -44,14 +47,15 @@ function Card({
   onRefresh: () => void;
   onDelete: () => void;
 }) {
+  const { t } = useI18n();
   return (
     <div className="dcard">
-      <button className="dcard-main" onClick={onOpen} title="Open">
+      <button className="dcard-main" onClick={onOpen} title={t("Open")}>
         <span className="dcard-name">{d.name}</span>
         <span className="dcard-meta">
           {d.refreshing ? (
             <>
-              <span className="spinner" /> refreshing…
+              <span className="spinner" /> {t("refreshing…")}
             </>
           ) : (
             ageLabel(d.refreshed_at)
@@ -69,11 +73,11 @@ function Card({
           className="panel-toggle inline"
           onClick={onRefresh}
           disabled={d.refreshing || !d.prompt}
-          title={d.prompt ? "Ask again and replace the contents" : "No saved question to re-ask"}
+          title={t(d.prompt ? "Ask again and replace the contents" : "No saved question to re-ask")}
         >
           <RefreshCwIcon className="size-3.5" />
         </button>
-        <button className="panel-toggle inline" onClick={onDelete} title="Delete">
+        <button className="panel-toggle inline" onClick={onDelete} title={t("Delete")}>
           <Trash2Icon className="size-3.5" />
         </button>
       </div>
@@ -93,6 +97,13 @@ function Card({
  * can only be dismissed by finding a small button is a trap.
  */
 function FullScreen({ d, onClose }: { d: Dashboard; onClose: () => void }) {
+  const { t } = useI18n();
+  const closeRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const previous = document.activeElement as HTMLElement | null;
+    closeRef.current?.focus();
+    return () => previous?.focus();
+  }, []);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -101,27 +112,27 @@ function FullScreen({ d, onClose }: { d: Dashboard; onClose: () => void }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  return (
-    <div className="dash-full" role="dialog" aria-label={d.name}>
+  return createPortal(
+    <div className="dash-full" role="dialog" aria-modal="true" aria-label={d.name}>
       <div className="dash-full-bar">
         <span className="dash-full-name">{d.name}</span>
         <span className="dash-full-age">
           {d.refreshing ? (
             <>
-              <span className="spinner" /> refreshing…
+              <span className="spinner" /> {t("refreshing…")}
             </>
           ) : (
-            <>data as of {ageLabel(d.refreshed_at)}</>
+            <>{t("data as of")} {ageLabel(d.refreshed_at)}</>
           )}
         </span>
-        <button className="panel-toggle" onClick={onClose} title="Close (Esc)" aria-label="Close">
+        <button ref={closeRef} className="panel-toggle" onClick={onClose} title={t("Close (Esc)")} aria-label={t("Close")}>
           <XIcon className="size-4" />
         </button>
       </div>
       <div className="dash-full-body">
         <Response>{d.source}</Response>
       </div>
-    </div>
+    </div>, document.querySelector(".dk-shell") ?? document.body
   );
 }
 
@@ -138,6 +149,7 @@ function Detail({
   onRename: (name: string) => void;
   onCron: (cron: string) => void;
 }) {
+  const { t } = useI18n();
   const [name, setName] = useState(d.name);
   const [full, setFull] = useState(false);
   useEffect(() => setName(d.name), [d.id, d.name]);
@@ -153,7 +165,7 @@ function Detail({
   return (
     <>
       <div className="trace-head">
-        <button className="panel-toggle inline" onClick={onBack} title="All dashboards">
+        <button className="panel-toggle inline" onClick={onBack} title={t("All dashboards")}>
           <ArrowLeftIcon className="size-4" />
         </button>
         <input
@@ -161,13 +173,13 @@ function Detail({
           value={name}
           onChange={(e) => setName(e.target.value)}
           onBlur={() => name.trim() && name !== d.name && onRename(name.trim())}
-          aria-label="Dashboard name"
+          aria-label={t("Dashboard name")}
         />
         <button
           className="panel-toggle inline"
           onClick={() => setFull(true)}
-          title="Full screen"
-          aria-label="Full screen"
+          title={t("Full screen")}
+          aria-label={t("Full screen")}
         >
           <Maximize2Icon className="size-4" />
         </button>
@@ -175,7 +187,7 @@ function Detail({
           className="panel-toggle inline"
           onClick={onRefresh}
           disabled={d.refreshing || !d.prompt}
-          title={d.prompt ? "Ask again and replace the contents" : "No saved question to re-ask"}
+          title={t(d.prompt ? "Ask again and replace the contents" : "No saved question to re-ask")}
         >
           <RefreshCwIcon className="size-4" />
         </button>
@@ -187,10 +199,10 @@ function Detail({
         <div className="dash-age">
           {d.refreshing ? (
             <>
-              <span className="spinner" /> refreshing…
+              <span className="spinner" /> {t("refreshing…")}
             </>
           ) : (
-            <>data as of {ageLabel(d.refreshed_at)}</>
+            <>{t("data as of")} {ageLabel(d.refreshed_at)}</>
           )}
         </div>
         {d.last_error && <div className="dash-error">⚠ {d.last_error}</div>}
@@ -199,16 +211,17 @@ function Detail({
 
         {d.prompt ? (
           <div className="dash-foot">
-            <div className="dash-foot-label">Refreshes by re-asking</div>
-            <div className="dash-prompt">{d.prompt}</div>
+            <div className="dash-refresh-row">
+              <div className="dash-refresh-label"><ClockIcon size={18}/><div><label htmlFor={`dash-refresh-${d.id}`}>{t("Refresh settings")}</label><small>{t("Refresh by re-running the saved question.")}</small></div></div>
             <select
-              className="input"
+              id={`dash-refresh-${d.id}`}
+              className="input dash-refresh-select"
               value={CRON_CHOICES.some((c) => c.value === d.cron) ? d.cron || "" : d.cron}
               onChange={(e) => onCron(e.target.value)}
             >
               {CRON_CHOICES.map((c) => (
                 <option key={c.value} value={c.value}>
-                  {c.label}
+                  {t(c.label)}
                 </option>
               ))}
               {/* A schedule set elsewhere — on the Schedules page, say — must
@@ -217,11 +230,13 @@ function Detail({
                 <option value={d.cron}>{describeCron(d.cron)}</option>
               )}
             </select>
+            </div>
+            <details className="dash-question"><summary>{t("View original question")}<ChevronDownIcon size={14}/></summary><div className="dash-prompt">{d.prompt}</div></details>
           </div>
         ) : (
           <div className="dash-foot">
             <div className="dash-foot-label">
-              Saved without a question, so it cannot refresh itself — it stays as it was.
+              {t("Saved without a question, so it cannot refresh itself — it stays as it was.")}
             </div>
           </div>
         )}
@@ -231,6 +246,7 @@ function Detail({
 }
 
 export default function DashboardsPanel() {
+  const { t } = useI18n();
   const [items, setItems] = useState<Dashboard[]>([]);
   const [openId, setOpenId] = useState("");
 
@@ -250,12 +266,9 @@ export default function DashboardsPanel() {
 
   // A refresh finishes in Go, whether this window started it or a cron did.
   useEffect(() => {
-    EventsOn("dashboard:updated", () => load());
-    EventsOn("dashboard:refreshing", () => load());
-    return () => {
-      EventsOff("dashboard:updated");
-      EventsOff("dashboard:refreshing");
-    };
+    const offUpdate = EventsOn("dashboard:updated", () => load());
+    const offRefresh = EventsOn("dashboard:refreshing", () => load());
+    return () => { offUpdate(); offRefresh(); };
   }, [load]);
 
   const open = items.find((d) => d.id === openId);
@@ -290,16 +303,15 @@ export default function DashboardsPanel() {
   return (
     <>
       <div className="trace-head">
-        <span>Dashboards</span>
+        <span>{t("Dashboards")}</span>
         <span style={{ color: "var(--text-3)", fontWeight: 400 }}>{items.length}</span>
       </div>
       <div className="trace-list">
         {items.length === 0 ? (
           <div className="trace-empty">
-            Nothing saved yet.
+            {t("Nothing saved yet.")}
             <br />
-            A reply that draws a chart, a wall or a panel gets a save button
-            under it.
+            {t("A reply that draws a chart, a wall or a panel gets a save button under it.")}
           </div>
         ) : (
           items.map((d) => (

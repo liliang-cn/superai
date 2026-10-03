@@ -1,21 +1,19 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { graphSrc } from "../lib/hivelink";
-import { graphLook } from "../lib/graphframe";
 import { EventsOn } from "../../wailsjs/runtime";
 import {
   Dashboard, GetStatus, GraphView as startGraphView, LongRunList, LongRunStart, LongRunState, LongRunStop,
 } from "../../wailsjs/go/app/App";
 import {
   Activity, AlertTriangle, Brain, Clock, Coins, Cpu, Database, Gauge, GitBranch, Grid3x3,
-  ListChecks, Play, Radio, RotateCcw, ScrollText, Shield, Sparkles, Square, Terminal, Wrench, Zap,
+  ListChecks, Radio, RotateCcw, ScrollText, Shield, Sparkles, Square, Terminal, Wrench,
 } from "lucide-react";
 import Reactor, { Counters, Pillar, PulseTicker, usePulse } from "../components/Reactor";
 import { BurnArea, CacheRing, CallRing, LoadGauges, ToolColumns, TurnColumns } from "../components/ReactorCharts";
 import { hueFor } from "../lib/hues";
 import HealthCard from "../components/HealthCard";
+import HiveDisc from "../components/HiveDisc";
 import RunTracePanel from "../components/RunTracePanel";
 import { useTween } from "../lib/useTween";
-import { useImeGuard } from "@/lib/ime";
 import { useDaylight } from "../lib/useDaylight";
 
 /**
@@ -101,14 +99,9 @@ export default function StatsView() {
   const [tasks, setTasks] = useState<TaskSummary[]>([]);
   const [taskId, setTaskId] = useState("");
   const [st, setSt] = useState<TaskState | null>(null);
-  const [goal, setGoal] = useState("");
-  const [segs, setSegs] = useState(8);
-  const [rounds, setRounds] = useState(40);
-  const [minutes, setMinutes] = useState(240);
-  // A task that runs for hours is one nobody is sitting beside. Default on;
-  // the audit log still records every call it lets through.
-  const [unattended, setUnattended] = useState(true);
-  const [busy, setBusy] = useState(false);
+  // Long tasks are started from the conversation (long_task_start); this page
+  // only watches them, and resumes one with the same limits it was given.
+  const segs = 8, rounds = 40, minutes = 240, unattended = true;
   // The task whose JSONL trace is open, if any. Its own state rather than a
   // mode of taskId: reading one task's trace must not move the focus of every
   // other panel on the page.
@@ -133,7 +126,6 @@ export default function StatsView() {
     const t = window.setInterval(load, 15000);
     return () => { alive = false; window.clearInterval(t); };
   }, []);
-  const ime = useImeGuard();
   const logRef = useRef<HTMLDivElement | null>(null);
 
   const loadDash = useCallback(async () => { try { setDash((await Dashboard()) as DashData); } catch { /* keep last */ } }, []);
@@ -162,12 +154,6 @@ export default function StatsView() {
     return () => { off(); if (timer) window.clearTimeout(timer); };
   }, [taskId, loadList, loadState, loadDash]);
   useEffect(() => { const el = logRef.current; if (el) el.scrollTop = el.scrollHeight; }, [st?.log?.length]);
-
-  const start = useCallback(async () => {
-    const g = goal.trim(); if (!g || busy) return;
-    setBusy(true);
-    try { const id = await LongRunStart(g, segs, rounds, minutes, 0, "", unattended); if (id) { setTaskId((cur) => cur || id); setGoal(""); await loadList(); } } finally { setBusy(false); }
-  }, [goal, segs, rounds, minutes, busy, loadList]);
 
   // ---- derived ----
   const d = useMemo(() => {
@@ -252,7 +238,7 @@ export default function StatsView() {
           {/* The live view's own switches, set from the URL: no control panels
               (inside a disc this size they would cover the graph), orbiting from
               the start, and the reactor's own black behind it. */}
-          <Reactor snap={pulse} pillars={pillars} brain={(graphSrc() ?? graph?.url) ? graphLook(`${graphSrc() ?? graph?.url}`, day, "panels=0&spin=4") : null} />
+          <Reactor snap={pulse} pillars={pillars} inside={<HiveDisc />} />
         </div>
         <div className="cr-side" data-pet-spot="charts" data-pet-label="the column of charts beside the reactor">
           <div className="cr-panel tight">
@@ -293,31 +279,17 @@ export default function StatsView() {
       </section>
 
       {/* ── the system ── */}
-      <section className="cr-stats six">
+      <section className={`cr-stats${d ? " six" : ""}`}>
         <Stat icon={<Cpu size={14} />} label="Model" value={<span className="cr-stat-txt">{dash?.llm?.model || "—"}</span>} sub={<>{dash?.llm?.maxRounds ?? "—"} rounds/turn · {short(dash?.llm?.baseURL || "", 34)}</>} />
         <Stat icon={<Gauge size={14} />} label="Tokens today" value={<Num v={dash?.usage?.today ?? 0} />} sub={<>{fmtK(dash?.usage?.totalTokens ?? 0)} all time · {pct(dash?.usage?.cachedTokens ?? 0, dash?.usage?.totalTokens ?? 0)}% cached · 7d {fmtK(days.reduce((a, x) => a + x.tokens, 0))}</>} tone="cyan" />
-        <Stat icon={<Sparkles size={14} />} label="Cache hit" value={d ? <Num v={d.cacheRate} fmt={(n) => Math.round(n) + "%"} /> : <span className="cr-dim">—</span>} sub={d ? `${fmtK(st!.totalCached)} / ${fmtK(st!.totalTokens)} this task` : "select or start a task"} tone={!d ? undefined : d.cacheRate >= 80 ? "lime" : "amber"} />
-        <Stat icon={<Coins size={14} />} label="Spend" value={!st ? <span className="cr-dim">—</span> : st.unpriced ? <span className="cr-dim">unpriced</span> : <Num v={st.costUsd} fmt={(n) => "$" + n.toFixed(3)} />} sub={!st ? "select or start a task" : st.unpriced ? "no rates for this model · set llm_price_* in settings" : `this task · ${st.segments.length} segments`} tone={!st ? undefined : st.unpriced ? "rose" : "amber"} />
+        {d && st && <Stat icon={<Sparkles size={14} />} label="Cache hit" value={d ? <Num v={d.cacheRate} fmt={(n) => Math.round(n) + "%"} /> : <span className="cr-dim">—</span>} sub={d ? `${fmtK(st!.totalCached)} / ${fmtK(st!.totalTokens)} this task` : "select or start a task"} tone={!d ? undefined : d.cacheRate >= 80 ? "lime" : "amber"} />}
+        {d && st && <Stat icon={<Coins size={14} />} label="Spend" value={!st ? <span className="cr-dim">—</span> : st.unpriced ? <span className="cr-dim">unpriced</span> : <Num v={st.costUsd} fmt={(n) => "$" + n.toFixed(3)} />} sub={!st ? "select or start a task" : st.unpriced ? "no rates for this model · set llm_price_* in settings" : `this task · ${st.segments.length} segments`} tone={!st ? undefined : st.unpriced ? "rose" : "amber"} />}
         <Stat icon={<Activity size={14} />} label="Turns" value={<Num v={dash?.usage?.modelTurns ?? 0} />} sub={<>{dash?.tasks?.length ?? 0} tasks on record · {dash?.activeRuns?.length ?? 0} active</>} />
-        <Stat icon={<Shield size={14} />} label="Lint gate" value={d ? <span className={d.rejected ? "rose" : "lime"}><Num v={d.rejected} /></span> : <span className="cr-dim">—</span>} sub={d ? `${pct(d.accepted, Math.max(1, d.rs.length))}% clean turns` : "select or start a task"} tone={!d ? undefined : d.rejected ? "rose" : "lime"} />
+        {d && st && <Stat icon={<Shield size={14} />} label="Lint gate" value={d ? <span className={d.rejected ? "rose" : "lime"}><Num v={d.rejected} /></span> : <span className="cr-dim">—</span>} sub={d ? `${pct(d.accepted, Math.max(1, d.rs.length))}% clean turns` : "select or start a task"} tone={!d ? undefined : d.rejected ? "rose" : "lime"} />}
       </section>
 
       {/* ── health: is the install itself sound ── */}
       <HealthCard />
-
-      {/* ── task bar ── */}
-      <section className="cr-taskbar">
-        <Play size={14} className="cr-dim" />
-        <input className="input" value={goal} onChange={(e) => setGoal(e.target.value)}
-          onCompositionStart={ime.handlers.onCompositionStart} onCompositionEnd={ime.handlers.onCompositionEnd}
-          onKeyDown={(e) => { if (e.key === "Enter" && !ime.composing(e)) { e.preventDefault(); start(); } }}
-          placeholder="Launch a task — press Enter, then launch another; they run side by side" autoComplete="off" />
-        <label className="cr-knob">seg<input type="number" min={1} value={segs} onChange={(e) => setSegs(+e.target.value || 1)} /></label>
-        <label className="cr-knob">rounds<input type="number" min={1} value={rounds} onChange={(e) => setRounds(+e.target.value || 1)} /></label>
-        <label className="cr-knob">min<input type="number" min={0} value={minutes} onChange={(e) => setMinutes(+e.target.value || 0)} /></label>
-        <label className="cr-knob cr-check" title="Tool calls go through the approval gate without asking; every one is audited"><input type="checkbox" checked={unattended} onChange={(e) => setUnattended(e.target.checked)} />unattended</label>
-        <button className="cr-btn primary" onClick={start} disabled={busy || !goal.trim()}><Play size={13} />{busy ? "Launching…" : "Launch"}</button>
-      </section>
 
       {/* ── the fleet: every task, side by side ── */}
       {tasks.length > 0 && (
@@ -361,9 +333,6 @@ export default function StatsView() {
         </section>
       )}
 
-      {!st && (
-        <div className="cr-empty"><Zap size={16} /> Nothing on the wall yet. Give the supervisor a goal above: it runs the agent segment by segment, carrying the plan and workspace across, and everything it does lands here as it happens.</div>
-      )}
 
       {st && d && (
         <>
@@ -452,7 +421,6 @@ export default function StatsView() {
         />
       )}
 
-      <footer className="cr-foot"><span>a long run is many runs, not a long run · the plan is the hand-off · checkpoints are the way back</span><span>superai · control room</span></footer>
     </div>
   );
 }
