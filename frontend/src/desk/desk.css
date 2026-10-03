@@ -384,3 +384,7 @@ html[data-desk] body { background: transparent; }
 .dk-fig.big { grid-column: 1 / -1; }
 .dk-fig.big b { font-size: 40px; color: var(--honey-deep); }
 .dk-st-h { font-size: 12px; font-weight: 650; color: var(--ink-3); padding: 10px 10px 2px; }
+.dk-foryou { margin: 6px 0 4px; }
+.dk-foryou .att-row { padding: 7px 6px; grid-template-columns: 24px minmax(0, 1fr); row-gap: 0; }
+.dk-foryou .att-row em { grid-column: 2; font-size: 11.5px; margin-top: -2px; }
+.dk-foryou .att-main b { font-size: 13.5px; }
