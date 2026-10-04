@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // Install and removal, shared by the chat tools and the Skills/MCP panels.
@@ -122,3 +123,35 @@ func InstalledSkillNames() []string {
 }
 
 func mcpConfigPath() string { return filepath.Join(DataDir(), "mcpServers.json") }
+
+// UninstallSkill removes a skill and unloads it: gone from the folder and from
+// the running agent, without a restart.
+func (s *Service) UninstallSkill(ctx context.Context, name string) error {
+	if err := RemoveSkill(name); err != nil {
+		return err
+	}
+	s.ReloadSkills(ctx)
+	return nil
+}
+
+// UninstallMCPServer removes a server from the config, stops it, and takes
+// its tools away from the running agent.
+func (s *Service) UninstallMCPServer(name string) error {
+	if err := RemoveMCPServer(name); err != nil {
+		return err
+	}
+	if s == nil || s.svc == nil {
+		return nil
+	}
+	if s.svc.MCP != nil {
+		_ = s.svc.MCP.StopServer(sanitizeName(name))
+	}
+	reg := s.svc.GetToolRegistry()
+	prefix := "mcp_" + sanitizeName(name) + "_"
+	for _, t := range reg.Names() {
+		if strings.HasPrefix(t, prefix) {
+			reg.Unregister(t)
+		}
+	}
+	return nil
+}

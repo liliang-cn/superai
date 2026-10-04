@@ -61,7 +61,24 @@ export default function LiveHive({ hive, runs, agents, now }: { hive: Hive; runs
     runs.forEach((r) => names.add(r.remote || "this Mac"));
     return [...names].slice(0, 3);
   }, [runs, agents]);
-  const machineBusy = (m: string) => runs.some((r) => (r.remote || "this Mac") === m && r.state === "running");
+  // Busy: a coding run there, or an order out to one of its agents —
+  // "codex.mac" for a CLI on it, "openclaw" for a named agent it serves.
+  // What a busy machine is doing, in a few words under its name: the agent
+  // and how long it has been at it — "codex · 3m".
+  const machineDoing = (m: string): string => {
+    const r = runs.find((x) => (x.remote || "this Mac") === m && x.state === "running");
+    const t = running.find((x) => x.dir === "out" && (x.worker.endsWith("." + m) ||
+      agents.some((a) => a.name === m && (a.agents ?? []).some((n) => n.name === x.worker))));
+    const what = r ? r.agent.split(".")[0] : t ? t.worker.split(".")[0] : "";
+    const since = r?.started ?? t?.started_at;
+    if (!what) return "";
+    const mins = since ? Math.max(0, Math.floor((now.getTime() - new Date(since).getTime()) / 60000)) : 0;
+    return `${what} · ${mins < 1 ? "working" : `${mins}m`}`;
+  };
+  const machineBusy = (m: string) =>
+    runs.some((r) => (r.remote || "this Mac") === m && r.state === "running") ||
+    running.some((t) => t.dir === "out" && (t.worker.endsWith("." + m) ||
+      agents.some((a) => a.name === m && (a.agents ?? []).some((n) => n.name === t.worker))));
 
 
   const recent = hive.tasks.filter((t) => t.state !== "running").slice(0, 3);
@@ -85,7 +102,7 @@ export default function LiveHive({ hive, runs, agents, now }: { hive: Hive; runs
     <div className="dk-hive">
       <div className="dk-hud">
         <b>The hive</b>
-        <span>{workers.length + 1} members, {busyBy.size} working</span>
+        <span>{workers.length + 1} members, {busyBy.size + machines.filter(machineBusy).length} working</span>
         <span className="dk-clock">{clock(now.toISOString())}</span>
       </div>
       <svg className="dk-comb" viewBox={`${-w} ${top} ${w * 2} ${height}`} preserveAspectRatio="xMidYMid meet">
@@ -120,11 +137,15 @@ export default function LiveHive({ hive, runs, agents, now }: { hive: Hive; runs
         </g>
         {machines.map((m, i) => {
           const [x, y] = machineAt(i, span);
+          const doingHere = machineDoing(m);
           return (
-            <g key={"m" + m} transform={`translate(${x} ${y})`} className={machineBusy(m) ? "dk-mac on" : "dk-mac"}>
+            <g key={"m" + m} transform={`translate(${x} ${y})`} className={doingHere || machineBusy(m) ? "dk-mac on" : "dk-mac"}>
+              {doingHere && <rect className="dk-mac-ring" x={-34} y={-22} width={68} height={44} rx={11} />}
               <rect x={-34} y={-22} width={68} height={44} rx={11} />
               <path d="M-12 -9 h24 v13 h-24 z M-16 8 h32" />
+              {doingHere && <path className="dk-mac-type" d="M-8 -4 h6 M0 -4 h8 M-8 0 h10" />}
               <text y={38}>{m}</text>
+              {doingHere && <text y={54} className="dk-mac-doing">{doingHere}</text>}
             </g>
           );
         })}

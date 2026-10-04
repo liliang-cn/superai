@@ -16,7 +16,7 @@ import (
 type AttentionItem struct {
 	// Level is "needs" (act on it) or "soon" (know about it).
 	Level string `json:"level"`
-	// Kind: approval, bee, failed, lost, run, event, reminder.
+	// Kind: approval, bee (waiting on a reply), report (a bee told you something), failed, lost, run, event, reminder.
 	Kind   string     `json:"kind"`
 	Title  string     `json:"title"`
 	Detail string     `json:"detail,omitempty"`
@@ -41,6 +41,10 @@ func (a *App) Attention() []AttentionItem {
 		who := fmt.Sprint(ap["by"])
 		if who == "" || who == "<nil>" {
 			who = "SuperAI"
+			// A coding agent's prompt names it in the tool: "claude.mac · Bash".
+			if tool := fmt.Sprint(ap["tool"]); strings.Contains(tool, " · ") {
+				who = strings.SplitN(tool, " · ", 2)[0]
+			}
 		}
 		what := fmt.Sprint(ap["command"])
 		if what == "" || what == "<nil>" {
@@ -58,6 +62,17 @@ func (a *App) Attention() []AttentionItem {
 	}
 
 	dayAgo := now.Add(-24 * time.Hour)
+
+	// What a bee told the person in the last day: it speaks only when
+	// something needs them, so each message is a thing to look at.
+	for _, r := range a.StandingReports("") {
+		if r.Kind != "message" || r.At.Before(dayAgo) {
+			continue
+		}
+		at := r.At
+		needs = append(needs, AttentionItem{Level: "needs", Kind: "report", Title: r.Name,
+			Detail: firstLineOf(r.Message, 160), At: &at, Ref: r.Agent, Open: "agents"})
+	}
 	for _, t := range a.tasks().Recent() {
 		if t.State == "failed" && t.EndedAt.After(dayAgo) {
 			at := t.EndedAt

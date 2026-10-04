@@ -1,4 +1,5 @@
-import { useNavigate } from "react-router-dom";
+import { translate, useI18n } from "../lib/i18n";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { PATHS } from "../lib/routes";
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { SquareIcon, ChevronRightIcon, PlusIcon, ArrowUpIcon, TerminalIcon, FolderIcon } from "lucide-react";
@@ -92,6 +93,9 @@ const lastAgent = () => {
  * "@claude" in a conversation show up here too.
  */
 export default function AgentsView() {
+  const { t } = useI18n();
+  const [params] = useSearchParams();
+  const requestedRun = params.get("run") ?? "";
   const [runs, setRuns] = useState<Run[]>([]);
   const [selected, setSelected] = useState<string>("");
   const [events, setEvents] = useState<Record<string, Ev[]>>({});
@@ -107,7 +111,7 @@ export default function AgentsView() {
   }, []);
 
   useEffect(() => {
-    load();
+    void load().catch(error => { setChoices([]); toast.error(String(error)); });
     const offRun = EventsOn("cli:run", (p: Run) => {
       setRuns((prev) => {
         const i = prev.findIndex((r) => r.id === p.id);
@@ -130,6 +134,12 @@ export default function AgentsView() {
       offEv();
     };
   }, [load]);
+
+  useEffect(() => {
+    if (!requestedRun) return;
+    const match = runs.find(run => run.id === requestedRun);
+    if (match) setSelected(match.thread);
+  }, [requestedRun, runs]);
 
   const threads = useMemo(() => threadsOf(runs), [runs]);
   const thread = threads.find((t) => t.id === selected) ?? null;
@@ -232,6 +242,8 @@ function Start({ choices, onStarted }: { choices: string[] | null; onStarted: (r
 
   // Clicking a CLI addresses the message to it, keeping what was typed.
   const pick = (n: string) => {
+    setFallback(n);
+    try { localStorage.setItem(LAST,n); } catch { /* in-memory choice remains */ }
     const rest = addressOf(text, names)[1];
     const next = `@${n} ${rest}`;
     setText(next);
@@ -253,7 +265,7 @@ function Start({ choices, onStarted }: { choices: string[] | null; onStarted: (r
   return (
     <div className="cd-start">
       <div className="cd-start-in">
-        <h2>New run</h2>
+        <h2>{translate("New run")}</h2>
         <Composer
           boxRef={box}
           value={text}
@@ -265,32 +277,26 @@ function Start({ choices, onStarted }: { choices: string[] | null; onStarted: (r
           foot={
             <>
               {agent && (
-                <span className="cd-to" title="Who gets this run. Type @ to change it.">
-                  <TerminalIcon size={13} /> <b>{partsOf(agent).cli}</b> on {whereOf(agent)}
-                </span>
+                <label className="cd-to" title={translate("Select a coding agent")}>
+                  <TerminalIcon size={13} />
+                  <select className="cd-agent-select" aria-label={translate("Select a coding agent")} value={agent} onChange={event => pick(event.target.value)}>
+                    {machines.map(([host, list]) => <optgroup key={host} label={host === "core" ? "Core" : host}>
+                      {list.map(name => <option key={name} value={name}>{partsOf(name).cli} · {whereOf(name)}</option>)}
+                    </optgroup>)}
+                  </select>
+                </label>
               )}
               <label className="cd-cwd" title="The directory it works in, on that machine">
                 <FolderIcon size={13} />
-                <input value={cwd} placeholder="workspace" onChange={(e) => setCwd(e.target.value)} spellCheck={false} />
+                <input value={cwd} placeholder={translate("workspace")} onChange={(e) => setCwd(e.target.value)} spellCheck={false} />
               </label>
               <label className="cd-ask" title="Off: the CLI runs its tools without asking">
-                <input type="checkbox" checked={ask} onChange={(e) => setAsk(e.target.checked)} /> Ask before tools run
+                <input type="checkbox" checked={ask} onChange={(e) => setAsk(e.target.checked)} /> {translate("Ask before tools run")}
               </label>
             </>
           }
         />
-        <div className="cd-where">
-          {machines.map(([host, list]) => (
-            <div key={host} className="cd-host">
-              <span className="cd-host-n">{host === "core" ? "Core" : host}</span>
-              <span className="cd-host-c">
-                {list.map((n) => (
-                  <button key={n} className={n === agent ? "on" : ""} onClick={() => pick(n)}>{partsOf(n).cli}</button>
-                ))}
-              </span>
-            </div>
-          ))}
-        </div>
+
       </div>
     </div>
   );
@@ -335,6 +341,14 @@ function Composer({
     return hits.length === 1 && hits[0].toLowerCase() === w ? [] : hits;
   }, [q, names]);
 
+  // WKWebView can deliver native input and composition commits without a
+  // matching React change event. Keep the controlled draft in step with both.
+  const syncInput = (input: HTMLTextAreaElement) => {
+    onChange(input.value);
+    setQ(names.length ? mentionAt(input.value, input.selectionStart ?? input.value.length) : null);
+    setActive(0);
+  };
+
   const accept = (n: string) => {
     if (!q) return;
     const caret = ref.current?.selectionStart ?? value.length;
@@ -369,13 +383,12 @@ function Composer({
         value={value}
         placeholder={placeholder}
         disabled={disabled}
-        onChange={(e) => {
-          onChange(e.target.value);
-          setQ(names.length ? mentionAt(e.target.value, e.target.selectionStart ?? e.target.value.length) : null);
-          setActive(0);
-        }}
+        aria-label={translate("Task instructions")}
+        onInput={event => syncInput(event.currentTarget)}
+        onChange={event => syncInput(event.currentTarget)}
         onBlur={() => setQ(null)}
-        {...ime.handlers}
+        onCompositionStart={ime.handlers.onCompositionStart}
+        onCompositionEnd={event => { ime.handlers.onCompositionEnd(event); syncInput(event.currentTarget); }}
         onKeyDown={(e) => {
           if (matches.length > 0) {
             if (e.key === "ArrowDown" || e.key === "ArrowUp") {

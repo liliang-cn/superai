@@ -321,3 +321,25 @@ func TestAWorkerShuttingDownTellsTheQueen(t *testing.T) {
 		t.Fatalf("still on the roster after a clean shutdown: %d", n)
 	}
 }
+
+func TestARetiredWorkerIsNotReportedLost(t *testing.T) {
+	// Retiring is on purpose: the pods going away must not read as workers
+	// gone missing, and their last heartbeats must not bring them back. A new
+	// pod under the same name (a later spawn) joins as usual.
+	h := NewHive("q", time.Minute)
+	old := hello("w3")
+	old.StartedAt = time.Now().Add(-time.Hour)
+	h.Join(old)
+	h.Join(hello("w0"))
+	h.Retire([]string{"w3"})
+	h.Join(old)
+	if ms := h.Members(); len(ms) != 1 || ms[0].Name != "w0" {
+		t.Fatalf("roster after retire %+v", ms)
+	}
+	fresh := hello("w3")
+	fresh.StartedAt = time.Now()
+	h.Join(fresh)
+	if len(h.Members()) != 2 {
+		t.Fatalf("a new pod under the retired name was refused: %+v", h.Members())
+	}
+}

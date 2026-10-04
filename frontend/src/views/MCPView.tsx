@@ -1,3 +1,4 @@
+import { translate, useI18n } from "../lib/i18n";
 import React, { useCallback, useEffect, useState } from "react";
 import { InstallMCPServer, MCP, RemoveMCPServer, SearchMCPServers } from "../../wailsjs/go/app/App";
 import { mcp } from "../../wailsjs/go/models";
@@ -23,6 +24,7 @@ function shortName(full: string): string {
 }
 
 export default function MCPView() {
+  const { t } = useI18n();
   const ime = useImeGuard();
   const [servers, setServers] = useState<mcp.ServerStatus[]>([]);
   const [loading, setLoading] = useState(true);
@@ -36,6 +38,7 @@ export default function MCPView() {
   const [confirmRemove, setConfirmRemove] = useState("");
 
   const search = useCallback(async () => {
+    setResults(current => current ?? []);
     setSearching(true);
     setNote("");
     try {
@@ -75,14 +78,14 @@ export default function MCPView() {
       <div className="view-header with-action">
         <div>
           <div className="view-title">MCP{servers.length > 0 ? ` (${servers.length})` : ""}</div>
-          <div className="view-desc">Model Context Protocol servers SuperAI connects to for extra tools.</div>
+          <div className="view-desc">{translate("Model Context Protocol servers SuperAI connects to for extra tools.")}</div>
         </div>
         <div className="vh-actions">
           <button className="btn ghost sm" onClick={() => (results ? setResults(null) : search())}>
-            {results ? "Close" : "+ Add server"}
+            {translate(results ? "Close" : "+ Add server")}
           </button>
           <button className="btn ghost sm" onClick={load} disabled={loading}>
-            {loading ? <><span className="spinner" style={{ borderTopColor: "var(--text-1)" }} /> Loading…</> : "↻ Refresh"}
+            {loading ? <><span className="spinner" style={{ borderTopColor: "var(--text-1)" }} /> Loading…</> : translate("↻ Refresh")}
           </button>
         </div>
       </div>
@@ -90,29 +93,29 @@ export default function MCPView() {
       <div className="panel-scroll">
         {results !== null && (
           <div className="card" style={{ marginBottom: 14 }}>
-            <div className="card-title">Add an MCP server</div>
+            <div className="card-title">{translate("Add an MCP server")}</div>
             <div className="card-desc">
-              Search the official registry. The launch command comes from the registry — no need to know the package name.
+              {translate("Search the official registry. The launch command comes from the registry — no need to know the package name.")}
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               <input
                 className="input"
                 value={query}
                 autoFocus
-                placeholder="What should it be able to do? e.g. postgres, slack, filesystem"
+                placeholder={translate("What should it be able to do? e.g. postgres, slack, filesystem")}
                 onChange={(e) => setQuery(e.target.value)}
                 onCompositionStart={ime.handlers.onCompositionStart}
                 onCompositionEnd={ime.handlers.onCompositionEnd}
                 onKeyDown={(e) => e.key === "Enter" && !ime.composing(e) && search()}
               />
               <button className="btn sm" onClick={search} disabled={searching}>
-                {searching ? "Searching…" : "Search"}
+                {translate(searching ? "Searching…" : "Search")}
               </button>
             </div>
             {note && <div className="hint err" style={{ marginTop: 8 }}>{note}</div>}
             <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10 }}>
               {results.length === 0 && !searching && (
-                <div className="trace-empty">No servers matched.</div>
+                <div className="trace-empty">{translate("No servers matched.")}</div>
               )}
               {results.map((c) => {
                 const name = shortName(c.name);
@@ -136,7 +139,7 @@ export default function MCPView() {
                             load();
                           }}
                         >
-                          {installed ? "Installed" : busy === c.name ? "Installing…" : "Install"}
+                          {translate(installed ? "Installed" : busy === c.name ? "Installing…" : "Install")}
                         </button>
                       </span>
                     </div>

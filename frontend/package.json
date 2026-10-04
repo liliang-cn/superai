@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:desktop": "node --test scripts/desktop-regression.test.cjs"
   },
   "dependencies": {
     "@ai-gui/core": "^0.36.3",

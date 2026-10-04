@@ -1,3 +1,4 @@
+import { translate, useI18n } from "../lib/i18n";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { graphSrc } from "../lib/hivelink";
 import { graphLook } from "../lib/graphframe";
@@ -72,6 +73,7 @@ const SERVED = Boolean((window as unknown as Record<string, unknown>).superaiSer
 
 
 export default function KnowledgeView() {
+  const { t } = useI18n();
   const ime = useImeGuard();
   const [aboutOpen, setAboutOpen] = useState(false);
   // Search and import are occasional; the graph is why the page exists. Both
@@ -195,7 +197,7 @@ export default function KnowledgeView() {
   const header = (
     <div className="view-header with-action">
       <div>
-        <div className="view-title">Knowledge</div>
+        <div className="view-title">{translate("Knowledge")}</div>
         <div className="view-desc">
           Everything SuperAI knows, as one graph it reads on every turn.
         </div>
@@ -321,7 +323,7 @@ export default function KnowledgeView() {
           </button>
           {(searched || query !== "") && (
             <button className="btn ghost" onClick={clearSearch}>
-              Clear
+              {translate("Clear")}
             </button>
           )}
         </div>

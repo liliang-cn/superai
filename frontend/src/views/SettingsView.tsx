@@ -102,18 +102,19 @@ function PasswordField({
   const [show, setShow] = useState(false);
   return (
     <div className="field">
-      <label>{label}</label>
+      <label>{translate(label)}</label>
       <div className="input-pw">
         <input
           className="input"
           type={show ? "text" : "password"}
           value={value}
+          aria-label={translate(label)}
           onChange={(e) => onChange(e.target.value)}
           placeholder="••••••••"
           autoComplete="off"
         />
         <button type="button" className="pw-toggle" onClick={() => setShow((s) => !s)}>
-          {show ? "hide" : "show"}
+          {translate(show ? "hide" : "show")}
         </button>
       </div>
       {hint && <span className="hint">{hint}</span>}
@@ -136,8 +137,8 @@ function TextField({
 }) {
   return (
     <div className="field">
-      <label>{label}</label>
-      <input className="input" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} autoComplete="off" />
+      <label>{translate(label)}</label>
+      <input className="input" aria-label={translate(label)} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} autoComplete="off" />
       {hint && <span className="hint">{hint}</span>}
     </div>
   );
@@ -379,7 +380,7 @@ function ExternalAgentsCard({
                     className="btn ghost sm"
                     onClick={() => onChange({ roots: roots.filter((_, j) => j !== i) })}
                   >
-                    Remove
+                    {translate("Remove")}
                   </button>
                 </div>
               ))}
@@ -786,12 +787,12 @@ export default function SettingsView({
       <div className="settings-scroll">
         <div className="settings-grid">
           <div className="card" hidden={section !== "model"}>
-            <div className="card-title">Accounts</div>
+            <div className="card-title">{translate("Accounts")}</div>
             <div className="card-desc">
-              Sign in with the AI accounts you already pay for — no API key needed. Everything stays on this machine.
+              {translate("Sign in with the AI accounts you already pay for — no API key needed. Everything stays on this machine.")}
             </div>
             <div className="field">
-              <label>Use my accounts</label>
+              <label>{translate("Use my accounts")}</label>
               <div
                 className="toggle"
                 onClick={() => set("cliproxy_enabled", !s.cliproxy_enabled)}
@@ -944,7 +945,7 @@ export default function SettingsView({
           </div>
 
           <div className="card" hidden={section !== "model"}>
-            <div className="card-title">Advanced</div>
+            <div className="card-title">{translate("Advanced")}</div>
             <div className="card-desc">
               {s.cliproxy_enabled
                 ? "Only used when \"Use my accounts\" is off — or to force a model name by hand."
@@ -954,19 +955,19 @@ export default function SettingsView({
             <PasswordField label="API Key" value={s.llm_key} onChange={(v) => set("llm_key", v)} />
             <TextField label="Model" value={s.llm_model} onChange={(v) => set("llm_model", v)} placeholder="gpt-5.5" />
             <div className="field">
-              <label>Local Port</label>
+              <label>{translate("Local Port")}</label>
               <input
                 className="input"
                 type="number"
                 value={s.cliproxy_port}
                 onChange={(e) => set("cliproxy_port", Number(e.target.value))}
               />
-              <span className="hint">Only change this if something else already uses it.</span>
+              <span className="hint">{translate("Only change this if something else already uses it.")}</span>
             </div>
           </div>
 
           <div className="card" hidden={section !== "safety"}>
-            <div className="card-title">Safety</div>
+            <div className="card-title">{translate("Safety")}</div>
             <div className="card-desc">
               Shell commands run on this machine with your permissions — the agent workspace is
               where they start, not a boundary they are held inside.
@@ -1184,7 +1185,7 @@ export default function SettingsView({
           )}
 
           <div className="card" hidden={section !== "runtime"}>
-            <div className="card-title">Runtime</div>
+            <div className="card-title">{translate("Runtime")}</div>
             <div className="card-desc">Workspace, agent loop limits, and avatar bridge.</div>
             <TextField label="Workspace Directory" value={s.workspace_dir} onChange={(v) => set("workspace_dir", v)} placeholder="~/.superai/workspace" hint="Where the agent reads and writes deliverable files." />
             <div className="row2">

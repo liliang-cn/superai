@@ -1,3 +1,5 @@
+import { calendarEvents } from "../lib/calendarEvents";
+import { getLanguage, translate, useI18n } from "../lib/i18n";
 import { useSearchParams } from "react-router-dom";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Life } from "../../wailsjs/go/app/App";
@@ -110,6 +112,7 @@ export default function RecordsView({
   log: ScheduleRunLog;
   onOpenConversation: (session: string) => void;
 }) {
+  const { t } = useI18n();
   const [data, setData] = useState<backend.LifeData | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string>("");
@@ -175,14 +178,14 @@ export default function RecordsView({
     syncStripFade();
   }, [tab, syncStripFade]);
 
-  const schedules = Array.isArray(data?.schedules) ? data!.schedules : [];
+  const schedules = calendarEvents(Array.isArray(data?.schedules) ? data!.schedules : []);
   const records = Array.isArray(data?.records) ? data!.records : [];
   const reminders = Array.isArray(data?.reminders) ? data!.reminders : [];
   const persons = data?.persons && typeof data.persons === "object" ? data.persons : {};
   const personEntries = Object.entries(persons);
 
   const count: Record<TabKey, number> = {
-    schedules: scheduleCount,
+    schedules: scheduleCount + schedules.length,
     notes: records.length,
     persons: personEntries.length,
     reminders: reminders.length,
@@ -203,8 +206,8 @@ export default function RecordsView({
     <div className="view">
       <div className="view-header with-action">
         <div>
-          <div className="view-title">Records</div>
-          <div className="view-desc">Schedules, notes, people and reminders SuperAI keeps for you. Edits happen via Chat.</div>
+          <div className="view-title">{t("Records")}</div>
+          <div className="view-desc">{t("Schedules, notes, people and reminders SuperAI keeps for you. Edits happen via Chat.")}</div>
         </div>
         {/* The Schedules tab reloads itself from the scheduler and has its own
             button. Showing this one too would stack two Refreshes that refresh
@@ -232,7 +235,7 @@ export default function RecordsView({
             className={`tab${tab === t.key ? " active" : ""}`}
             onClick={() => setTab(t.key)}
           >
-            <t.icon size={14} strokeWidth={1.8} /> {t.label}
+            <t.icon size={14} strokeWidth={1.8} /> {translate(t.label)}
             <span className="tab-count">{count[t.key]}</span>
           </button>
         ))}
@@ -248,6 +251,8 @@ export default function RecordsView({
         {!err && data && (
           <>
             {tab === "schedules" && (
+              <>
+              <CalendarAgenda items={schedules}/>
               <SchedulesView
                 embedded
                 status={status}
@@ -255,6 +260,7 @@ export default function RecordsView({
                 onOpenConversation={onOpenConversation}
                 onCount={setScheduleCount}
               />
+              </>
             )}
             {tab === "notes" && renderArrayTab(records, "notes", NotebookPenIcon)}
             {tab === "reminders" && renderArrayTab(reminders, "reminders", AlarmClockIcon)}
@@ -273,4 +279,25 @@ export default function RecordsView({
       </div>
     </div>
   );
+}
+
+/** Personal calendar entries are distinct from the scheduler's automated routines. */
+export function CalendarAgenda({ items }: { items: Record<string, any>[] }) {
+  const { t } = useI18n();
+  const events = calendarEvents(items);
+  if (!events.length) return null;
+  const when = (value: unknown) => {
+    const raw = typeof value === "string" ? value : "";
+    const date = new Date(raw);
+    return Number.isFinite(date.getTime()) ? date.toLocaleString(getLanguage(), {year:"numeric",month:"short",day:"numeric",weekday:"short",hour:"2-digit",minute:"2-digit"}) : raw;
+  };
+  return <section className="calendar-agenda" aria-label={t("Calendar")}>
+    <h2>{t("Calendar")} <span>{events.length}</span></h2>
+    <div className="record-list">{events.map((event,index) => <article className="record-card" key={String(event.id ?? index)}>
+      <div className="rc-title">{String(event.title ?? event.subject ?? t("Event"))}</div>
+      {event.start_at && <div className="rc-row"><span className="rc-key">{t("Time")}</span><time className="rc-val" dateTime={String(event.start_at)} title={String(event.start_at)}>{when(event.start_at)}</time></div>}
+      {event.location && <div className="rc-row"><span className="rc-key">{t("Location")}</span><span className="rc-val">{String(event.location)}</span></div>}
+      {Array.isArray(event.participants) && event.participants.length > 0 && <div className="rc-row"><span className="rc-key">{t("Participants")}</span><span className="rc-val">{event.participants.join(", ")}</span></div>}
+    </article>)}</div>
+  </section>;
 }

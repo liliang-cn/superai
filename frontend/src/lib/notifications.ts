@@ -46,6 +46,7 @@ type Listener = (unread: number) => void;
 
 let unread = 0;
 const listeners = new Set<Listener>();
+const listListeners = new Set<() => void>();
 
 function publish(next: number) {
   if (next === unread) return;
@@ -66,6 +67,7 @@ export async function refreshUnread(): Promise<void> {
 /** Called by the one "notice" listener, for every notice the backend raises. */
 export function noticeArrived(): void {
   void refreshUnread();
+  for (const listener of listListeners) listener();
 }
 
 /** The badge. */
@@ -88,42 +90,49 @@ export function useUnreadNotifications(): number {
 export function useNotificationList(open: boolean) {
   const [items, setItems] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       setItems(((await Notifications()) as unknown as Notification[]) ?? []);
+      setError("");
     } catch {
-      setItems([]);
+      setError("Could not load notifications.");
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    if (open) void load();
+    if (!open) return;
+    void load();
+    const refresh = () => { void load(); };
+    listListeners.add(refresh);
+    const timer = setInterval(refresh, POLL_MS);
+    return () => { listListeners.delete(refresh); clearInterval(timer); };
   }, [open, load]);
 
-  const markAllRead = useCallback(async () => {
-    // The list on screen is updated first and not reloaded afterwards: reading
-    // is the one action here whose result the user can already see, and a
-    // reload would repaint every row to say what it already says.
-    setItems((current) => current.map((n) => ({ ...n, read: true })));
+  const markAllRead = useCallback(async (ids: string[]) => {
+    if (!ids.length) return;
     try {
-      await MarkNotificationsRead([]);
-    } finally {
-      void refreshUnread();
-    }
+      const result = await MarkNotificationsRead(ids);
+      if (!result.ok) throw new Error(result.error ?? "Could not mark notifications read.");
+      setItems(current => current.map(n => ids.includes(n.id) ? { ...n, read: true } : n));
+    } catch {
+      setError("Could not mark notifications read.");
+    } finally { void refreshUnread(); }
   }, []);
 
   const clear = useCallback(async () => {
-    setItems([]);
     try {
-      await ClearNotifications();
-    } finally {
-      void refreshUnread();
-    }
+      const result = await ClearNotifications();
+      if (!result.ok) throw new Error(result.error ?? "Could not clear notifications.");
+      setItems([]);
+      setError("");
+    } catch { setError("Could not clear notifications."); }
+    finally { void refreshUnread(); }
   }, []);
 
-  return { items, loading, reload: load, markAllRead, clear };
+  return { items, loading, error, reload: load, markAllRead, clear };
 }

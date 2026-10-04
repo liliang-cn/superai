@@ -323,11 +323,15 @@ func (a *App) startCLIRun(o cliStart) (CLIRun, error) {
 			req.Env["MCP_TOOL_TIMEOUT"] = fmt.Sprint((cliApproveWait + time.Minute).Milliseconds())
 		case "codex":
 			// Codex has no prompt to forward in exec mode; ask means its own
-			// sandbox: writes inside the workspace only, no network.
+			// sandbox: writes inside the workspace only. The network stays
+			// open in it — an agent sent to look something up (a repository's
+			// activity, a release page) otherwise fails on its first request,
+			// and what the sandbox is for is what it may change, not read.
 			req.PermissionMode = agentexec.PermissionDefault
 			req.Sandbox = true
 			// -c rather than --sandbox: `codex exec resume` takes no --sandbox.
-			req.ExtraArgs = []string{"--skip-git-repo-check", "-c", `sandbox_mode="workspace-write"`}
+			req.ExtraArgs = []string{"--skip-git-repo-check", "-c", `sandbox_mode="workspace-write"`,
+				"-c", "sandbox_workspace_write.network_access=true"}
 		}
 	}
 	sess := provider.NewSession()

@@ -1,9 +1,10 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { HiveStatus } from "../../wailsjs/go/app/App";
 import { EventsOn } from "../../wailsjs/runtime";
-import type { StageHandle, StagePulse, StageTask, StageWorker } from "./hiveFx";
+import { withDelegates, withRunTasks, type StageHandle, type StagePulse, type StageTask, type StageWorker } from "./hiveFx";
 import { useHiveMeter } from "./HiveMeter";
 import { useTween } from "../lib/useTween";
+import { useCodingRuns } from "../canvas/data";
 
 // The hive in 3D, drawn inside the reactor's disc: the same stage as the Hive
 // page (its look, as picked there), with the hive's meter under it. Loaded
@@ -30,6 +31,7 @@ export default function HiveDisc() {
   const [ready, setReady] = useState(false);
   const stage = useRef<StageHandle>(null);
   const { members, total } = useHiveMeter();
+  const runs = useCodingRuns();
   const tokens = useTween(total.tokens);
 
   // The roster is polled (a worker going quiet sends nothing); tasks and the
@@ -66,10 +68,16 @@ export default function HiveDisc() {
   }, [load]);
 
   if (!st || st.role === "") return null;
-  const workers = st.members ?? [];
-  const working = members.filter((m) => m.live && m.name !== "queen").length;
+  const shown = withRunTasks(tasks, runs);
+  const workers = withDelegates(st.members ?? [], shown, runs);
+  // Working: hive members whose meter says so, and agents outside the hive
+  // with an order or a coding run in hand.
+  const working = new Set([
+    ...members.filter((m) => m.live && m.name !== "queen").map((m) => m.name),
+    ...shown.filter((t) => t.state === "running").map((t) => t.worker),
+  ]).size;
   const l = look();
-  const props = { role: st.role, self: st.name, workers, tasks, ready };
+  const props = { role: st.role, self: st.name, workers, tasks: shown, ready };
   return (
     <div className="hd">
       <Suspense fallback={null}>

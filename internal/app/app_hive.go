@@ -168,6 +168,11 @@ func (a *App) HiveStatus() map[string]any {
 		return out
 	}
 	out["role"] = s.Hive.Role
+	if s.Hive.Role == backend.HiveRoleWorker {
+		a.mu.Lock()
+		out["abilities"] = a.abilities
+		a.mu.Unlock()
+	}
 	if sp, _ := backend.NewSpawner(s.Hive.Spawner); sp != nil && s.Hive.Role == backend.HiveRoleQueen {
 		out["spawner"] = map[string]any{"enabled": true, "max": sp.Max()}
 	}
@@ -354,6 +359,7 @@ func (a *App) startHive() {
 		defer close(done)
 		ann.Run(ctx)
 	}()
+	go a.syncAbilities(ctx, ann)
 }
 
 func (a *App) stopHive() {
@@ -509,6 +515,9 @@ func (a *App) registerHiveTools(svc *backend.Service, cfg *backend.Settings) {
 
 	inner.AddToolWithMetadata("hive_command",
 		"Command the other workers — SuperAI instances in this hive — to work in parallel and collect what each reports back."+
+			" A `commands` entry may also name an agent outside the hive — a coding agent on a linked machine (\"codex.mac\","+
+			" from coding_agent_list) or a named agent (\"openclaw\", from remote_agent_list) — and it runs at the same"+
+			" time as the workers; put every part of a job in one call."+
 			"\n\nYou are the queen: they act on your word, they share your memory, and they cannot command you."+
 			" The workers are whoever has joined; call hive_members to see them. Give every live worker the same order with"+
 			" `prompt`, or split the work with `commands`, one entry per worker. Each worker gets a fresh conversation and"+
@@ -527,7 +536,7 @@ func (a *App) registerHiveTools(svc *backend.Service, cfg *backend.Settings) {
 					"items": map[string]any{
 						"type": "object",
 						"properties": map[string]any{
-							"worker": map[string]any{"type": "string"},
+							"worker": map[string]any{"type": "string", "description": "A worker, or a coding agent (codex.mac) or named agent (openclaw)."},
 							"prompt": map[string]any{"type": "string"},
 						},
 						"required": []string{"worker", "prompt"},
@@ -629,6 +638,15 @@ func (a *App) hiveCommand(ctx context.Context, args map[string]any) (any, error)
 		go func() {
 			defer wg.Done()
 			if _, ok := live[o.worker]; !ok {
+				started := time.Now()
+				if text, failed, handled := a.delegateOutside(ctx, o.worker, o.prompt); handled {
+					if failed {
+						out[i] = fmt.Sprintf("## %s\nFAILED after %.1fs: %s", o.worker, time.Since(started).Seconds(), text)
+					} else {
+						out[i] = fmt.Sprintf("## %s (%.1fs)\n%s", o.worker, time.Since(started).Seconds(), text)
+					}
+					return
+				}
 				out[i] = fmt.Sprintf("## %s\nFAILED: %s", o.worker, why(o.worker))
 				return
 			}
@@ -851,7 +869,7 @@ func (a *App) hiveSpawn(ctx context.Context, count int) map[string]any {
 func (a *App) HiveRetire(count int, force bool) map[string]any {
 	ctx := context.Background()
 	fail := func(err error) map[string]any { return map[string]any{"ok": false, "error": err.Error()} }
-	_, sp, err := a.queenSpawner()
+	h, sp, err := a.queenSpawner()
 	if err != nil {
 		return fail(err)
 	}
@@ -893,6 +911,7 @@ func (a *App) HiveRetire(count int, force bool) map[string]any {
 	if err := sp.SetReplicas(ctx, target); err != nil {
 		return fail(err)
 	}
+	h.Retire(going)
 	sort.Strings(going)
 	return map[string]any{"ok": true, "replicas": target, "retiring": going}
 }

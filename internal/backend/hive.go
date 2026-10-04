@@ -168,13 +168,16 @@ type Hive struct {
 
 	mu      sync.Mutex
 	members map[string]*HiveMember
+	// retired is who was let go, by the start time of the process let go, so
+	// its last heartbeats while the pod stops do not put it back.
+	retired map[string]time.Time
 }
 
 func NewHive(name string, interval time.Duration) *Hive {
 	if interval <= 0 {
 		interval = DefaultHiveInterval
 	}
-	return &Hive{name: name, interval: interval, now: time.Now, members: map[string]*HiveMember{}}
+	return &Hive{name: name, interval: interval, now: time.Now, members: map[string]*HiveMember{}, retired: map[string]time.Time{}}
 }
 
 // Join records one announcement. Idempotent: the tenth hello from a worker is the
@@ -198,6 +201,12 @@ func (h *Hive) Join(hello HiveHello) (HiveWelcome, error) {
 
 	h.mu.Lock()
 	defer h.mu.Unlock()
+	if at, ok := h.retired[hello.Name]; ok {
+		if hello.StartedAt.Equal(at) {
+			return HiveWelcome{Protocol: HiveProtocol, Queen: h.name, IntervalMS: int(h.interval / time.Millisecond), Members: len(h.members)}, nil
+		}
+		delete(h.retired, hello.Name)
+	}
 	now := h.now()
 	m, ok := h.members[hello.Name]
 	if !ok {
@@ -236,6 +245,20 @@ func (h *Hive) Leave(name string, startedAt time.Time) bool {
 	delete(h.members, name)
 	log.Printf("hive: %s left", name)
 	return true
+}
+
+// Retire takes workers being let go off the roster at once. A retired worker
+// is not lost — nobody should be told it went missing.
+func (h *Hive) Retire(names []string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	for _, n := range names {
+		if m, ok := h.members[n]; ok {
+			h.retired[n] = m.StartedAt
+			delete(h.members, n)
+			log.Printf("hive: %s retired", n)
+		}
+	}
 }
 
 // Members is the roster, sorted by name, dropping anyone lost for long enough.

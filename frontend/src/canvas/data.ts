@@ -15,6 +15,8 @@ export interface HiveMember {
 export interface HiveTask {
   id: string;
   worker: string;
+  /** "out" for an order this core gave — to a worker, or to an agent outside the hive. */
+  dir?: "out" | "in" | "peer";
   prompt: string;
   state: "running" | "done" | "failed" | "cancelled";
   tool?: string;

@@ -1,14 +1,15 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  ListTodoIcon, LayoutDashboardIcon, ChartColumnIcon, PanelRightOpenIcon, BookOpenIcon, BotIcon, HexagonIcon, MessageSquareIcon, PaletteIcon, PlugIcon,
-  PuzzleIcon, SlidersHorizontalIcon, TerminalIcon,
+  ListTodoIcon, LayoutDashboardIcon, ChartColumnIcon, PanelRightOpenIcon, BookOpenIcon, BotIcon, HexagonIcon, MessageSquareIcon, PaletteIcon,
+  NotebookTabsIcon, PuzzleIcon, SlidersHorizontalIcon, TerminalIcon,
 } from "lucide-react";
+import DeskStatusBar from "./DeskStatusBar";
 import Sky, { Lane } from "../canvas/Sky";
 import { CanvasTheme, loadTheme, saveTheme, themeVars } from "../canvas/theme";
 import { useCodingRuns } from "../canvas/data";
 import { PATHS } from "../lib/routes";
-import { ViewKey } from "../lib/types";
+import { AppStatus, ViewKey } from "../lib/types";
 import { SetWindowTheme } from "../../wailsjs/go/app/App";
 import { useI18n } from "../lib/i18n";
 import NotificationCenter from "../components/NotificationCenter";
@@ -32,8 +33,8 @@ const RAIL: { key: ViewKey; label: string; Icon: typeof HexagonIcon; cls: string
   { key: "agents", label: "Bees", Icon: BotIcon, cls: "dk-a-bees" },
   { key: "coding", label: "Coding", Icon: TerminalIcon, cls: "dk-a-code" },
   { key: "knowledge", label: "Knowledge", Icon: BookOpenIcon, cls: "dk-a-know" },
-  { key: "skills", label: "Skills", Icon: PuzzleIcon, cls: "dk-a-later" },
-  { key: "mcp", label: "MCP", Icon: PlugIcon, cls: "dk-a-mcp" },
+  { key: "records", label: "Records", Icon: NotebookTabsIcon, cls: "dk-a-rec" },
+  { key: "skills", label: "Extensions", Icon: PuzzleIcon, cls: "dk-a-later" },
 ];
 
 /** The pages the right column opens; it stays on every page but the home,
@@ -51,7 +52,7 @@ export const TITLES: Record<ViewKey, string> = {
  * is the shell's child — the home's three panes, or any other screen on a
  * pane of glass.
  */
-export default function DeskShell({ view, badges, children, onOpenConversation }: { view: ViewKey; badges?: Partial<Record<ViewKey, number>>; children: React.ReactNode; onOpenConversation?: (session: string) => void }) {
+export default function DeskShell({ view, badges, children, onOpenConversation, status, loading }: { view: ViewKey; badges?: Partial<Record<ViewKey, number>>; children: React.ReactNode; onOpenConversation?: (session: string) => void; status:AppStatus|null; loading:boolean }) {
   const { t } = useI18n();
   const navigate = useNavigate();
   const [theme, setThemeState] = useState<CanvasTheme>(loadTheme);
@@ -91,7 +92,7 @@ export default function DeskShell({ view, badges, children, onOpenConversation }
         </div>
         <nav className="dk-rail" style={drag}>
           {RAIL.map(({ key, label, Icon, cls }) => (
-            <button key={key} title={t(label)} style={noDrag} className={`dk-app ${cls} ${view === key || (key === "home" && view === "chat") ? "on" : ""}`}
+            <button key={key} title={t(label)} style={noDrag} className={`dk-app ${cls} ${view === key || (key === "skills" && view === "mcp") || (key === "home" && view === "chat") ? "on" : ""}`}
               onClick={() => navigate(PATHS[key])}>
               <Icon size={21} strokeWidth={2} />
               {count(key) > 0 && <span className="dk-badge">{count(key)}</span>}
@@ -126,6 +127,7 @@ export default function DeskShell({ view, badges, children, onOpenConversation }
             <div className="content">{children}</div>
           </main>
         )}
+        <DeskStatusBar status={status} loading={loading} codingRuns={liveRuns}/>
       </div>
     </ThemeCtx.Provider>
   );

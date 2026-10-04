@@ -116,7 +116,7 @@ require (
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/liliang-cn/mcp-swagger-server v1.3.0 // indirect
 	github.com/liliang-cn/pipeit v0.1.0 // indirect
-	github.com/liliang-cn/skills-go v1.9.0 // indirect
+	github.com/liliang-cn/skills-go v1.9.1 // indirect
 	github.com/mark3labs/mcp-go v1.0.0 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect

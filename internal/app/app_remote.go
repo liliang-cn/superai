@@ -381,10 +381,13 @@ func (a *App) registerRemoteTools(svc *backend.Service, cfg backend.RemoteAgents
 			"required": []string{"agent", "prompt"},
 		},
 		func(ctx context.Context, args map[string]any) (any, error) {
-			res, err := a.remoteRunner().Run(ctx, str(args["agent"]), str(args["prompt"]))
-			if err != nil {
-				return nil, err
-			}
+			id := a.tasks().Start(str(args["agent"]), backend.TaskOut, str(args["prompt"]))
+			a.tasks().InSession(id, backend.ChatSessionFrom(ctx))
+			// The same route @name takes in the conversation: an agent linked
+			// over the agent link that serves it first, then the configured
+			// hosts. Configured hosts alone go stale — an HA service moves.
+			res := a.askAgent(ctx, str(args["agent"]), str(args["prompt"]))
+			a.finishDelegated(id, !res.Failed, res.Text, res.Reason)
 			// The verdict comes first and in words, because the failure that
 			// matters here is the one that reads like an answer: a CLI sitting
 			// on a login prompt prints a paragraph and exits, and a result that

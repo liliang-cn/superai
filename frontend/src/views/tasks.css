@@ -31,3 +31,5 @@
 .attention-card.reminder { border-left-color:var(--text-2); }
 .attention-card.reminder .attention-card-icon,.attention-card.reminder .attention-category { color:var(--text-2); }
 .attention-reminder-time { font-weight:600; }
+.attention-view .attention-actions { display:flex; flex-direction:column; gap:8px; flex:none; }
+.attention-view .attention-action.ghost { color:var(--text-0); background:transparent; border-color:var(--border-strong); }
