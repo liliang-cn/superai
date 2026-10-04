@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net"
 	"strings"
 	"testing"
@@ -118,6 +119,17 @@ func TestCoreRoutesThroughALinkedAgent(t *testing.T) {
 	res := core.askAgent(context.Background(), "openclaw", "hi")
 	if res.Failed || res.Text != "pong to hi" || res.Host != "box" {
 		t.Fatalf("ask through the link: %+v", res)
+	}
+
+	// The same agent, given its part in a hive_command alongside the workers.
+	out, err := core.hiveCommand(context.Background(), map[string]any{"commands": []any{
+		map[string]any{"worker": "openclaw", "prompt": "your part"},
+	}})
+	if err != nil || !strings.Contains(fmt.Sprint(out), "## openclaw") || !strings.Contains(fmt.Sprint(out), "pong to your part") {
+		t.Fatalf("hive_command to a named agent: %v %v", out, err)
+	}
+	if tasks := core.tasks().Recent(); len(tasks) == 0 || tasks[0].Worker != "openclaw" || tasks[0].State != "done" {
+		t.Fatalf("the order is not on the board: %+v", tasks)
 	}
 
 	// Its events arrive as the SSE lines the run mirror reads.

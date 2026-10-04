@@ -4,7 +4,7 @@
 .dk-shell {
   display: grid;
   grid-template-columns: 76px minmax(0, 1fr);
-  grid-template-rows: 44px minmax(0, 1fr);
+  grid-template-rows: 44px minmax(0, 1fr) 30px;
   font-size: 14px;
 }
 .dk-shell > * { position: relative; z-index: 1; }
@@ -198,6 +198,16 @@
 .dk-mac rect { fill: #fff; stroke: rgba(29,26,22,.22); }
 .dk-mac path { fill: none; stroke: #1d1a16; stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; }
 .dk-mac.on rect { stroke: var(--honey); stroke-width: 2; }
+/* A machine with work out to it: a ring that keeps leaving it, lines typing on
+   its screen, and what it is running under its name. */
+.dk-mac.on rect:not(.dk-mac-ring) { fill: rgba(var(--honey-rgb), .1); }
+.dk-mac.on path { stroke: var(--honey-deep); }
+.dk-mac-ring { fill: none !important; stroke: var(--honey) !important; stroke-width: 2; transform-box: fill-box; transform-origin: center; animation: dk-mac-ring 1.6s ease-out infinite; }
+@keyframes dk-mac-ring { from { opacity: .75; transform: scale(1); } to { opacity: 0; transform: scale(1.32); } }
+.dk-mac .dk-mac-type { stroke: var(--honey-deep); stroke-width: 1.4; stroke-dasharray: 10; animation: dk-type 1.1s steps(5) infinite; }
+@keyframes dk-type { from { stroke-dashoffset: 10; } to { stroke-dashoffset: -10; } }
+.dk-mac text.dk-mac-doing { fill: var(--honey-deep); font-family: var(--font-mono); font-size: 10.5px; font-weight: 600; }
+@media (prefers-reduced-motion: reduce) { .dk-mac-ring, .dk-mac .dk-mac-type { animation: none; } }
 .dk-mac text { fill: var(--ink-2); font-family: var(--font-sans); font-weight: 500; font-size: 12px; }
 .dk-chip { display: inline-flex; align-items: center; gap: 7px; height: 28px; padding: 0 10px 0 6px; border-radius: 14px; font: 12px var(--font-sans); color: #1d1a16;
   background: rgba(255,255,255,.78); box-shadow: inset 0 1px 0 #fff, 0 3px 10px rgba(0,0,0,.08); white-space: nowrap; max-width: 220px; }
@@ -517,4 +527,46 @@ html[data-desk] body { background: transparent; }
 .dk-side > .dk-foot { position: sticky; bottom: -10px; z-index: 1; margin: 6px -10px -10px; padding: 8px 10px 10px; background: rgba(var(--glass-rgb), .97); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
 @media (max-width: 1240px) {
   .dk:not(.folded) > .dk-live { bottom: 96px; }
+  .dk:not(.folded) > .dk-live .dk-hud { right: 52px; }
 }
+
+/* Skills and MCP share one desktop destination. */
+.extensions-view { flex:1; min-width:0; min-height:0; display:flex; flex-direction:column; overflow:hidden; }
+.extensions-header { padding:24px 28px 0; flex:none; }
+.extensions-header h1 { font-size:24px; font-weight:650; margin:0 0 18px; color:var(--ink); }
+.extensions-tabs { display:flex; gap:6px; padding-bottom:14px; border-bottom:1px solid var(--line); }
+.extensions-tabs button { display:flex; align-items:center; gap:8px; padding:9px 16px; border-radius:10px; color:var(--ink-2); font-size:14px; }
+.extensions-tabs button[aria-selected="true"] { background:rgba(var(--honey-rgb),.15); color:var(--honey-deep); font-weight:600; }
+.extensions-tabs button:hover { background:rgba(var(--glass-rgb),.6); }
+.extensions-tabs button:focus-visible { outline:2px solid var(--honey); outline-offset:2px; }
+.extensions-panel { flex:1; min-height:0; min-width:0; display:flex; overflow:hidden; }
+.extensions-panel > .view { flex:1; min-width:0; }
+@media(max-width:640px) { .extensions-header { padding:16px 16px 0; } }
+
+.dk-float-x { display: none; }
+@media (max-width: 1240px) {
+  .dk:not(.folded) > .dk-live .dk-screen { position: relative; }
+  .dk:not(.folded) > .dk-live .dk-float-x { display: grid; position: absolute; z-index: 3; top: 10px; right: 10px; width: 30px; height: 30px; border-radius: 50%; background: rgba(var(--glass-rgb), .9); box-shadow: inset 0 0 0 1px var(--line); }
+  /* The pane's footer belongs to the pane: no spilling over the conversation. */
+  .dk:not(.folded) > .dk-live .dk-ctl { margin-top: 8px; padding: 8px 12px; border-radius: calc(16px * var(--rs)); background: rgba(var(--glass-rgb), .94); box-shadow: 0 8px 24px rgba(40, 30, 10, .12); }
+  .dk:not(.folded) > .dk-live { bottom: 96px; }
+  .dk:not(.folded) > .dk-live .dk-hud { right: 52px; }
+}
+
+.dk-shell > .dk-statusbar { grid-column:1/-1; grid-row:3; display:flex; align-items:center; gap:16px; padding:0 18px; border-top:1px solid var(--line); background:rgba(var(--glass-rgb),.72); color:var(--ink-2); font-size:11px; min-width:0; --wails-draggable:no-drag; }
+.dk-statusbar > span,.dk-status-connection { display:flex; align-items:center; gap:6px; min-width:0; white-space:nowrap; }
+.dk-status-connection { padding:2px 0; }
+.dk-status-connection:hover { color:var(--ink); }
+.dk-status-dot { width:6px; height:6px; border-radius:50%; background:#2fb36d; flex:none; }
+.dk-status-dot.bad { background:#e5484d; }
+.dk-status-dot.pending { background:var(--honey); }
+.dk-status-backend,.dk-status-model { max-width:240px; overflow:hidden; text-overflow:ellipsis; }
+.dk-status-model { font-family:var(--font-mono); }
+.dk-statusbar > .dk-status-spacer { flex:1; }
+.cd-agent-select { appearance:auto; max-width:170px; border:0; background:transparent; color:inherit; font:inherit; cursor:pointer; outline-offset:3px; }
+@media(max-width:1000px) { .dk-statusbar .dk-status-tools { display:none; } .dk-statusbar .dk-status-model { max-width:170px; } }
+@media(max-width:800px) { .dk-statusbar .dk-status-workers { display:none; } .dk-statusbar .dk-status-backend { max-width:145px; } }
+
+/* Long conversation names must not push the status line into the transcript. */
+.dk-chead > div { min-width:0; flex:1; }
+.dk-chead b { display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }

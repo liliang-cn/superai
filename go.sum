@@ -240,8 +240,8 @@ github.com/liliang-cn/mcp-swagger-server v1.3.0 h1:PFnm9mSbjVoFv4AelRzmHuxuuJXI8
 github.com/liliang-cn/mcp-swagger-server v1.3.0/go.mod h1:xci2K+i6OU3pMeb/hQOialGiIUrMS38ZswQdOFoRraw=
 github.com/liliang-cn/pipeit v0.1.0 h1:ZU5hkL5SXr6vHtn/gcJBX9i55l0HM4rVsYTfxqn5M34=
 github.com/liliang-cn/pipeit v0.1.0/go.mod h1:ghxqa1CKTztR5me4vl8srIYQhfv89tc37SnocoXv4/E=
-github.com/liliang-cn/skills-go v1.9.0 h1:f734/1BM4edgTeMlhkcUnXYenxeXEdgVm9/MDbkwE3Y=
-github.com/liliang-cn/skills-go v1.9.0/go.mod h1:9uDod4rl/qZmh2vu6jcmbMMf0bjms7QNpBePg3zXxUo=
+github.com/liliang-cn/skills-go v1.9.1 h1:KqLHh3+HJkHga1jXrKTp7ojK2L6p5aTT32vwvAbu0gk=
+github.com/liliang-cn/skills-go v1.9.1/go.mod h1:9uDod4rl/qZmh2vu6jcmbMMf0bjms7QNpBePg3zXxUo=
 github.com/mark3labs/mcp-go v1.0.0 h1:CZqCzXwUiTOstkIdW1MyOZGuM+LaKMEJSu+ZYluN4DU=
 github.com/mark3labs/mcp-go v1.0.0/go.mod h1:r2fW4o3wsoJ7IMsx1Wuq5xeP8PRGXPDfNveoGAYbb/s=
 github.com/matryer/is v1.4.0/go.mod h1:8I/i5uYgLzgsgEloJE1U6xx5HkBQpAZvepWuujKwMRU=

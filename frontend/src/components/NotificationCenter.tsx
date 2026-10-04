@@ -57,7 +57,7 @@ export default function NotificationCenter({
   const { t } = useI18n();
   const unread = useUnreadNotifications();
   const [open, setOpen] = useState(false);
-  const { items, loading, markAllRead, clear } = useNotificationList(open);
+  const { items, loading, error, reload, markAllRead, clear } = useNotificationList(open);
   const wrap = useRef<HTMLDivElement | null>(null);
 
   // Where the panel hangs. Measured rather than written in CSS: the status bar
@@ -89,12 +89,10 @@ export default function NotificationCenter({
       return;
     }
     if (loading) return;
-    setFresh((current) => {
-      if (current.size > 0) return current;
-      const next = new Set(items.filter((n) => !n.read).map((n) => n.id));
-      if (next.size > 0) void markAllRead();
-      return next;
-    });
+    const unreadIds = items.filter(n => !n.read).map(n => n.id);
+    if (!unreadIds.length) return;
+    setFresh(current => new Set([...current, ...unreadIds]));
+    void markAllRead(unreadIds);
   }, [open, loading, items, markAllRead]);
 
   // Click-away and Escape. A panel that hangs over the app until you find its
@@ -144,8 +142,9 @@ export default function NotificationCenter({
               </button>
             )}
           </div>
+          {error && <div className="notif-empty" role="alert">{t(error)} <button className="notif-action" onClick={() => void reload()}>{t("Retry")}</button></div>}
           <div className="notif-list">
-            {items.length === 0 && (
+            {items.length === 0 && !error && (
               <div className="notif-empty">{t(loading ? "Loading…" : "Nothing yet.")}</div>
             )}
             {items.map((n) => {
@@ -159,6 +158,11 @@ export default function NotificationCenter({
                     (fresh.has(n.id) ? " notif-new" : "") +
                     (clickable ? " notif-clickable" : "")
                   }
+                  role={clickable ? "button" : undefined}
+                  tabIndex={clickable ? 0 : undefined}
+                  onKeyDown={clickable ? e => {
+                    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpenConversation!(n.session!); setOpen(false); }
+                  } : undefined}
                   onClick={
                     clickable
                       ? () => {

@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"context"
 	"strings"
 	"sync"
 	"time"
@@ -79,11 +80,14 @@ type HiveTask struct {
 	Worker string `json:"worker"`
 	// From is who gave the order when it was not the queen: the asking worker,
 	// for a peer task.
-	From   string `json:"from,omitempty"`
-	Dir    string `json:"dir"`
-	Prompt string `json:"prompt"`
-	State  string `json:"state"`
-	Phase  string `json:"phase,omitempty"`
+	From string `json:"from,omitempty"`
+	Dir  string `json:"dir"`
+	// Session is the conversation the order was given in, so the orders one
+	// request fanned out into can be shown together.
+	Session string `json:"session,omitempty"`
+	Prompt  string `json:"prompt"`
+	State   string `json:"state"`
+	Phase   string `json:"phase,omitempty"`
 	// Tool is the tool being called while Phase is "tool"; Tools counts how many
 	// have been called so far.
 	Tool      string      `json:"tool,omitempty"`
@@ -172,6 +176,34 @@ func (b *TaskBoard) StartAs(id, worker, from, dir, prompt string) string {
 }
 
 // Progress notes what a running task is doing. A tool call also counts it.
+// InSession records the conversation an order was given in. "" is a no-op.
+func (b *TaskBoard) InSession(id, session string) {
+	if session == "" {
+		return
+	}
+	b.update(id, func(t *HiveTask) bool {
+		if t.Session == session {
+			return false
+		}
+		t.Session = session
+		return true
+	})
+}
+
+type chatSessionKey struct{}
+
+// WithChatSession marks a run's context with the conversation it serves;
+// ChatSessionFrom reads it back in a tool that runs within it.
+func WithChatSession(ctx context.Context, session string) context.Context {
+	return context.WithValue(ctx, chatSessionKey{}, session)
+}
+
+// ChatSessionFrom is the conversation a tool call is part of, or "".
+func ChatSessionFrom(ctx context.Context) string {
+	s, _ := ctx.Value(chatSessionKey{}).(string)
+	return s
+}
+
 func (b *TaskBoard) Progress(id, phase, tool string) {
 	b.update(id, func(t *HiveTask) bool {
 		if t.State != TaskRunning {

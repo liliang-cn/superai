@@ -31,6 +31,11 @@ type App struct {
 	agentTap     atomic.Pointer[func(string, map[string]any)]
 	// memberPulses is the latest meter summary from each linked agent.
 	memberPulses sync.Map
+	// openTurns are the turns still running, by request id, as the session
+	// list shows them (ChatSessions).
+	openTurns sync.Map
+	// abilities is what the last sync of the queen's skills and MCP did.
+	abilities AbilitiesState
 
 	mu       sync.Mutex
 	svc      *backend.Service
@@ -788,9 +793,11 @@ func (a *App) SendChat(sessionID, message string, imagePaths []string) string {
 	// never a decision about this app: they cut off real work mid-sentence and
 	// reported it as a turn the user had cancelled, which is a lie the
 	// transcript then kept.
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(backend.WithChatSession(context.Background(), sessionID))
 	a.trackRun(requestID, cancel)
 	a.runSession(requestID, sessionID)
+	a.openTurns.Store(requestID, backend.ChatSessionInfo{ID: sessionID, Title: firstLineOf(message, 80),
+		UpdatedAt: time.Now().UTC().Format(time.RFC3339)})
 
 	// An order from the hive is put on the task board, so the panel can show
 	// this worker working. A person typing at this instance is not a task.
@@ -811,6 +818,7 @@ func (a *App) SendChat(sessionID, message string, imagePaths []string) string {
 	go func() {
 		defer cancel()
 		defer a.untrackRun(requestID)
+		defer a.openTurns.Delete(requestID)
 
 		driver.Emit(backend.AvatarEvent{Type: "state", State: backend.AvatarStateThinking})
 
@@ -1072,7 +1080,27 @@ func (a *App) ChatSessions() []backend.ChatSessionInfo {
 	if svc == nil {
 		return []backend.ChatSessionInfo{}
 	}
-	return svc.Sessions(200)
+	return withOpenTurns(svc.Sessions(200), &a.openTurns)
+}
+
+// withOpenTurns adds the conversations whose turn is still running and that
+// the store does not list yet — a conversation is saved when its first answer
+// is, and one asked from another device or by a long job would otherwise be
+// missing from every list for as long as it works.
+func withOpenTurns(saved []backend.ChatSessionInfo, open *sync.Map) []backend.ChatSessionInfo {
+	have := map[string]bool{}
+	for _, s := range saved {
+		have[s.ID] = true
+	}
+	var live []backend.ChatSessionInfo
+	open.Range(func(_, v any) bool {
+		if s := v.(backend.ChatSessionInfo); !have[s.ID] {
+			have[s.ID] = true
+			live = append(live, s)
+		}
+		return true
+	})
+	return append(live, saved...)
 }
 
 // ChatHistory returns a past conversation's visible messages so the transcript

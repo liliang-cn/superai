@@ -393,3 +393,18 @@ func TestAFinishedTaskPulsesNothing(t *testing.T) {
 		t.Fatalf("%+v", log.all())
 	}
 }
+
+// An order remembers the conversation it was given in, read from the run's
+// context, so a request's orders can be shown together.
+func TestAnOrderRemembersItsConversation(t *testing.T) {
+	b := NewTaskBoard(nil)
+	id := b.Start("w1", TaskOut, "find the market size")
+	b.InSession(id, ChatSessionFrom(WithChatSession(context.Background(), "chat-42")))
+	got, _ := b.Get(id)
+	if got.Session != "chat-42" {
+		t.Fatalf("session = %q", got.Session)
+	}
+	if ChatSessionFrom(context.Background()) != "" {
+		t.Fatal("a context without a conversation named one")
+	}
+}

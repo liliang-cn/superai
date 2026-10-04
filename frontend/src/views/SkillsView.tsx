@@ -1,3 +1,4 @@
+import { translate, useI18n } from "../lib/i18n";
 import React, { useCallback, useEffect, useState } from "react";
 import { InstallSkill, RemoveSkill, SearchSkills, Skills } from "../../wailsjs/go/app/App";
 import { backend } from "../../wailsjs/go/models";
@@ -5,6 +6,7 @@ import { toast } from "../lib/toasts";
 import { PuzzleIcon } from "lucide-react";
 
 export default function SkillsView() {
+  const { t } = useI18n();
   const [skills, setSkills] = useState<backend.SkillInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string>("");
@@ -45,18 +47,18 @@ export default function SkillsView() {
     <div className="view">
       <div className="view-header with-action">
         <div>
-          <div className="view-title">Skills{skills.length > 0 ? ` (${skills.length})` : ""}</div>
-          <div className="view-desc">Installed skills SuperAI can activate during a turn.</div>
+          <div className="view-title">{t("Skills")}{skills.length > 0 ? ` (${skills.length})` : ""}</div>
+          <div className="view-desc">{translate("Installed skills SuperAI can activate during a turn.")}</div>
         </div>
         <div className="vh-actions">
           <button
             className="btn ghost sm"
             onClick={() => (available ? setAvailable(null) : browse(query))}
           >
-            {available ? "Close" : "+ Add skill"}
+            {translate(available ? "Close" : "+ Add skill")}
           </button>
           <button className="btn ghost sm" onClick={load} disabled={loading}>
-            {loading ? <><span className="spinner" style={{ borderTopColor: "var(--text-1)" }} /> Loading…</> : "↻ Refresh"}
+            {loading ? <><span className="spinner" style={{ borderTopColor: "var(--text-1)" }} /> Loading…</> : translate("↻ Refresh")}
           </button>
         </div>
       </div>
@@ -64,15 +66,15 @@ export default function SkillsView() {
       <div className="panel-scroll">
         {available !== null && (
           <div className="card" style={{ marginBottom: 14 }}>
-            <div className="card-title">Add a skill</div>
+            <div className="card-title">{translate("Add a skill")}</div>
             <div className="card-desc">
-              Skills already on this machine, including the ones Claude Code uses (~/.claude/skills).
+              {translate("Skills already on this machine, including the ones Claude Code uses (~/.claude/skills).")}
             </div>
             <input
               className="input"
               value={query}
               autoFocus
-              placeholder="Filter by name or what it does…"
+              placeholder={translate("Filter by name or what it does…")}
               onChange={(e) => {
                 setQuery(e.target.value);
                 browse(e.target.value);
@@ -80,7 +82,7 @@ export default function SkillsView() {
             />
             {note && <div className="hint err" style={{ marginTop: 8 }}>{note}</div>}
             <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10 }}>
-              {available.length === 0 && <div className="trace-empty">Nothing found on this machine.</div>}
+              {available.length === 0 && <div className="trace-empty">{translate("Nothing found on this machine.")}</div>}
               {available.map((c) => (
                 <div key={c.name} className="record-card">
                   <div className="rc-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -122,8 +124,8 @@ export default function SkillsView() {
         {!err && !loading && skills.length === 0 && (
           <div className="inline-empty">
             <PuzzleIcon className="ie-icon" size={22} strokeWidth={1.6} />
-            <div>No skills installed.</div>
-            <div className="ie-hint">Use “+ Add skill” to install one already on this machine.</div>
+            <div>{translate("No skills installed.")}</div>
+            <div className="ie-hint">{translate("Use “+ Add skill” to install one already on this machine.")}</div>
           </div>
         )}
         {!err && skills.length > 0 && (

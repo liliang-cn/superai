@@ -203,3 +203,34 @@ export function hash01(s: string, salt = 0): number {
   }
   return ((h >>> 0) % 100000) / 100000;
 }
+
+/**
+ * The members to draw: the hive's, and any agent outside it — a coding agent
+ * on a linked machine ("codex.mac"), a named agent ("openclaw") — that has an
+ * order of the queen's in hand, so handing work to it shows like any other.
+ */
+export function withDelegates(members: StageWorker[], tasks: StageTask[], runs: { agent: string; state: string }[] = []): StageWorker[] {
+  const have = new Set(members.map((m) => m.name));
+  const out = [...members];
+  const add = (name: string) => {
+    if (have.has(name)) return;
+    have.add(name);
+    const dot = name.indexOf(".");
+    out.push({ name, state: "live", engine: dot > 0 ? `cli · ${name.slice(0, dot)}` : "agent" });
+  };
+  for (const t of tasks) if (t.dir === "out" && t.state === "running") add(t.worker);
+  // Coding runs the core mirrors ("codex.mac"), for a core that does not yet
+  // put them on its board.
+  for (const r of runs) if (r.state === "running") add(r.agent);
+  return out;
+}
+
+/** The orders to draw, with a running coding run that has no board entry
+ *  standing in as one, so its node gets the order line and the glow. */
+export function withRunTasks(tasks: StageTask[], runs: { id: string; agent: string; state: string; started: string }[]): StageTask[] {
+  const onBoard = new Set(tasks.filter((t) => t.state === "running").map((t) => t.worker));
+  const extra = runs
+    .filter((r) => r.state === "running" && !onBoard.has(r.agent))
+    .map((r) => ({ id: "run-" + r.id, worker: r.agent, dir: "out" as const, state: "running" as const, tools: 0, started_at: r.started }));
+  return extra.length ? [...tasks, ...extra] : tasks;
+}

@@ -1,3 +1,4 @@
+import { useSearchParams } from "react-router-dom";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PauseIcon, PlayIcon, ZapIcon, CopyIcon, XIcon, PlusIcon } from "lucide-react";
 import {
@@ -130,7 +131,10 @@ export default function StandingView({ children }: { children?: React.ReactNode 
   const [agents, setAgents] = useState<View[]>([]);
   const [wakes, setWakes] = useState<Mark[]>([]);
   const [reports, setReports] = useState<Report[]>([]);
-  const [open, setOpen] = useState("");
+  const [params] = useSearchParams();
+  const agentId = params.get("agent") ?? "";
+  const [open, setOpen] = useState(agentId);
+  useEffect(() => { setOpen(agentId); }, [agentId]);
   const [editing, setEditing] = useState<Spec | null>(null);
   const [error, setError] = useState("");
   const [now, setNow] = useState(Date.now());

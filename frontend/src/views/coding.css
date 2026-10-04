@@ -92,3 +92,7 @@
   .cd-start, .cd-log, .cd-follow { padding-left: 16px; padding-right: 16px; }
   .cd-host-n { width: 64px; }
 }
+
+/* Editing controls always receive input, even inside native drag surfaces. */
+.cd-comp, .cd-comp textarea, .cd-comp input, .cd-comp select { --wails-draggable: no-drag; }
+.cd-comp textarea { pointer-events:auto; user-select:text; -webkit-user-select:text; cursor:text; }

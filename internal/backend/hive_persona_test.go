@@ -52,3 +52,14 @@ func TestTheSettingsStateTheModelsWindow(t *testing.T) {
 		t.Fatal("registered more than the one model")
 	}
 }
+
+// A person asks for the job, not for the plan: the queen is told to find who
+// she has, split the work across them in parallel, and bring it back together.
+func TestTheQueenPlansBigJobsHerself(t *testing.T) {
+	got := hiveSection(HiveSettings{Role: HiveRoleQueen, Name: "q"})
+	for _, want := range []string{"hive_members", "coding_agent_list", "remote_agent_list", "hive_command", "coding_agent_run", "remote_agent_run", "knowledge_save", "ONE hive_command call", "at the same time"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("queen section does not mention %q", want)
+		}
+	}
+}

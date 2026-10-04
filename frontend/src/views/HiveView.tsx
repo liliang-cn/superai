@@ -1,13 +1,38 @@
 import { useAttention } from "../canvas/attention";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { HiveRetire, HiveSpawn, HiveStatus } from "../../wailsjs/go/app/App";
+import { ChatSessions, HiveRetire, HiveSpawn, HiveStatus, StandingAgents } from "../../wailsjs/go/app/App";
 import { EventsOn } from "../../wailsjs/runtime";
 import { Link, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import HiveTaskPage, { FullTask } from "./HiveTaskPage";
 import { taskPath } from "../lib/routes";
-import HiveStageView from "../components/HiveStageView";
 import type { StageHandle, StagePulse, StageTask } from "../components/HiveStage";
 import { QUEEN, SELF } from "../components/hiveFx";
+import { useHiveMeter } from "../components/HiveMeter";
+
+const short = (n: string) => n.replace(/^superai-/, "");
+const fmtK = (n: number) => (n >= 1e6 ? (n / 1e6).toFixed(2) + "M" : n >= 1e3 ? (n / 1e3).toFixed(1) + "k" : String(Math.round(n)));
+
+/** The conversations' titles by id, read now and every half minute. A bee's
+ *  wake is named after the bee, not after the brief it was woken with. */
+function useSessionTitles(): Record<string, string> {
+  const [titles, setTitles] = useState<Record<string, string>>({});
+  useEffect(() => {
+    const load = () => Promise.all([ChatSessions(), StandingAgents().catch(() => [])]).then(([l, bees]) => {
+      const out: Record<string, string> = {};
+      for (const s of (l ?? []) as { id: string; title: string }[]) {
+        out[s.id] = s.title.startsWith("You hold a standing responsibility") ? "A bee's check" : s.title;
+      }
+      for (const b of (bees ?? []) as { name: string; lastWake?: { session_id?: string }; running?: { session_id?: string } }[]) {
+        for (const w of [b.lastWake, b.running]) if (w?.session_id) out[w.session_id] = `${b.name} (bee)`;
+      }
+      setTitles(out);
+    }).catch(() => {});
+    load();
+    const t = window.setInterval(load, 30000);
+    return () => window.clearInterval(t);
+  }, []);
+  return titles;
+}
 
 /** One worker as HiveStatus reports it. */
 interface Member {
@@ -70,8 +95,6 @@ function ago(iso: string, now: number): string {
 export default function HiveView() {
   const navigate = useNavigate();
   // The swarm view folds away and stays the way it was left.
-  const [swarmOpen, setSwarmOpenState] = useState(() => { try { return localStorage.getItem("superai-hive-swarm") !== "0"; } catch { return true; } });
-  const setSwarmOpen = (on: boolean) => { setSwarmOpenState(on); try { localStorage.setItem("superai-hive-swarm", on ? "1" : "0"); } catch { /* fine */ } };
   const [st, setSt] = useState<Status | null>(null);
   const [err, setErr] = useState("");
   const [now, setNow] = useState(Date.now());
@@ -199,24 +222,57 @@ export default function HiveView() {
   };
   const live = members.filter((m) => m.state === "live").length;
 
+  // The workers' meters (tokens, what each is doing) and the conversations'
+  // titles, for the table and for naming the requests orders came from.
+  const meter = useHiveMeter().members;
+  const titles = useSessionTitles();
+  const tokensOf = (name: string) => meter.find((m) => m.name === name)?.tokens ?? 0;
+  const doingOf = (name: string) => tasks.find((t) => t.worker === name && t.state === "running");
+  // Orders grouped by the conversation that gave them, newest request first.
+  const groups = (() => {
+    const by = new Map<string, Task[]>();
+    for (const t of ordered) {
+      const k = (t as Task & { session?: string }).session || "";
+      by.set(k, [...(by.get(k) ?? []), t]);
+    }
+    return [...by.entries()].sort(([, x], [, y]) =>
+      Math.max(...y.map((t) => Date.parse(t.started_at))) - Math.max(...x.map((t) => Date.parse(t.started_at))));
+  })();
+  const who = (t: Task) => t.dir === "peer"
+    ? `${short(t.from ?? "")} ⇄ ${short(t.worker)}`
+    : t.dir === "out" ? short(t.worker) : "queen";
+  const phase = (t: Task) => (t.state === "running"
+    ? t.phase === "tool" ? `⚙ ${t.tool || "tool"}` : t.phase === "writing" ? "writing…" : "thinking…"
+    : t.state) + (t.tools > 0 ? ` · ${t.tools} tool${t.tools === 1 ? "" : "s"}` : "");
+
   const overview = (
     <div className="view hive-page">
       <div className="view-header with-action">
         <div>
           <div className="view-title">Hive</div>
-          <div className="view-desc">
-            SuperAI instances sharing one memory. The queen gives the orders; workers announce themselves and carry them out.
-          </div>
+          {st && st.role !== "" && (
+            <div className="view-desc">
+              {st.role === "queen" ? (st.name && st.name !== "queen" ? `${st.name} · queen` : "queen") : `${st.name} · worker of ${st.queen?.name || "the queen"}`} · {st.protocol}
+            </div>
+          )}
         </div>
+        {st?.role === "queen" && st.spawner?.enabled && (
+          <div className="vh-actions hive-spawn">
+            <button className="btn ghost sm" disabled={making !== ""} onClick={() => resize("retire")}>
+              {making === "retire" ? "Retiring…" : "− Worker"}
+            </button>
+            <button className="btn sm" disabled={making !== ""} onClick={() => resize("spawn")}>
+              {making === "spawn" ? "Starting…" : "+ Worker"}
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="panel-scroll">
         {err && <div className="hint err">{err}</div>}
+        {note && <div className="hint err">{note}</div>}
         {st && (
           <>
-            {/* First what needs reading: who is up, who is busy, who is not
-                answering, what waits on you — then what is running. The
-                swarm is below, and folds away. */}
             {st.role !== "" && (
               <div className="hive-sum">
                 <div><b>{live}<small>/{members.length}</small></b><span>online</span></div>
@@ -225,175 +281,98 @@ export default function HiveView() {
                 <div className={waiting > 0 ? "wait" : ""}><b>{waiting}</b><span>waiting for you</span></div>
               </div>
             )}
-            {st.role !== "" && (
+
+            {/* Who is in the hive, and what each is doing now. */}
+            {st.role === "queen" && (
               <div className="card">
-                <div className="card-title">
-                  Missions{running > 0 ? ` · ${running} running` : ""}
-                </div>
-                {ordered.length === 0 ? (
-                  <div className="hive-dim">
-                    {st.role === "queen"
-                      ? "Nothing has been ordered yet. Ask this queen to have the workers do something and it appears here as it happens."
-                      : "No orders received yet. When the queen sends this worker something, it appears here as it happens."}
-                  </div>
+                <div className="card-title">Workers</div>
+                {members.length === 0 ? (
+                  <div className="hive-dim">No workers yet. + Worker starts one; a SuperAI set to join this queen joins by itself.</div>
                 ) : (
-                  <div className="hive-missions">
-                    {ordered.map((t) => (
-                      <div className="hive-mission" key={t.id}>
-                        <div className="hive-m-head" onClick={() => navigate(taskPath(t.id))}>
-                          <span className={`hive-live-dot ${t.state}`} title={t.state} />
-                          <span className="hive-m-who">{t.dir === "peer"
-                              ? `${(t.from ?? "").replace(/^superai-/, "")} ⇄ ${t.worker.replace(/^superai-/, "")}`
-                              : t.dir === "out"
-                                ? `→ ${t.worker.replace(/^superai-/, "")}`
-                                : "← queen"}</span>
-                          <span className="hive-m-prompt" title={t.prompt}>{t.prompt}</span>
-                          <span className="hive-m-phase">
-                            {t.state === "running"
-                              ? t.phase === "tool"
-                                ? `⚙ ${t.tool || "tool"}`
-                                : t.phase === "writing"
-                                  ? "writing…"
-                                  : "thinking…"
-                              : t.state}
-                            {t.tools > 0 ? ` · ${t.tools} tool${t.tools === 1 ? "" : "s"}` : ""}
+                  <div className="hive-roster" role="table">
+                    {members.map((m) => {
+                      const t = doingOf(m.name);
+                      return (
+                        <div className={`hive-roster-row${m.state === "lost" ? " lost" : ""}${t ? " busy" : ""}`} role="row" key={m.name}>
+                          <span className={`hive-live-dot ${t ? "running" : m.state === "live" ? "done" : "failed"}`} title={m.state} />
+                          <span className="hive-roster-name">
+                            <b>{short(m.name)}</b>
+                            {m.engine && <span className="chip">{m.engine}</span>}
                           </span>
-                          <span className="hive-m-meta">
-                            <Link to={taskPath(t.id)} className="hive-uuid" onClick={(e) => e.stopPropagation()} title={t.id}>
-                              {t.id.slice(0, 8)}
-                            </Link>{" "}
-                            {elapsed(t)}
+                          <span className="hive-roster-doing" title={t?.prompt}>
+                            {t ? <><em>{phase(t)}</em> {t.prompt}</> : m.state === "lost" ? "not answering" : <span className="hive-dim">idle</span>}
                           </span>
+                          <span className="hive-roster-num">{fmtK(tokensOf(m.name))} <small>tokens</small></span>
+                          <span className="hive-dim hive-roster-seen">{m.state === "lost" ? `last heard ${ago(m.last_seen, now)}` : `up ${ago(m.joined_at, now).replace(/ ago$/, "")}`}</span>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
             )}
-
-            <div className="card hive-swarm">
-              <button className="hive-swarm-head" onClick={() => setSwarmOpen(!swarmOpen)}>
-                <span className="card-title">The swarm</span>
-                <span className="hive-dim">{swarmOpen ? "Hide" : "Show"}</span>
-              </button>
-              {swarmOpen && <HiveStageView ref={stage} role={st.role} self={st.name} workers={members} tasks={tasks} ready={ready} />}
-            </div>
-
-            <div className="card hive-self">
-              <span className={`hive-role ${st.role || "alone"}`}>{st.role || "standalone"}</span>
-              <div className="hive-self-body">
-                <div className="hive-self-name">{st.name || "this instance"}</div>
-                <div className="hive-dim">
-                  {st.role === "queen" && `Accepting workers · ${live} live of ${members.length}`}
-                  {st.role === "worker" && "Announces itself to the queen and obeys her"}
-                  {st.role === "" && "Working on its own. Nothing here is required."}
-                </div>
-              </div>
-              <span className="chip">{st.protocol}</span>
-            </div>
 
             {st.role === "worker" && st.queen && (
               <div className="card hive-link">
                 <span className={`status-dot ${st.queen.joined ? "ok" : "bad"}`} />
                 <div className="hive-self-body">
-                  <div className="hive-self-name">
-                    {st.queen.joined ? "Joined the queen" : "Not joined yet"}
-                  </div>
+                  <div className="hive-self-name">{st.queen.joined ? "Joined the queen" : "Not joined yet"}</div>
                   <div className="hive-dim hive-mono">{st.queen.url}</div>
-                  {st.queen.joined ? (
-                    <div className="hive-dim">last heard {ago(st.queen.last_ok, now)}</div>
-                  ) : (
-                    <div className="hive-dim">
-                      {st.queen.error || "trying…"} — keeps trying, in any start order.
-                    </div>
-                  )}
+                  <div className="hive-dim">{st.queen.joined ? `last heard ${ago(st.queen.last_ok, now)}` : st.queen.error || "trying…"}</div>
                 </div>
               </div>
             )}
 
-            {st.role === "queen" && (
-              <div className="card">
-                <div className="hive-head-row">
-                  <div className="card-title">Workers ({members.length})</div>
-                  {st.spawner?.enabled && (
-                    <div className="hive-spawn">
-                      <button className="btn ghost sm" disabled={making !== ""} onClick={() => resize("retire")}>
-                        {making === "retire" ? "Retiring…" : "− Worker"}
-                      </button>
-                      <button className="btn ghost sm" disabled={making !== ""} onClick={() => resize("spawn")}>
-                        {making === "spawn" ? "Starting…" : "+ Worker"}
-                      </button>
-                    </div>
-                  )}
-                </div>
-                {note && <div className="hint err" style={{ margin: "6px 0" }}>{note}</div>}
-                {members.length === 0 ? (
-                  <div className="hive-empty">
-                    <p>No workers have joined yet.</p>
-                    <p className="hive-dim">
-                      A worker joins by itself: give it <code>hive.role: "worker"</code> and{" "}
-                      <code>hive.join_url</code> pointing here, plus a reachable{" "}
-                      <code>hive.advertise_url</code>. This roster is whoever is actually there.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="hive-table" role="table">
-                    <div className="hive-row hive-head" role="row">
-                      <span />
-                      <span>Worker</span>
-                      <span>Address</span>
-                      <span>Joined</span>
-                      <span>Last heard</span>
-                    </div>
-                    {members.map((m) => (
-                      <div className={`hive-row${m.state === "lost" ? " lost" : ""}`} role="row" key={m.name}>
-                        <span
-                          className={`status-dot ${m.state === "live" ? "ok" : "unknown"}`}
-                          title={m.state}
-                        />
-                        <span className="hive-name">
-                          {m.name}
-                          {m.engine && <span className="chip" title="Not a SuperAI: an agent behind an adapter">{m.engine}</span>}
-                          {m.state === "lost" && <span className="chip">lost</span>}
-                        </span>
-                        <span className="hive-mono hive-dim">{m.url}</span>
-                        <span className="hive-dim">{ago(m.joined_at, now)}</span>
-                        <span className={m.state === "lost" ? "hive-warn" : "hive-dim"}>{ago(m.last_seen, now)}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <div className="hive-foot hive-dim">
-                  A worker that stays quiet for three heartbeats
-                  {st.interval_ms ? ` (${Math.round((st.interval_ms * 3) / 1000)}s)` : ""} is marked lost and is not
-                  given orders; it returns to live by speaking again.
-                </div>
-              </div>
-            )}
-
+            {/* Every order, grouped by the request it came from. */}
             {st.role !== "" && (
               <div className="card">
-                <div className="card-title">Messages{mail.length ? ` · ${mail.length}` : ""}</div>
-                {mail.length === 0 ? (
+                <div className="card-title">Missions{running > 0 ? ` · ${running} running` : ""}</div>
+                {groups.length === 0 ? (
                   <div className="hive-dim">
-                    No messages yet. Members write to each other with <code>hive_send</code>; a message starts a turn
-                    on the one it is for, in its conversation with the sender.
+                    {st.role === "queen" ? "No orders yet. Ask the queen for something big and the parts she hands out appear here." : "No orders received yet."}
                   </div>
                 ) : (
-                  <div className="hive-mail">
-                    {[...mail].reverse().map((m) => (
-                      <div className={`hive-mail-row ${m.dir || "in"}`} key={`${m.id}-${m.dir}`}>
-                        <span className="hive-mail-who">
-                          {m.from.replace(/^superai-/, "")} → {m.to.replace(/^superai-/, "")}
-                          {m.reply_to && <span className="chip">reply</span>}
-                        </span>
-                        <span className="hive-mail-text">{m.text}</span>
-                        <span className="hive-dim">{ago(m.at, now)}</span>
-                      </div>
-                    ))}
+                  <div className="hive-groups">
+                    {groups.map(([session, list]) => {
+                      const live = list.filter((t) => t.state === "running").length;
+                      return (
+                        <div className="hive-group" key={session || "none"}>
+                          <div className="hive-group-h">
+                            <b>{session ? titles[session] || "A conversation" : "Orders"}</b>
+                            <span className="hive-dim">{list.length} part{list.length === 1 ? "" : "s"}{live ? ` · ${live} running` : ""} · {ago(list[list.length - 1].started_at, now)}</span>
+                          </div>
+                          {list.map((t) => (
+                            <button className="hive-group-row" key={t.id} onClick={() => navigate(taskPath(t.id))}>
+                              <span className={`hive-live-dot ${t.state}`} title={t.state} />
+                              <span className="hive-group-who">{who(t)}</span>
+                              <span className="hive-group-p" title={t.prompt}>{t.prompt}</span>
+                              <span className="hive-group-ph">{phase(t)}</span>
+                              <span className="hive-dim hive-group-t">{elapsed(t)}</span>
+                            </button>
+                          ))}
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
+              </div>
+            )}
+
+            {st.role !== "" && mail.length > 0 && (
+              <div className="card">
+                <div className="card-title">Messages · {mail.length}</div>
+                <div className="hive-mail">
+                  {[...mail].reverse().map((m) => (
+                    <div className={`hive-mail-row ${m.dir || "in"}`} key={`${m.id}-${m.dir}`}>
+                      <span className="hive-mail-who">
+                        {short(m.from)} → {short(m.to)}
+                        {m.reply_to && <span className="chip">reply</span>}
+                      </span>
+                      <span className="hive-mail-text">{m.text}</span>
+                      <span className="hive-dim">{ago(m.at, now)}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 

@@ -13,6 +13,7 @@ import StandingView from "./views/StandingView";
 import SchedulesView from "./views/SchedulesView";
 import SettingsView from "./views/SettingsView";
 import KnowledgeView from "./views/KnowledgeView";
+import ExtensionsView from "./views/ExtensionsView";
 import SkillsView from "./views/SkillsView";
 import MCPView from "./views/MCPView";
 import { useAttentionState } from "./canvas/attention";
@@ -182,7 +183,7 @@ export default function App() {
         }
       />
       <Route path="/dashboards" element={<div className="dashboards-view"><DashboardsPanel /></div>} />
-      <Route path="/tasks" element={<TasksView attention={attention} approvals={approvals.pending} onOpenConversation={openConversation} />} />
+      <Route path="/tasks" element={<TasksView attention={attention} approvals={approvals.pending} onOpenConversation={openConversation} onResolve={approvals.resolve} />} />
       <Route path="/stats" element={<StatsView />} />
       {/* Everything under /hive is the Hive screen's own to route:
           the overview, and one page per task. */}
@@ -191,8 +192,8 @@ export default function App() {
       <Route path="/coding" element={<AgentsView />} />
       <Route path="/settings" element={<SettingsView onSaved={refreshStatus} status={status} />} />
       <Route path="/knowledge" element={<KnowledgeView />} />
-      <Route path="/skills" element={<SkillsView />} />
-      <Route path="/mcp" element={<MCPView />} />
+      <Route path="/skills" element={clientKind() === "desktop" ? <ExtensionsView /> : <SkillsView />} />
+      <Route path="/mcp" element={clientKind() === "desktop" ? <ExtensionsView /> : <MCPView />} />
       <Route
         path="/records"
         element={<RecordsView status={status} log={runs} onOpenConversation={openConversation} />}
@@ -207,7 +208,7 @@ export default function App() {
   if (clientKind() === "desktop") {
     return (
       <>
-        <DeskShell view={view} badges={{ records: runs.unseen, tasks: attention.items.filter(i => i.level === "needs").length }} onOpenConversation={openConversation}>
+        <DeskShell status={status} loading={loading} view={view} badges={{ records: runs.unseen, tasks: attention.items.filter(i => i.level === "needs").length }} onOpenConversation={openConversation}>
           {view === "home" || view === "chat" ? (
             <DeskView attentionItems={attention.items} attentionError={attention.error} approvals={approvals} openSession={pendingSession} onSessionOpened={() => setPendingSession("")} />
           ) : routes}

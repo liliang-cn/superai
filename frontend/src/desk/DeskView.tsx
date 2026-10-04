@@ -1,4 +1,4 @@
-import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowUpIcon, HexagonIcon, 
@@ -13,7 +13,7 @@ import EventSheet from "../components/EventSheet";
 import { AgentInfo, useAgentMentions } from "../lib/useAgentMentions";
 import { AgentMenu } from "../components/AgentMenu";
 import { attentionTitle, AttentionItem } from "../canvas/attention";
-import { taskPath } from "../lib/routes";
+import { attentionPath } from "../lib/routes";
 import type { ToolApproval } from "../lib/useToolApprovals";
 import { PATHS } from "../lib/routes";
 import { withoutCallNotes } from "../lib/format";
@@ -62,18 +62,33 @@ function shortWhen(at: string | undefined, now: Date | number, t: (k: string) =>
   return `${day} ${d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false })}`;
 }
 
+/** The conversations on the core, newest first. Read again after this window
+ *  sends, whenever any conversation finishes or starts elsewhere (the phone,
+ *  the web, a job), when the window comes back, and every fifteen seconds. */
 function useRecents(sending: boolean): Session[] {
   const [list, setList] = useState<Session[]>([]);
-  useEffect(() => {
-    if (sending) return;
+  const load = useCallback(() => {
     ChatSessions()
       .then((l) => setList(((l ?? []) as unknown as Session[])
-        .filter((s) => s.id !== QUEEN_SESSION && !s.id.startsWith("tile-") && !s.title.startsWith("You hold a standing responsibility"))
+        .filter((s) => s.id !== QUEEN_SESSION && !s.id.startsWith("tile-") && !s.id.startsWith("hive-") && !s.title.startsWith("You hold a standing responsibility"))
         .map((s) => ({ ...s, title: withoutCallNotes(s.title) }))
         .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
         .slice(0, 9)))
       .catch(() => {});
-  }, [sending]);
+  }, []);
+  useEffect(() => {
+    if (!sending) load();
+  }, [sending, load]);
+  useEffect(() => {
+    const offs = ["chat:done", "chat:error", "chat:cancelled"].map((n) => EventsOn(n, () => load()));
+    const t = window.setInterval(load, 15000);
+    window.addEventListener("focus", load);
+    return () => {
+      offs.forEach((off) => { if (typeof off === "function") off(); });
+      window.clearInterval(t);
+      window.removeEventListener("focus", load);
+    };
+  }, [load]);
   return list;
 }
 
@@ -135,7 +150,7 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
     try { const n = Number(localStorage.getItem("superai-desk-side-width")); return Number.isFinite(n) && n >= 200 ? Math.min(480, n) : 252; } catch { return 252; }
   });
   const [resizing, setResizing] = useState(false);
-  const clampWidth = (n: number) => Math.round(Math.max(200, Math.min(480, (layoutRef.current?.clientWidth ?? 1200) - (folded ? 418 : 760), n)));
+  const clampWidth = (n: number) => Math.round(Math.max(200, Math.min(480, (layoutRef.current?.clientWidth ?? 1200) - (folded || window.matchMedia("(max-width: 1240px)").matches ? 418 : 760), n)));
   const resizeSide = (n: number) => setSideWidth(clampWidth(n));
   useEffect(() => { try { localStorage.setItem("superai-desk-side-width", String(sideWidth)); } catch { /* private window */ } }, [sideWidth]);
   useEffect(() => {
@@ -209,11 +224,8 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
   const feed = attention.filter((i) => i.level === "soon");
   const [sheet, setSheet] = useState<AttentionItem | null>(null);
   const openItem = (it: AttentionItem) => {
-    if (it.open === "hive" && it.kind === "failed" && it.ref) navigate(taskPath(it.ref));
-    else if (it.open === "hive") navigate(PATHS.hive);
-    else if (it.open === "coding") navigate(PATHS.coding);
-    else if (it.kind === "event" || it.kind === "reminder") setSheet(it);
-    else if (it.open === "agents") navigate(PATHS.agents);
+    if (it.kind === "event" || it.kind === "reminder") setSheet(it);
+    else navigate(attentionPath(it));
   };
 
   // The tabs: the hive, its status and the figures always; every coding run
@@ -263,7 +275,20 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
     chat.loadSession(id).catch(() => {});
   };
 
-  const busyWorkers = new Set(hive.tasks.filter((t) => t.state === "running").map((t) => t.worker)).size;
+  // Who is working: workers with an order, and coding agents running somewhere.
+  // Esc hides the pane when it floats over the conversation.
+  useEffect(() => {
+    if (folded) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && window.matchMedia("(max-width: 1240px)").matches) fold(true);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [folded]);
+  const busyWorkers = new Set([
+    ...hive.tasks.filter((t) => t.state === "running").map((t) => t.worker),
+    ...runs.filter((r) => r.state === "running").map((r) => r.agent),
+  ]).size;
   const live = hive.members.filter((m) => m.state === "live" && !/queen/.test(m.name)).length;
   const workers = hive.members.filter((m) => !/queen/.test(m.name)).length;
   const status = !hive.loaded ? t("Finding the hive…") : !hive.role ? t("This Mac on its own") : `${live} of ${workers} workers up, ${busyWorkers} busy`;
@@ -333,7 +358,7 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
         }}
         onPointerDown={(e) => {
           if (e.button !== 0) return;
-          e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); setResizing(true);
+          e.preventDefault(); e.currentTarget.focus(); e.currentTarget.setPointerCapture(e.pointerId); setResizing(true);
         }}
         onPointerMove={(e) => {
           if (e.currentTarget.hasPointerCapture(e.pointerId)) resizeSide(e.clientX - (layoutRef.current?.getBoundingClientRect().left ?? 0));
@@ -344,7 +369,7 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
       <section className="cv-glass dk-chat">
         <header className="dk-chead">
           <span className="dk-qhex big">Q</span>
-          <div><b>{title}</b><small><i className={hive.role ? "dk-ok" : "dk-off"} />{status}</small></div>
+          <div><b title={title}>{title}</b><small><i className={hive.role ? "dk-ok" : "dk-off"} />{status}</small></div>
         </header>
         <div className="dk-msgs">
           {msgs.length === 0 && (
@@ -358,6 +383,7 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
                 <LiveTurn m={m} trace={chat.trace} pulse={pulse} session={chat.sessionId} />
                 {m.content ? <Response>{withoutCallNotes(m.content)}</Response>
                   : m.cancelled ? <span className="dk-thinking">{t("Stopped.")}</span> : null}
+                {m.cancelled && m.content && <div className="dk-thinking" role="status">{t("Stopped.")}</div>}
                 {m.error && <div className="dk-err">{m.error}</div>}
                 {!m.streaming && !m.error && hasRenderableBlock(m.content) && <button className="dk-save-dashboard" onClick={() => {
                   const prompt = [...msgs.slice(0, index)].reverse().find(message => message.role === "user")?.content ?? "";
@@ -457,6 +483,10 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
           <button className="dk-icon" title={t("Hide this pane")} onClick={() => fold(true)}><PanelRightCloseIcon size={17} /></button>
         </div>
         <div className="cv-glass dk-screen">
+          {/* Shown when the pane floats over the conversation (a narrow
+              window): its tab row is up in the title bar there, where the
+              Mac app's own title bar can take the click. */}
+          <button className="dk-icon dk-float-x" title={t("Hide this pane")} aria-label={t("Hide this pane")} onClick={() => fold(true)}><XIcon size={16} /></button>
           <div className="dk-in">
             {current === "hive" && <LiveHive hive={hive} runs={runs} agents={linked} now={now} />}
             {current === "status" && <LiveStatus hive={hive} now={now} agents={linked} runs={runs} />}

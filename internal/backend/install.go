@@ -109,6 +109,40 @@ func (s *Service) registerInstallTools() {
 		destMeta,
 	)
 
+	// --- remove_skill / remove_mcp_server ---
+	svc.AddToolWithMetadata(
+		"remove_skill",
+		"Uninstall a skill: delete it and unload it, so it is gone at once — not only after a restart. Use this, never deleting the folder in a shell, which leaves the skill loaded. On a queen, the workers that got the skill from her drop it within a minute by themselves; a worker that installed its own copy has to be told to run remove_skill too.",
+		map[string]interface{}{
+			"type":       "object",
+			"properties": map[string]interface{}{"name": map[string]interface{}{"type": "string", "description": "The skill's name (its directory name)"}},
+			"required":   []string{"name"},
+		},
+		func(ctx context.Context, a map[string]interface{}) (interface{}, error) {
+			if err := s.UninstallSkill(ctx, argStr(a, "name")); err != nil {
+				return errResult(err.Error()), nil
+			}
+			return okData(map[string]any{"removed": argStr(a, "name")}), nil
+		},
+		destMeta,
+	)
+	svc.AddToolWithMetadata(
+		"remove_mcp_server",
+		"Uninstall an MCP server: remove it from mcpServers.json, stop it, and withdraw its tools now.",
+		map[string]interface{}{
+			"type":       "object",
+			"properties": map[string]interface{}{"name": map[string]interface{}{"type": "string", "description": "The server's name"}},
+			"required":   []string{"name"},
+		},
+		func(ctx context.Context, a map[string]interface{}) (interface{}, error) {
+			if err := s.UninstallMCPServer(argStr(a, "name")); err != nil {
+				return errResult(err.Error()), nil
+			}
+			return okData(map[string]any{"removed": argStr(a, "name")}), nil
+		},
+		destMeta,
+	)
+
 	// --- install_skill ---
 	svc.AddToolWithMetadata(
 		"install_skill",

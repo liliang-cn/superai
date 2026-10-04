@@ -69,7 +69,11 @@ func (a *App) registerCodingAgentTools(svc *backend.Service, cfg *backend.Settin
 			"required": []string{"agent", "prompt"},
 		},
 		func(ctx context.Context, args map[string]any) (any, error) {
-			return a.runCodingAgent(ctx, str(args["agent"]), str(args["prompt"]), str(args["cwd"]), str(args["continue_run"])), nil
+			id := a.tasks().Start(str(args["agent"]), backend.TaskOut, str(args["prompt"]))
+			a.tasks().InSession(id, backend.ChatSessionFrom(ctx))
+			out := a.runCodingAgent(ctx, str(args["agent"]), str(args["prompt"]), str(args["cwd"]), str(args["continue_run"]))
+			a.finishDelegated(id, out["ok"] == true, fmt.Sprint(orEmpty(out["answer"])), fmt.Sprint(orEmpty(out["error"])))
+			return out, nil
 		},
 		agent.ToolMetadata{Destructive: true})
 }
@@ -130,4 +134,46 @@ func (a *App) runCodingAgent(ctx context.Context, name, prompt, cwd, cont string
 		out["error"] = r.Error
 	}
 	return out
+}
+
+// finishDelegated closes the board entry for work handed to an agent outside
+// the hive — a coding agent on a linked machine, a named agent — so the hive's
+// live views show it beside the workers' orders, from start to answer.
+func (a *App) finishDelegated(id string, ok bool, answer, errMsg string) {
+	state := backend.TaskDone
+	if !ok {
+		state = backend.TaskFailed
+	}
+	a.tasks().Finish(id, state, firstLineOf(answer, 400), errMsg)
+}
+
+// delegateOutside hands an order to an agent outside the hive: a coding agent
+// on a linked machine ("codex.mac") or a named agent ("openclaw"). handled is
+// false when the name is neither. It is what hive_command does with such a
+// name, so a job's parts for workers and for agents go out in one call and run
+// at the same time.
+func (a *App) delegateOutside(ctx context.Context, name, prompt string) (text string, failed bool, handled bool) {
+	switch {
+	case a.isDrivenCLI(name):
+		id := a.tasks().Start(name, backend.TaskOut, prompt)
+		a.tasks().InSession(id, backend.ChatSessionFrom(ctx))
+		out := a.runCodingAgent(ctx, name, prompt, "", "")
+		ok := out["ok"] == true
+		answer, errMsg := fmt.Sprint(orEmpty(out["answer"])), fmt.Sprint(orEmpty(out["error"]))
+		a.finishDelegated(id, ok, answer, errMsg)
+		if !ok {
+			return firstNonEmpty(errMsg, answer), true, true
+		}
+		return answer, false, true
+	case a.addressable(name):
+		id := a.tasks().Start(name, backend.TaskOut, prompt)
+		a.tasks().InSession(id, backend.ChatSessionFrom(ctx))
+		res := a.askAgent(ctx, name, prompt)
+		a.finishDelegated(id, !res.Failed, res.Text, res.Reason)
+		if res.Failed {
+			return firstNonEmpty(res.Reason, res.Text), true, true
+		}
+		return res.Text, false, true
+	}
+	return "", false, false
 }

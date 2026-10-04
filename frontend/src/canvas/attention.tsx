@@ -1,4 +1,5 @@
-import { getLanguage, translate } from "../lib/i18n";
+import { summarizeAttention } from "../lib/attentionSummary";
+import { getLanguage, translate, useI18n } from "../lib/i18n";
 import { useEffect, useState } from "react";
 import { AlertTriangleIcon, BellIcon, CalendarIcon, CircleSlashIcon, TerminalIcon, BotIcon } from "lucide-react";
 import { Attention } from "../../wailsjs/go/app/App";
@@ -14,9 +15,10 @@ export interface AttentionItem {
   place?: string;
   ref?: string;
   open?: string;
+  updates?: number;
 }
 
-const TRIGGERS = ["hive:task", "cli:run", "agent:update", "schedule:changed", "schedule:run", "tool:approval", "tool:approval:resolved", "tool:approval:closed", "agents:changed"];
+const TRIGGERS = ["hive:task", "cli:run", "agent:update", "agent:report", "schedule:changed", "schedule:run", "tool:approval", "tool:approval:resolved", "tool:approval:closed", "agents:changed"];
 
 /** What needs the person, then what is coming up — the core's one answer,
  *  kept current by the events that change it and a minute's clock. */
@@ -29,7 +31,7 @@ export function useAttentionState() {
     let alive = true;
     let timer = 0;
     const load = () => Attention().then((list) => {
-      if (alive) { setItems((list ?? []) as unknown as AttentionItem[]); setError(""); }
+      if (alive) { setItems(summarizeAttention((list ?? []) as unknown as AttentionItem[])); setError(""); }
     }).catch(() => { if (alive) setError("Could not load items that need your attention."); })
       .finally(() => { if (alive) setLoading(false); });
     const soon = () => { window.clearTimeout(timer); timer = window.setTimeout(load, 250); };
@@ -55,9 +57,10 @@ const DAY = 24 * 3600 * 1000;
 export function whenOf(it: AttentionItem, now = new Date()): string {
   if (!it.at) return "";
   const d = new Date(it.at);
+  if (!Number.isFinite(d.getTime())) return "";
   const hm = (x: Date) => x.toLocaleTimeString(getLanguage(), { hour: "2-digit", minute: "2-digit", hour12: false });
   const start = new Date(now); start.setHours(0, 0, 0, 0);
-  const days = Math.floor((d.getTime() - start.getTime()) / DAY);
+  const days = Math.round((Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) - Date.UTC(start.getFullYear(), start.getMonth(), start.getDate())) / DAY);
   let day: string;
   if (it.level === "needs") {
     const mins = Math.round((now.getTime() - d.getTime()) / 60000);
@@ -86,6 +89,7 @@ const ICON: Record<string, typeof BellIcon> = {
 
 /** The list itself, for any screen. */
 export function AttentionList({ items, onOpen, skip = [], limit = 8 }: { items: AttentionItem[]; onOpen?: (it: AttentionItem) => void; skip?: string[]; limit?: number }) {
+  const { t } = useI18n();
   const [now, setNow] = useState(() => new Date());
   useEffect(() => { const t = window.setInterval(() => setNow(new Date()), 60000); return () => window.clearInterval(t); }, []);
   const shown = items.filter((i) => !skip.includes(i.kind)).slice(0, limit);
@@ -106,9 +110,9 @@ export function AttentionList({ items, onOpen, skip = [], limit = 8 }: { items: 
   };
   return (
     <div className="att">
-      {needs.length > 0 && <div className="att-h needs">Needs you</div>}
+      {needs.length > 0 && <div className="att-h needs">{t("Needs you")}</div>}
       {needs.map(row)}
-      {soon.length > 0 && <div className="att-h">Coming up</div>}
+      {soon.length > 0 && <div className="att-h">{t("Coming up")}</div>}
       {soon.map(row)}
     </div>
   );

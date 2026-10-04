@@ -36,3 +36,13 @@ export function viewOf(pathname: string): ViewKey {
 
 /** The address of one hive task. The id is a UUID, so it needs no escaping. */
 export const taskPath = (id: string) => `/hive/tasks/${id}`;
+
+/** Open the exact item that raised an attention card. */
+export function attentionPath(item: { kind: string; open?: string; ref?: string }): string {
+  if (item.kind === "failed" && item.ref) return taskPath(item.ref);
+  if (item.open === "agents") return PATHS.agents + (item.ref ? `?agent=${encodeURIComponent(item.ref)}` : "");
+  if (item.open === "coding") return PATHS.coding + (item.ref ? `?run=${encodeURIComponent(item.ref)}` : "");
+  if (item.kind === "reminder") return PATHS.records + "?tab=reminders";
+  if (item.open === "records") return PATHS.records;
+  return PATHS.hive;
+}
