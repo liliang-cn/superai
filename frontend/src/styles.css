@@ -1518,9 +1518,9 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
 .cr-orbital-foot .rose b { color: var(--cr-rose); } .cr-orbital-foot .lime b { color: var(--cr-lime); }
 
 .cr-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-.cr-stats.six { grid-template-columns: repeat(6, 1fr); }
-@media (max-width: 1100px) { .cr-stats.six { grid-template-columns: repeat(3, 1fr); } }
-@media (max-width: 640px) { .cr-stats.six { grid-template-columns: repeat(2, 1fr); } }
+.cr-stats.five { grid-template-columns: repeat(5, 1fr); }
+@media (max-width: 1100px) { .cr-stats.five { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 640px) { .cr-stats.five { grid-template-columns: repeat(2, 1fr); } }
 .cr-stat { background: linear-gradient(180deg, var(--cr-panel-2), var(--cr-panel)); border: 1px solid var(--cr-line); border-radius: 10px; padding: 12px 14px; position: relative; overflow: hidden; animation: cr-in .5s cubic-bezier(.2,.8,.2,1) both; }
 .cr-stat:nth-child(2) { animation-delay: .05s } .cr-stat:nth-child(3) { animation-delay: .1s } .cr-stat:nth-child(4) { animation-delay: .15s } .cr-stat:nth-child(5) { animation-delay: .2s } .cr-stat:nth-child(6) { animation-delay: .25s }
 .cr-stat::after { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 2px; background: var(--cr-line-2); }

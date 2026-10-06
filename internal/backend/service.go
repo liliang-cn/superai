@@ -538,26 +538,23 @@ func (s *Service) chatRunOptions(sessionID string, imagePaths []string) []agent.
 
 // TurnResult is what one turn produced: the answer, and what it cost.
 //
-// The cost is here because a turn a worker runs for the queen is spend the
+// The usage is here because a turn a worker runs for the queen is tokens the
 // queen's own accounting cannot see any other way: it reaches the queen in
 // chat:done and from there the observers on the queen's run. Usage is nil
-// and CostUnpriced true when the provider or the pricing table said nothing,
-// which is an unknown and not a zero.
+// when the provider said nothing, which is an unknown and not a zero.
 type TurnResult struct {
-	Text         string
-	Usage        *domain.TokenUsage
-	CostUSD      float64
-	CostUnpriced bool
+	Text  string
+	Usage *domain.TokenUsage
 }
 
 // Stream runs one turn, forwarding every agent event to emit, and returns the
-// final completion text. StreamTurn is the same turn with its cost.
+// final completion text. StreamTurn is the same turn with its usage.
 func (s *Service) Stream(ctx context.Context, sessionID, message string, imagePaths []string, emit func(ev *agent.Event)) (string, error) {
 	out, err := s.StreamTurn(ctx, sessionID, message, imagePaths, emit)
 	return out.Text, err
 }
 
-// StreamTurn runs one turn and returns the answer with what it cost.
+// StreamTurn runs one turn and returns the answer with the tokens it used.
 func (s *Service) StreamTurn(ctx context.Context, sessionID, message string, imagePaths []string, emit func(ev *agent.Event)) (TurnResult, error) {
 	var turn TurnResult
 	opts := s.chatRunOptions(sessionID, imagePaths)
@@ -603,7 +600,7 @@ func (s *Service) StreamTurn(ctx context.Context, sessionID, message string, ima
 		case agent.EventTypeComplete, agent.EventTypeBlocked:
 			final = ev.Content
 			sawTerminal = true
-			turn.Usage, turn.CostUSD, turn.CostUnpriced = ev.Usage, ev.EstimatedCostUSD, ev.CostUnpriced
+			turn.Usage = ev.Usage
 		case agent.EventTypeError:
 			lastErr = ev.Content
 		}

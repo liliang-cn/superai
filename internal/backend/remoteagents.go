@@ -339,12 +339,8 @@ type RemoteResult struct {
 	// TaskID names the order on the task board, for a worker reached over
 	// HTTP; empty for an agent run over SSH, which the board does not record.
 	TaskID string `json:"task_id,omitempty"`
-	// What the worker said its turn cost. Usage is nil when it said nothing;
-	// CostUnpriced is true when it could not price its model — an unknown,
-	// which must not be read as free.
-	Usage        *domain.TokenUsage `json:"usage,omitempty"`
-	CostUSD      float64            `json:"cost_usd,omitempty"`
-	CostUnpriced bool               `json:"cost_unpriced,omitempty"`
+	// The tokens the worker said its turn used; nil when it said nothing.
+	Usage *domain.TokenUsage `json:"usage,omitempty"`
 }
 
 // Bracket announces one remote run to whoever watches the caller's own run,

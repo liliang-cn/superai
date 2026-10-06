@@ -899,12 +899,9 @@ func (a *App) SendChat(sessionID, message string, imagePaths []string) string {
 		}
 		driver.Emit(backend.AvatarEvent{Type: "state", State: backend.AvatarStateIdle})
 		board.Finish(taskID, backend.TaskDone, reply, "")
-		// What the turn cost rides along, so a queen that ordered it can add
-		// it to its own accounting instead of reading the worker as free.
-		done := map[string]any{
-			"requestId": requestID, "final": reply, "emotion": emotion,
-			"estimated_cost_usd": turn.CostUSD, "cost_unpriced": turn.CostUnpriced,
-		}
+		// The tokens the turn used ride along, so a queen that ordered it can
+		// add them to its own accounting.
+		done := map[string]any{"requestId": requestID, "final": reply, "emotion": emotion}
 		if turn.Usage != nil {
 			done["usage"] = map[string]any{
 				"prompt_tokens":        turn.Usage.PromptTokens,

@@ -65,8 +65,7 @@ type AgentSpec struct {
 	// Where it reports.
 	Report AgentReport `json:"report"`
 	// Ceilings.
-	MaxWakesPerDay   int     `json:"maxWakesPerDay,omitempty"`
-	MaxCostPerDayUSD float64 `json:"maxCostPerDayUsd,omitempty"`
+	MaxWakesPerDay int `json:"maxWakesPerDay,omitempty"`
 	// HookSecret is the last part of the agent's webhook URL.
 	HookSecret string    `json:"hookSecret,omitempty"`
 	CreatedAt  time.Time `json:"createdAt"`
@@ -89,7 +88,6 @@ type AgentView struct {
 	NextDue      *time.Time  `json:"nextDue,omitempty"`
 	NextDueKind  string      `json:"nextDueKind,omitempty"`
 	WakesToday   int         `json:"wakesToday"`
-	CostTodayUSD float64     `json:"costTodayUsd"`
 	// HookPath is where an event can be POSTed, relative to this server.
 	HookPath string `json:"hookPath,omitempty"`
 	// WaitingFor names the tool its wake is waiting for you to approve.
@@ -119,7 +117,6 @@ type WakeMark struct {
 	Started   time.Time  `json:"started"`
 	Ended     *time.Time `json:"ended,omitempty"`
 	ToolCalls int        `json:"toolCalls"`
-	CostUSD   float64    `json:"costUsd"`
 	Error     string     `json:"error,omitempty"`
 	Notified  int        `json:"notified"`
 }
@@ -303,7 +300,7 @@ func viewOf(sp AgentSpec, st *agent.Standing) AgentView {
 			t := s.NextDue
 			v.NextDue, v.NextDueKind = &t, string(s.NextDueKind)
 		}
-		v.WakesToday, v.CostTodayUSD = s.WakesToday, s.CostTodayUSD
+		v.WakesToday = s.WakesToday
 	}
 	return v
 }
@@ -323,7 +320,7 @@ func (a *App) SaveStandingAgent(sp AgentSpec) (AgentView, error) {
 			return AgentView{}, fmt.Errorf("the schedule %q is not a valid cron: %v", sp.Cron, err)
 		}
 	}
-	if sp.EveryMinutes < 0 || sp.ScanEveryMinutes < 0 || sp.MaxWakesPerDay < 0 || sp.MaxCostPerDayUSD < 0 {
+	if sp.EveryMinutes < 0 || sp.ScanEveryMinutes < 0 || sp.MaxWakesPerDay < 0 {
 		return AgentView{}, errors.New("intervals and ceilings cannot be negative")
 	}
 	if err := tiersConflict(sp); err != nil {
@@ -368,7 +365,7 @@ func (a *App) SaveStandingAgent(sp AgentSpec) (AgentView, error) {
 	if sp.ScanEveryMinutes > 0 {
 		r.Scan = &agent.ScanPolicy{Every: time.Duration(sp.ScanEveryMinutes) * time.Minute}
 	}
-	r.MaxWakesPerDay, r.MaxCostPerDayUSD = sp.MaxWakesPerDay, sp.MaxCostPerDayUSD
+	r.MaxWakesPerDay = sp.MaxWakesPerDay
 	saved, err := st.Add(context.Background(), r)
 	if err != nil {
 		return AgentView{}, err
@@ -450,7 +447,7 @@ func (a *App) WakeStandingAgent(id, message string) error {
 
 func (a *App) recordWake(id string, w *agent.Wake) {
 	m := WakeMark{Agent: id, Kind: string(w.Kind), Reason: w.Reason, Started: w.StartedAt,
-		ToolCalls: w.ToolCalls, CostUSD: w.CostUSD, Error: w.Error, Notified: w.Notified}
+		ToolCalls: w.ToolCalls, Error: w.Error, Notified: w.Notified}
 	if !w.EndedAt.IsZero() {
 		t := w.EndedAt
 		m.Ended = &t

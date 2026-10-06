@@ -37,9 +37,6 @@ type LongRunOptions struct {
 	// long. A segment already started is allowed to finish, so the task ends
 	// at a hand-off point with its plan and workspace consistent.
 	MaxDuration time.Duration
-	// MaxCostUSD caps what the whole task may spend. Each segment is handed
-	// the remainder, so the ceiling holds inside a segment too.
-	MaxCostUSD float64
 	// TaskID names the task. Pass the id of an interrupted task to pick it
 	// back up: the plan and its checkpoints live under it, so a resumed run
 	// starts from what was already finished instead of from nothing.
@@ -91,12 +88,11 @@ type LongRunReport struct {
 	TaskID string `json:"task_id"`
 	// Done is true only when the task actually finished — not merely when the
 	// supervisor stopped asking.
-	Done     bool    `json:"done"`
-	Stop     string  `json:"stop"`
-	Segments int     `json:"segments"`
-	Text     string  `json:"text"`
-	CostUSD  float64 `json:"cost_usd"`
-	Duration string  `json:"duration"`
+	Done     bool   `json:"done"`
+	Stop     string `json:"stop"`
+	Segments int    `json:"segments"`
+	Text     string `json:"text"`
+	Duration string `json:"duration"`
 }
 
 // Traces is the store this service writes per-task traces through.
@@ -121,7 +117,6 @@ func (s *Service) StreamLong(ctx context.Context, goal string, o LongRunOptions,
 		MaxSegments:      o.MaxSegments,
 		RoundsPerSegment: o.RoundsPerSegment,
 		MaxDuration:      o.MaxDuration,
-		MaxTotalCostUSD:  o.MaxCostUSD,
 	}
 	var opts []agent.RunOption
 	if o.TaskID != "" {
@@ -181,7 +176,6 @@ func (s *Service) StreamLong(ctx context.Context, goal string, o LongRunOptions,
 		Stop:     string(out.Result.Stop),
 		Segments: len(out.Result.Segments),
 		Text:     out.Result.Text,
-		CostUSD:  out.Result.TotalCostUSD,
 		Duration: time.Since(began).Round(time.Second).String(),
 	}, nil
 }

@@ -40,15 +40,14 @@ type RoundStat struct {
 
 // SegmentStat is one run of a segmented task.
 type SegmentStat struct {
-	Index      int     `json:"index"`
-	SessionID  string  `json:"sessionId"`
-	StartedAt  string  `json:"startedAt"`
-	EndedAt    string  `json:"endedAt,omitempty"`
-	StopReason string  `json:"stopReason,omitempty"`
-	Productive bool    `json:"productive"`
-	CostUSD    float64 `json:"costUsd"`
-	Err        string  `json:"err,omitempty"`
-	Rounds     int     `json:"rounds"`
+	Index      int    `json:"index"`
+	SessionID  string `json:"sessionId"`
+	StartedAt  string `json:"startedAt"`
+	EndedAt    string `json:"endedAt,omitempty"`
+	StopReason string `json:"stopReason,omitempty"`
+	Productive bool   `json:"productive"`
+	Err        string `json:"err,omitempty"`
+	Rounds     int    `json:"rounds"`
 }
 
 // LogLine is one line of the activity narration.
@@ -87,12 +86,8 @@ type TaskState struct {
 	Checkpoints int            `json:"checkpoints"`
 	Errors      int            `json:"errors"`
 
-	TotalTokens int     `json:"totalTokens"`
-	TotalCached int     `json:"totalCached"`
-	CostUSD     float64 `json:"costUsd"`
-	// Unpriced means CostUSD is 0 because nothing could price the model, not
-	// because the task was free.
-	Unpriced bool `json:"unpriced,omitempty"`
+	TotalTokens int `json:"totalTokens"`
+	TotalCached int `json:"totalCached"`
 
 	Log []LogLine `json:"log"`
 }
@@ -231,12 +226,9 @@ func (w *RunWall) OnSegment(_ context.Context, info agent.SegmentInfo) {
 				s.EndedAt = nowStamp()
 				s.StopReason = string(info.StopReason)
 				s.Productive = info.Productive
-				s.CostUSD = info.CostUSD
 				s.Err = info.Err
 			}
 		}
-		t.CostUSD = info.CostUSD
-		t.Unpriced = t.Unpriced || info.Unpriced
 		status := string(info.StopReason)
 		if info.Err != "" {
 			status = "FAILED: " + oneLine(info.Err, 80)
@@ -462,28 +454,26 @@ func (w *RunWall) Snapshot(ctx context.Context, taskID string) *TaskState {
 // TaskSummary is one card on the fleet: enough to see how every task is
 // doing at once without opening any of them.
 type TaskSummary struct {
-	TaskID      string  `json:"taskId"`
-	Goal        string  `json:"goal"`
-	Model       string  `json:"model"`
-	StartedAt   string  `json:"startedAt"`
-	EndedAt     string  `json:"endedAt,omitempty"`
-	Running     bool    `json:"running"`
-	Done        bool    `json:"done"`
-	Stop        string  `json:"stop,omitempty"`
-	Segments    int     `json:"segments"`
-	MaxSegments int     `json:"maxSegments"`
-	SegmentOpen bool    `json:"segmentOpen"`
-	Rounds      int     `json:"rounds"`
-	LastTokens  int     `json:"lastTokens"`
-	LastTools   int     `json:"lastTools"`
-	TotalTokens int     `json:"totalTokens"`
-	TotalCached int     `json:"totalCached"`
-	CostUSD     float64 `json:"costUsd"`
-	Unpriced    bool    `json:"unpriced,omitempty"`
-	Rejected    int     `json:"rejected"`
-	Errors      int     `json:"errors"`
-	PlanDone    int     `json:"planDone"`
-	PlanTotal   int     `json:"planTotal"`
+	TaskID      string `json:"taskId"`
+	Goal        string `json:"goal"`
+	Model       string `json:"model"`
+	StartedAt   string `json:"startedAt"`
+	EndedAt     string `json:"endedAt,omitempty"`
+	Running     bool   `json:"running"`
+	Done        bool   `json:"done"`
+	Stop        string `json:"stop,omitempty"`
+	Segments    int    `json:"segments"`
+	MaxSegments int    `json:"maxSegments"`
+	SegmentOpen bool   `json:"segmentOpen"`
+	Rounds      int    `json:"rounds"`
+	LastTokens  int    `json:"lastTokens"`
+	LastTools   int    `json:"lastTools"`
+	TotalTokens int    `json:"totalTokens"`
+	TotalCached int    `json:"totalCached"`
+	Rejected    int    `json:"rejected"`
+	Errors      int    `json:"errors"`
+	PlanDone    int    `json:"planDone"`
+	PlanTotal   int    `json:"planTotal"`
 	// Spark is tokens per turn for the last few turns, for a card sparkline.
 	Spark []int `json:"spark"`
 }
@@ -504,7 +494,7 @@ func (w *RunWall) List() []TaskSummary {
 			Running: t.Running, Done: t.Done, Stop: t.Stop,
 			Segments: len(t.Segments), MaxSegments: t.MaxSegments,
 			Rounds:      len(t.Rounds),
-			TotalTokens: t.TotalTokens, TotalCached: t.TotalCached, CostUSD: t.CostUSD, Unpriced: t.Unpriced,
+			TotalTokens: t.TotalTokens, TotalCached: t.TotalCached,
 			Rejected: t.LintRetries + t.LintBlocks, Errors: t.Errors,
 		}
 		if n := len(t.Segments); n > 0 && t.Segments[n-1].EndedAt == "" {

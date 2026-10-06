@@ -4,7 +4,7 @@ import {
   Dashboard, GetStatus, GraphView as startGraphView, LongRunList, LongRunStart, LongRunState, LongRunStop,
 } from "../../wailsjs/go/app/App";
 import {
-  Activity, AlertTriangle, Brain, Clock, Coins, Cpu, Database, Gauge, GitBranch, Grid3x3,
+  Activity, AlertTriangle, Brain, Clock, Cpu, Database, Gauge, GitBranch, Grid3x3,
   ListChecks, Radio, RotateCcw, ScrollText, Shield, Sparkles, Square, Terminal, Wrench,
 } from "lucide-react";
 import Reactor, { Counters, Pillar, PulseTicker, usePulse } from "../components/Reactor";
@@ -33,19 +33,19 @@ import { useDaylight } from "../lib/useDaylight";
 
 // ---- shapes ----
 interface RoundStat { segment: number; round: number; tokens: number; cached: number; tools: number; text: number; durMs: number; compacted?: boolean; lint?: string; retried?: boolean; failed?: boolean }
-interface SegmentStat { index: number; sessionId: string; startedAt: string; endedAt?: string; stopReason?: string; productive: boolean; costUsd: number; err?: string; rounds: number }
+interface SegmentStat { index: number; sessionId: string; startedAt: string; endedAt?: string; stopReason?: string; productive: boolean; err?: string; rounds: number }
 interface LogLine { at: string; kind: string; text: string }
 interface PlanItem { text: string; done: boolean; note?: string }
 interface TaskState {
   taskId: string; goal: string; model: string; startedAt: string; endedAt?: string; done: boolean; running: boolean; stop?: string; final?: string; maxSegments: number;
   segments: SegmentStat[]; rounds: RoundStat[]; plan: PlanItem[]; toolCounts: Record<string, number>; toolCalls: number; toolErrors: number;
   lints: Record<string, number>; lintRetries: number; lintBlocks: number; compactions: number; retries: number; checkpoints: number; errors: number;
-  totalTokens: number; totalCached: number; costUsd: number; unpriced?: boolean; log: LogLine[];
+  totalTokens: number; totalCached: number; log: LogLine[];
 }
 interface TaskSummary {
   taskId: string; goal: string; model: string; startedAt: string; endedAt?: string; running: boolean; done: boolean; stop?: string;
   segments: number; maxSegments: number; segmentOpen: boolean; rounds: number; lastTokens: number; lastTools: number;
-  totalTokens: number; totalCached: number; costUsd: number; unpriced?: boolean; rejected: number; errors: number; planDone: number; planTotal: number; spark: number[];
+  totalTokens: number; totalCached: number; rejected: number; errors: number; planDone: number; planTotal: number; spark: number[];
 }
 // Where a task is on the loop, from its summary alone — the same rule the
 // detail view uses, so a card and the orbital never disagree.
@@ -279,11 +279,10 @@ export default function StatsView() {
       </section>
 
       {/* ── the system ── */}
-      <section className={`cr-stats${d ? " six" : ""}`}>
+      <section className={`cr-stats${d ? " five" : ""}`}>
         <Stat icon={<Cpu size={14} />} label="Model" value={<span className="cr-stat-txt">{dash?.llm?.model || "—"}</span>} sub={<>{dash?.llm?.maxRounds ?? "—"} rounds/turn · {short(dash?.llm?.baseURL || "", 34)}</>} />
         <Stat icon={<Gauge size={14} />} label="Tokens today" value={<Num v={dash?.usage?.today ?? 0} />} sub={<>{fmtK(dash?.usage?.totalTokens ?? 0)} all time · {pct(dash?.usage?.cachedTokens ?? 0, dash?.usage?.totalTokens ?? 0)}% cached · 7d {fmtK(days.reduce((a, x) => a + x.tokens, 0))}</>} tone="cyan" />
         {d && st && <Stat icon={<Sparkles size={14} />} label="Cache hit" value={d ? <Num v={d.cacheRate} fmt={(n) => Math.round(n) + "%"} /> : <span className="cr-dim">—</span>} sub={d ? `${fmtK(st!.totalCached)} / ${fmtK(st!.totalTokens)} this task` : "select or start a task"} tone={!d ? undefined : d.cacheRate >= 80 ? "lime" : "amber"} />}
-        {d && st && <Stat icon={<Coins size={14} />} label="Spend" value={!st ? <span className="cr-dim">—</span> : st.unpriced ? <span className="cr-dim">unpriced</span> : <Num v={st.costUsd} fmt={(n) => "$" + n.toFixed(3)} />} sub={!st ? "select or start a task" : st.unpriced ? "no rates for this model · set llm_price_* in settings" : `this task · ${st.segments.length} segments`} tone={!st ? undefined : st.unpriced ? "rose" : "amber"} />}
         <Stat icon={<Activity size={14} />} label="Turns" value={<Num v={dash?.usage?.modelTurns ?? 0} />} sub={<>{dash?.tasks?.length ?? 0} tasks on record · {dash?.activeRuns?.length ?? 0} active</>} />
         {d && st && <Stat icon={<Shield size={14} />} label="Lint gate" value={d ? <span className={d.rejected ? "rose" : "lime"}><Num v={d.rejected} /></span> : <span className="cr-dim">—</span>} sub={d ? `${pct(d.accepted, Math.max(1, d.rs.length))}% clean turns` : "select or start a task"} tone={!d ? undefined : d.rejected ? "rose" : "lime"} />}
       </section>
@@ -312,7 +311,6 @@ export default function StatsView() {
                   <span><b>{t.planDone}</b>/{t.planTotal || "?"} plan</span>
                   <span><b>{t.rounds}</b> turns</span>
                   <span><b>{cache}%</b> cache</span>
-                  <span>{t.unpriced ? <b className="cr-dim" title="no rates for this model">unpriced</b> : <b>${t.costUsd.toFixed(2)}</b>}</span>
                   <span className={t.rejected ? "rose" : ""}><b>{t.rejected}</b> rej</span>
                   <span className="cr-task-time">{elapsed(t.startedAt, t.endedAt)}</span>
                 </div>
@@ -325,7 +323,7 @@ export default function StatsView() {
                 <div className="cr-task-actions" onClick={(e) => e.stopPropagation()}>
                   <span role="button" className="cr-btn tiny" onClick={() => setTraceId(t.taskId)} title="Every event this task emitted, one per row"><Terminal size={10} />Trace</span>
                   {t.running && <span role="button" className="cr-btn tiny" onClick={() => LongRunStop(t.taskId)}><Square size={10} />Stop</span>}
-                  {!t.running && !t.done && <span role="button" className="cr-btn tiny" onClick={() => LongRunStart(t.goal, segs, rounds, minutes, 0, t.taskId, unattended).then(loadList)}><RotateCcw size={10} />Resume</span>}
+                  {!t.running && !t.done && <span role="button" className="cr-btn tiny" onClick={() => LongRunStart(t.goal, segs, rounds, minutes, t.taskId, unattended).then(loadList)}><RotateCcw size={10} />Resume</span>}
                 </div>
               </button>
             );

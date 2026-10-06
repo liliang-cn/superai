@@ -17,14 +17,20 @@
 # another provider altogether, SUPERAI_LLM_BASE_URL='https://api.deepseek.com'
 # with SUPERAI_LLM_KEY_ENV=DEEPSEEK_API_KEY (the name of a variable in this
 # shell holding the key; the key goes through a pipe, never an argument) and
-# SUPERAI_LLM_MODEL='deepseek-flash'. Roles come from the settings: the queen
-# accepts joins and the workers announce themselves.
+# SUPERAI_LLM_MODEL='deepseek-flash'. How much the model holds is optional
+# and stated, never looked up by name: SUPERAI_LLM_CONTEXT_TOKENS=1000000 and
+# SUPERAI_LLM_MAX_OUTPUT_TOKENS=384000 (the provider's own page says); unset,
+# the hive keeps whatever the source settings say, and with neither agent-go
+# compacts at a fixed 60k. Roles come from the settings: the queen accepts
+# joins and the workers announce themselves.
 set -euo pipefail
 export SUPERAI_PASSWORD_HASH="${SUPERAI_PASSWORD_HASH:-}"
 export SUPERAI_NEW_TOKEN="${SUPERAI_NEW_TOKEN:-}"
 export SUPERAI_LLM_MODEL="${SUPERAI_LLM_MODEL:-}"
 export SUPERAI_LLM_BASE_URL="${SUPERAI_LLM_BASE_URL:-}"
 export SUPERAI_LLM_KEY_ENV="${SUPERAI_LLM_KEY_ENV:-}"
+export SUPERAI_LLM_CONTEXT_TOKENS="${SUPERAI_LLM_CONTEXT_TOKENS:-}"
+export SUPERAI_LLM_MAX_OUTPUT_TOKENS="${SUPERAI_LLM_MAX_OUTPUT_TOKENS:-}"
 if [ -n "$SUPERAI_LLM_BASE_URL" ] && { [ -z "$SUPERAI_LLM_KEY_ENV" ] || [ -z "${!SUPERAI_LLM_KEY_ENV:-}" ]; }; then
   echo "SUPERAI_LLM_BASE_URL needs SUPERAI_LLM_KEY_ENV naming a set variable" >&2; exit 1
 fi
@@ -40,7 +46,8 @@ token = secrets.token_hex(24) if os.environ.get('NEW') else a['token']
 # The voice too: the console reads answers aloud through /api/tts, and a
 # queen without these answers 501 and the console falls back to the browser's
 # own voice.
-base = {k: s[k] for k in ('llm_base_url','llm_key','llm_model','embed_base_url','embed_key','embed_model',
+base = {k: s[k] for k in ('llm_base_url','llm_key','llm_model','llm_context_tokens','llm_max_output_tokens',
+                          'embed_base_url','embed_key','embed_model',
                           'searxng_url','tts_base_url','tts_key','tts_model','tts_voice') if k in s}
 # The hive speaks with Microsoft Edge's Xiaoxiao, through the converter in
 # deploy/k3s/edge-tts: quicker and more natural than the gateway's model. The
@@ -54,15 +61,6 @@ base.update(memory_backend='shared', shared_memory_endpoint=s['shared_memory_end
             # Off: the default starts an embedded proxy with no accounts in it and
             # routes the model through that, which answers "unknown provider".
             cliproxy_enabled=False)
-# What the model costs, so a turn's cost is a number and not "unpriced": agent-go
-# has no Gemini rates of its own. Gemini 3.8 Flash's introductory prices, per
-# 1K tokens, valid through 2026-12-31 (ai.google.dev/gemini-api/docs/pricing);
-# from 2027-01-01 they double to 0.0015 / 0.00015 / 0.0075.
-if base.get('llm_model', '').startswith('gemini-3.8-flash'):
-    base.update(llm_price_input_per_1k=0.00075, llm_price_cached_per_1k=0.000075, llm_price_output_per_1k=0.00375)
-    # And what it holds (the model page, ai.google.dev/gemini-api/docs/models):
-    # without it the conversation compacts at 60k tokens of a 1M window.
-    base.update(llm_context_tokens=1048576, llm_max_output_tokens=65536)
 # Roles, not a list. The queen accepts joins; a worker announces itself to it
 # (superai-hive/1, see internal/backend/hive.go), so the roster is whoever is
 # actually there and adding a worker is raising the replica count.
@@ -85,16 +83,21 @@ print(json.dumps(out))
 PY" | python3 -c '
 import json, os, sys
 d = json.load(sys.stdin)
-url = os.environ.get("SUPERAI_LLM_BASE_URL")
-if url:
-    # Another provider: its address and key replace the gateway ones in both roles.
-    key = os.environ[os.environ["SUPERAI_LLM_KEY_ENV"]]
-    for k in ("settings-queen.json", "settings-worker.json"):
-        s = json.loads(d[k])
-        s.update(llm_base_url=url, llm_key=key)
-        for p in ("llm_price_input_per_1k", "llm_price_cached_per_1k", "llm_price_output_per_1k", "llm_context_tokens", "llm_max_output_tokens"):
-            s.pop(p, None)
-        d[k] = json.dumps(s)
+env = os.environ.get
+url, window, out = env("SUPERAI_LLM_BASE_URL"), env("SUPERAI_LLM_CONTEXT_TOKENS"), env("SUPERAI_LLM_MAX_OUTPUT_TOKENS")
+for k in ("settings-queen.json", "settings-worker.json"):
+    s = json.loads(d[k])
+    if url:
+        # Another provider: its address and key replace the gateway ones, and
+        # what the source said its model holds no longer applies.
+        s.update(llm_base_url=url, llm_key=env(env("SUPERAI_LLM_KEY_ENV")))
+        s.pop("llm_context_tokens", None)
+        s.pop("llm_max_output_tokens", None)
+    if window:
+        s["llm_context_tokens"] = int(window)
+    if out:
+        s["llm_max_output_tokens"] = int(out)
+    d[k] = json.dumps(s)
 print(json.dumps(d))
 ' | ssh "$KUBE" "python3 -c '
 import json, subprocess, sys, tempfile, os
