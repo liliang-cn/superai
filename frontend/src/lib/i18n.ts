@@ -1,9 +1,15 @@
 import { useSyncExternalStore } from "react";
 export type Language = "en" | "zh-CN";
 const KEY = "superai-language";
+// English is the default; Chinese is a choice in Settings (the core's case
+// in the world, or the Settings page). A choice made before English became
+// the default is reset once.
 function initial(): Language {
-  try { const saved = localStorage.getItem(KEY); if (saved === "en" || saved === "zh-CN") return saved; } catch { /* private browser */ }
-  return navigator.language.toLowerCase().startsWith("zh") ? "zh-CN" : "en";
+  try {
+    if (!localStorage.getItem(KEY + "-v2")) { localStorage.setItem(KEY + "-v2", "1"); localStorage.setItem(KEY, "en"); }
+    const saved = localStorage.getItem(KEY); if (saved === "en" || saved === "zh-CN") return saved;
+  } catch { /* private browser */ }
+  return "en";
 }
 let language = initial();
 const listeners = new Set<() => void>();

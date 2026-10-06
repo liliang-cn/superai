@@ -1,6 +1,7 @@
 import { translate, useI18n } from "../lib/i18n";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { PATHS } from "../lib/routes";
+import { focusInWorld } from "../world/bus";
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { SquareIcon, ChevronRightIcon, PlusIcon, ArrowUpIcon, TerminalIcon, FolderIcon } from "lucide-react";
 import "./coding.css";
@@ -174,7 +175,7 @@ export default function AgentsView() {
           {threads.map((t) => {
             const { cli, host } = partsOf(t.agent);
             return (
-              <button key={t.id} className={`cd-item${t.id === selected ? " on" : ""}`} onClick={() => setSelected(t.id)}>
+              <button key={t.id} className={`cd-item${t.id === selected ? " on" : ""}`} onClick={() => { setSelected(t.id); focusInWorld("machine", t.latest.remote || host || "core"); }}>
                 <span className="cd-item-top">
                   <i className={`cd-dot ${t.latest.state}`} />
                   <b>{cli}</b>

@@ -5,6 +5,7 @@ import { EventsOn } from "../../wailsjs/runtime";
 import { Link, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import HiveTaskPage, { FullTask } from "./HiveTaskPage";
 import { taskPath } from "../lib/routes";
+import { focusInWorld, isSelected, useWorldSelection } from "../world/bus";
 import type { StageHandle, StagePulse, StageTask } from "../components/HiveStage";
 import { QUEEN, SELF } from "../components/hiveFx";
 import { useHiveMeter } from "../components/HiveMeter";
@@ -93,6 +94,7 @@ function ago(iso: string, now: number): string {
 }
 
 export default function HiveView() {
+  const sel = useWorldSelection();
   const navigate = useNavigate();
   // The swarm view folds away and stays the way it was left.
   const [st, setSt] = useState<Status | null>(null);
@@ -293,7 +295,8 @@ export default function HiveView() {
                     {members.map((m) => {
                       const t = doingOf(m.name);
                       return (
-                        <div className={`hive-roster-row${m.state === "lost" ? " lost" : ""}${t ? " busy" : ""}`} role="row" key={m.name}>
+                        <div className={`hive-roster-row${m.state === "lost" ? " lost" : ""}${t ? " busy" : ""}${isSelected(sel, "worker", m.name) ? " on" : ""}`} role="row" key={m.name}
+                          onClick={() => focusInWorld("worker", m.name)}>
                           <span className={`hive-live-dot ${t ? "running" : m.state === "live" ? "done" : "failed"}`} title={m.state} />
                           <span className="hive-roster-name">
                             <b>{short(m.name)}</b>

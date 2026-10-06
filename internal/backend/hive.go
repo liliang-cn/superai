@@ -127,6 +127,9 @@ type HiveHello struct {
 	// claude"), and About is a line for the roster. Both are only labels.
 	Engine string `json:"engine,omitempty"`
 	About  string `json:"about,omitempty"`
+	// Node is the machine the worker runs on ($SUPERAI_NODE; in k3s the pod's
+	// node), so a client can draw workers where they really are.
+	Node string `json:"node,omitempty"`
 }
 
 // HiveWelcome is the queen's answer.
@@ -151,6 +154,7 @@ type HiveMember struct {
 	// heartbeat of the one it replaced.
 	StartedAt time.Time `json:"started_at"`
 	Engine    string    `json:"engine,omitempty"`
+	Node      string    `json:"node,omitempty"`
 	about     string
 	// State is "live" or "lost", computed when asked rather than stored, so it
 	// cannot go stale between sweeps.
@@ -217,7 +221,7 @@ func (h *Hive) Join(hello HiveHello) (HiveWelcome, error) {
 		log.Printf("hive: %s is back at %s", hello.Name, hello.URL)
 	}
 	m.Role, m.URL, m.Version, m.token, m.LastSeen = hello.Role, strings.TrimRight(hello.URL, "/"), hello.Version, hello.Token, now
-	m.StartedAt, m.Engine, m.about = hello.StartedAt, hello.Engine, hello.About
+	m.StartedAt, m.Engine, m.about, m.Node = hello.StartedAt, hello.Engine, hello.About, hello.Node
 	return HiveWelcome{
 		Protocol: HiveProtocol, Queen: h.name,
 		IntervalMS: int(h.interval / time.Millisecond), Members: len(h.members),
@@ -401,6 +405,7 @@ func (a *Announcer) Once(ctx context.Context) (HiveWelcome, error) {
 	body, _ := json.Marshal(HiveHello{
 		Protocol: HiveProtocol, Name: a.Name(), Role: HiveRoleWorker, URL: a.advertise(),
 		Token: a.Token, Version: a.Version, StartedAt: a.started, Engine: a.Engine, About: a.About,
+		Node: os.Getenv("SUPERAI_NODE"),
 	})
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
 		strings.TrimRight(a.Settings.JoinURL, "/")+"/api/hive/join", bytes.NewReader(body))

@@ -87,6 +87,7 @@ spec:
             - {name: SUPERAI_PASSWORD_HASH, valueFrom: {secretKeyRef: {name: superai-hive, key: password_hash, optional: true}}}
             - {name: SUPERAI_USER, valueFrom: {secretKeyRef: {name: superai-hive, key: user, optional: true}}}
             - {name: POD_NAME, valueFrom: {fieldRef: {fieldPath: metadata.name}}}
+            - {name: SUPERAI_NODE, valueFrom: {fieldRef: {fieldPath: spec.nodeName}}}
             - {name: SUPERAI_ADVERTISE_URL, value: "http://$(POD_NAME).superai-queen.superai.svc.cluster.local:43117"}
             # Core: agents dial in here over gRPC (proto/agentlink/v1).
             - {name: SUPERAI_AGENT_PORT, value: "43120"}
@@ -152,6 +153,7 @@ spec:
             - {name: SUPERAI_PASSWORD_HASH, valueFrom: {secretKeyRef: {name: superai-hive, key: password_hash, optional: true}}}
             - {name: SUPERAI_USER, valueFrom: {secretKeyRef: {name: superai-hive, key: user, optional: true}}}
             - {name: POD_NAME, valueFrom: {fieldRef: {fieldPath: metadata.name}}}
+            - {name: SUPERAI_NODE, valueFrom: {fieldRef: {fieldPath: spec.nodeName}}}
             - {name: SUPERAI_ADVERTISE_URL, value: "http://$(POD_NAME).superai-worker.superai.svc.cluster.local:43117"}
             # Each worker is also an agent of the queen, over the agent link.
             - {name: SUPERAI_CORE, value: "superai-queen.superai.svc.cluster.local:43120"}

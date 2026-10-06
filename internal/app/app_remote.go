@@ -236,8 +236,10 @@ func (a *App) askAgent(ctx context.Context, name, prompt string) backend.RemoteR
 		}
 		return res
 	}
-	if a.remoteRunner().Config().Has(name) {
-		res, err := a.remoteRunner().Run(ctx, name, prompt)
+	// A worker of this hive is on the runner's roster, not in its config.
+	runner := a.remoteRunner()
+	if _, onRoster := runner.Workers()[name]; onRoster || runner.Config().Has(name) {
+		res, err := runner.Run(ctx, name, prompt)
 		if err != nil {
 			return backend.RemoteResult{Agent: name, Failed: true, Reason: err.Error()}
 		}

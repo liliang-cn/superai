@@ -570,3 +570,89 @@ html[data-desk] body { background: transparent; }
 /* Long conversation names must not push the status line into the transcript. */
 .dk-chead > div { min-width:0; flex:1; }
 .dk-chead b { display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+/* ── The world behind the app (src/world) ─────────────────────────────── */
+.dk-shell.dk-world > .wl-root { position: absolute; z-index: 0; }
+/* A page floats on the left on its card; the district shows to its right. */
+.dk-world .dk-page { justify-self: start; width: clamp(520px, 50%, 820px); }
+/* The home grid lets clicks through to the world where it shows. */
+.dk-world .dk { pointer-events: none; }
+.dk-world .dk > * { pointer-events: auto; }
+.dk-world .dk-live { pointer-events: none; }
+.dk-world .dk-live > .dk-tabs, .dk-world .dk-live > .dk-ctl, .dk-world .dk-live .dk-float-x { pointer-events: auto; }
+.dk-world .dk-screen.see-world { background: transparent; border: 0; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; pointer-events: none; }
+.dk-world .dk-screen:not(.see-world) { pointer-events: auto; }
+@media (max-width: 1240px) { .dk-world .dk-page { width: auto; justify-self: stretch; } }
+/* Over the world, cards are white enough to read and show nothing through. */
+.dk-world .cv-glass { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(18px) saturate(1.1); -webkit-backdrop-filter: blur(18px) saturate(1.1); }
+.dk-world .dk-screen.see-world { background: transparent; }
+
+/* Over the world a page is a panel, not a sheet: narrow, floating, with the
+   world all around it. Pages that need room get more of it. */
+.dk-world .dk-page { width: 440px; margin: 6px 0 14px 4px; border-radius: 20px; box-shadow: 0 18px 50px rgba(22, 32, 43, 0.16), 0 0 0 1px rgba(22, 32, 43, 0.05); }
+.dk-world .dk-page.page-settings, .dk-world .dk-page.page-knowledge, .dk-world .dk-page.page-stats,
+.dk-world .dk-page.page-records, .dk-world .dk-page.page-dashboards, .dk-world .dk-page.page-skills,
+.dk-world .dk-page.page-mcp, .dk-world .dk-page.page-coding { width: 600px; }
+
+/* Needs you, as a panel: compact rows; the selected one is the crate that is
+   lit in the world. */
+.dk-world .attention-view { padding: 18px 16px; }
+.dk-world .attention-heading { margin-bottom: 14px; gap: 10px; }
+.dk-world .attention-heading h1 { font-size: 20px; }
+.dk-world .attention-heading p { font-size: 12.5px; margin-top: 2px; }
+.dk-world .attention-symbol { width: 38px; height: 38px; border-radius: 12px; }
+.dk-world .attention-symbol svg { width: 18px; height: 18px; }
+.dk-world .attention-view button { padding: 7px 11px; font-size: 13px; }
+.dk-world .attention-cards { gap: 8px; }
+.dk-world .attention-card { flex-wrap: wrap; gap: 6px 10px; padding: 12px 14px; border-left-width: 3px; cursor: pointer; transition: box-shadow 0.15s, background 0.15s; }
+.dk-world .attention-card:hover { background: #f7f9fc; }
+.dk-world .attention-card.on { box-shadow: 0 0 0 2px #2f5bea; background: #f4f7ff; }
+.dk-world .attention-card-icon { width: 17px; height: 17px; margin-top: 2px; }
+.dk-world .attention-card-content { flex: 1 1 calc(100% - 40px); }
+.dk-world .attention-card h2 { font-size: 14.5px; margin: 2px 0; }
+.dk-world .attention-card p { font-size: 12.5px; margin: 4px 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.dk-world .attention-card small { margin-top: 4px; font-size: 11.5px; }
+.dk-world .attention-card .attention-action, .dk-world .attention-card .attention-actions { margin-left: 27px; }
+.dk-world .attention-card .attention-actions { flex-direction: row; }
+.dk-world .attention-section-title { margin: 10px 0 8px; font-size: 13px; }
+.dk-world .hive-roster-row { cursor: pointer; border-radius: 10px; }
+.dk-world .hive-roster-row:hover { background: #f4f7fb; }
+.dk-world .hive-roster-row.on { background: #eef3ff; box-shadow: inset 3px 0 0 #2f5bea; }
+.dk-world .dk-page.page-hive { width: 520px; }
+.dk-world .dk-page.page-agents { width: 620px; }
+/* A page's list is a fallback over the world, shown with the List button. */
+.dk-world:not(.panel-on) .dk-page { display: none; }
+/* Home's conversation is the fallback too: kept mounted (it holds the chat),
+   shown with the List button. */
+.dk-world:not(.panel-on) > .dk { display: none; }
+.dk-world.panel-on .wc { left: auto; right: 90px; transform: none; width: min(560px, 40%); }
+/* The menu is the fallback too: the rail and the side buttons show only in
+   Menu mode. */
+.dk-world:not(.panel-on) > .dk-rail,
+.dk-world:not(.panel-on) > .dk-side-strip { display: none; }
+.dk-world:not(.panel-on) .wl-cam { right: 20px; }
+
+/* A page opened full size over the world: the screen of the thing it
+   belongs to, in a window with a way back. */
+.dk-world.window-on > .dk-rail, .dk-world.window-on > .dk-side-strip { display: none; }
+.dk-world.window-on > .dk-page {
+  display: flex; position: fixed; z-index: 8; inset: 52px 72px 44px 72px; width: auto; margin: 0;
+  border-radius: 18px; background: #fff; box-shadow: 0 30px 80px rgba(22, 32, 43, 0.28), 0 0 0 1px rgba(22, 32, 43, 0.08);
+  animation: dk-win-in 0.22s ease-out;
+}
+.dk-world.window-on > .dk {
+  display: grid; position: fixed; z-index: 8; inset: 52px 72px 44px 72px; margin: 0;
+  grid-template-columns: var(--dk-side-width, 252px) minmax(0, 1fr) 0 !important; grid-template-rows: minmax(0, 1fr);
+  background: #f3f5f8; border-radius: 18px; padding: 10px; box-shadow: 0 30px 80px rgba(22, 32, 43, 0.28);
+  animation: dk-win-in 0.22s ease-out;
+}
+.dk-world.window-on > .dk > .dk-live, .dk-world.window-on > .dk > .dk-live-strip { display: none; }
+.dk-world.window-on .wc { display: none; }
+@keyframes dk-win-in { from { opacity: 0; transform: scale(0.97); } }
+.dk-win-x { position: fixed; z-index: 9; top: 40px; right: 58px; width: 34px; height: 34px; border-radius: 50%; border: 0; background: #16202b; color: #fff; display: grid; place-items: center; cursor: pointer; box-shadow: 0 6px 16px rgba(22, 32, 43, 0.3); }
+/* The window always takes the same frame, whatever width the page had as a
+   panel, and its close button sits on its own corner. */
+.dk-world.window-on > .dk-page { width: auto !important; justify-self: stretch; }
+.dk-world.window-on > .dk-win-x { top: 64px; right: 84px; width: 30px; height: 30px; background: #f1f4f8; color: #16202b; box-shadow: none; border: 1px solid rgba(22, 32, 43, 0.1); }
+.dk-world.window-on > .dk-win-x:hover { background: #16202b; color: #fff; }
+.dk-world.window-on > .dk-page > .content { padding-right: 40px; }
