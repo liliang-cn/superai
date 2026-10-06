@@ -486,3 +486,30 @@ func TestAMessageSomeoneIsWaitingForGoesToTheWait(t *testing.T) {
 	}
 	time.Sleep(100 * time.Millisecond) // room for a wrong wake to show itself
 }
+
+func TestAskingAHiveWorkerByNameGoesToTheWorker(t *testing.T) {
+	// A worker is on the hive's roster, not in the remote-agents config; a
+	// direct question to it must still reach it rather than fall through to
+	// the local coding CLIs.
+	var hit sync.Once
+	reached := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hit.Do(func() { close(reached) })
+		http.Error(w, "not a real worker", http.StatusTeapot)
+	}))
+	t.Cleanup(srv.Close)
+	q := &App{settings: &backend.Settings{Hive: backend.HiveSettings{Role: backend.HiveRoleQueen, Name: "q"}}}
+	q.hive = backend.NewHive("q", 10*time.Second)
+	if _, err := q.hive.Join(backend.HiveHello{Protocol: backend.HiveProtocol, Name: "w9", Role: backend.HiveRoleWorker, URL: srv.URL}); err != nil {
+		t.Fatal(err)
+	}
+	res := q.AskRemoteAgent("w9", "who are you?")
+	select {
+	case <-reached:
+	default:
+		t.Fatalf("the worker was never asked; got %+v", res)
+	}
+	if strings.Contains(res.Reason, "agent CLIs") {
+		t.Fatalf("fell through to the CLIs: %+v", res)
+	}
+}

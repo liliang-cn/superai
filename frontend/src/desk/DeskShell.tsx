@@ -1,11 +1,11 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ListTodoIcon, LayoutDashboardIcon, ChartColumnIcon, PanelRightOpenIcon, BookOpenIcon, BotIcon, HexagonIcon, MessageSquareIcon, PaletteIcon,
-  NotebookTabsIcon, PuzzleIcon, SlidersHorizontalIcon, TerminalIcon,
+  NotebookTabsIcon, PuzzleIcon, SlidersHorizontalIcon, TerminalIcon, XIcon,
 } from "lucide-react";
 import DeskStatusBar from "./DeskStatusBar";
-import Sky, { Lane } from "../canvas/Sky";
+import World from "../world/World";
 import { CanvasTheme, loadTheme, saveTheme, themeVars } from "../canvas/theme";
 import { useCodingRuns } from "../canvas/data";
 import { PATHS } from "../lib/routes";
@@ -58,6 +58,35 @@ export default function DeskShell({ view, badges, children, onOpenConversation, 
   const [theme, setThemeState] = useState<CanvasTheme>(loadTheme);
   const setTheme = (t: CanvasTheme) => { setThemeState(t); saveTheme(t); };
   const [theming, setTheming] = useState(false);
+  // The world is the app. A page opens full size over it as the screen of
+  // the thing it belongs to ("window"); the old rail and lists are the
+  // fallback ("menu").
+  const [mode, setMode] = useState<"world" | "menu" | "window">("world");
+  const pendingWindow = useRef(false);
+  useEffect(() => {
+    setMode((m) => (pendingWindow.current ? "window" : m === "menu" ? "menu" : "world"));
+    pendingWindow.current = false;
+  }, [view]);
+  useEffect(() => {
+    const open = (e: Event) => {
+      const path = (e as CustomEvent<string>).detail;
+      pendingWindow.current = true;
+      navigate(path);
+      // Same page: the view does not change, so open it here.
+      window.setTimeout(() => { if (pendingWindow.current) { pendingWindow.current = false; setMode("window"); } }, 50);
+    };
+    const theme = () => setTheming(true);
+    // Esc closes the window, unless someone is typing in it.
+    const esc = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !(e.target as HTMLElement)?.closest?.("input,textarea,[contenteditable=true]")) setMode((m) => (m === "window" ? "world" : m));
+    };
+    window.addEventListener("keydown", esc);
+    window.addEventListener("superai:window", open);
+    window.addEventListener("superai:theme", theme);
+    return () => { window.removeEventListener("keydown", esc); window.removeEventListener("superai:window", open); window.removeEventListener("superai:theme", theme); };
+  }, [navigate]);
+  const panel = mode === "menu";
+  const setPanel = (f: (v: boolean) => boolean) => setMode((m) => (f(m === "menu") ? "menu" : "world"));
   const runs = useCodingRuns();
   const liveRuns = runs.filter((r) => r.state === "running").length;
 
@@ -75,17 +104,12 @@ export default function DeskShell({ view, badges, children, onOpenConversation, 
     if (!served) void SetWindowTheme(theme.mode === "dark").catch(() => {});
   }, [theme.mode]);
 
-  const lanes = useMemo<Lane[]>(() => {
-    const palette: [number, number, number][] = [[242, 165, 22], [255, 120, 90], [70, 180, 170], [60, 170, 100], [80, 150, 240]];
-    return Array.from({ length: 5 }, (_, i) => ({ key: "d" + i, busy: 0.12, rgb: palette[i] }));
-  }, []);
-
   const count = (k: ViewKey) => (k === "coding" ? liveRuns : badges?.[k] ?? 0);
 
   return (
     <ThemeCtx.Provider value={{ theme, setTheme }}>
-      <div className={`cv-root dk-shell ${theme.mode === "dark" ? "dk-dark" : ""}`} style={themeVars(theme)}>
-        <Sky at={new Date()} lanes={lanes} base={theme.base} mode={theme.mode} />
+      <div className={`cv-root dk-shell dk-world${mode === "menu" ? " panel-on" : mode === "window" ? " window-on" : ""} ${theme.mode === "dark" ? "dk-dark" : ""}`} style={themeVars(theme)}>
+        <World view={view} panel={panel} onPanel={() => setPanel((v) => !v)} />
         <div className="dk-bar" style={drag} />
         <div className="dk-corner" style={noDrag}>
           <NotificationCenter variant="desk" onOpenConversation={onOpenConversation} />
@@ -123,9 +147,12 @@ export default function DeskShell({ view, badges, children, onOpenConversation, 
           </nav>
         )}
         {view === "home" ? children : (
-          <main className="cv-glass dk-page with-side">
+          <main className={`cv-glass dk-page with-side page-${view}`}>
             <div className="content">{children}</div>
           </main>
+        )}
+        {mode === "window" && (
+          <button className="dk-win-x" style={noDrag} title={t("Back to the world")} onClick={() => setMode("world")}><XIcon size={18} /></button>
         )}
         <DeskStatusBar status={status} loading={loading} codingRuns={liveRuns}/>
       </div>

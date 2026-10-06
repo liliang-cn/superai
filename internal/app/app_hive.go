@@ -181,6 +181,7 @@ func (a *App) HiveStatus() map[string]any {
 		name, _ = os.Hostname()
 	}
 	out["name"] = name
+	out["node"] = os.Getenv("SUPERAI_NODE")
 	if h != nil {
 		out["members"] = h.Members()
 		out["interval_ms"] = int(s.Hive.Interval() / time.Millisecond)

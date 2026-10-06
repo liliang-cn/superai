@@ -1,4 +1,5 @@
 import { useSearchParams } from "react-router-dom";
+import { focusInWorld, useWorldSelection } from "../world/bus";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PauseIcon, PlayIcon, ZapIcon, CopyIcon, XIcon, PlusIcon } from "lucide-react";
 import {
@@ -135,6 +136,9 @@ export default function StandingView({ children }: { children?: React.ReactNode 
   const agentId = params.get("agent") ?? "";
   const [open, setOpen] = useState(agentId);
   useEffect(() => { setOpen(agentId); }, [agentId]);
+  // A bee picked in the world opens here too.
+  const picked = useWorldSelection();
+  useEffect(() => { if (picked?.kind === "bee") setOpen(picked.id); }, [picked]);
   const [editing, setEditing] = useState<Spec | null>(null);
   const [error, setError] = useState("");
   const [now, setNow] = useState(Date.now());
@@ -219,7 +223,7 @@ export default function StandingView({ children }: { children?: React.ReactNode 
                 from={from}
                 now={now}
                 open={open === a.id}
-                onOpen={() => setOpen(open === a.id ? "" : a.id)}
+                onOpen={() => { setOpen(open === a.id ? "" : a.id); if (open !== a.id) focusInWorld("bee", a.id); }}
               />
               {open === a.id && (
                 <Detail

@@ -1229,6 +1229,7 @@ export namespace backend {
 	    // Go type: time
 	    started_at: any;
 	    engine?: string;
+	    node?: string;
 	    state: string;
 	
 	    static createFrom(source: any = {}) {
@@ -1245,6 +1246,7 @@ export namespace backend {
 	        this.last_seen = this.convertValues(source["last_seen"], null);
 	        this.started_at = this.convertValues(source["started_at"], null);
 	        this.engine = source["engine"];
+	        this.node = source["node"];
 	        this.state = source["state"];
 	    }
 	

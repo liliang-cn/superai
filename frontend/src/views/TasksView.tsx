@@ -1,9 +1,11 @@
 import { useI18n } from "../lib/i18n";
 import { useNavigate } from "react-router-dom";
+import { useEffect } from "react";
 import { ArrowRightIcon, BellIcon, BotIcon, ShieldAlertIcon, TriangleAlertIcon, CheckCircleIcon } from "lucide-react";
 import { AttentionItem, attentionTitle, whenOf } from "../canvas/attention";
 import { ToolApproval } from "../lib/useToolApprovals";
 import { PATHS, attentionPath } from "../lib/routes";
+import { focusInWorld, isSelected, useWorldSelection } from "../world/bus";
 import "./tasks.css";
 const TYPES: Record<string, { label: string; action: string; Icon: typeof BellIcon }> = {
   reminder: {label:"Reminder", action:"View reminder", Icon:BellIcon},
@@ -23,6 +25,12 @@ export default function TasksView({attention, approvals, onOpenConversation, onR
 }) {
   const { t } = useI18n();
   const navigate = useNavigate();
+  const sel = useWorldSelection();
+  // A row's object in the world is marked when either side selects it.
+  useEffect(() => {
+    if (!sel) return;
+    document.querySelector(".attention-card.on")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [sel]);
   const items = attention.items.filter(i=>i.level==="needs" && i.kind!=="reminder");
   const reminders = attention.items.filter(i => i.kind === "reminder");
   const order = ["approval","bee","report","failed","run","lost"];
@@ -43,7 +51,8 @@ export default function TasksView({attention, approvals, onOpenConversation, onR
       const type=TYPES[it.kind] ?? {label:"Needs attention",action:"Open details",Icon:BellIcon};
       const Icon=type.Icon;
       const approval=approvals.find(a=>a.id===it.ref);
-      return <div key={`${it.kind}-${it.ref}-${index}`}>{it.kind === "reminder" && index === sorted.length && <h2 className="attention-section-title">{t("Reminders")} <span>{reminders.length}</span></h2>}<article className={`attention-card ${it.kind}`} key={`${it.kind}-${it.ref}-${index}`}>
+      return <div key={`${it.kind}-${it.ref}-${index}`}>{it.kind === "reminder" && index === sorted.length && <h2 className="attention-section-title">{t("Reminders")} <span>{reminders.length}</span></h2>}<article className={`attention-card ${it.kind}${isSelected(sel, it.kind, it.ref) ? " on" : ""}`} key={`${it.kind}-${it.ref}-${index}`}
+        onClick={(e) => { if (!(e.target as HTMLElement).closest("button")) focusInWorld(it.kind, it.ref ?? ""); }}>
         <Icon size={22} className="attention-card-icon"/><div className="attention-card-content"><span className="attention-category">{t(type.label)}</span><h2>{attentionTitle(it)}</h2>{it.kind === "report" && <small>{t("{count} updates · latest shown", {count:it.updates ?? 1})}</small>}{it.detail && !(approval?.command && approval.command === it.detail) && <p>{it.detail}</p>}{it.kind === "reminder" && <p className="attention-reminder-time">{whenOf(it)}</p>}{approval?.command && <pre>{approval.command}</pre>}{it.kind!=="report" && <small>{t(it.kind==="approval" ? "The agent is paused until you review this request." : it.kind==="bee" ? "The agent needs your input to continue." : it.kind==="reminder" ? "Open your reminders to review this item." : "Open the original item to investigate and take action.")}</small>}</div>
         {it.kind==="approval" && approval && onResolve ? (
           <div className="attention-actions">
