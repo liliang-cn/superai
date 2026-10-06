@@ -156,17 +156,8 @@ func applySettingsProvider(out *DoctorReport, home string) {
 	}
 	// agent-go's own per-provider checks never run here — the provider lives
 	// in settings.json, not agentgo.db — so ask the one question of theirs
-	// that matters for a long task: can this model be priced at all? Loading
-	// the settings above already registered any rates they carry.
-	pricing := DoctorCheck{Name: "llm.pricing", Status: "ok", Detail: st.LLMModel + " is priced"}
-	if _, known := pool.LookupModelPricing(st.LLMModel); !known {
-		pricing = DoctorCheck{
-			Name: "llm.pricing", Status: "warn",
-			Detail: "no rates for " + st.LLMModel + "; spend reads 0 and the cost ceiling never fires",
-			Fix:    "set llm_price_input_per_1k, llm_price_cached_per_1k and llm_price_output_per_1k in settings.json",
-		}
-	}
-	out.Checks = append(out.Checks, pricing)
+	// that matters for a long task: does it know how much this model holds?
+	// Loading the settings above already registered any window they carry.
 	window := DoctorCheck{Name: "llm.window", Status: "ok", Detail: st.LLMModel + " has a known context window"}
 	if _, known := pool.LookupModelWindow(st.LLMModel); !known {
 		window = DoctorCheck{

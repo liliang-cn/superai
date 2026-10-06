@@ -59,7 +59,7 @@ func (a *App) registerLongTaskTools(svc *backend.Service, cfg *backend.Settings)
 			if segments == 0 {
 				segments = 8
 			}
-			id := a.LongRunStart(goal, segments, 40, minutes, 0, "", unattended)
+			id := a.LongRunStart(goal, segments, 40, minutes, "", unattended)
 			return map[string]any{"ok": true, "id": id, "max_minutes": minutes, "max_segments": segments}, nil
 		},
 		agent.ToolMetadata{Destructive: true})

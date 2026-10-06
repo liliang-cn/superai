@@ -20,13 +20,6 @@ type Settings struct {
 	LLMBaseURL string `json:"llm_base_url"`
 	LLMKey     string `json:"llm_key"`
 	LLMModel   string `json:"llm_model"`
-	// Rates for LLMModel, USD per 1k tokens. agent-go has no price table of its
-	// own: unpriced, every cost reads 0 and the spend ceilings never trigger.
-	// Set these and the run wall, the health card and MaxTotalCostUSD all
-	// start meaning something.
-	LLMPriceInputPer1K  float64 `json:"llm_price_input_per_1k,omitempty"`
-	LLMPriceCachedPer1K float64 `json:"llm_price_cached_per_1k,omitempty"`
-	LLMPriceOutputPer1K float64 `json:"llm_price_output_per_1k,omitempty"`
 	// LLMContextTokens is LLMModel's context window, and LLMMaxOutputTokens the
 	// most one response may use. agent-go derives when to compact from the
 	// window and knows none by itself; unset, it compacts at a fixed 60k
@@ -119,8 +112,7 @@ type Settings struct {
 	// MaxRounds is the tool-call round budget for one turn. agent.UnlimitedRounds
 	// (-1) removes the budget entirely, which also removes the only thing that
 	// stops a model looping on a failing tool — there is no wall-clock deadline
-	// on a turn and the spend ceilings are inert until llm_price_* are set, so
-	// unlimited means the stop button is the backstop.
+	// on a turn, so unlimited means the stop button is the backstop.
 	MaxRounds int  `json:"max_rounds"`
 	Headless  bool `json:"headless"`
 
@@ -562,7 +554,6 @@ func (s *Settings) backfill(def *Settings) {
 	if s.CLIProxyPort <= 0 {
 		s.CLIProxyPort = def.CLIProxyPort
 	}
-	s.registerPricing()
 	s.registerWindow()
 	// An older settings file has no memory_backend; it was on local memory, so
 	// that is what it stays on.
@@ -590,21 +581,6 @@ func (s *Settings) backfill(def *Settings) {
 
 // Save writes the settings to ~/.superai/settings.json (creating the
 // data directory if needed).
-// registerPricing tells agent-go what the brain's model costs, when the
-// settings say. Registered rates win over the bundled table, so a public
-// name can be corrected too. Nothing set leaves the table alone.
-func (s *Settings) registerPricing() {
-	model := strings.TrimSpace(s.LLMModel)
-	if model == "" || (s.LLMPriceInputPer1K <= 0 && s.LLMPriceOutputPer1K <= 0) {
-		return
-	}
-	pool.RegisterModelPricing(model, pool.ModelPricing{
-		InputPer1K:       s.LLMPriceInputPer1K,
-		CachedInputPer1K: s.LLMPriceCachedPer1K,
-		OutputPer1K:      s.LLMPriceOutputPer1K,
-	})
-}
-
 // registerWindow tells agent-go how much the brain's model holds, when the
 // settings say.
 func (s *Settings) registerWindow() {

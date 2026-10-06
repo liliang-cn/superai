@@ -133,8 +133,7 @@ export namespace agent {
 	    started_at: any;
 	    // Go type: time
 	    ended_at?: any;
-	    cost_usd: number;
-	    unpriced?: boolean;
+	    usage?: domain.TokenUsage;
 	    tool_calls: number;
 	    error?: string;
 	    notified: number;
@@ -154,8 +153,7 @@ export namespace agent {
 	        this.run_id = source["run_id"];
 	        this.started_at = this.convertValues(source["started_at"], null);
 	        this.ended_at = this.convertValues(source["ended_at"], null);
-	        this.cost_usd = source["cost_usd"];
-	        this.unpriced = source["unpriced"];
+	        this.usage = this.convertValues(source["usage"], domain.TokenUsage);
 	        this.tool_calls = source["tool_calls"];
 	        this.error = source["error"];
 	        this.notified = source["notified"];
@@ -276,7 +274,6 @@ export namespace app {
 	    scanEveryMinutes?: number;
 	    report: AgentReport;
 	    maxWakesPerDay?: number;
-	    maxCostPerDayUsd?: number;
 	    hookSecret?: string;
 	    // Go type: time
 	    createdAt: any;
@@ -305,7 +302,6 @@ export namespace app {
 	        this.scanEveryMinutes = source["scanEveryMinutes"];
 	        this.report = this.convertValues(source["report"], AgentReport);
 	        this.maxWakesPerDay = source["maxWakesPerDay"];
-	        this.maxCostPerDayUsd = source["maxCostPerDayUsd"];
 	        this.hookSecret = source["hookSecret"];
 	        this.createdAt = this.convertValues(source["createdAt"], null);
 	    }
@@ -347,7 +343,6 @@ export namespace app {
 	    scanEveryMinutes?: number;
 	    report: AgentReport;
 	    maxWakesPerDay?: number;
-	    maxCostPerDayUsd?: number;
 	    hookSecret?: string;
 	    // Go type: time
 	    createdAt: any;
@@ -360,7 +355,6 @@ export namespace app {
 	    nextDue?: any;
 	    nextDueKind?: string;
 	    wakesToday: number;
-	    costTodayUsd: number;
 	    hookPath?: string;
 	    waitingFor?: string;
 	
@@ -388,7 +382,6 @@ export namespace app {
 	        this.scanEveryMinutes = source["scanEveryMinutes"];
 	        this.report = this.convertValues(source["report"], AgentReport);
 	        this.maxWakesPerDay = source["maxWakesPerDay"];
-	        this.maxCostPerDayUsd = source["maxCostPerDayUsd"];
 	        this.hookSecret = source["hookSecret"];
 	        this.createdAt = this.convertValues(source["createdAt"], null);
 	        this.paused = source["paused"];
@@ -399,7 +392,6 @@ export namespace app {
 	        this.nextDue = this.convertValues(source["nextDue"], null);
 	        this.nextDueKind = source["nextDueKind"];
 	        this.wakesToday = source["wakesToday"];
-	        this.costTodayUsd = source["costTodayUsd"];
 	        this.hookPath = source["hookPath"];
 	        this.waitingFor = source["waitingFor"];
 	    }
@@ -943,7 +935,6 @@ export namespace app {
 	    // Go type: time
 	    ended?: any;
 	    toolCalls: number;
-	    costUsd: number;
 	    error?: string;
 	    notified: number;
 	
@@ -959,7 +950,6 @@ export namespace app {
 	        this.started = this.convertValues(source["started"], null);
 	        this.ended = this.convertValues(source["ended"], null);
 	        this.toolCalls = source["toolCalls"];
-	        this.costUsd = source["costUsd"];
 	        this.error = source["error"];
 	        this.notified = source["notified"];
 	    }
@@ -1720,8 +1710,6 @@ export namespace backend {
 	    ms: number;
 	    task_id?: string;
 	    usage?: domain.TokenUsage;
-	    cost_usd?: number;
-	    cost_unpriced?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new RemoteResult(source);
@@ -1737,8 +1725,6 @@ export namespace backend {
 	        this.ms = source["ms"];
 	        this.task_id = source["task_id"];
 	        this.usage = this.convertValues(source["usage"], domain.TokenUsage);
-	        this.cost_usd = source["cost_usd"];
-	        this.cost_unpriced = source["cost_unpriced"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -1798,7 +1784,6 @@ export namespace backend {
 	    endedAt?: string;
 	    stopReason?: string;
 	    productive: boolean;
-	    costUsd: number;
 	    err?: string;
 	    rounds: number;
 	
@@ -1814,7 +1799,6 @@ export namespace backend {
 	        this.endedAt = source["endedAt"];
 	        this.stopReason = source["stopReason"];
 	        this.productive = source["productive"];
-	        this.costUsd = source["costUsd"];
 	        this.err = source["err"];
 	        this.rounds = source["rounds"];
 	    }
@@ -1823,9 +1807,6 @@ export namespace backend {
 	    llm_base_url: string;
 	    llm_key: string;
 	    llm_model: string;
-	    llm_price_input_per_1k?: number;
-	    llm_price_cached_per_1k?: number;
-	    llm_price_output_per_1k?: number;
 	    llm_context_tokens?: number;
 	    llm_max_output_tokens?: number;
 	    embed_base_url: string;
@@ -1873,9 +1854,6 @@ export namespace backend {
 	        this.llm_base_url = source["llm_base_url"];
 	        this.llm_key = source["llm_key"];
 	        this.llm_model = source["llm_model"];
-	        this.llm_price_input_per_1k = source["llm_price_input_per_1k"];
-	        this.llm_price_cached_per_1k = source["llm_price_cached_per_1k"];
-	        this.llm_price_output_per_1k = source["llm_price_output_per_1k"];
 	        this.llm_context_tokens = source["llm_context_tokens"];
 	        this.llm_max_output_tokens = source["llm_max_output_tokens"];
 	        this.embed_base_url = source["embed_base_url"];
@@ -1998,8 +1976,6 @@ export namespace backend {
 	    errors: number;
 	    totalTokens: number;
 	    totalCached: number;
-	    costUsd: number;
-	    unpriced?: boolean;
 	    log: LogLine[];
 	
 	    static createFrom(source: any = {}) {
@@ -2033,8 +2009,6 @@ export namespace backend {
 	        this.errors = source["errors"];
 	        this.totalTokens = source["totalTokens"];
 	        this.totalCached = source["totalCached"];
-	        this.costUsd = source["costUsd"];
-	        this.unpriced = source["unpriced"];
 	        this.log = this.convertValues(source["log"], LogLine);
 	    }
 	
@@ -2073,8 +2047,6 @@ export namespace backend {
 	    lastTools: number;
 	    totalTokens: number;
 	    totalCached: number;
-	    costUsd: number;
-	    unpriced?: boolean;
 	    rejected: number;
 	    errors: number;
 	    planDone: number;
@@ -2103,8 +2075,6 @@ export namespace backend {
 	        this.lastTools = source["lastTools"];
 	        this.totalTokens = source["totalTokens"];
 	        this.totalCached = source["totalCached"];
-	        this.costUsd = source["costUsd"];
-	        this.unpriced = source["unpriced"];
 	        this.rejected = source["rejected"];
 	        this.errors = source["errors"];
 	        this.planDone = source["planDone"];

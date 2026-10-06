@@ -33,7 +33,6 @@ interface Wake {
   started_at: string;
   ended_at?: string;
   tool_calls: number;
-  cost_usd: number;
   error?: string;
 }
 type View = Spec & {
@@ -44,7 +43,6 @@ type View = Spec & {
   lastWake?: Wake;
   nextDue?: string;
   wakesToday: number;
-  costTodayUsd: number;
   hookPath?: string;
   waitingFor?: string;
 };
@@ -102,7 +100,6 @@ const blank = (): Spec =>
     scanEveryMinutes: 0,
     report: { push: true, telegram: false },
     maxWakesPerDay: 0,
-    maxCostPerDayUsd: 0,
   }) as unknown as Spec;
 
 const t = (s?: string) => parseTime(s)?.getTime() ?? 0;
@@ -695,9 +692,7 @@ function Editor({ spec, onClose, onSaved }: { spec: Spec; onClose: () => void; o
               </div>
               <span>At most</span>
               <div>
-                <input type="number" min={0} value={s.maxWakesPerDay || ""} onChange={(e) => set("maxWakesPerDay", Number(e.target.value) || 0)} placeholder="24" /> wakes
-                <em>and</em>
-                $<input type="number" min={0} step="0.1" value={s.maxCostPerDayUsd || ""} onChange={(e) => set("maxCostPerDayUsd", Number(e.target.value) || 0)} placeholder="—" /> a day
+                <input type="number" min={0} value={s.maxWakesPerDay || ""} onChange={(e) => set("maxWakesPerDay", Number(e.target.value) || 0)} placeholder="24" /> wakes a day
               </div>
             </div>
             <p className="ed-hint">Also wakes when it asks to, when you tell it something, and when its webhook is called.</p>

@@ -233,7 +233,7 @@ func askWorker(ctx context.Context, t workerTarget, prompt string, progress func
 			}
 			text, _ := ev.Payload["final"].(string)
 			res.Text = strings.TrimSpace(text)
-			readTurnCost(ev.Payload, &res)
+			readTurnUsage(ev.Payload, &res)
 			switch ev.Name {
 			case "chat:error":
 				msg, _ := ev.Payload["error"].(string)
@@ -273,10 +273,10 @@ func cancelWorker(base, token, requestID string) {
 	}
 }
 
-// readTurnCost takes what a worker reported about its turn's cost out of a
-// terminal event. A worker built before it reported any leaves everything at
-// its zero value, and Usage nil is exactly how "it did not say" is spelled.
-func readTurnCost(payload map[string]any, res *RemoteResult) {
+// readTurnUsage takes what a worker reported about its turn's tokens out of a
+// terminal event. A worker built before it reported any leaves Usage nil,
+// which is exactly how "it did not say" is spelled.
+func readTurnUsage(payload map[string]any, res *RemoteResult) {
 	if u, ok := payload["usage"].(map[string]any); ok {
 		n := func(k string) int {
 			f, _ := u[k].(float64)
@@ -289,8 +289,6 @@ func readTurnCost(payload map[string]any, res *RemoteResult) {
 			CacheWriteTokens:   n("cache_write_tokens"),
 		}
 	}
-	res.CostUSD, _ = payload["estimated_cost_usd"].(float64)
-	res.CostUnpriced, _ = payload["cost_unpriced"].(bool)
 }
 
 // eventLines reads an event stream a line at a time, and passes over a line

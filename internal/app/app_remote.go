@@ -69,7 +69,7 @@ func (a *App) remoteRunner() *backend.RemoteRunner {
 				out := agent.RemoteAgentRunResult{
 					Agent: res.Agent, Provider: "superai-hive", Endpoint: res.Host,
 					Summary: res.Text, Failed: res.Failed, Reason: res.Reason, Duration: res.MS,
-					Usage: res.Usage, CostUSD: res.CostUSD, CostUnpriced: res.CostUnpriced || res.Usage == nil,
+					Usage: res.Usage,
 				}
 				if err == nil && res.Failed {
 					err = errors.New(res.Reason)
