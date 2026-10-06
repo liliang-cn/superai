@@ -13,12 +13,21 @@
 #
 # Model and CortexDB credentials are copied from the same place.
 # SUPERAI_LLM_MODEL='gemini-3.8-flash' runs the hive on another of the gateway's
-# models — for when the usual one has no account behind it. Roles come from the
-# settings: the queen accepts joins and the workers announce themselves.
+# models — for when the usual one has no account behind it. To run it on
+# another provider altogether, SUPERAI_LLM_BASE_URL='https://api.deepseek.com'
+# with SUPERAI_LLM_KEY_ENV=DEEPSEEK_API_KEY (the name of a variable in this
+# shell holding the key; the key goes through a pipe, never an argument) and
+# SUPERAI_LLM_MODEL='deepseek-flash'. Roles come from the settings: the queen
+# accepts joins and the workers announce themselves.
 set -euo pipefail
 export SUPERAI_PASSWORD_HASH="${SUPERAI_PASSWORD_HASH:-}"
 export SUPERAI_NEW_TOKEN="${SUPERAI_NEW_TOKEN:-}"
 export SUPERAI_LLM_MODEL="${SUPERAI_LLM_MODEL:-}"
+export SUPERAI_LLM_BASE_URL="${SUPERAI_LLM_BASE_URL:-}"
+export SUPERAI_LLM_KEY_ENV="${SUPERAI_LLM_KEY_ENV:-}"
+if [ -n "$SUPERAI_LLM_BASE_URL" ] && { [ -z "$SUPERAI_LLM_KEY_ENV" ] || [ -z "${!SUPERAI_LLM_KEY_ENV:-}" ]; }; then
+  echo "SUPERAI_LLM_BASE_URL needs SUPERAI_LLM_KEY_ENV naming a set variable" >&2; exit 1
+fi
 SRC="${SUPERAI_SRC:-ops@192.168.123.65}"
 KUBE="${SUPERAI_KUBE:-orange1}"
 NS=superai
@@ -73,7 +82,21 @@ out = {'token': token, 'user': a.get('user') or 'superai', 'password_hash': a.ge
                   'settings-queen.json': json.dumps(queen), 'settings-worker.json': json.dumps(worker)}
 if os.environ.get('PW'): out['password_hash'] = os.environ['PW']
 print(json.dumps(out))
-PY" | ssh "$KUBE" "python3 -c '
+PY" | python3 -c '
+import json, os, sys
+d = json.load(sys.stdin)
+url = os.environ.get("SUPERAI_LLM_BASE_URL")
+if url:
+    # Another provider: its address and key replace the gateway ones in both roles.
+    key = os.environ[os.environ["SUPERAI_LLM_KEY_ENV"]]
+    for k in ("settings-queen.json", "settings-worker.json"):
+        s = json.loads(d[k])
+        s.update(llm_base_url=url, llm_key=key)
+        for p in ("llm_price_input_per_1k", "llm_price_cached_per_1k", "llm_price_output_per_1k", "llm_context_tokens", "llm_max_output_tokens"):
+            s.pop(p, None)
+        d[k] = json.dumps(s)
+print(json.dumps(d))
+' | ssh "$KUBE" "python3 -c '
 import json, subprocess, sys, tempfile, os
 d = json.load(sys.stdin)
 with tempfile.TemporaryDirectory() as t:
