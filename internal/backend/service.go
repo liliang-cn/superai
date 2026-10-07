@@ -10,9 +10,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/liliang-cn/agent-go/v3/pkg/agent"
 	"github.com/liliang-cn/agent-go/v3/pkg/config"
@@ -1217,7 +1219,7 @@ func SplitEmotion(text string) (reply, emotion string) {
 
 	rest, ok := strings.CutPrefix(last, moodMarker)
 	if !ok {
-		return text, ""
+		return splitInlineEmotion(text, trimmed)
 	}
 	emotion = strings.TrimSpace(rest)
 	if emotion == "" {
@@ -1232,6 +1234,29 @@ func SplitEmotion(text string) (reply, emotion string) {
 	reply = strings.TrimRight(trimmed[:cut], " \t\r\n")
 	reply = strings.TrimSuffix(reply, "\\n")
 	return strings.TrimRight(reply, " \t\r\n"), emotion
+}
+
+// splitInlineEmotion peels a tag the model wrote on the answer's own last
+// line instead of below it — "其余时间空着。MOOD: neutral" reached a person
+// that way, tag and all, from a final answer the model handed in through
+// task_complete. Mid-line, only a tag that ends the reply, names one of the
+// avatar's moods and follows the end of a sentence counts; anything looser
+// would cut a reply that is talking about the format.
+func splitInlineEmotion(text, trimmed string) (string, string) {
+	i := strings.LastIndex(trimmed, moodMarker)
+	if i <= 0 {
+		return text, ""
+	}
+	emotion := strings.TrimSpace(trimmed[i+len(moodMarker):])
+	if !slices.Contains(AvatarEmotions(), emotion) {
+		return text, ""
+	}
+	before := strings.TrimRight(trimmed[:i], " \t")
+	r, _ := utf8.DecodeLastRuneInString(before)
+	if !strings.ContainsRune("。！？.!?", r) {
+		return text, ""
+	}
+	return before, emotion
 }
 
 // Plan returns the current plan for a task, or nil.
