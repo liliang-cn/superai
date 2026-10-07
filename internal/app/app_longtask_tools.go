@@ -44,6 +44,7 @@ func (a *App) registerLongTaskTools(svc *backend.Service, cfg *backend.Settings)
 				"goal":         map[string]any{"type": "string", "description": "The whole job, self-contained: what done looks like, where to work, constraints."},
 				"max_minutes":  map[string]any{"type": "integer", "minimum": 1, "description": "Time limit. Default 240."},
 				"max_segments": map[string]any{"type": "integer", "minimum": 1, "description": "At most this many segments. Default 8."},
+				"max_tokens":   map[string]any{"type": "integer", "minimum": 1, "description": "Optional token budget for the whole task. Only when the person gives one; otherwise the settings decide, and by default there is none."},
 			},
 			"required": []string{"goal"},
 		},
@@ -59,8 +60,13 @@ func (a *App) registerLongTaskTools(svc *backend.Service, cfg *backend.Settings)
 			if segments == 0 {
 				segments = 8
 			}
-			id := a.LongRunStart(goal, segments, 40, minutes, "", unattended)
-			return map[string]any{"ok": true, "id": id, "max_minutes": minutes, "max_segments": segments}, nil
+			tokens := num(args, "max_tokens")
+			id := a.LongRunStart(goal, segments, 40, minutes, tokens, "", unattended)
+			out := map[string]any{"ok": true, "id": id, "max_minutes": minutes, "max_segments": segments}
+			if tokens > 0 {
+				out["max_tokens"] = tokens
+			}
+			return out, nil
 		},
 		agent.ToolMetadata{Destructive: true})
 

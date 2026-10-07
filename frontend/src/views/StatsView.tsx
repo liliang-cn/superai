@@ -323,7 +323,7 @@ export default function StatsView() {
                 <div className="cr-task-actions" onClick={(e) => e.stopPropagation()}>
                   <span role="button" className="cr-btn tiny" onClick={() => setTraceId(t.taskId)} title="Every event this task emitted, one per row"><Terminal size={10} />Trace</span>
                   {t.running && <span role="button" className="cr-btn tiny" onClick={() => LongRunStop(t.taskId)}><Square size={10} />Stop</span>}
-                  {!t.running && !t.done && <span role="button" className="cr-btn tiny" onClick={() => LongRunStart(t.goal, segs, rounds, minutes, t.taskId, unattended).then(loadList)}><RotateCcw size={10} />Resume</span>}
+                  {!t.running && !t.done && <span role="button" className="cr-btn tiny" onClick={() => LongRunStart(t.goal, segs, rounds, minutes, 0, t.taskId, unattended).then(loadList)}><RotateCcw size={10} />Resume</span>}
                 </div>
               </button>
             );

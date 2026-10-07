@@ -1201,6 +1201,30 @@ export default function SettingsView({
                 <span className="hint">Tool-call rounds per task.</span>
               </div>
               <div className="field">
+                <label>Token budget per turn</label>
+                <input
+                  className="input"
+                  type="number"
+                  min={0}
+                  value={s.turn_max_tokens || ""}
+                  placeholder="No limit"
+                  onChange={(e) => set("turn_max_tokens", Math.max(0, Number(e.target.value) || 0))}
+                />
+                <span className="hint">Optional. Input plus output tokens one turn may use; empty means no limit.</span>
+              </div>
+              <div className="field">
+                <label>Token budget per long task</label>
+                <input
+                  className="input"
+                  type="number"
+                  min={0}
+                  value={s.long_task_max_tokens || ""}
+                  placeholder="No limit"
+                  onChange={(e) => set("long_task_max_tokens", Math.max(0, Number(e.target.value) || 0))}
+                />
+                <span className="hint">Optional. Used when a long task is started without its own budget.</span>
+              </div>
+              <div className="field">
                 <label>Avatar Port</label>
                 <input
                   className="input"

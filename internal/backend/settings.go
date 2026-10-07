@@ -116,6 +116,13 @@ type Settings struct {
 	MaxRounds int  `json:"max_rounds"`
 	Headless  bool `json:"headless"`
 
+	// Token budgets, optional: zero means no cap. TurnMaxTokens bounds one
+	// turn, prompt plus completion over all its rounds; LongTaskMaxTokens is
+	// what a long task may use across all its segments when whoever starts it
+	// does not say.
+	TurnMaxTokens     int `json:"turn_max_tokens,omitempty"`
+	LongTaskMaxTokens int `json:"long_task_max_tokens,omitempty"`
+
 	// DisableBrowser is retained for settings-file compatibility. agent-go v3
 	// removed pkg/browser, so SuperAI no longer attaches a browser at all;
 	// wire an MCP browser server if browsing is needed.

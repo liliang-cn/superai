@@ -37,6 +37,9 @@ type LongRunOptions struct {
 	// long. A segment already started is allowed to finish, so the task ends
 	// at a hand-off point with its plan and workspace consistent.
 	MaxDuration time.Duration
+	// MaxTotalTokens caps the tokens the whole task may use, across every
+	// segment. Zero = no cap.
+	MaxTotalTokens int
 	// TaskID names the task. Pass the id of an interrupted task to pick it
 	// back up: the plan and its checkpoints live under it, so a resumed run
 	// starts from what was already finished instead of from nothing.
@@ -117,6 +120,7 @@ func (s *Service) StreamLong(ctx context.Context, goal string, o LongRunOptions,
 		MaxSegments:      o.MaxSegments,
 		RoundsPerSegment: o.RoundsPerSegment,
 		MaxDuration:      o.MaxDuration,
+		MaxTotalTokens:   o.MaxTotalTokens,
 	}
 	var opts []agent.RunOption
 	if o.TaskID != "" {
