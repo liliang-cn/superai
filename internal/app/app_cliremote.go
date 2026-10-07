@@ -246,7 +246,8 @@ func (r cliRemote) events(ctx context.Context) (*http.Response, error) {
 	if r.link != nil {
 		return &http.Response{StatusCode: http.StatusOK, Body: r.link.eventStream(ctx)}, nil
 	}
-	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, r.base+"/api/events", nil)
+	// Only the coding-run events this mirror reads.
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, r.base+"/api/events?only=cli:", nil)
 	if r.token != "" {
 		req.Header.Set("Authorization", "Bearer "+r.token)
 	}

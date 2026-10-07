@@ -49,7 +49,7 @@ func TestEmitReachesWindowAndCompanionTogether(t *testing.T) {
 	if hub == nil {
 		t.Fatal("the companion server is running but its hub is not in the emit path")
 	}
-	sub, off := hub.subscribe()
+	sub, off := hub.subscribe(nil)
 	defer off()
 
 	app.emit("chat:event", map[string]any{"type": "token"})
