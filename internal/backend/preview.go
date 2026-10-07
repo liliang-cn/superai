@@ -123,3 +123,29 @@ func previewDeliverable(d agent.DeliverableRequirement) string {
 	}
 	return fmt.Sprintf("%s: %s", kind, desc)
 }
+
+// Warm opens what the first turn would otherwise open: the model's
+// connection, and — through a preview, which sends and stores nothing — the
+// memory store's connection, its first search and the tool catalogue. The two
+// are independent and run side by side.
+func (s *Service) Warm(ctx context.Context) error {
+	if s == nil || s.svc == nil {
+		return fmt.Errorf("superai: agent service unavailable")
+	}
+	model := make(chan error, 1)
+	go func() {
+		if w, ok := s.brain.(interface{ Warm(context.Context) error }); ok {
+			model <- w.Warm(ctx)
+			return
+		}
+		model <- nil
+	}()
+	var err error
+	if p := s.PreviewPrompt(ctx, "warmup", "hello"); p.Error != "" {
+		err = fmt.Errorf("preview: %s", p.Error)
+	}
+	if merr := <-model; merr != nil && err == nil {
+		err = fmt.Errorf("model: %w", merr)
+	}
+	return err
+}
