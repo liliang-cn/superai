@@ -98,6 +98,9 @@ for k in ("settings-queen.json", "settings-worker.json"):
     if out:
         s["llm_max_output_tokens"] = int(out)
     d[k] = json.dumps(s)
+# The CortexDB tools think with the same model the hive does.
+q = json.loads(d["settings-queen.json"])
+d.update(cortexdb_llm_base_url=q.get("llm_base_url", ""), cortexdb_llm_model=q.get("llm_model", ""), cortexdb_llm_key=q.get("llm_key", ""))
 print(json.dumps(d))
 ' | ssh "$KUBE" "python3 -c '
 import json, subprocess, sys, tempfile, os

@@ -98,6 +98,12 @@ spec:
             # the store its memory already uses and withholds the duplicate memory
             # tools; the token comes from CORTEXDB_GRPC_TOKEN above.
             - {name: SUPERAI_MCP_JSON, value: '{"mcpServers":{"cortexdb":{"type":"stdio","command":"cortexdb-mcp-stdio","env":{"CORTEXDB_REMOTE":"192.168.123.252:47821"}}}}'}
+            # The model the CortexDB tools think with (graph_update, global search,
+            # multi-hop, query rewriting); without it they fall back to their
+            # deterministic modes. The MCP server inherits this environment.
+            - {name: CORTEXDB_LLM_BASE_URL, valueFrom: {secretKeyRef: {name: superai-hive, key: cortexdb_llm_base_url, optional: true}}}
+            - {name: CORTEXDB_LLM_MODEL, valueFrom: {secretKeyRef: {name: superai-hive, key: cortexdb_llm_model, optional: true}}}
+            - {name: CORTEXDB_LLM_API_KEY, valueFrom: {secretKeyRef: {name: superai-hive, key: cortexdb_llm_key, optional: true}}}
           readinessProbe:
             httpGet: {path: /api/session, port: 43117}
           volumeMounts: [{name: data, mountPath: /data}]
@@ -166,6 +172,12 @@ spec:
             # the store its memory already uses and withholds the duplicate memory
             # tools; the token comes from CORTEXDB_GRPC_TOKEN above.
             - {name: SUPERAI_MCP_JSON, value: '{"mcpServers":{"cortexdb":{"type":"stdio","command":"cortexdb-mcp-stdio","env":{"CORTEXDB_REMOTE":"192.168.123.252:47821"}}}}'}
+            # The model the CortexDB tools think with (graph_update, global search,
+            # multi-hop, query rewriting); without it they fall back to their
+            # deterministic modes. The MCP server inherits this environment.
+            - {name: CORTEXDB_LLM_BASE_URL, valueFrom: {secretKeyRef: {name: superai-hive, key: cortexdb_llm_base_url, optional: true}}}
+            - {name: CORTEXDB_LLM_MODEL, valueFrom: {secretKeyRef: {name: superai-hive, key: cortexdb_llm_model, optional: true}}}
+            - {name: CORTEXDB_LLM_API_KEY, valueFrom: {secretKeyRef: {name: superai-hive, key: cortexdb_llm_key, optional: true}}}
           readinessProbe:
             httpGet: {path: /api/session, port: 43117}
           volumeMounts: [{name: data, mountPath: /data}]
