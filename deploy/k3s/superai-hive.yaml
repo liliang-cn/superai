@@ -83,6 +83,9 @@ spec:
           imagePullPolicy: IfNotPresent
           ports: [{containerPort: 43117}, {containerPort: 43120, name: agent}]
           env:
+            # The person's zone, not the node's. Unset, the pod ran in UTC and
+            # "下周三上午十点" was stored as 10:00Z — 18:00 in Hangzhou.
+            - {name: TZ, value: Asia/Shanghai}
             - {name: SUPERAI_TOKEN, valueFrom: {secretKeyRef: {name: superai-hive, key: token}}}
             - {name: SUPERAI_PASSWORD_HASH, valueFrom: {secretKeyRef: {name: superai-hive, key: password_hash, optional: true}}}
             - {name: SUPERAI_USER, valueFrom: {secretKeyRef: {name: superai-hive, key: user, optional: true}}}
@@ -155,6 +158,9 @@ spec:
           imagePullPolicy: IfNotPresent
           ports: [{containerPort: 43117}]
           env:
+            # The person's zone, not the node's. Unset, the pod ran in UTC and
+            # "下周三上午十点" was stored as 10:00Z — 18:00 in Hangzhou.
+            - {name: TZ, value: Asia/Shanghai}
             - {name: SUPERAI_TOKEN, valueFrom: {secretKeyRef: {name: superai-hive, key: token}}}
             - {name: SUPERAI_PASSWORD_HASH, valueFrom: {secretKeyRef: {name: superai-hive, key: password_hash, optional: true}}}
             - {name: SUPERAI_USER, valueFrom: {secretKeyRef: {name: superai-hive, key: user, optional: true}}}
