@@ -489,13 +489,16 @@ func (s *Service) Close() error {
 // from options the send path does not use is a picture of a run nobody is
 // about to make. Anything added here reaches both.
 func (s *Service) chatRunOptions(sessionID string, imagePaths []string) []agent.RunOption {
-	maxRounds := 0
+	maxRounds, maxTokens := 0, 0
 	if s.settings != nil {
-		maxRounds = s.settings.MaxRounds
+		maxRounds, maxTokens = s.settings.MaxRounds, s.settings.TurnMaxTokens
 	}
 	opts := []agent.RunOption{
 		agent.WithSessionID(sessionID),
 		agent.WithMaxTurns(maxRounds),
+	}
+	if maxTokens > 0 {
+		opts = append(opts, agent.WithMaxBudgetTokens(maxTokens))
 	}
 	// An order from the hive: the order's UUID is the agent-go task id, so
 	// the plan, the checkpoints and the journal on this worker are named by

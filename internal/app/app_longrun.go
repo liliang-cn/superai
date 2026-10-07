@@ -40,11 +40,12 @@ func (a *App) runWall() *backend.RunWall {
 // LongRunStart begins a segmented task and returns its id. Everything the
 // run does reaches the page as longrun:tick events; LongRunState reads the
 // wall back. maxSegments / roundsPerSegment / maxMinutes at zero
-// take agent-go's defaults. taskID non-empty resumes that task. unattended
+// take agent-go's defaults; maxTokens at zero takes the settings'
+// long_task_max_tokens, and none there is no budget. taskID non-empty resumes that task. unattended
 // lets its tool calls through the approval gate without asking (audited),
 // which a task that runs for hours needs and a page nobody has open cannot
 // give.
-func (a *App) LongRunStart(goal string, maxSegments, roundsPerSegment, maxMinutes int, taskID string, unattended bool) string {
+func (a *App) LongRunStart(goal string, maxSegments, roundsPerSegment, maxMinutes, maxTokens int, taskID string, unattended bool) string {
 	goal = strings.TrimSpace(goal)
 	if goal == "" {
 		return ""
@@ -93,6 +94,12 @@ func (a *App) LongRunStart(goal string, maxSegments, roundsPerSegment, maxMinute
 		}
 		if maxMinutes > 0 {
 			opts.MaxDuration = time.Duration(maxMinutes) * time.Minute
+		}
+		// A budget the caller did not give falls back to the settings', and
+		// none there means none at all.
+		opts.MaxTotalTokens = maxTokens
+		if maxTokens <= 0 && settings != nil {
+			opts.MaxTotalTokens = settings.LongTaskMaxTokens
 		}
 		report, err := svc.StreamLong(ctx, goal, opts, nil)
 		if err != nil {
