@@ -96,7 +96,10 @@ func askWorker(ctx context.Context, t workerTarget, prompt string, progress func
 	// listening, and the terminal event it already sent is gone.
 	sseCtx, stopSSE := context.WithCancel(ctx)
 	defer stopSSE()
-	req, _ := http.NewRequestWithContext(sseCtx, http.MethodGet, base.String()+"/api/events", nil)
+	// Only the conversation events: the worker's meter, pulse and every other
+	// run's tokens are nothing this order needs. A worker too old to read the
+	// filter sends everything, as before.
+	req, _ := http.NewRequestWithContext(sseCtx, http.MethodGet, base.String()+"/api/events?only=chat:", nil)
 	auth(req)
 	resp, err := workerHTTP.Do(req)
 	if err != nil {

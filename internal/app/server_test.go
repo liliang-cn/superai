@@ -298,7 +298,7 @@ func TestApprovalRoundTripOverHTTPAndSSE(t *testing.T) {
 
 func TestHubDropsSlowSubscriberWithoutBlocking(t *testing.T) {
 	hub := newEventHub()
-	ch, off := hub.subscribe()
+	ch, off := hub.subscribe(nil)
 	defer off()
 	_ = ch // never read: the subscriber is maximally slow
 

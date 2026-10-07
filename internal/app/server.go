@@ -59,11 +59,47 @@ var rpcDenied = map[string]string{
 // the middle of chat turns, and a stalled browser tab must not stall the agent.
 type eventHub struct {
 	mu   sync.Mutex
-	subs map[chan []byte]struct{}
+	subs map[chan []byte]eventFilter
+}
+
+// eventFilter is which events one subscriber asked for, as name prefixes; an
+// empty filter is every event.
+//
+// Every subscriber used to get everything: a watch that only shows its own
+// answer received the meter twice a second, the pulse, the hive's chatter and
+// every other conversation's tokens — 49 events in an idle 20 seconds,
+// measured, all decoded on the wrist and thrown away. Worse, a slow phone's
+// buffer filled with those and the one event it needed, the end of its own
+// answer, was the one dropped.
+type eventFilter []string
+
+func (f eventFilter) wants(name string) bool {
+	if len(f) == 0 {
+		return true
+	}
+	for _, p := range f {
+		if strings.HasPrefix(name, p) {
+			return true
+		}
+	}
+	return false
+}
+
+// parseEventFilter reads ?only=chat:,tool:approval into a filter.
+func parseEventFilter(r *http.Request) eventFilter {
+	var f eventFilter
+	for _, v := range r.URL.Query()["only"] {
+		for _, p := range strings.Split(v, ",") {
+			if p = strings.TrimSpace(p); p != "" {
+				f = append(f, p)
+			}
+		}
+	}
+	return f
 }
 
 func newEventHub() *eventHub {
-	return &eventHub{subs: make(map[chan []byte]struct{})}
+	return &eventHub{subs: make(map[chan []byte]eventFilter)}
 }
 
 func (h *eventHub) broadcast(name string, payload map[string]any) {
@@ -73,7 +109,10 @@ func (h *eventHub) broadcast(name string, payload map[string]any) {
 	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	for ch := range h.subs {
+	for ch, f := range h.subs {
+		if !f.wants(name) {
+			continue
+		}
 		select {
 		case ch <- b:
 		default: // drop for this subscriber rather than block the run
@@ -81,10 +120,10 @@ func (h *eventHub) broadcast(name string, payload map[string]any) {
 	}
 }
 
-func (h *eventHub) subscribe() (<-chan []byte, func()) {
+func (h *eventHub) subscribe(f eventFilter) (<-chan []byte, func()) {
 	ch := make(chan []byte, 256)
 	h.mu.Lock()
-	h.subs[ch] = struct{}{}
+	h.subs[ch] = f
 	h.mu.Unlock()
 	return ch, func() {
 		h.mu.Lock()
@@ -104,7 +143,7 @@ func (h *eventHub) serveSSE(w http.ResponseWriter, r *http.Request) {
 	// worker does exactly that — and an answer quicker than the gap between
 	// the flush and the subscription was lost, leaving the asker waiting for
 	// an end that had already gone by.
-	ch, off := h.subscribe()
+	ch, off := h.subscribe(parseEventFilter(r))
 	defer off()
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
