@@ -313,6 +313,7 @@ func ServeMain(argv []string) {
 	_ = fl.Parse(argv)
 
 	log.SetPrefix("superai-serve ")
+	startPprof()
 
 	hub := newEventHub()
 	app := NewApp()
