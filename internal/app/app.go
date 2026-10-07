@@ -334,9 +334,9 @@ func (a *App) rebuild() {
 	a.registerHiveTools(svc, cfg)
 	a.registerLongTaskTools(svc, cfg)
 	// The first question after a start paid for everything the service opens
-	// lazily — the shared brain's connection and its first search, the tool
-	// catalogue — about two seconds before its first word, measured. A preview
-	// walks the same assembly with nothing sent or stored, so the start pays.
+	// lazily — the model's connection, the shared brain's connection and its
+	// first search, the tool catalogue — about two seconds before its first
+	// word, measured; four on the hive's queen. The start pays instead.
 	go warmUp(svc)
 }
 
@@ -346,8 +346,8 @@ func warmUp(svc *backend.Service) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	start := time.Now()
-	if p := svc.PreviewPrompt(ctx, "warmup", "hello"); p.Error != "" {
-		log.Printf("superai: warm-up: %s", p.Error)
+	if err := svc.Warm(ctx); err != nil {
+		log.Printf("superai: warm-up: %v", err)
 		return
 	}
 	log.Printf("superai: warmed up in %s", time.Since(start).Round(time.Millisecond))
