@@ -17,7 +17,11 @@ package backend
 // restart, is visible to a person reading the list, and needs no second store
 // to fall out of step with the first.
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/liliang-cn/agent-go/v3/pkg/agent"
+)
 
 // oneShotMark is what a one-shot reminder's note carries.
 //
@@ -113,7 +117,41 @@ func (s *Service) reconcileReminders(rows []map[string]any) []map[string]any {
 	for _, t := range list {
 		live[t.ID] = true
 	}
-	return liveReminders(rows, live)
+	return withScheduledPrompts(liveReminders(rows, live), list)
+}
+
+// withScheduledPrompts adds the schedules no reminder row stands for — what
+// schedule_prompt made, which writes no row. list_reminders is where a model
+// looks before setting one, and without these it read "none": told about a
+// daughter's peanut allergy, it checked, found nothing, and set the weekly
+// piano-lesson reminder it had set one turn earlier a second time.
+func withScheduledPrompts(rows []map[string]any, list []agent.ScheduledPrompt) []map[string]any {
+	listed := make(map[string]bool, len(rows))
+	for _, r := range rows {
+		if id, _ := r["id"].(string); id != "" {
+			listed[id] = true
+		}
+	}
+	for _, t := range list {
+		if listed[t.ID] {
+			continue
+		}
+		row := map[string]any{
+			"id":      t.ID,
+			"kind":    "scheduled_prompt",
+			"what":    orDefault(t.Note, t.Prompt),
+			"cron":    t.Schedule,
+			"enabled": t.Enabled,
+		}
+		if isOneShotNote(t.Note) {
+			row["once"] = true
+		}
+		if t.NextRun != nil {
+			row["next_run"] = t.NextRun.Local().Format("2006-01-02 15:04 MST")
+		}
+		rows = append(rows, row)
+	}
+	return rows
 }
 
 // DropFinishedOneShots deletes the one-shot schedules that firedPrompt just

@@ -1,6 +1,11 @@
 package backend
 
-import "testing"
+import (
+	"testing"
+	"time"
+
+	"github.com/liliang-cn/agent-go/v3/pkg/agent"
+)
 
 // The schedule that prompted this: "立即提醒" on a Tuesday afternoon became
 // `38 16 25 8 *` — 16:38 on 25 August, every year — and its next run was 2027.
@@ -77,4 +82,26 @@ func indexOf(s, sub string) int {
 		}
 	}
 	return -1
+}
+
+// A schedule with no reminder row — schedule_prompt's — is listed too, once;
+// one a row already stands for is not listed twice.
+func TestRemindersListScheduledPrompts(t *testing.T) {
+	next := time.Date(2026, 10, 9, 16, 30, 0, 0, time.Local)
+	rows := []map[string]any{{"id": "r1", "text": "交周报"}}
+	list := []agent.ScheduledPrompt{
+		{ID: "r1", Prompt: "交周报", Schedule: "0 9 * * 1", Enabled: true},
+		{ID: "p1", Prompt: "提醒陈默：可可今天下午四点半上钢琴课。", Note: "可可钢琴课（每周五 16:30）", Schedule: "30 16 * * 5", Enabled: true, NextRun: &next},
+	}
+	got := withScheduledPrompts(rows, list)
+	if len(got) != 2 {
+		t.Fatalf("rows = %v, want the reminder and the scheduled prompt", got)
+	}
+	p := got[1]
+	if p["id"] != "p1" || p["kind"] != "scheduled_prompt" || p["what"] != "可可钢琴课（每周五 16:30）" || p["cron"] != "30 16 * * 5" {
+		t.Fatalf("scheduled prompt row = %v", p)
+	}
+	if _, ok := p["next_run"]; !ok {
+		t.Fatal("next_run missing")
+	}
 }

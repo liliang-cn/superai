@@ -43,6 +43,14 @@ func TestSplitEmotion(t *testing.T) {
 		{"empty tag", "an answer\nMOOD:", "an answer\nMOOD:", ""},
 
 		{"tag only", "MOOD: sleepy", "", "sleepy"},
+
+		// A model now and then writes the tag on the answer's last line
+		// rather than below it. After a sentence, naming a real mood, at the
+		// very end: that is the tag. Otherwise it is text about the tag.
+		{"tag after the last sentence", "就这两件，其余时间空着。MOOD: neutral", "就这两件，其余时间空着。", "neutral"},
+		{"tag after an english sentence", "All done. MOOD: happy\n", "All done.", "happy"},
+		{"inline marker naming no mood", "Done. MOOD: whatever", "Done. MOOD: whatever", ""},
+		{"inline marker not after a sentence", "end the reply with MOOD: happy", "end the reply with MOOD: happy", ""},
 		{"trailing whitespace", "done\n\nMOOD: excited   \n\n", "done", "excited"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
