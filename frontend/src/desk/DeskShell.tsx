@@ -128,7 +128,7 @@ export default function DeskShell({ view, badges, children, onOpenConversation, 
     <WorldCtx.Provider value={world}>
       {/* Menu mode keeps the world's styling, which every page is tuned
           for, and shows the rail and pages full width with no world drawn. */}
-      <div className={`cv-root dk-shell dk-world${world ? "" : " panel-on dk-flat"}${mode === "window" ? " window-on" : ""} ${theme.mode === "dark" ? "dk-dark" : ""}`} style={themeVars(theme)}>
+      <div className={`cv-root dk-shell dk-world${world ? "" : " panel-on dk-flat"}${served ? " served" : ""}${view === "home" ? " on-home" : ""}${mode === "window" ? " window-on" : ""} ${theme.mode === "dark" ? "dk-dark" : ""}`} style={themeVars(theme)}>
         {world && <World view={view} />}
         <div className="dk-bar" style={drag} />
         <div className="dk-corner" style={noDrag}>
