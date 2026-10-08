@@ -173,11 +173,14 @@ function paint(s: Screen, title: string, status: string, lines: string[], busy: 
 function workstation(kind: "desktop" | "laptop" | "console") {
   const g = new THREE.Group();
   const wide = kind === "console" ? 10 : 6.2;
+  // The surface: at a robot's hands where one types (a worker's shoulder is
+  // about 1.57 up), higher at the queen's console, which she stands before.
+  const surface = kind === "console" ? 1.75 : 1.15;
   const top = rbox(wide, 0.2, 3, mat(0xffffff, { rough: 0.5 }), 0.08);
-  top.position.y = 1.55;
+  top.position.y = surface - 0.2;
   g.add(top);
   for (const [x, z] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
-    const leg = box(0.14, 1.55, 0.14, mat(INK), true);
+    const leg = box(0.14, surface - 0.2, 0.14, mat(INK), true);
     leg.position.set(x * (wide / 2 - 0.3), 0, z * 1.25);
     g.add(leg);
   }
@@ -192,16 +195,16 @@ function workstation(kind: "desktop" | "laptop" | "console") {
     const sc = screen(3.05, 1.8, 640);
     sc.mesh.position.set(0, 0.75 + 1.025, -0.12);
     m.add(foot, neck, bezel, sc.mesh);
-    m.position.set(x, 1.75, -0.6);
+    m.position.set(x, surface, -0.6);
     m.rotation.y = tilt;
     screens.push(sc);
     g.add(m);
   };
   if (kind === "laptop") {
     const base = rbox(3, 0.12, 2.1, mat(0xe8ebef, { rough: 0.4, metal: 0.2 }), 0.06);
-    base.position.set(0, 1.75, 0.1);
+    base.position.set(0, surface, 0.1);
     const lid = new THREE.Group();
-    lid.position.set(0, 1.87, -0.95);
+    lid.position.set(0, surface + 0.12, -0.95);
     const back = rbox(3, 2, 0.08, mat(0xe8ebef, { rough: 0.4, metal: 0.2 }), 0.05);
     const sc = screen(2.75, 1.7, 640);
     sc.mesh.position.set(0, 1, 0.05);
@@ -214,7 +217,7 @@ function workstation(kind: "desktop" | "laptop" | "console") {
   } else {
     monitor(0);
     const keys = rbox(2.4, 0.07, 0.8, mat(0x2a3442), 0.03, false);
-    keys.position.set(0, 1.75, 0.65);
+    keys.position.set(0, surface, 0.65);
     g.add(keys);
   }
   // The case on the floor beside the desk, with its light.
@@ -226,8 +229,9 @@ function workstation(kind: "desktop" | "laptop" | "console") {
   g.userData.tower = tower;
   g.userData.screens = screens;
   g.userData.strip = strip;
-  // In front of the desk, at the keyboard, facing the screen.
-  g.userData.spots = [new THREE.Vector3(0, 0, 2.2), new THREE.Vector3(-1.7, 0, 2.2), new THREE.Vector3(1.7, 0, 2.2)];
+  // Against the desk's front edge, close enough for the hands to reach the
+  // keys, facing the screen.
+  g.userData.spots = [new THREE.Vector3(0, 0, 1.95), new THREE.Vector3(-1.7, 0, 1.95), new THREE.Vector3(1.7, 0, 1.95)];
   return g;
 }
 
@@ -544,7 +548,8 @@ export const cluster: District<WorldData> = {
           for (const r of typing) {
             if (bits.children.length > 60) break;
             const b = new THREE.Mesh(bitGeo, bitMat.clone());
-            const p = r.localToWorld(new THREE.Vector3((Math.random() - 0.5) * 0.6, 1.4, 0.9));
+            // From under the hands, on the keys.
+            const p = r.localToWorld(new THREE.Vector3((Math.random() - 0.5) * 0.8, 0.95, 0.62));
             b.position.copy(p);
             b.userData.v = new THREE.Vector3((Math.random() - 0.5) * 0.3, 1.2 + Math.random() * 0.6, 0).applyQuaternion(r.getWorldQuaternion(new THREE.Quaternion()));
             b.userData.life = 0;
