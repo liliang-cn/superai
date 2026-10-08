@@ -539,7 +539,9 @@ function Controls({ current, run, dash, busy, onOpenHive, onOpenStats }: { curre
       <div className="dk-ctl">
         <span>{going ? `${agentName(run.agent)} is working on ${where}` : `${agentName(run.agent)} ${run.state === "done" ? "finished" : run.state}`}</span>
         {going && <button className="dk-btn ghost" onClick={() => CancelCLIRun(run.id).catch((e) => setErr(String(e)))}>Stop</button>}
-        {detail?.session && (
+        {/* Take over opens a terminal on the machine this window runs on; a
+            browser tab has none to open. */}
+        {detail?.session && !served && (
           <button className="dk-btn light" onClick={() => TakeOver(run.agent, detail.session!, detail.cwd).catch((e) => setErr(String(e?.message ?? e)))}>Take over</button>
         )}
         {err && <em className="dk-ctl-err">{err}</em>}

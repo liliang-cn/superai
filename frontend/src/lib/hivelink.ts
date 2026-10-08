@@ -26,18 +26,20 @@ const LOCAL = new Set([
 
 type Bound = Record<string, (...args: unknown[]) => Promise<unknown>>;
 
-/** Which end this window is. The served build is the web; the Wails window is
- *  the desktop unless asked to look like the other (for testing in a browser,
- *  `localStorage["superai-client"] = "desktop"` makes the web draw the desktop). */
+/** Which shell this window draws. The desktop one, in the Wails window and in
+ *  a browser tab alike; only a phone-width tab keeps the web layout, the one
+ *  built for a screen that narrow. `localStorage["superai-client"]` set to
+ *  "desktop" or "web" overrides it. */
 export function clientKind(): "desktop" | "web" {
   const w = window as unknown as Record<string, unknown>;
   try {
     const forced = localStorage.getItem("superai-client");
     if (forced === "desktop" || forced === "web") return forced;
   } catch {
-    /* no storage: go by the build */
+    /* no storage: go by the window */
   }
-  return w.superaiServed ? "web" : "desktop";
+  if (!w.superaiServed) return "desktop";
+  return window.matchMedia("(max-width: 640px)").matches ? "web" : "desktop";
 }
 
 let bridged = false;

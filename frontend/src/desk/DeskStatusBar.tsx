@@ -8,6 +8,8 @@ import { openSwitcher } from "../lib/hivelink";
 import type { AppStatus } from "../lib/types";
 
 /** Runtime status belongs to every desktop page, below its working area. */
+const served = Boolean((window as unknown as Record<string, unknown>).superaiServed);
+
 export default function DeskStatusBar({ status, loading, codingRuns }: { status:AppStatus|null; loading:boolean; codingRuns:number }) {
   const { t } = useI18n();
   const hive = useHive();
@@ -23,7 +25,10 @@ export default function DeskStatusBar({ status, loading, codingRuns }: { status:
         const data = results[0].value;
         setRuntime({model:String(data?.llm?.model ?? ""), active:Array.isArray(data?.activeRuns) ? data.activeRuns.length : 0, error:false});
       } else setRuntime(current => ({...current,error:true}));
-      if (results[1].status === "fulfilled") setLink(results[1].value);
+      // A browser tab is on the server that served it; what that server says
+      // about links is about its own machine, not this window.
+      if (served) setLink({linked:true, live:true, url:location.host});
+      else if (results[1].status === "fulfilled") setLink(results[1].value);
     };
     const refresh = () => { window.clearTimeout(timer); timer = window.setTimeout(read,250); };
     void read();
