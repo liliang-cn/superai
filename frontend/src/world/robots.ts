@@ -150,8 +150,10 @@ export function pose(r: THREE.Object3D, t: number, reduced = false) {
   } else if (s === "work" && u.desk) {
     // Typing in earnest: hands taking quick turns on the keys, the body
     // keeping time, the head sweeping the screen, the eyes reading along.
-    const tap = still ? 0 : 0.22;
-    la = -1.05 + Math.sin(k * 19) * tap; ra = -1.05 + Math.sin(k * 19 + Math.PI) * tap; lz = 0.18; rz = -0.18;
+    // Reached forward and down onto the keys: from the shoulder at 1.12 the
+    // hand lands about 0.18 lower and 0.6 ahead, where the desk puts them.
+    const tap = still ? 0 : 0.12;
+    la = -1.28 + Math.sin(k * 19) * tap; ra = -1.28 + Math.sin(k * 19 + Math.PI) * tap; lz = 0.14; rz = -0.14;
     hx = 0.16 + (still ? 0 : Math.sin(k * 1.3) * 0.05); hy = still ? 0 : Math.sin(k * 0.8) * 0.22;
     bob = still ? 0 : Math.abs(Math.sin(k * 9.5)) * 0.035;
     if (!still) (u.eyes as THREE.Mesh[]).forEach((e, i) => { e.position.x = (i ? 0.15 : -0.15) + Math.sin(k * 3.2) * 0.04; });
