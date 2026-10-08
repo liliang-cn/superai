@@ -6,7 +6,6 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/liliang-cn/agent-go/v3/pkg/agent"
@@ -689,11 +688,7 @@ func (p *Pulse) sample(now time.Time) {
 	// CPU is a rate, so it needs two readings: this one and the last. The
 	// first sample has no last and reads 0, which is right for a process
 	// that has only just started watching itself.
-	var ru syscall.Rusage
-	var used time.Duration
-	if syscall.Getrusage(syscall.RUSAGE_SELF, &ru) == nil {
-		used = time.Duration(ru.Utime.Nano() + ru.Stime.Nano())
-	}
+	used := processCPUTime()
 	p.mu.Lock()
 	if !p.cpuAt.IsZero() && used > 0 {
 		if wall := now.Sub(p.cpuAt); wall > 0 {
