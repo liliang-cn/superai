@@ -64,7 +64,7 @@ type App struct {
 	// Settings changes made by the agent or over MCP, not yet applied (selfmcp.go).
 	selfPendingMu sync.Mutex
 	selfPending   map[string]any
-	runs  map[string]*chatRun
+	runs          map[string]*chatRun
 
 	// wall narrates every long run into state a window can draw. It outlives
 	// a rebuild on purpose: a settings save must not erase the run wall.
