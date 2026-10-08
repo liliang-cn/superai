@@ -21,7 +21,9 @@
 # and stated, never looked up by name: SUPERAI_LLM_CONTEXT_TOKENS=1000000 and
 # SUPERAI_LLM_MAX_OUTPUT_TOKENS=384000 (the provider's own page says); unset,
 # the hive keeps whatever the source settings say, and with neither agent-go
-# compacts at a fixed 60k. Roles come from the settings: the queen accepts
+# compacts at a fixed 60k. SUPERAI_LLM_REASONING_EFFORT=low sends that
+# reasoning_effort on every model call: on the gateway's thinking models it
+# is most of a turn's wait. Roles come from the settings: the queen accepts
 # joins and the workers announce themselves.
 set -euo pipefail
 export SUPERAI_PASSWORD_HASH="${SUPERAI_PASSWORD_HASH:-}"
@@ -31,6 +33,7 @@ export SUPERAI_LLM_BASE_URL="${SUPERAI_LLM_BASE_URL:-}"
 export SUPERAI_LLM_KEY_ENV="${SUPERAI_LLM_KEY_ENV:-}"
 export SUPERAI_LLM_CONTEXT_TOKENS="${SUPERAI_LLM_CONTEXT_TOKENS:-}"
 export SUPERAI_LLM_MAX_OUTPUT_TOKENS="${SUPERAI_LLM_MAX_OUTPUT_TOKENS:-}"
+export SUPERAI_LLM_REASONING_EFFORT="${SUPERAI_LLM_REASONING_EFFORT:-}"
 if [ -n "$SUPERAI_LLM_BASE_URL" ] && { [ -z "$SUPERAI_LLM_KEY_ENV" ] || [ -z "${!SUPERAI_LLM_KEY_ENV:-}" ]; }; then
   echo "SUPERAI_LLM_BASE_URL needs SUPERAI_LLM_KEY_ENV naming a set variable" >&2; exit 1
 fi
@@ -97,6 +100,8 @@ for k in ("settings-queen.json", "settings-worker.json"):
         s["llm_context_tokens"] = int(window)
     if out:
         s["llm_max_output_tokens"] = int(out)
+    if env("SUPERAI_LLM_REASONING_EFFORT"):
+        s["llm_reasoning_effort"] = env("SUPERAI_LLM_REASONING_EFFORT")
     d[k] = json.dumps(s)
 # The CortexDB tools think with the same model the hive does.
 q = json.loads(d["settings-queen.json"])
