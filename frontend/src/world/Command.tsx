@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowUpIcon, ListIcon, MessageSquareIcon, PlusIcon, MinusIcon, ChevronDownIcon } from "lucide-react";
+import { ArrowUpIcon, MessageSquareIcon, PlusIcon, MinusIcon, ChevronDownIcon } from "lucide-react";
 import { ChatHistory, HiveRetire, HiveSpawn, SendChat } from "../../wailsjs/go/app/App";
 import { visibleAnswer } from "../lib/format";
 import { Response } from "@/components/ai-elements/response";
@@ -33,8 +33,8 @@ const ACTIONS: Record<string, { label: string; say?: string; run?: () => Promise
  * The bar along the bottom of the world: the district's actions, a line to
  * the queen from anywhere, and her answer above it while it is fresh.
  */
-export default function Command({ view, panel, onPanel, onConversation, onTyping }: {
-  view: ViewKey; panel: boolean; onPanel: () => void; onConversation: () => void;
+export default function Command({ view, onConversation, onTyping }: {
+  view: ViewKey; onConversation: () => void;
   /** Called with the thing an @name points at, so the world can light it. */
   onTyping?: (kind: string, id: string) => void;
 }) {
@@ -137,8 +137,6 @@ export default function Command({ view, panel, onPanel, onConversation, onTyping
         </div>
       )}
       <div className="wc-bar">
-        <button className={`wc-act${panel ? " on" : ""}`} onClick={onPanel} title={t("Menus and lists, the way it was")}><ListIcon size={15} />{t("Menu")}</button>
-        <span className="wc-sep" />
         {(ACTIONS[district] ?? []).map((a, i) => (
           <button key={i} className="wc-act" disabled={busy === a.label + i}
             onClick={() => {

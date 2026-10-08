@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  ListTodoIcon, LayoutDashboardIcon, ChartColumnIcon, PanelRightOpenIcon, BookOpenIcon, BotIcon, HexagonIcon, MessageSquareIcon, PaletteIcon,
+  ListTodoIcon, LayoutDashboardIcon, ChartColumnIcon, PanelRightOpenIcon, BookOpenIcon, BotIcon, BoxIcon, HexagonIcon, ListIcon, MessageSquareIcon, PaletteIcon,
   NotebookTabsIcon, PuzzleIcon, SlidersHorizontalIcon, TerminalIcon, XIcon,
 } from "lucide-react";
 import DeskStatusBar from "./DeskStatusBar";
@@ -25,6 +25,16 @@ export const noDrag = { "--wails-draggable": "no-drag" } as React.CSSProperties;
 /** The desktop's look, shared by the shell and the page in it. */
 const ThemeCtx = createContext<{ theme: CanvasTheme; setTheme: (t: CanvasTheme) => void }>({ theme: loadTheme(), setTheme: () => {} });
 export const useDeskTheme = () => useContext(ThemeCtx);
+
+/** Whether the 3D world is up. In Menu mode it is not drawn at all, and the
+ *  pages that showed it through themselves show something else. */
+const WorldCtx = createContext(true);
+export const useDeskWorld = () => useContext(WorldCtx);
+
+const MODE_KEY = "superai-desk-mode";
+const loadMode = (): "world" | "menu" => {
+  try { return localStorage.getItem(MODE_KEY) === "menu" ? "menu" : "world"; } catch { return "world"; }
+};
 
 const RAIL: { key: ViewKey; label: string; Icon: typeof HexagonIcon; cls: string }[] = [
   { key: "home", label: "The queen", Icon: MessageSquareIcon, cls: "dk-a-chat" },
@@ -58,10 +68,16 @@ export default function DeskShell({ view, badges, children, onOpenConversation, 
   const [theme, setThemeState] = useState<CanvasTheme>(loadTheme);
   const setTheme = (t: CanvasTheme) => { setThemeState(t); saveTheme(t); };
   const [theming, setTheming] = useState(false);
-  // The world is the app. A page opens full size over it as the screen of
-  // the thing it belongs to ("window"); the old rail and lists are the
-  // fallback ("menu").
-  const [mode, setMode] = useState<"world" | "menu" | "window">("world");
+  // Two modes, switched: the 3D world, where a page opens full size over it
+  // as the screen of the thing it belongs to ("window"); or the menus and
+  // lists with no world at all ("menu"). The choice is kept.
+  const [mode, setMode] = useState<"world" | "menu" | "window">(loadMode);
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
+  const switchTo = (m: "world" | "menu") => {
+    setMode(m);
+    try { localStorage.setItem(MODE_KEY, m); } catch { /* fine */ }
+  };
   const pendingWindow = useRef(false);
   useEffect(() => {
     setMode((m) => (pendingWindow.current ? "window" : m === "menu" ? "menu" : "world"));
@@ -70,6 +86,8 @@ export default function DeskShell({ view, badges, children, onOpenConversation, 
   useEffect(() => {
     const open = (e: Event) => {
       const path = (e as CustomEvent<string>).detail;
+      // In Menu mode a page is already a page: just go there.
+      if (modeRef.current === "menu") { navigate(path); return; }
       pendingWindow.current = true;
       navigate(path);
       // Same page: the view does not change, so open it here.
@@ -85,8 +103,7 @@ export default function DeskShell({ view, badges, children, onOpenConversation, 
     window.addEventListener("superai:theme", theme);
     return () => { window.removeEventListener("keydown", esc); window.removeEventListener("superai:window", open); window.removeEventListener("superai:theme", theme); };
   }, [navigate]);
-  const panel = mode === "menu";
-  const setPanel = (f: (v: boolean) => boolean) => setMode((m) => (f(m === "menu") ? "menu" : "world"));
+  const world = mode !== "menu";
   const runs = useCodingRuns();
   const liveRuns = runs.filter((r) => r.state === "running").length;
 
@@ -108,9 +125,15 @@ export default function DeskShell({ view, badges, children, onOpenConversation, 
 
   return (
     <ThemeCtx.Provider value={{ theme, setTheme }}>
-      <div className={`cv-root dk-shell dk-world${mode === "menu" ? " panel-on" : mode === "window" ? " window-on" : ""} ${theme.mode === "dark" ? "dk-dark" : ""}`} style={themeVars(theme)}>
-        <World view={view} panel={panel} onPanel={() => setPanel((v) => !v)} />
-        <div className="dk-bar" style={drag} />
+    <WorldCtx.Provider value={world}>
+      <div className={`cv-root dk-shell${world ? " dk-world" : " dk-menu"}${mode === "window" ? " window-on" : ""} ${theme.mode === "dark" ? "dk-dark" : ""}`} style={themeVars(theme)}>
+        {world && <World view={view} />}
+        <div className="dk-bar" style={drag}>
+          <div className="dk-mode" role="group" aria-label={t("View")} style={noDrag}>
+            <button className={world ? "on" : ""} aria-pressed={world} title={t("The hive in 3D")} onClick={() => switchTo("world")}><BoxIcon size={14} />3D</button>
+            <button className={world ? "" : "on"} aria-pressed={!world} title={t("Menus and lists, the way it was")} onClick={() => switchTo("menu")}><ListIcon size={14} />{t("Menu")}</button>
+          </div>
+        </div>
         <div className="dk-corner" style={noDrag}>
           <NotificationCenter variant="desk" onOpenConversation={onOpenConversation} />
         </div>
@@ -156,6 +179,7 @@ export default function DeskShell({ view, badges, children, onOpenConversation, 
         )}
         <DeskStatusBar status={status} loading={loading} codingRuns={liveRuns}/>
       </div>
+    </WorldCtx.Provider>
     </ThemeCtx.Provider>
   );
 }
