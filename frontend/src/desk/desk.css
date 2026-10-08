@@ -671,3 +671,22 @@ html[data-desk] body { background: transparent; }
 @media (max-width: 1240px) {
   .dk-world.dk-flat .dk-live .dk-screen, .dk-world.dk-flat .dk-live > .dk-ctl { background: #fff; }
 }
+
+/* Menu mode in a browser: no window to drag and no traffic lights, so no
+   title bar. Everything starts at the top; the bell and the live pane's tabs
+   keep to the right. */
+.dk-shell.dk-flat.served { grid-template-rows: 10px minmax(0, 1fr) 30px; }
+.dk-shell.dk-flat.served > .dk-bar { display: none; }
+.dk-shell.dk-flat.served > .dk-corner { position: absolute; top: 10px; right: 26px; margin: 0; height: 42px; display: flex; align-items: center; }
+.dk-shell.dk-flat.served .dk-live { margin-top: 0; }
+.dk-shell.dk-flat.served > .dk-side-strip { padding-top: 52px; }
+@media (max-width: 1240px) {
+  .dk-shell.dk-flat.served .dk:not(.folded) > .dk-live { top: 0; }
+  .dk-shell.dk-flat.served .dk.folded > .dk-live-strip { padding-top: 52px; }
+}
+/* Off the home, the bell heads the strip of buttons down the right, in their
+   shape; on the home it sits at the end of the live pane's tab row. */
+.dk-shell.dk-flat.served:not(.on-home) > .dk-corner { top: 14px; right: 21px; height: 44px; }
+.dk-shell.dk-flat.served:not(.on-home) > .dk-corner .dk-bell { width: 44px; height: 44px; border-radius: calc(14px * var(--rs)); background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 1px 2px rgba(22, 32, 43, 0.06), 0 6px 18px rgba(22, 32, 43, 0.08), inset 0 0 0 1px rgba(22, 32, 43, 0.05); }
+.dk-shell.dk-flat.served:not(.on-home) > .dk-side-strip { padding-top: 66px; }
