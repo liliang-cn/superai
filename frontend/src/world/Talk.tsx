@@ -30,6 +30,29 @@ const keyOf = (t: Talker) => t.kind + ":" + ("name" in t ? t.name : "agent" in t
  * asked directly; a coding CLI gets a run, and what is said next follows it
  * up; a bee is woken with the message and its next report is its answer.
  */
+/** How long the answer has been coming, once it has been a while: an agent on
+ *  another machine runs its own model and tools, and can take minutes over a
+ *  question the queen answers in seconds. Mounted with the busy line, so it
+ *  counts from when the question went. */
+function Waited({ remote }: { remote: boolean }) {
+  const { t } = useI18n();
+  const [from] = useState(() => Date.now());
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const i = setInterval(() => tick((n) => n + 1), 1000);
+    return () => clearInterval(i);
+  }, []);
+  const s = Math.floor((Date.now() - from) / 1000);
+  if (s < 5) return null;
+  const took = s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`;
+  return (
+    <span className="wt-waited">
+      {took}
+      {remote && s >= 30 && <span> — {t("an agent on another machine can take a few minutes")}</span>}
+    </span>
+  );
+}
+
 export default function Talk({ who, placeholder }: { who: Talker; placeholder: string }) {
   const { t } = useI18n();
   const ime = useImeGuard();
@@ -143,7 +166,7 @@ export default function Talk({ who, placeholder }: { who: Talker; placeholder: s
       {(lines.length > 0 || busy) && (
         <div className="wt-lines">
           {lines.map((l, i) => <p key={i} className={`wt-${l.who}${l.bad ? " bad" : ""}`}>{l.text}</p>)}
-          {busy && <p className="wt-it wt-busy">{busy}</p>}
+          {busy && <p className="wt-it wt-busy">{busy} <Waited remote={who.kind === "agent" || who.kind === "worker"} /></p>}
           <div ref={end} />
         </div>
       )}
