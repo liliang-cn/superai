@@ -61,6 +61,9 @@ type App struct {
 	// Service), and "stop" must not queue behind that — the moment it is worth
 	// pressing is exactly the moment the app is busy.
 	runMu sync.Mutex
+	// Settings changes made by the agent or over MCP, not yet applied (selfmcp.go).
+	selfPendingMu sync.Mutex
+	selfPending   map[string]any
 	runs  map[string]*chatRun
 
 	// wall narrates every long run into state a window can draw. It outlives
@@ -331,6 +334,7 @@ func (a *App) rebuild() {
 	a.registerRemoteTools(svc, cfg.RemoteAgents)
 	a.registerCodingAgentTools(svc, cfg)
 	a.registerScheduleTools(svc)
+	a.registerSelfTools(svc)
 	a.registerHiveTools(svc, cfg)
 	a.registerLongTaskTools(svc, cfg)
 	// The first question after a start paid for everything the service opens

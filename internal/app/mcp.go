@@ -34,7 +34,7 @@ const mcpPath = "/mcp"
 // mcpServerVersion is what a client sees in the initialize handshake. The app
 // itself carries no version string, so this tracks the tool surface: bump it
 // when a tool is added, removed, or changes shape.
-const mcpServerVersion = "0.4.0"
+const mcpServerVersion = "0.5.0"
 
 // nextRunsShown is how many upcoming times a create/validate answer names.
 //
@@ -105,6 +105,7 @@ func newMCPHandler(app *App, version string) http.Handler {
 		&mcp.Implementation{Name: "superai", Title: "SuperAI", Version: version},
 		&mcp.ServerOptions{Instructions: mcpInstructions},
 	)
+	addSelfMCPTools(s, app)
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:  "superai_schedule_create",

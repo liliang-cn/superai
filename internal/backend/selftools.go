@@ -217,8 +217,11 @@ func (s *Service) registerSelfTools() {
 // Secrets are reported as a boolean. The point of the tool is to let it answer
 // "what model am I on" and "is the webhook set", not to put a key where a reply
 // could repeat it.
-func (s *Service) settingsSnapshot() map[string]interface{} {
-	cfg := s.settings
+func (s *Service) settingsSnapshot() map[string]interface{} { return SettingsSnapshot(s.settings) }
+
+// SettingsSnapshot is cfg as a model may see it: secrets as whether they are
+// set, and the list of what settings_set may change.
+func SettingsSnapshot(cfg *Settings) map[string]interface{} {
 	if cfg == nil {
 		return map[string]interface{}{"error": "settings unavailable"}
 	}
@@ -264,6 +267,21 @@ func (s *Service) applySetting(key string, raw interface{}) (interface{}, error)
 	if err != nil {
 		return nil, err
 	}
+	if _, err := SetWritableSetting(cfg, key, raw); err != nil {
+		return nil, err
+	}
+	if err := cfg.Save(); err != nil {
+		return nil, err
+	}
+	// The in-memory copy is what settings_get reads back, so it has to move too
+	// or the agent is told its own change did not happen.
+	s.settings = cfg
+	return raw, nil
+}
+
+// SetWritableSetting changes one whitelisted field of cfg in place, checking
+// its range, and saves nothing. Anything outside settingsWritable is refused.
+func SetWritableSetting(cfg *Settings, key string, raw interface{}) (interface{}, error) {
 	switch key {
 	case "llm_model":
 		cfg.LLMModel = toStr(raw)
@@ -302,12 +320,6 @@ func (s *Service) applySetting(key string, raw interface{}) (interface{}, error)
 	default:
 		return nil, errNotWritable(key)
 	}
-	if err := cfg.Save(); err != nil {
-		return nil, err
-	}
-	// The in-memory copy is what settings_get reads back, so it has to move too
-	// or the agent is told its own change did not happen.
-	s.settings = cfg
 	return raw, nil
 }
 
