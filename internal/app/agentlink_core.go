@@ -147,15 +147,52 @@ func orNull(s string) string {
 	return s
 }
 
-// agentHub is every agent connected to this core, by name.
+// How core knows an agent is still there. It pings every agentPingEvery and
+// the agent answers; any frame counts as hearing from it. Three pings without
+// a word and the agent is dropped, even when the connection looks open: a
+// machine that lost power or network leaves a half-open TCP connection, and
+// the pings go into its send buffer without an error for many minutes.
+const (
+	agentPingEvery = 20 * time.Second
+	agentSilence   = 3*agentPingEvery + 5*time.Second
+)
+
+// agentForget is how long a dropped agent stays in Needs you before it is
+// taken as gone on purpose, like a hive worker (hiveForget in backend).
+const agentForget = 15 * time.Minute
+
+// agentHub is every agent connected to this core, by name, and the ones that
+// dropped recently with when they were last heard.
 type agentHub struct {
 	mu     sync.Mutex
 	agents map[string]*agentConn
+	lost   map[string]time.Time
+
+	pingEvery, silence time.Duration // agentPingEvery and agentSilence, shorter in tests
 }
 
 func (a *App) agents() *agentHub {
-	a.agentHubOnce.Do(func() { a.agentHubV = &agentHub{agents: map[string]*agentConn{}} })
+	a.agentHubOnce.Do(func() {
+		a.agentHubV = &agentHub{agents: map[string]*agentConn{}, lost: map[string]time.Time{},
+			pingEvery: agentPingEvery, silence: agentSilence}
+	})
 	return a.agentHubV
+}
+
+// lostAgents is the agents that dropped without coming back, by when they
+// were last heard, forgetting the ones gone longer than agentForget.
+func (h *agentHub) lostAgents(now time.Time) map[string]time.Time {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	out := map[string]time.Time{}
+	for name, seen := range h.lost {
+		if now.Sub(seen) > agentForget {
+			delete(h.lost, name)
+			continue
+		}
+		out[name] = seen
+	}
+	return out
 }
 
 func (h *agentHub) get(name string) *agentConn {
@@ -256,6 +293,9 @@ func newAgentLinkServer(app *App, ok tokenCheck) *grpc.Server {
 		grpc.StreamInterceptor(auth),
 		grpc.MaxRecvMsgSize(32<<20),
 		grpc.KeepaliveEnforcementPolicy(keepalive.EnforcementPolicy{MinTime: 10 * time.Second, PermitWithoutStream: true}),
+		// Core probes the transport too, so a dead peer is closed by gRPC
+		// itself and not only by the silence check below.
+		grpc.KeepaliveParams(keepalive.ServerParameters{Time: 30 * time.Second, Timeout: 10 * time.Second}),
 	)
 	agentlinkpb.RegisterAgentLinkServer(s, &agentLinkServer{app: app})
 	return s
@@ -297,14 +337,20 @@ func (s *agentLinkServer) Connect(stream agentlinkpb.AgentLink_ConnectServer) er
 		old.closeOnce()
 	}
 	hub.agents[hello.GetName()] = c
+	delete(hub.lost, hello.GetName())
 	hub.mu.Unlock()
 	s.app.agentsChanged()
 	log.Printf("agent %s connected from %s (%s/%s), clis %v", hello.GetName(), hello.GetHost(), hello.GetOs(), hello.GetArch(), hello.GetClis())
 
+	// An agent that closes its side said goodbye: it is stopping, not lost.
+	bye := false
 	defer func() {
 		hub.mu.Lock()
 		if hub.agents[hello.GetName()] == c {
 			delete(hub.agents, hello.GetName())
+			if !bye {
+				hub.lost[hello.GetName()] = time.UnixMilli(c.lastSeen.Load())
+			}
 		}
 		hub.mu.Unlock()
 		c.closeOnce()
@@ -316,11 +362,13 @@ func (s *agentLinkServer) Connect(stream agentlinkpb.AgentLink_ConnectServer) er
 		return err
 	}
 
-	// One goroutine writes (gRPC streams take one sender at a time), this one
+	// One goroutine writes (gRPC streams take one sender at a time), another
 	// reads, and a ticker keeps the line warm and the last-seen time honest.
+	// This one waits for either to fail: a Recv on a dead connection never
+	// returns, and returning from here is what ends it.
 	sendErr := make(chan error, 1)
 	go func() {
-		ping := time.NewTicker(20 * time.Second)
+		ping := time.NewTicker(hub.pingEvery)
 		defer ping.Stop()
 		for {
 			select {
@@ -330,6 +378,11 @@ func (s *agentLinkServer) Connect(stream agentlinkpb.AgentLink_ConnectServer) er
 					return
 				}
 			case <-ping.C:
+				if quiet := time.Since(time.UnixMilli(c.lastSeen.Load())); quiet > hub.silence {
+					log.Printf("agent %s silent for %s; dropping it", c.name(), quiet.Round(time.Second))
+					sendErr <- status.Errorf(codes.DeadlineExceeded, "no word from the agent for %s", quiet.Round(time.Second))
+					return
+				}
 				f := &agentlinkpb.CoreFrame{Kind: &agentlinkpb.CoreFrame_Ping{Ping: &agentlinkpb.Ping{AtUnixMs: time.Now().UnixMilli()}}}
 				if err := stream.Send(f); err != nil {
 					sendErr <- err
@@ -343,12 +396,27 @@ func (s *agentLinkServer) Connect(stream agentlinkpb.AgentLink_ConnectServer) er
 		}
 	}()
 
+	recvErr := make(chan error, 1)
+	go func() { recvErr <- s.receive(stream, c) }()
+	select {
+	case err := <-recvErr:
+		if errors.Is(err, io.EOF) {
+			bye = true
+			return nil
+		}
+		return err
+	case err := <-sendErr:
+		return err
+	case <-c.done: // replaced by a newer stream from the same agent
+		return nil
+	}
+}
+
+// receive handles what the agent sends until the stream fails.
+func (s *agentLinkServer) receive(stream agentlinkpb.AgentLink_ConnectServer, c *agentConn) error {
 	for {
 		f, err := stream.Recv()
 		if err != nil {
-			if errors.Is(err, io.EOF) {
-				return nil
-			}
 			return err
 		}
 		c.lastSeen.Store(time.Now().UnixMilli())
@@ -379,11 +447,6 @@ func (s *agentLinkServer) Connect(stream agentlinkpb.AgentLink_ConnectServer) er
 			}
 			c.mu.Unlock()
 		case *agentlinkpb.AgentFrame_Pong:
-		}
-		select {
-		case err := <-sendErr:
-			return err
-		default:
 		}
 	}
 }

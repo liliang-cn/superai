@@ -94,6 +94,11 @@ func (a *App) Attention() []AttentionItem {
 		}
 	}
 
+	for name, seen := range a.agents().lostAgents(now) {
+		needs = append(needs, AttentionItem{Level: "needs", Kind: "lost", Title: name + " is not answering",
+			Detail: "Last heard " + ago(now, seen), At: &seen, Ref: name, Open: "hive"})
+	}
+
 	for _, r := range a.CLIRuns() {
 		if (r.State == "failed" || r.State == "error") && r.Ended != nil && r.Ended.After(dayAgo) {
 			at := *r.Ended
