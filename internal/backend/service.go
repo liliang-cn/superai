@@ -130,6 +130,7 @@ func NewService(s *Settings) (*Service, error) {
 		Providers: []pool.Provider{{
 			Name: "brain", BaseURL: s.LLMBaseURL, Key: s.LLMKey,
 			ModelName: s.LLMModel, MaxConcurrency: 5, Capability: 8,
+			ReasoningEffort: s.LLMReasoningEffort,
 		}},
 	})
 	if err != nil {

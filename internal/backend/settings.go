@@ -26,6 +26,11 @@ type Settings struct {
 	// tokens, a sixteenth of a 1M-token model.
 	LLMContextTokens   int `json:"llm_context_tokens,omitempty"`
 	LLMMaxOutputTokens int `json:"llm_max_output_tokens,omitempty"`
+	// LLMReasoningEffort is sent as reasoning_effort on every call to LLMModel
+	// ("low", "medium", "high"); empty sends nothing. On a thinking model
+	// behind a gateway it is most of a turn's wait: gemini-3.8-flash-high
+	// took 5–8s to its first tool call, 4–4.7s at "low".
+	LLMReasoningEffort string `json:"llm_reasoning_effort,omitempty"`
 
 	// Embeddings (optional). If EmbedKey is empty or "none", SuperAI falls back
 	// to file memory so chat-only proxies still work.
