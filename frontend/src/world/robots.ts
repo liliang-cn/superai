@@ -20,6 +20,20 @@ let accent = 0xf2b416;
 export function setAccent(c: number) { accent = c; }
 
 let capsule: THREE.BufferGeometry | null = null;
+let collarGeo: THREE.BufferGeometry | null = null;
+/** The visor band: a ring under the head with the skull's rounded corners and
+ *  bevelled edges, not a flat plate. */
+const collar = () => (collarGeo ??= (() => {
+  const w = 0.82, d = 0.68, r = 0.2, x = -w / 2, y = -d / 2;
+  const s = new THREE.Shape();
+  s.moveTo(x + r, y); s.lineTo(x + w - r, y); s.quadraticCurveTo(x + w, y, x + w, y + r);
+  s.lineTo(x + w, y + d - r); s.quadraticCurveTo(x + w, y + d, x + w - r, y + d);
+  s.lineTo(x + r, y + d); s.quadraticCurveTo(x, y + d, x, y + d - r);
+  s.lineTo(x, y + r); s.quadraticCurveTo(x, y, x + r, y);
+  const g = new THREE.ExtrudeGeometry(s, { depth: 0.05, bevelEnabled: true, bevelThickness: 0.025, bevelSize: 0.025, bevelSegments: 4, curveSegments: 10 });
+  g.rotateX(-Math.PI / 2);
+  return g;
+})());
 const arm = () => (capsule ??= (() => { const c = new THREE.CapsuleGeometry(0.11, 0.42, 4, 10); c.translate(0, -0.3, 0); return c; })());
 
 /**
@@ -73,7 +87,7 @@ export function robot(kind: RobotKind, trim = accent) {
   const skull = rbox(0.86, 0.66, 0.72, shell, 0.2);
   const face = rbox(0.7, 0.42, 0.06, mat(FACE, { rough: 0.25 }), 0.08, false);
   face.position.set(0, 0.12, 0.36);
-  const band = box(0.88, 0.07, 0.74, mat(trim, { rough: 0.5 }));
+  const band = new THREE.Mesh(collar(), mat(trim, { rough: 0.5 }));
   band.position.y = 0.02;
   const eyeMat = ownMat(EYE_IDLE, { emissive: EYE_IDLE, glow: 0.9 });
   const eyes: THREE.Mesh[] = [];

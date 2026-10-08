@@ -1,14 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
   <title>SuperAI</title>
   <defs>
-    <linearGradient id="c" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#f0a36a"/><stop offset="1" stop-color="#cf6d31"/>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f4f7fc"/><stop offset="1" stop-color="#d6e2f7"/>
     </linearGradient>
   </defs>
-  
-  <g stroke-linejoin="round" stroke-width="1.6">
-    <polygon points="18.60,28.90 30.64,35.85 30.64,49.75 18.60,56.70 6.56,49.75 6.56,35.85" fill="#b8642f" stroke="#b8642f"/>
-    <polygon points="45.40,28.90 57.44,35.85 57.44,49.75 45.40,56.70 33.36,49.75 33.36,35.85" fill="#b8642f" stroke="#b8642f"/>
-    <polygon points="32.00,5.70 44.04,12.65 44.04,26.55 32.00,33.50 19.96,26.55 19.96,12.65" fill="url(#c)" stroke="url(#c)"/>
-  </g>
+  <rect x="1" y="1" width="62" height="62" rx="14" fill="url(#bg)"/>
+  <rect x="31" y="9" width="2" height="9" fill="#232a33"/>
+  <circle cx="32" cy="8.5" r="4" fill="#1f5bff"/>
+  <rect x="13" y="17" width="38" height="30" rx="9" fill="#ffffff" stroke="#c9d3e2" stroke-width="1.2"/>
+  <rect x="17" y="21" width="30" height="16" rx="4" fill="#141a22"/>
+  <rect x="21" y="26.5" width="8" height="5" rx="2.5" fill="#8fe3ff"/>
+  <rect x="35" y="26.5" width="8" height="5" rx="2.5" fill="#8fe3ff"/>
+  <rect x="15" y="46" width="34" height="5" rx="2.5" fill="#5b7cff"/>
+  <path d="M14 63 v-6 a6 6 0 0 1 6-6 h24 a6 6 0 0 1 6 6 v6 z" fill="#ffffff" stroke="#c9d3e2" stroke-width="1.2"/>
 </svg>

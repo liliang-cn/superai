@@ -4,70 +4,83 @@
 <script type="module">
 import * as THREE from "three";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 const P = new URLSearchParams(location.search);
-const S = 1024, mode = P.get("mode") || "ios";
+const S = 1024, v = P.get("v") || "a"; // a: the icon in use; b, c: the variants not chosen
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
 renderer.setPixelRatio(1); renderer.setSize(S, S);
-renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 0.85;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 0.95;
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
 const scene = new THREE.Scene();
 const pm = new THREE.PMREMGenerator(renderer);
 scene.environment = pm.fromScene(new RoomEnvironment(), 0.04).texture;
 
-// The ground: daylight, pale sky above, warm cream below (a big plane under the comb).
+// Backgrounds: a = daylight (cool white into pale blue), b = signal blue, c = daylight, front-on.
+const SIGNAL = 0x1f5bff;
 const cv = document.createElement("canvas"); cv.width = cv.height = 512;
 const g = cv.getContext("2d");
-const lg = g.createLinearGradient(0, 0, 0, 512);
-lg.addColorStop(0, "#c6ddf1"); lg.addColorStop(0.5, "#e9eef0"); lg.addColorStop(1, "#f8eedc");
-g.fillStyle = lg; g.fillRect(0, 0, 512, 512);
-const rg = g.createRadialGradient(150, 120, 0, 150, 120, 380);
-rg.addColorStop(0, "rgba(255,247,226,0.95)"); rg.addColorStop(1, "rgba(255,247,226,0)");
-g.fillStyle = rg; g.fillRect(0, 0, 512, 512);
+if (v === "b") {
+  const lg = g.createLinearGradient(0, 0, 0, 512); lg.addColorStop(0, "#3b74ff"); lg.addColorStop(1, "#1240d8");
+  g.fillStyle = lg; g.fillRect(0, 0, 512, 512);
+  const rg = g.createRadialGradient(170, 120, 0, 170, 120, 420); rg.addColorStop(0, "rgba(255,255,255,0.28)"); rg.addColorStop(1, "rgba(255,255,255,0)");
+  g.fillStyle = rg; g.fillRect(0, 0, 512, 512);
+} else {
+  const lg = g.createLinearGradient(0, 0, 0, 512); lg.addColorStop(0, "#f7f9fc"); lg.addColorStop(1, "#dfe8f6");
+  g.fillStyle = lg; g.fillRect(0, 0, 512, 512);
+  const rg = g.createRadialGradient(360, 90, 0, 360, 90, 380); rg.addColorStop(0, "rgba(31,91,255,0.16)"); rg.addColorStop(1, "rgba(31,91,255,0)");
+  g.fillStyle = rg; g.fillRect(0, 0, 512, 512);
+}
 const bgTex = new THREE.CanvasTexture(cv); bgTex.colorSpace = THREE.SRGBColorSpace;
-scene.background = mode === "ios" ? bgTex : null;
-const ground = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.ShadowMaterial({ opacity: 0.22 }));
-ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
+scene.background = bgTex;
 
-const camera = new THREE.PerspectiveCamera(26, 1, 0.1, 100);
-camera.position.set(0, 11.6, 10.6); camera.lookAt(0, 0.3, 0.3);
+const shell = new THREE.MeshPhysicalMaterial({ color: 0xf6f7f9, roughness: 0.38, clearcoat: 0.6, clearcoatRoughness: 0.25, envMapIntensity: 0.8 });
+const face = new THREE.MeshPhysicalMaterial({ color: 0x141a22, roughness: 0.18, clearcoat: 1, clearcoatRoughness: 0.05, envMapIntensity: 1.0 });
+const joint = new THREE.MeshStandardMaterial({ color: 0x232a33, roughness: 0.5 });
+const eyeCol = v === "b" ? 0x9fd0ff : 0x5b8cff;
+const eye = new THREE.MeshStandardMaterial({ color: eyeCol, emissive: eyeCol, emissiveIntensity: 2.2, toneMapped: false });
+const bandMat = new THREE.MeshPhysicalMaterial({ color: v === "b" ? 0xf2b416 : SIGNAL, roughness: 0.35, clearcoat: 0.5 });
+const bulbMat = new THREE.MeshStandardMaterial({ color: v === "b" ? 0xf2b416 : SIGNAL, emissive: v === "b" ? 0xf2b416 : SIGNAL, emissiveIntensity: 1.2, toneMapped: false });
 
-scene.add(new THREE.HemisphereLight(0xfff3df, 0xb9c6d2, 0.55));
-const sun = new THREE.DirectionalLight(0xfff8ee, 2.6);
-sun.position.set(-5, 8, 3); sun.castShadow = true;
-sun.shadow.mapSize.set(2048, 2048); sun.shadow.radius = 9; sun.shadow.blurSamples = 20;
-Object.assign(sun.shadow.camera, { left: -5, right: 5, top: 5, bottom: -5 });
+const rb = (w, h, d, m, r) => { const mesh = new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 5, r), m); mesh.castShadow = mesh.receiveShadow = true; return mesh; };
+
+// The robot as the app draws it (robots.ts), head and shoulders.
+const bot = new THREE.Group();
+const torso = rb(0.92, 0.82, 0.62, shell, 0.18); torso.position.y = 0.83; bot.add(torso);
+const chest = rb(0.42, 0.22, 0.05, new THREE.MeshStandardMaterial({ color: 0x141a22, emissive: SIGNAL, emissiveIntensity: 0.6 }), 0.05); chest.position.set(0, 0.85, 0.31); bot.add(chest);
+const head = new THREE.Group(); head.position.y = 1.32;
+const skull = rb(0.86, 0.66, 0.72, shell, 0.2); skull.position.y = 0.33; head.add(skull);
+const visor = rb(0.7, 0.42, 0.06, face, 0.08); visor.position.set(0, 0.45, 0.36); head.add(visor);
+// The collar: a rounded ring under the head, its corners following the
+// skull's and its edges bevelled, rather than a flat plate.
+const collarShape = (w, d, r) => { const s = new THREE.Shape(); const x = -w / 2, y = -d / 2;
+  s.moveTo(x + r, y); s.lineTo(x + w - r, y); s.quadraticCurveTo(x + w, y, x + w, y + r); s.lineTo(x + w, y + d - r); s.quadraticCurveTo(x + w, y + d, x + w - r, y + d);
+  s.lineTo(x + r, y + d); s.quadraticCurveTo(x, y + d, x, y + d - r); s.lineTo(x, y + r); s.quadraticCurveTo(x, y, x + r, y); return s; };
+const collarGeo = new THREE.ExtrudeGeometry(collarShape(0.82, 0.68, 0.2), { depth: 0.05, bevelEnabled: true, bevelThickness: 0.025, bevelSize: 0.025, bevelSegments: 6, curveSegments: 16 });
+collarGeo.rotateX(-Math.PI / 2);
+const band = new THREE.Mesh(collarGeo, bandMat); band.position.y = 0.02; band.castShadow = true; head.add(band);
+for (const x of [-0.15, 0.15]) {
+  const e = new THREE.Mesh(new THREE.CapsuleGeometry(0.055, 0.08, 6, 12), eye);
+  e.rotation.z = Math.PI / 2; e.position.set(x, 0.46, 0.4); head.add(e);
+}
+const stalk = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.28, 10), joint); stalk.position.y = 0.8; head.add(stalk);
+const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.08, 20, 14), bulbMat); bulb.position.y = 0.98; head.add(bulb);
+bot.add(head);
+for (const x of [-0.58, 0.58]) {
+  const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.11, 0.42, 6, 14), shell); arm.position.set(x, 0.82, 0.02); arm.castShadow = true; bot.add(arm);
+}
+scene.add(bot);
+
+const camera = new THREE.PerspectiveCamera(24, 1, 0.1, 100);
+if (v === "c") { camera.position.set(0, 1.9, 4.6); camera.lookAt(0, 1.62, 0); bot.rotation.y = 0; }
+else { camera.position.set(1.5, 2.15, 4.2); camera.lookAt(0, 1.58, 0); bot.rotation.y = 0.12; }
+
+scene.add(new THREE.HemisphereLight(0xffffff, v === "b" ? 0x2a50c8 : 0xc4d2e6, 0.7));
+const sun = new THREE.DirectionalLight(0xffffff, 2.4);
+sun.position.set(-3, 6, 5); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); sun.shadow.radius = 6;
+Object.assign(sun.shadow.camera, { left: -3, right: 3, top: 3, bottom: -3 });
 scene.add(sun);
-
-function hexShape(r) {
-  const s = new THREE.Shape();
-  for (let i = 0; i < 6; i++) {
-    const a = Math.PI / 6 + (Math.PI / 3) * i;   // pointy top when seen from above
-    const x = r * Math.cos(a), y = r * Math.sin(a);
-    i ? s.lineTo(x, y) : s.moveTo(x, y);
-  }
-  s.closePath();
-  return s;
-}
-function cell(x, z, h, mat) {
-  const geo = new THREE.ExtrudeGeometry(hexShape(0.82), { depth: h, bevelEnabled: true, bevelThickness: 0.12, bevelSize: 0.11, bevelSegments: 8, curveSegments: 1 });
-  const m = new THREE.Mesh(geo, mat);
-  m.rotation.x = -Math.PI / 2; m.position.set(x, 0, z);
-  m.castShadow = true; m.receiveShadow = true;
-  scene.add(m);
-  return m;
-}
-const porcelain = new THREE.MeshPhysicalMaterial({ color: 0xf3ede3, roughness: 0.45, clearcoat: 0.45, clearcoatRoughness: 0.3, envMapIntensity: 0.7 });
-const honey = new THREE.MeshPhysicalMaterial({ color: 0xe08600, roughness: 0.42, clearcoat: 0.35, clearcoatRoughness: 0.2, emissive: 0xa04800, emissiveIntensity: 0.35, envMapIntensity: 0.2 });
-const ink = new THREE.MeshPhysicalMaterial({ color: 0x1d1a16, roughness: 0.22, clearcoat: 1, clearcoatRoughness: 0.06, metalness: 0.1, envMapIntensity: 0.9 });
-
-const d = Math.sqrt(3) * 0.82 + 0.42;           // centre to centre, with a gap
-const ring = [0, 60, 120, 180, 240, 300].map((a) => [d * Math.cos((a * Math.PI) / 180), d * Math.sin((a * Math.PI) / 180)]);
-cell(0, 0, 1.25, ink);                          // the queen, a little taller
-const lit = new Set([0, 3 + 1]);                // two workers busy
-ring.forEach(([x, z], i) => cell(x, z, lit.has(i) ? 0.8 : 0.5, lit.has(i) ? honey : porcelain));
-// warm light thrown by the busy ones
-
+const rim = new THREE.DirectionalLight(v === "b" ? 0xbcd2ff : 0xcfe0ff, 1.2); rim.position.set(4, 3, -3); scene.add(rim);
 
 renderer.render(scene, camera);
 window.__done = true;
