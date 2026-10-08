@@ -141,7 +141,9 @@ func (a *App) agentLinkOnce(ctx context.Context, o AgentLinkOptions) error {
 	}
 	defer conn.Close()
 
-	sctx, cancel := context.WithCancel(metadata.AppendToOutgoingContext(ctx, "authorization", "Bearer "+o.Token))
+	// The stream outlives ctx by a moment: when this agent stops it closes its
+	// side first, so core reads a goodbye rather than a lost agent.
+	sctx, cancel := context.WithCancel(metadata.AppendToOutgoingContext(context.Background(), "authorization", "Bearer "+o.Token))
 	defer cancel()
 	stream, err := agentlinkpb.NewAgentLinkClient(conn).Connect(sctx)
 	if err != nil {
@@ -167,6 +169,10 @@ func (a *App) agentLinkOnce(ctx context.Context, o AgentLinkOptions) error {
 					cancel()
 					return
 				}
+			case <-ctx.Done():
+				_ = stream.CloseSend()
+				time.AfterFunc(2*time.Second, cancel)
+				return
 			case <-sctx.Done():
 				return
 			}

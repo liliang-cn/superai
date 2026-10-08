@@ -253,3 +253,60 @@ func TestALinkedAgentCountsInTheHiveMeter(t *testing.T) {
 	<-done
 	waitFor(t, "the agent to leave the meter", func() bool { return len(core.HivePulse().Members) == 1 })
 }
+
+// An agent whose connection looks open but which no longer answers — a
+// machine that lost power or network — is dropped after three silent pings
+// and shows in Needs you, until it connects again.
+func TestASilentAgentIsDroppedAndShownLost(t *testing.T) {
+	core := NewApp()
+	core.agents().pingEvery, core.agents().silence = 50*time.Millisecond, 200*time.Millisecond
+	addr := startCore(t, core)
+	stream := dialAs(t, addr, "tok")
+	if err := stream.Send(&agentlinkpb.AgentFrame{Kind: &agentlinkpb.AgentFrame_Hello{Hello: &agentlinkpb.Hello{Name: "sleepy"}}}); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "the agent to connect", func() bool { return core.agents().get("sleepy") != nil })
+	// It never answers a ping.
+	waitFor(t, "core to drop the silent agent", func() bool { return core.agents().get("sleepy") == nil })
+
+	lost := func() bool {
+		for _, it := range core.Attention() {
+			if it.Kind == "lost" && it.Ref == "sleepy" {
+				return true
+			}
+		}
+		return false
+	}
+	if !lost() {
+		t.Fatalf("the dropped agent is not in Needs you: %+v", core.Attention())
+	}
+
+	again := dialAs(t, addr, "tok")
+	if err := again.Send(&agentlinkpb.AgentFrame{Kind: &agentlinkpb.AgentFrame_Hello{Hello: &agentlinkpb.Hello{Name: "sleepy"}}}); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "the agent to reconnect", func() bool { return core.agents().get("sleepy") != nil })
+	if lost() {
+		t.Fatal("a reconnected agent is still shown as not answering")
+	}
+}
+
+// An agent that is stopped says goodbye, so it leaves without being lost.
+func TestAStoppedAgentIsNotLost(t *testing.T) {
+	core := NewApp()
+	addr := startCore(t, core)
+	agent := NewApp()
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		agent.RunAgentLink(ctx, AgentLinkOptions{Core: addr, Token: "tok", Name: "tidy", Version: "test"})
+		close(done)
+	}()
+	waitFor(t, "the agent to connect", func() bool { return core.agents().get("tidy") != nil })
+	cancel()
+	<-done
+	waitFor(t, "core to see it leave", func() bool { return core.agents().get("tidy") == nil })
+	if l := core.agents().lostAgents(time.Now()); len(l) != 0 {
+		t.Fatalf("a stopped agent is counted lost: %v", l)
+	}
+}
