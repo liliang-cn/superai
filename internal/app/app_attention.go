@@ -108,8 +108,10 @@ func (a *App) Attention() []AttentionItem {
 
 	// Reminders: their next time is the scheduler's.
 	next := map[string]*time.Time{}
+	what := map[string]string{}
 	for _, u := range a.Upcoming() {
 		next[u.ID] = u.Next
+		what[u.ID] = u.What
 	}
 	for _, r := range life.Reminders {
 		id := fmt.Sprint(r["id"])
@@ -117,7 +119,10 @@ func (a *App) Attention() []AttentionItem {
 		if at == nil || at.After(week) || at.Before(now) {
 			continue
 		}
-		soon = append(soon, AttentionItem{Level: "soon", Kind: "reminder", Title: fmt.Sprint(r["title"]),
+		// A row saved without a title printed as "<nil>"; the scheduled
+		// task it belongs to still says what it is for.
+		title := firstNonEmpty(fmt.Sprint(orEmpty(r["title"])), what[id], "Reminder")
+		soon = append(soon, AttentionItem{Level: "soon", Kind: "reminder", Title: title,
 			Detail: strings.TrimSpace(fmt.Sprint(orEmpty(r["when"]))), At: at, Ref: id, Open: "records"})
 	}
 
