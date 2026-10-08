@@ -31,7 +31,7 @@ import LiveHive from "./LiveHive";
 import LiveRun, { useRun } from "./LiveRun";
 import LiveStatus from "./LiveStatus";
 import LiveStats from "./LiveStats";
-import { useDeskTheme } from "./DeskShell";
+import { useDeskTheme, useDeskWorld } from "./DeskShell";
 
 type TabKey = string; // "hive" | "run:<id>" | "dash:<id>"
 
@@ -183,6 +183,7 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
     }), [hive]);
   const mentions = useAgentMentions(draft, setDraft, workerNames);
   const { theme } = useDeskTheme();
+  const world = useDeskWorld();
   const [naming, setNaming] = useState<{content:string; prompt:string} | null>(null);
   const [saveError, setSaveError] = useState("");
   const [pins, setPins] = useState<Dashboard[]>([]);
@@ -482,13 +483,15 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
           <button className="dk-icon" title={t("Stats")} onClick={() => navigate(PATHS.stats)}><ChartColumnIcon size={17} /></button>
           <button className="dk-icon" title={t("Hide this pane")} onClick={() => fold(true)}><PanelRightCloseIcon size={17} /></button>
         </div>
-        <div className={current === "hive" ? "dk-screen see-world" : "cv-glass dk-screen"}>
+        <div className={current === "hive" && world ? "dk-screen see-world" : "cv-glass dk-screen"}>
           {/* Shown when the pane floats over the conversation (a narrow
               window): its tab row is up in the title bar there, where the
               Mac app's own title bar can take the click. */}
           <button className="dk-icon dk-float-x" title={t("Hide this pane")} aria-label={t("Hide this pane")} onClick={() => fold(true)}><XIcon size={16} /></button>
           <div className="dk-in">
-            {/* The hive tab is a window onto the world behind the app. */}
+            {/* The hive tab is a window onto the world behind the app; in
+                Menu mode there is no world, so it is the flat map. */}
+            {current === "hive" && !world && <LiveHive hive={hive} runs={runs} agents={linked} now={now} />}
             {current === "status" && <LiveStatus hive={hive} now={now} agents={linked} runs={runs} />}
             {current === "stats" && <LiveStats hive={hive} runs={runs} />}
             {current.startsWith("run:") && <RunTab id={current.slice(4)} now={now} />}

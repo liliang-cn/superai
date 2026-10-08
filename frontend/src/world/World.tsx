@@ -57,9 +57,8 @@ function useBusy() {
  * The cluster behind the whole desktop app: one scene, a lens per page.
  * What is selected gets a card tied to it by a line, with everything that can
  * be done to it; the bar along the bottom talks to the queen from anywhere.
- * `panel` says whether the page's list is showing over the left of it.
  */
-export default function World({ view, panel, onPanel }: { view: ViewKey; panel: boolean; onPanel: () => void }) {
+export default function World({ view }: { view: ViewKey }) {
   const host = useRef<HTMLDivElement>(null);
   const card = useRef<HTMLDivElement>(null);
   const line = useRef<SVGLineElement>(null);
@@ -130,7 +129,7 @@ export default function World({ view, panel, onPanel }: { view: ViewKey; panel: 
     ro.observe(document.body);
     const t = window.setTimeout(measure, 300);
     return () => { ro.disconnect(); window.clearTimeout(t); };
-  }, [view, panel]);
+  }, [view]);
 
   const close = () => { setPicked(null); engine.current?.select(null); worldBus.publish(null); };
   return (
@@ -153,12 +152,12 @@ export default function World({ view, panel, onPanel }: { view: ViewKey; panel: 
           engine.current?.look(l.x, l.z, l.zoom, "cluster");
         }}><LocateFixedIcon size={15} /></button>
       </div>
-      <Hud view={view} data={data} left={panel ? (inset || 84) + 16 : 24} />
+      <Hud view={view} data={data} left={24} />
       <div ref={card} className="wl-callout" style={{ display: picked ? "" : "none" }}>
         {picked && <Inspector key={picked.kind + ":" + picked.id} picked={picked} data={data} onClose={close} openDash={setDash} open={(to, full) => { if (full) window.dispatchEvent(new CustomEvent("superai:window", { detail: to })); else navigate(to); }} />}
       </div>
       {dash && <DashScreen id={dash} onClose={() => setDash("")} />}
-      <Command view={view} panel={panel} onPanel={onPanel} onConversation={() => window.dispatchEvent(new CustomEvent("superai:window", { detail: "/" }))} onTyping={(kind, id) => engine.current?.hint(kind, id)} />
+      <Command view={view} onConversation={() => window.dispatchEvent(new CustomEvent("superai:window", { detail: "/" }))} onTyping={(kind, id) => engine.current?.hint(kind, id)} />
     </div>
   );
 }
