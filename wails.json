@@ -9,5 +9,12 @@
   "author": {
     "name": "Liang Li",
     "email": "liliang.imut@gmail.com"
+  },
+  "info": {
+    "companyName": "SuperAI",
+    "productName": "SuperAI",
+    "productVersion": "0.18.0",
+    "copyright": "© 2026 Liang Li",
+    "comments": "SuperAI desktop"
   }
 }
