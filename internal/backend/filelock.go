@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"sync"
-	"syscall"
 )
 
 // An advisory lock on a file in the data directory, for the jobs that exactly
@@ -46,7 +45,7 @@ func AcquireFileLock(name string) (*FileLock, error) {
 
 	// Non-blocking: the point is to find out whether someone else has it, not
 	// to wait for them to quit.
-	if err := syscall.Flock(int(file.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+	if err := lockFile(file); err != nil {
 		_ = file.Close()
 		return nil, nil
 	}
@@ -70,7 +69,7 @@ func (l *FileLock) Release() {
 	if l.file == nil {
 		return
 	}
-	_ = syscall.Flock(int(l.file.Fd()), syscall.LOCK_UN)
+	_ = unlockFile(l.file)
 	_ = l.file.Close()
 	l.file = nil
 }

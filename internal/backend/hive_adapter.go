@@ -15,7 +15,6 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/google/uuid"
@@ -427,8 +426,7 @@ func (e *ExecEngine) RunSteerable(ctx context.Context, prompt string, emit func(
 	// Its own process group, so cancelling takes the agent's children with it: an
 	// agent that shelled out and was then stopped must not leave the shell
 	// running.
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	cmd.Cancel = func() error { return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) }
+	killGroupOnCancel(cmd)
 	cmd.WaitDelay = 3 * time.Second
 	var stderr bytes.Buffer
 	cmd.Stderr = &limitedWriter{w: &stderr, n: 8 << 10}

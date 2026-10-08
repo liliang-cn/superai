@@ -234,6 +234,8 @@ github.com/liliang-cn/agent-go/v3 v3.51.3 h1:2kpCnnRxTAi+eEK01oDTt2/tmeRuvrccLMU
 github.com/liliang-cn/agent-go/v3 v3.51.3/go.mod h1:RfIFY/C0mIiq6CRgXp9pq/kBoZeOdb94pAUcEv0Gc9I=
 github.com/liliang-cn/agentexec v0.5.3 h1:LJ8KNGKI8CpAhZTRs9LPZjxZzf97vID2/ty1cjlUn2s=
 github.com/liliang-cn/agentexec v0.5.3/go.mod h1:Lt1DVrf3IX0u/2B4YokbMOfQElXKN4bd1xgKNI4acIo=
+github.com/liliang-cn/agentexec v0.5.4 h1:AWVmSiawGL/46x9vnwPyddQ8xkx+TuqfT8uKWPx/Hp8=
+github.com/liliang-cn/agentexec v0.5.4/go.mod h1:Lt1DVrf3IX0u/2B4YokbMOfQElXKN4bd1xgKNI4acIo=
 github.com/liliang-cn/cortexdb/v2 v2.123.0 h1:GDNBaQOOWHn/XR5ICLeemoAfhxflrGsNUe/Z1XKO57I=
 github.com/liliang-cn/cortexdb/v2 v2.123.0/go.mod h1:EIBy+2JQDHiBgxSD84fx4vvZ2B9o46Q3yVBSjB+bInU=
 github.com/liliang-cn/mcp-swagger-server v1.3.0 h1:PFnm9mSbjVoFv4AelRzmHuxuuJXI8QRUYVeYmjkpsPw=
