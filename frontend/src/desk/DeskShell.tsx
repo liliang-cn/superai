@@ -126,14 +126,11 @@ export default function DeskShell({ view, badges, children, onOpenConversation, 
   return (
     <ThemeCtx.Provider value={{ theme, setTheme }}>
     <WorldCtx.Provider value={world}>
-      <div className={`cv-root dk-shell${world ? " dk-world" : " dk-menu"}${mode === "window" ? " window-on" : ""} ${theme.mode === "dark" ? "dk-dark" : ""}`} style={themeVars(theme)}>
+      {/* Menu mode keeps the world's styling, which every page is tuned
+          for, and shows the rail and pages full width with no world drawn. */}
+      <div className={`cv-root dk-shell dk-world${world ? "" : " panel-on dk-flat"}${mode === "window" ? " window-on" : ""} ${theme.mode === "dark" ? "dk-dark" : ""}`} style={themeVars(theme)}>
         {world && <World view={view} />}
-        <div className="dk-bar" style={drag}>
-          <div className="dk-mode" role="group" aria-label={t("View")} style={noDrag}>
-            <button className={world ? "on" : ""} aria-pressed={world} title={t("The hive in 3D")} onClick={() => switchTo("world")}><BoxIcon size={14} />3D</button>
-            <button className={world ? "" : "on"} aria-pressed={!world} title={t("Menus and lists, the way it was")} onClick={() => switchTo("menu")}><ListIcon size={14} />{t("Menu")}</button>
-          </div>
-        </div>
+        <div className="dk-bar" style={drag} />
         <div className="dk-corner" style={noDrag}>
           <NotificationCenter variant="desk" onOpenConversation={onOpenConversation} />
         </div>
@@ -177,6 +174,10 @@ export default function DeskShell({ view, badges, children, onOpenConversation, 
         {mode === "window" && (
           <button className="dk-win-x" style={noDrag} title={t("Back to the world")} onClick={() => setMode("world")}><XIcon size={18} /></button>
         )}
+        <button className="dk-mode-fab" style={noDrag} onClick={() => switchTo(world ? "menu" : "world")}
+          title={world ? t("Menus and lists, the way it was") : t("The hive in 3D")}>
+          {world ? <ListIcon size={17} /> : <BoxIcon size={17} />}<span>{world ? t("Menu") : "3D"}</span>
+        </button>
         <DeskStatusBar status={status} loading={loading} codingRuns={liveRuns}/>
       </div>
     </WorldCtx.Provider>

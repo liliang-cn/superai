@@ -621,13 +621,17 @@ html[data-desk] body { background: transparent; }
 .dk-world .dk-page.page-hive { width: 520px; }
 .dk-world .dk-page.page-agents { width: 620px; }
 /* In 3D mode the world is the whole screen: pages show only as a window
-   over it, and the rail and lists are Menu mode's. Home's conversation stays
-   mounted (it holds the chat). */
-.dk-world .dk-page { display: none; }
-.dk-world > .dk { display: none; }
-.dk-world > .dk-rail,
-.dk-world > .dk-side-strip { display: none; }
-.dk-world .wl-cam { right: 20px; }
+   over it, and the rail and lists are Menu mode's (panel-on). Home's
+   conversation stays mounted (it holds the chat). */
+.dk-world:not(.panel-on) .dk-page { display: none; }
+.dk-world:not(.panel-on) > .dk { display: none; }
+.dk-world:not(.panel-on) > .dk-rail,
+.dk-world:not(.panel-on) > .dk-side-strip { display: none; }
+.dk-world:not(.panel-on) .wl-cam { right: 20px; }
+/* Menu mode: no world behind, so a page takes the width it used to leave
+   for it. */
+.dk-shell.dk-world.dk-flat > .dk-page { width: auto; justify-self: stretch; margin: 6px 0 14px 4px; }
+.dk-shell.dk-world.dk-flat > .dk-page.with-side { margin-right: 72px; }
 
 /* A page opened full size over the world: the screen of the thing it
    belongs to, in a window with a way back. */
@@ -654,12 +658,16 @@ html[data-desk] body { background: transparent; }
 .dk-world.window-on > .dk-win-x:hover { background: #16202b; color: #fff; }
 .dk-world.window-on > .dk-page > .content { padding-right: 40px; }
 
-/* ── 3D or Menu: one switch, left on the title bar, in both modes ─────── */
-.dk-bar { position: relative; z-index: 6; }
-.dk-mode { display: inline-flex; padding: 2px; border-radius: 9px; background: rgba(22, 32, 43, 0.06); box-shadow: inset 0 0 0 1px rgba(22, 32, 43, 0.06); }
-.dk-mode button { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 10px; border: 0; border-radius: 7px; background: transparent; color: var(--ink-2); font: 500 12.5px/1 var(--font-sans, inherit); cursor: pointer; }
-.dk-mode button:hover { color: var(--ink); }
-.dk-mode button.on { background: #fff; color: var(--ink); box-shadow: 0 1px 2px rgba(22, 32, 43, 0.12), 0 0 0 1px rgba(22, 32, 43, 0.06); }
-.dk-mode button:focus-visible { outline: 2px solid #2f5bea; outline-offset: 1px; }
-.dk-dark .dk-mode { background: rgba(255, 255, 255, 0.08); }
-.dk-dark .dk-mode button.on { background: rgba(255, 255, 255, 0.16); color: #fff; }
+/* ── 3D or Menu: one floating button, bottom right, in both modes ────── */
+.dk-mode-fab { position: fixed; z-index: 7; right: 22px; bottom: 44px; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center;
+  background: #16202b; box-shadow: 0 8px 22px rgba(22, 32, 43, 0.28), 0 0 0 1px rgba(255, 255, 255, 0.06); cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; }
+.dk-shell .dk-mode-fab { color: #fff; }
+.dk-mode-fab > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.dk-mode-fab:hover { transform: translateY(-1px); box-shadow: 0 12px 26px rgba(22, 32, 43, 0.32); }
+.dk-mode-fab:focus-visible { outline: 2px solid #2f5bea; outline-offset: 2px; }
+.dk-world.window-on > .dk-mode-fab { display: none; }
+/* Menu mode in a narrow window: the live pane floats over the conversation,
+   so it is solid, controls included. */
+@media (max-width: 1240px) {
+  .dk-world.dk-flat .dk-live .dk-screen, .dk-world.dk-flat .dk-live > .dk-ctl { background: #fff; }
+}
