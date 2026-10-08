@@ -144,7 +144,12 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
 }) {
   const { t } = useI18n();
   const navigate = useNavigate();
-  const [folded, setFolded] = useState(() => { try { return localStorage.getItem(FOLD_KEY) === "1"; } catch { return false; } });
+  // Kept the way it was left; in a narrow window, where it would float over
+  // the conversation, it starts folded.
+  const [folded, setFolded] = useState(() => {
+    try { const v = localStorage.getItem(FOLD_KEY); if (v !== null) return v === "1"; } catch { /* fine */ }
+    return window.matchMedia("(max-width: 1240px)").matches;
+  });
   const layoutRef = useRef<HTMLDivElement>(null);
   const [sideWidth, setSideWidth] = useState(() => {
     try { const n = Number(localStorage.getItem("superai-desk-side-width")); return Number.isFinite(n) && n >= 200 ? Math.min(480, n) : 252; } catch { return 252; }
@@ -232,13 +237,16 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
   // The tabs: the hive, its status and the figures always; every coding run
   // that is going; and whatever was opened.
   const liveRuns = runs.filter((r) => r.state === "running");
+  // The hive tab is a window onto the 3D world; Menu mode has none, so its
+  // first tab is the status.
+  const fixed = world ? FIXED : FIXED.filter((k) => k !== "hive");
   const tabs: TabKey[] = useMemo(() => {
-    const out: TabKey[] = [...FIXED];
+    const out: TabKey[] = [...fixed];
     liveRuns.forEach((r) => { const k = "run:" + r.id; if (!closed.has(k)) out.push(k); });
     opened.forEach((k) => { if (!out.includes(k)) out.push(k); });
     return out;
-  }, [liveRuns.map((r) => r.id).join(), opened, closed]);
-  const current = tabs.includes(active) ? active : "hive";
+  }, [liveRuns.map((r) => r.id).join(), opened, closed, world]);
+  const current = tabs.includes(active) ? active : fixed[0];
   const open = (k: TabKey) => {
     setClosed((c) => { const n = new Set(c); n.delete(k); return n; });
     setOpened((o) => (o.includes(k) ? o : [...o, k]));
@@ -248,7 +256,7 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
   const close = (k: TabKey) => {
     setOpened((o) => o.filter((x) => x !== k));
     setClosed((c) => new Set(c).add(k));
-    if (current === k) setActive("hive");
+    if (current === k) setActive(fixed[0]);
   };
   // The right pane folds away to a strip, and stays the way it was left.
   const fold = (on: boolean) => { setFolded(on); try { localStorage.setItem(FOLD_KEY, on ? "1" : "0"); } catch { /* fine */ } };
@@ -474,7 +482,7 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
               <button key={k} className={on ? "dk-tab on" : "dk-tab"} onClick={() => setActive(k)}>
                 {liveDot ? <i className="dk-livedot" /> : k.startsWith("run:") ? <TerminalIcon size={14} /> : k.startsWith("dash:") ? <LayoutDashboardIcon size={14} /> : k === "status" ? <ActivityIcon size={14} /> : k === "stats" ? <GaugeIcon size={14} /> : <HexagonIcon size={14} />}
                 <span>{tabLabel(k)}</span>
-                {!FIXED.includes(k) && <XIcon size={13} className="dk-tab-x" onClick={(e) => { e.stopPropagation(); close(k); }} />}
+                {!fixed.includes(k) && <XIcon size={13} className="dk-tab-x" onClick={(e) => { e.stopPropagation(); close(k); }} />}
               </button>
             );
           })}
@@ -483,15 +491,13 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
           <button className="dk-icon" title={t("Stats")} onClick={() => navigate(PATHS.stats)}><ChartColumnIcon size={17} /></button>
           <button className="dk-icon" title={t("Hide this pane")} onClick={() => fold(true)}><PanelRightCloseIcon size={17} /></button>
         </div>
-        <div className={current === "hive" && world ? "dk-screen see-world" : "cv-glass dk-screen"}>
+        <div className={current === "hive" ? "dk-screen see-world" : "cv-glass dk-screen"}>
           {/* Shown when the pane floats over the conversation (a narrow
               window): its tab row is up in the title bar there, where the
               Mac app's own title bar can take the click. */}
           <button className="dk-icon dk-float-x" title={t("Hide this pane")} aria-label={t("Hide this pane")} onClick={() => fold(true)}><XIcon size={16} /></button>
           <div className="dk-in">
-            {/* The hive tab is a window onto the world behind the app; in
-                Menu mode there is no world, so it is the flat map. */}
-            {current === "hive" && !world && <LiveHive hive={hive} runs={runs} agents={linked} now={now} />}
+            {/* The hive tab is a window onto the world behind the app. */}
             {current === "status" && <LiveStatus hive={hive} now={now} agents={linked} runs={runs} />}
             {current === "stats" && <LiveStats hive={hive} runs={runs} />}
             {current.startsWith("run:") && <RunTab id={current.slice(4)} now={now} />}
