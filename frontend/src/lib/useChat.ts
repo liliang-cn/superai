@@ -250,6 +250,17 @@ function lintRetryLine(content: string | undefined): string {
           );
           break;
         }
+        case "tombstone": {
+          // What was streamed is withdrawn: a draft answer the output lint
+          // turned down, or an attempt that failed and is being retried. The
+          // next answer is written from scratch, so start the text over. An
+          // unmarked tombstone ends the run (stopped, failed); what was
+          // streamed is kept then, as it always was.
+          if (ev.debugType !== "retry" || !streamed.current.get(askId)) return;
+          streamed.current.set(askId, "");
+          patchMessage(askId, (m) => (m.content ? { ...m, content: "" } : m));
+          break;
+        }
         case "thinking":
         case "state_update": {
           const text = cleanProgress(ev.content);
