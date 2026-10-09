@@ -92,7 +92,10 @@ function savedLine(t: TraceItem): string {
 export default function LiveTurn({ m, trace, pulse, session }: { m: ChatMessage; trace: TraceItem[]; pulse: Snap; session: string }) {
   const running = !!m.streaming;
   const now = useClock(running);
-  const [open, setOpen] = useState(false);
+  // Open while it runs and folded once it is done, unless the person has
+  // clicked it one way or the other: then it stays how they left it.
+  const [pref, setPref] = useState<boolean | null>(null);
+  const open = pref ?? running;
 
   const calls = trace.filter((t) => t.askId === m.id);
   const top = calls.filter((t) => !t.inner);
@@ -130,11 +133,12 @@ export default function LiveTurn({ m, trace, pulse, session }: { m: ChatMessage;
     </>
   );
 
-  if (!running && !open) {
+  if (!open) {
     return (
       <>
-        <button className="lt-fold" onClick={() => setOpen(true)}>
-          <span>Worked</span>{stats}<ChevronDownIcon size={13} />
+        <button className={`lt-fold${running ? " on" : ""}`} onClick={() => setPref(true)}>
+          {running && <i className="lt-pulse" />}
+          <span>{running ? "Working" : "Worked"}</span>{stats}<ChevronDownIcon size={13} />
         </button>
         {savedList}
       </>
@@ -143,11 +147,11 @@ export default function LiveTurn({ m, trace, pulse, session }: { m: ChatMessage;
 
   return (
     <div className={`lt${running ? " on" : ""}`}>
-      <button className="lt-head" onClick={() => !running && setOpen(false)} disabled={running}>
+      <button className="lt-head" onClick={() => setPref(false)}>
         <i className="lt-pulse" />
         <span className="lt-what">{running ? "Working" : "Worked"}</span>
         {stats}
-        {!running && <ChevronDownIcon size={13} className="lt-up" />}
+        <ChevronDownIcon size={13} className="lt-up" />
       </button>
       {(top.length > 0 || (running && thought)) && (
         <ol className="lt-steps">
