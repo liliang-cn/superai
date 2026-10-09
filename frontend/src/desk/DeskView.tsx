@@ -221,7 +221,23 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
 
   const msgs = chat.messages.filter((m) => m.kind !== "context");
   const lastText = msgs.length ? msgs[msgs.length - 1].content : "";
-  useEffect(() => { endRef.current?.scrollIntoView({ block: "end" }); }, [msgs.length, lastText.length]);
+  // Follow the conversation while the person is at the bottom of it: a tool
+  // call, a thought or a line of answer landing keeps the newest in view. If
+  // they have scrolled up to read, it leaves them there; a new message brings
+  // them back down.
+  const msgsRef = useRef<HTMLDivElement>(null);
+  const atBottom = useRef(true);
+  useEffect(() => {
+    const el = msgsRef.current;
+    if (!el) return;
+    const onScroll = () => { atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80; };
+    const follow = new MutationObserver(() => { if (atBottom.current) el.scrollTop = el.scrollHeight; });
+    el.addEventListener("scroll", onScroll, { passive: true });
+    follow.observe(el, { childList: true, subtree: true, characterData: true });
+    return () => { el.removeEventListener("scroll", onScroll); follow.disconnect(); };
+  }, []);
+  useEffect(() => { atBottom.current = true; endRef.current?.scrollIntoView({ block: "end" }); }, [msgs.length]);
+  useEffect(() => { if (atBottom.current) endRef.current?.scrollIntoView({ block: "end" }); }, [lastText.length]);
 
   const waiting: Bee[] = bees.filter((b) => b.waitingFor && !b.paused);
   // Approvals and waiting bees are answered in the conversation (the cards);
@@ -380,7 +396,7 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
           <span className="dk-qhex big">Q</span>
           <div><b title={title}>{title}</b><small><i className={hive.role ? "dk-ok" : "dk-off"} />{status}</small></div>
         </header>
-        <div className="dk-msgs">
+        <div className="dk-msgs" ref={msgsRef}>
           {msgs.length === 0 && (
             <div className="dk-empty">Ask the queen anything, or give the hive an order: “check disk on every worker and tell me the fullest”.</div>
           )}
