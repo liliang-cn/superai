@@ -118,7 +118,7 @@ spec:
     - metadata: {name: data}
       spec:
         accessModes: [ReadWriteOnce]
-        storageClassName: sds-drbd-remote
+        storageClassName: haify-drbd-remote
         resources: {requests: {storage: 2Gi}}
 ---
 apiVersion: v1
