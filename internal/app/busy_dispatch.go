@@ -34,10 +34,13 @@ func (a *App) idleWorker() string {
 			busy[t.Worker] = true
 		}
 	}
+	// The hive's own workers only. The runner's list also holds every other
+	// agent reachable by URL — a laptop's node, say — which is not this
+	// hive's to hand a question to.
 	var free []string
-	for name := range a.remoteRunner().Workers() {
-		if !busy[name] {
-			free = append(free, name)
+	for _, m := range a.HiveMembers() {
+		if m.Role == backend.HiveRoleWorker && m.State == "live" && !busy[m.Name] {
+			free = append(free, m.Name)
 		}
 	}
 	if len(free) == 0 {
