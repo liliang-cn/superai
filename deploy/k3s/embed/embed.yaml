@@ -1,0 +1,44 @@
+# embeddinggemma for the shared brain (CortexDB) — see Dockerfile.
+# Two replicas on different nodes: recall waits on this, so one node going
+# down must not take embedding with it. The NodePort is what the SDS nodes,
+# where CortexDB runs, reach it on; it is on the LAN only and serves nothing
+# but embeddings.
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: embed, namespace: superai}
+spec:
+  replicas: 2
+  selector: {matchLabels: {app: embed}}
+  template:
+    metadata: {labels: {app: embed}}
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector: {matchLabels: {app: embed}}
+              topologyKey: kubernetes.io/hostname
+      containers:
+        - name: ollama
+          image: embed:hive
+          imagePullPolicy: IfNotPresent
+          ports: [{containerPort: 11434}]
+          # Loads the model before the pod is called ready, so the first
+          # recall after a restart does not pay for it.
+          lifecycle:
+            postStart:
+              exec:
+                command: ["sh", "-c", "for i in $(seq 1 60); do ollama run embeddinggemma:latest warm >/dev/null 2>&1 && exit 0; sleep 1; done; exit 0"]
+          readinessProbe:
+            httpGet: {path: /api/version, port: 11434}
+            periodSeconds: 10
+          resources:
+            requests: {cpu: 200m, memory: 900Mi}
+            limits: {memory: 2Gi}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: embed, namespace: superai}
+spec:
+  type: NodePort
+  selector: {app: embed}
+  ports: [{name: http, port: 11434, targetPort: 11434, nodePort: 31746}]
