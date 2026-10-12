@@ -40,6 +40,11 @@ type ChatTurn struct {
 	// the conversation is reopened. Rather than drop the working entirely, the
 	// transcript that is being hidden is summarised into these lines.
 	Steps []string `json:"steps,omitempty"`
+	// At is when the ask was made, or when the answer came (RFC 3339); empty
+	// for turns from before times were kept. ElapsedMs is how long an answer
+	// took. Filled in by the app layer, which records them.
+	At        string `json:"at,omitempty"`
+	ElapsedMs int64  `json:"elapsed_ms,omitempty"`
 }
 
 // maxTitle caps how much of the opening message becomes a session title.

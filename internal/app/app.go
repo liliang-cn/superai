@@ -838,10 +838,12 @@ func (a *App) SendChat(sessionID, message string, imagePaths []string) string {
 		}
 	}
 
+	asked, askedAt := message, time.Now()
 	go func() {
 		defer cancel()
 		defer a.untrackRun(requestID)
 		defer a.openTurns.Delete(requestID)
+		defer func() { recordTurnTime(sessionID, asked, askedAt, time.Since(askedAt)) }()
 
 		driver.Emit(backend.AvatarEvent{Type: "state", State: backend.AvatarStateThinking})
 
@@ -1132,7 +1134,7 @@ func (a *App) ChatHistory(sessionID string) []backend.ChatTurn {
 	if svc == nil {
 		return []backend.ChatTurn{}
 	}
-	return svc.SessionTurns(sessionID)
+	return withTurnTimes(sessionID, svc.SessionTurns(sessionID))
 }
 
 // SearchMCPServers finds installable MCP servers in the official registry, so
