@@ -807,6 +807,16 @@ func (a *App) SendChat(sessionID, message string, imagePaths []string) string {
 		return requestID
 	}
 
+	// Asked again while the queen is still answering here: a free worker takes
+	// it (see busy_dispatch.go). Pictures stay with the queen; a worker is
+	// asked in words only.
+	if len(imagePaths) == 0 && a.sessionBusy(sessionID) {
+		if w := a.idleWorker(); w != "" {
+			a.routeToIdleWorker(requestID, sessionID, w, message)
+			return requestID
+		}
+	}
+
 	// Registered here rather than inside the goroutine: SendChat returns the id
 	// to the frontend, and a stop pressed before the goroutine got scheduled
 	// would otherwise be told the run does not exist.
