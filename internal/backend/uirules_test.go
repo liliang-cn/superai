@@ -42,9 +42,14 @@ func TestUIRulesRoundTrip(t *testing.T) {
 		t.Error("different rules must report a change")
 	}
 
+	// The prompt names what can be drawn and where the format is; the rules
+	// themselves stay out of every turn and come from ui_block_rules.
 	persona := buildPersona(time.Now(), true, false) + uiRulesSection()
-	if !strings.Contains(persona, "```chart") {
-		t.Error("persona must carry the rendering rules")
+	if !strings.Contains(persona, "chart") || !strings.Contains(persona, "sources") || !strings.Contains(persona, "ui_block_rules") {
+		t.Errorf("persona must name the blocks and the tool that describes them:\n%s", persona)
+	}
+	if strings.Contains(persona, "```chart") {
+		t.Error("the full rendering rules went into the prompt")
 	}
 	if !strings.Contains(persona, "You are SuperAI") {
 		t.Error("persona must keep its original instructions")
