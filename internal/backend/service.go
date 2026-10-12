@@ -167,6 +167,9 @@ func NewService(s *Settings) (*Service, error) {
 	// 94KB was the knowledge and graph surface — about 23k tokens on every
 	// turn, for tools an ordinary conversation never calls.
 	cfg.Tooling.DeferTools = deferredToolPatterns
+	// Every tool goes out as its signature: 91 schemas were about 14k tokens
+	// on every model call, most of it description written for a reader.
+	cfg.Tooling.CompactSchemas = true
 	// Memory backend: local by default, or the shared CortexDB brain when the
 	// user picked it and an endpoint is known. The shared backend is a remote
 	// store, so the local embedder plays no part in it — the server owns the
