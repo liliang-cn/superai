@@ -1,5 +1,7 @@
 # embeddinggemma for the shared brain (CortexDB) — see Dockerfile.
-# Two replicas on different nodes: recall waits on this, so one node going
+# Standby (replicas: 0): the live embedder is embed-ollama.service on dell,
+# since a 2-vCPU AVX-only orange node takes 1-2s per query and dell 0.3s.
+# Scaled up, it runs two replicas on different nodes: recall waits on this, so one node going
 # down must not take embedding with it. The NodePort is what the SDS nodes,
 # where CortexDB runs, reach it on; it is on the LAN only and serves nothing
 # but embeddings.
@@ -7,7 +9,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata: {name: embed, namespace: superai}
 spec:
-  replicas: 2
+  replicas: 0
   selector: {matchLabels: {app: embed}}
   template:
     metadata: {labels: {app: embed}}

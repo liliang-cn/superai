@@ -1,0 +1,27 @@
+[Unit]
+Description=embeddinggemma for the shared brain (CortexDB recall); see superai deploy/k3s/embed
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+# Same Ollama build and model file as the k3s image, so vectors match the stored ones.
+# The orange VMs (2 vCPU, AVX only) take 1-2s per query; here 8 threads take ~0.2s.
+# Eight threads at nice 5, so it yields to the VMs this host runs. The thread count
+# lives in the model: /opt/embed/Modelfile is FROM embeddinggemma:latest plus
+# PARAMETER num_thread 8, created over the same name (weights unchanged).
+ExecStart=/opt/embed/bin/ollama serve
+Environment=OLLAMA_HOST=192.168.123.98:43746
+Environment=OLLAMA_MODELS=/opt/embed/models
+Environment=LD_LIBRARY_PATH=/opt/embed/lib/ollama
+Environment=OLLAMA_KEEP_ALIVE=-1
+Environment=OLLAMA_MAX_LOADED_MODELS=1
+Environment=OLLAMA_NUM_PARALLEL=4
+Environment=HOME=/opt/embed
+ExecStartPost=/bin/sh -c "for i in $(seq 1 30); do /opt/embed/bin/ollama run embeddinggemma:latest warm >/dev/null 2>&1 && exit 0; sleep 1; done; exit 0"
+Nice=5
+MemoryMax=3G
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
