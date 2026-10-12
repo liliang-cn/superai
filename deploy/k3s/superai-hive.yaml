@@ -86,6 +86,9 @@ spec:
             # The person's zone, not the node's. Unset, the pod ran in UTC and
             # "下周三上午十点" was stored as 10:00Z — 18:00 in Hangzhou.
             - {name: TZ, value: Asia/Shanghai}
+            # One line per model call, memory step and tool call in the pod log:
+            # where each turn's time went. See agent-go pkg/trace.
+            - {name: AGENTGO_TRACE, value: "1"}
             - {name: SUPERAI_TOKEN, valueFrom: {secretKeyRef: {name: superai-hive, key: token}}}
             - {name: SUPERAI_PASSWORD_HASH, valueFrom: {secretKeyRef: {name: superai-hive, key: password_hash, optional: true}}}
             - {name: SUPERAI_USER, valueFrom: {secretKeyRef: {name: superai-hive, key: user, optional: true}}}
@@ -161,6 +164,9 @@ spec:
             # The person's zone, not the node's. Unset, the pod ran in UTC and
             # "下周三上午十点" was stored as 10:00Z — 18:00 in Hangzhou.
             - {name: TZ, value: Asia/Shanghai}
+            # One line per model call, memory step and tool call in the pod log:
+            # where each turn's time went. See agent-go pkg/trace.
+            - {name: AGENTGO_TRACE, value: "1"}
             - {name: SUPERAI_TOKEN, valueFrom: {secretKeyRef: {name: superai-hive, key: token}}}
             - {name: SUPERAI_PASSWORD_HASH, valueFrom: {secretKeyRef: {name: superai-hive, key: password_hash, optional: true}}}
             - {name: SUPERAI_USER, valueFrom: {secretKeyRef: {name: superai-hive, key: user, optional: true}}}
