@@ -226,9 +226,9 @@ func (a *App) askAgent(ctx context.Context, name, prompt string) backend.RemoteR
 	name = strings.TrimSpace(name)
 	// An agent connected over the agent link that can reach it goes first:
 	// it is there, and it is where the thing actually runs.
-	if c := a.agents().serving(name); c != nil {
+	if c, as := a.agents().servingAs(name); c != nil {
 		var res backend.RemoteResult
-		if err := c.call(ctx, "AskRemoteAgent", []any{name, prompt}, &res); err != nil {
+		if err := c.call(ctx, "AskRemoteAgent", []any{as, prompt}, &res); err != nil {
 			return backend.RemoteResult{Agent: name, Host: c.name(), Failed: true, Reason: err.Error()}
 		}
 		if res.Host == "" || backend.IsLocalHost(res.Host) || res.Host == "this machine" {
@@ -269,7 +269,9 @@ func (a *App) askLocalCLI(ctx context.Context, name, prompt string) backend.Remo
 	}
 	reg := svc.Agent().GetToolRegistry()
 	if reg == nil || !reg.Has("cli_agent_run") {
-		return fail("agent CLIs are switched off in Settings (External agents)")
+		// Reaching here means no connected machine serves the name either, so
+		// that is the news; the switch is only why this machine could not.
+		return fail(name + " is not served by any connected machine right now (and agent CLIs on this one are off in Settings › External agents)")
 	}
 
 	out, err := reg.Call(ctx, "cli_agent_run", map[string]any{"agent": name, "prompt": prompt})

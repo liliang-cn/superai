@@ -215,14 +215,56 @@ func (h *agentHub) list() []*agentConn {
 // serving is the agent that runs the named agent (openclaw, hermes, ...), if
 // one connected says it can.
 func (h *agentHub) serving(name string) *agentConn {
-	for _, c := range h.list() {
-		for _, n := range c.hello.GetAgents() {
-			if n.GetName() == name {
-				return c
+	c, _ := h.servingAs(name)
+	return c
+}
+
+// servingAs finds the connection that serves name, and the name that agent
+// knows it by.
+//
+// The phone's world names an agent with its machine, "openclaw.sds-b", and
+// asked by that it reached nobody: agents announce themselves bare, so the
+// lookup missed and the ask fell through to this machine's own CLIs, which
+// said "switched off". A qualified name now reaches the bare one, on that
+// machine when it is there, and on whichever machine serves it when it is
+// not — openclaw follows its HA group from node to node, and the name the
+// phone kept from before a failover must still get an answer.
+func (h *agentHub) servingAs(name string) (*agentConn, string) {
+	has := func(c *agentConn, n string) bool {
+		for _, a := range c.hello.GetAgents() {
+			if a.GetName() == n {
+				return true
 			}
 		}
+		return false
 	}
-	return nil
+	conns := h.list()
+	for _, c := range conns {
+		if has(c, name) {
+			return c, name
+		}
+	}
+	i := strings.LastIndex(name, ".")
+	if i <= 0 || i == len(name)-1 {
+		return nil, name
+	}
+	bare, machine := name[:i], name[i+1:]
+	var other *agentConn
+	for _, c := range conns {
+		if !has(c, bare) {
+			continue
+		}
+		if c.name() == machine || c.hello.GetHost() == machine {
+			return c, bare
+		}
+		if other == nil {
+			other = c
+		}
+	}
+	if other != nil {
+		return other, bare
+	}
+	return nil, name
 }
 
 // LinkedAgent is a connected agent as the screens show it.

@@ -120,6 +120,14 @@ func TestCoreRoutesThroughALinkedAgent(t *testing.T) {
 	if res.Failed || res.Text != "pong to hi" || res.Host != "box" {
 		t.Fatalf("ask through the link: %+v", res)
 	}
+	// The phone names it with its machine, and keeps that name after a
+	// failover moves openclaw elsewhere: both reach the agent, asked bare.
+	for _, n := range []string{"openclaw.box", "openclaw.sds-b"} {
+		res := core.askAgent(context.Background(), n, "hi")
+		if res.Failed || res.Text != "pong to hi" || res.Host != "box" {
+			t.Fatalf("ask %s through the link: %+v", n, res)
+		}
+	}
 
 	// The same agent, given its part in a hive_command alongside the workers.
 	out, err := core.hiveCommand(context.Background(), map[string]any{"commands": []any{
