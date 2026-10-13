@@ -89,6 +89,9 @@ spec:
             # One line per model call, memory step and tool call in the pod log:
             # where each turn's time went. See agent-go pkg/trace.
             - {name: AGENTGO_TRACE, value: "1"}
+            # The brain is Gemini behind CPA: web_search must ask for Google
+            # Search by its own field, or the call answers without searching.
+            - {name: SEARCH_NATIVE, value: google_search}
             - {name: SUPERAI_TOKEN, valueFrom: {secretKeyRef: {name: superai-hive, key: token}}}
             - {name: SUPERAI_PASSWORD_HASH, valueFrom: {secretKeyRef: {name: superai-hive, key: password_hash, optional: true}}}
             - {name: SUPERAI_USER, valueFrom: {secretKeyRef: {name: superai-hive, key: user, optional: true}}}
@@ -167,6 +170,9 @@ spec:
             # One line per model call, memory step and tool call in the pod log:
             # where each turn's time went. See agent-go pkg/trace.
             - {name: AGENTGO_TRACE, value: "1"}
+            # The brain is Gemini behind CPA: web_search must ask for Google
+            # Search by its own field, or the call answers without searching.
+            - {name: SEARCH_NATIVE, value: google_search}
             - {name: SUPERAI_TOKEN, valueFrom: {secretKeyRef: {name: superai-hive, key: token}}}
             - {name: SUPERAI_PASSWORD_HASH, valueFrom: {secretKeyRef: {name: superai-hive, key: password_hash, optional: true}}}
             - {name: SUPERAI_USER, valueFrom: {secretKeyRef: {name: superai-hive, key: user, optional: true}}}

@@ -62,6 +62,11 @@ type Settings struct {
 	SearchBaseURL string `json:"search_base_url"`
 	SearchKey     string `json:"search_key"`
 	SearchModel   string `json:"search_model"`
+	// SearchNative names the field that turns that endpoint's search on:
+	// google_search (a Gemini gateway), openai, dashscope or none. Empty sends
+	// both the OpenAI and the DashScope field, which a Gemini gateway accepts
+	// and ignores — the call then answers without searching.
+	SearchNative string `json:"search_native"`
 
 	// SearXNGURL points the builtin websearch MCP at a self-hosted SearXNG
 	// instance (its JSON API must be enabled). Configured, that instance is
@@ -452,6 +457,7 @@ func defaults() *Settings {
 		SearchBaseURL:   envOr("SEARCH_BASE", ""),
 		SearchKey:       envOr("SEARCH_KEY", ""),
 		SearchModel:     envOr("SEARCH_MODEL", ""),
+		SearchNative:    envOr("SEARCH_NATIVE", ""),
 		WorkspaceDir:    filepath.Join(DataDir(), "workspace"),
 		MaxRounds:       defaultMaxRds,
 		Headless:        true,

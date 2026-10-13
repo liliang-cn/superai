@@ -372,8 +372,19 @@ func NewService(s *Settings) (*Service, error) {
 	// than a grounded guess. On a fresh install with no MCP servers configured
 	// this was the only route to the open web, and it was not wired.
 	searchBase, searchKey, searchModel := s.WebSearch()
+	searchNative, err := domain.ParseNativeWebSearchFormat(s.SearchNative)
+	if err != nil {
+		log.Printf("superai: search_native: %v; sending both search fields", err)
+	}
+	// The brain's thinking effort goes along only when the search runs on the
+	// brain's own model; another model may not take the same values.
+	searchEffort := ""
+	if strings.TrimSpace(s.SearchModel) == "" {
+		searchEffort = s.LLMReasoningEffort
+	}
 	agent.RegisterWebSearchTool(svc, agent.WebSearchConfig{
 		BaseURL: searchBase, APIKey: searchKey, Model: searchModel,
+		Native: searchNative, ReasoningEffort: searchEffort,
 	})
 
 	// --- Life-assistant store + tools (ported from examples/superai). ---
