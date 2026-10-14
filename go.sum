@@ -234,6 +234,8 @@ github.com/liliang-cn/agent-go/v3 v3.57.0 h1:NVni5LWhlcEtajxDdyIyiIzFa021cxTTeZB
 github.com/liliang-cn/agent-go/v3 v3.57.0/go.mod h1:RfIFY/C0mIiq6CRgXp9pq/kBoZeOdb94pAUcEv0Gc9I=
 github.com/liliang-cn/agent-go/v3 v3.58.0 h1:JGPjFD8zLXFKSSM7Bn8jwPCKYSz08xnAVr8T4UeHw0U=
 github.com/liliang-cn/agent-go/v3 v3.58.0/go.mod h1:RfIFY/C0mIiq6CRgXp9pq/kBoZeOdb94pAUcEv0Gc9I=
+github.com/liliang-cn/agent-go/v3 v3.59.0 h1:lKZ+BYdB2fWkvo8NsKV1QOTClnIhdkOqrOi2ZQlCP94=
+github.com/liliang-cn/agent-go/v3 v3.59.0/go.mod h1:RfIFY/C0mIiq6CRgXp9pq/kBoZeOdb94pAUcEv0Gc9I=
 github.com/liliang-cn/agentexec v0.5.4 h1:AWVmSiawGL/46x9vnwPyddQ8xkx+TuqfT8uKWPx/Hp8=
 github.com/liliang-cn/agentexec v0.5.4/go.mod h1:Lt1DVrf3IX0u/2B4YokbMOfQElXKN4bd1xgKNI4acIo=
 github.com/liliang-cn/cortexdb/v2 v2.123.0 h1:GDNBaQOOWHn/XR5ICLeemoAfhxflrGsNUe/Z1XKO57I=

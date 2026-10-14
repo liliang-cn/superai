@@ -215,6 +215,11 @@ func NewService(s *Settings) (*Service, error) {
 	// Every tool goes out as its signature: 91 schemas were about 14k tokens
 	// on every model call, most of it description written for a reader.
 	cfg.Tooling.CompactSchemas = true
+	// noted's everyday tools stay in the schema even when the catalogue is
+	// big enough that the rest go behind search: "what's on tomorrow" cost a
+	// worker two model calls just to find list_events — ten seconds of a
+	// twenty-five second answer.
+	cfg.Tooling.EagerTools = eagerNotedTools
 	// Memory backend: local by default, or the shared CortexDB brain when the
 	// user picked it and an endpoint is known. The shared backend is a remote
 	// store, so the local embedder plays no part in it — the server owns the
@@ -1401,6 +1406,15 @@ func (s *Service) Plan(ctx context.Context, taskID string) []agent.PlanItem {
 // app has exactly one user, so any stable value is correct; it only has to
 // stay the same across runs.
 const singleUserID = "owner"
+
+// eagerNotedTools are the noted tools an ordinary day of conversation calls:
+// reading the day and the lists, and the few writes people dictate.
+var eagerNotedTools = []string{
+	"mcp_noted_get_overview", "mcp_noted_list_events", "mcp_noted_list_tasks",
+	"mcp_noted_list_holdings", "mcp_noted_create_event", "mcp_noted_create_task",
+	"mcp_noted_complete_task", "mcp_noted_update_task", "mcp_noted_search_notes",
+	"mcp_noted_create_note", "mcp_noted_log_time",
+}
 
 // deferredToolPatterns are the tools this app keeps behind the index rather
 // than in every turn's schema.

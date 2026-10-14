@@ -113,7 +113,9 @@ spec:
             # How much work the queen hands to workers: max (default), auto or
             # off. Overrides hive.delegation in settings-queen.json; uncomment
             # to turn it down without touching the Secret.
-            # - {name: SUPERAI_HIVE_DELEGATION, value: auto}
+            # auto: the queen answers small things herself (a calendar look-up
+            # went 46s -> one round) and hands real work to workers.
+            - {name: SUPERAI_HIVE_DELEGATION, value: auto}
             # APNs: the silent push that tells the iOS app its alarms changed.
             # The .p8 key's PEM text and its id; team and topic default to
             # NUDL4XSA6J and cn.superleo.superai.ios. Without them the queen
