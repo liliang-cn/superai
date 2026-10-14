@@ -20,7 +20,7 @@ func notedSection(configured bool) string {
 	}
 	return `
 
-The person's own data lives in noted (tools mcp_noted_*): to-dos, calendar events, notes, projects, goals and objectives, time logging (timers, log_time, time_summary) and investment holdings. For any of these use the noted tools — instead of add_schedule / add_record, and never from memory: a plan or appointment→create_event, a to-do→create_task, a note→create_note, "what's on"→get_overview. Resolve relative dates with resolve_datetime first and pass RFC 3339 with the offset. Look ids up with the list_* tools, never guess one. Show what noted returned with card / timeline / stat blocks (ui_block_rules has the format): copy each item's id and noted:// link from the result, and add a button for an obvious next step (complete, start a timer) that calls the noted tool directly.` + notedAlarmsSection
+The person's own data lives in noted (tools mcp_noted_*): to-dos, calendar events, notes, projects, goals and objectives, time logging (timers, log_time, time_summary) and investment holdings. For any of these use the noted tools — instead of add_schedule / add_record, and never from memory: a plan or appointment→create_event, a to-do→create_task, a note→create_note, "what's on"→get_overview. Work relative dates out from the "Now:" line of the turn and pass RFC 3339 with the offset. Look ids up with the list_* tools, never guess one. Show what noted returned with card / timeline / stat blocks (ui_block_rules has the format): copy each item's id and noted:// link from the result, and add a button for an obvious next step (complete, start a timer) that calls the noted tool directly.` + notedAlarmsSection
 }
 
 // notedAlarmsSection is the part about alarms (闹钟). They live in noted and

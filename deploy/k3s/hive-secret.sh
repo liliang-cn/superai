@@ -58,6 +58,10 @@ base = {k: s[k] for k in ('llm_base_url','llm_key','llm_model','llm_context_toke
 if os.environ.get('MODEL'): base['llm_model'] = os.environ['MODEL']
 base.update(tts_base_url='http://edge-tts.$NS.svc.cluster.local:43540/v1', tts_model='edge',
             tts_voice='zh-CN-XiaoxiaoNeural', tts_key='')
+# Recall embeds every question before it searches. The standalone install's
+# embedder is t2m in Tokyo relaying to a laptop — the whole two-second recall
+# budget, every turn. The hive uses the one CortexDB uses, on dell, 0.3s away.
+base.update(embed_base_url='http://192.168.123.98:43746/v1', embed_key='', embed_model='embeddinggemma:latest')
 base.update(memory_backend='shared', shared_memory_endpoint=s['shared_memory_endpoint'],
             shared_memory_namespace='hive', max_rounds=-1, headless=True, disable_browser=True,
             workspace_dir='/data/workspace',
