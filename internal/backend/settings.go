@@ -31,6 +31,13 @@ type Settings struct {
 	// behind a gateway it is most of a turn's wait: gemini-3.8-flash-high
 	// took 5–8s to its first tool call, 4–4.7s at "low".
 	LLMReasoningEffort string `json:"llm_reasoning_effort,omitempty"`
+	// LLMFastModel, on the same endpoint, answers short everyday asks — a
+	// greeting, a look-up, one thing to note down — while LLMModel keeps
+	// anything long or asking for analysis, writing or code (fastRouter).
+	// Measured through the hive's gateway with its 11k-token prompt:
+	// gemini-3.8-flash-high 5.7s to the first token, flash-lite 3.0–3.3s,
+	// and an answer is two or three such calls. Empty: one model for all.
+	LLMFastModel string `json:"llm_fast_model,omitempty"`
 
 	// Embeddings (optional). If EmbedKey is empty or "none", SuperAI falls back
 	// to file memory so chat-only proxies still work.

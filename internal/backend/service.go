@@ -170,14 +170,27 @@ func NewService(s *Settings) (*Service, error) {
 	}
 
 	// --- Brain (LLM): OpenAI-compatible pool. ---
+	llms := []pool.Provider{{
+		Name: "brain", BaseURL: s.LLMBaseURL, Key: s.LLMKey,
+		ModelName: s.LLMModel, MaxConcurrency: 5, Capability: 8,
+		ReasoningEffort: s.LLMReasoningEffort,
+	}}
+	fastModel := strings.TrimSpace(s.LLMFastModel)
+	if fastModel != "" && fastModel != s.LLMModel {
+		// Lower capability, so a call that names no model still goes to the
+		// brain; the fast one answers only what fastRouter sends it, and
+		// stands in when the brain is down.
+		llms = append(llms, pool.Provider{
+			Name: "fast", BaseURL: s.LLMBaseURL, Key: s.LLMKey,
+			ModelName: fastModel, MaxConcurrency: 5, Capability: 4,
+		})
+	} else {
+		fastModel = ""
+	}
 	brain, err := pool.NewPool(pool.PoolConfig{
-		Enabled:  true,
-		Strategy: pool.StrategyRoundRobin,
-		Providers: []pool.Provider{{
-			Name: "brain", BaseURL: s.LLMBaseURL, Key: s.LLMKey,
-			ModelName: s.LLMModel, MaxConcurrency: 5, Capability: 8,
-			ReasoningEffort: s.LLMReasoningEffort,
-		}},
+		Enabled:   true,
+		Strategy:  pool.StrategyCapability,
+		Providers: llms,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("build brain: %w", err)
@@ -289,7 +302,11 @@ func NewService(s *Settings) (*Service, error) {
 	// prompt says so (notedSection).
 	_, notedMissing, _, notedConfigured := findMCPServer(MCPConfigSources(), NotedServer, os.LookupEnv)
 	notedConfigured = notedConfigured && len(notedMissing) == 0
-	b := agent.New("SuperAI").
+	b := agent.New("SuperAI")
+	if fastModel != "" {
+		b = b.WithModelRouter(fastRouter{model: fastModel})
+	}
+	b = b.
 		WithPrompt(buildPersona(time.Now(), !s.DisableSelfInstall, s.ExternalAgents.Enabled) + hiveSection(s.Hive) + notedSection(notedConfigured) + uiRulesSection()).
 		WithConfig(cfg).
 		WithLLM(brain).
