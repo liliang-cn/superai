@@ -62,9 +62,6 @@ base.update(tts_base_url='http://edge-tts.$NS.svc.cluster.local:43540/v1', tts_m
 # embedder is t2m in Tokyo relaying to a laptop — the whole two-second recall
 # budget, every turn. The hive uses the one CortexDB uses, on dell, 0.3s away.
 base.update(embed_base_url='http://192.168.123.98:43746/v1', embed_key='', embed_model='embeddinggemma:latest')
-# Short everyday asks go to a lite model on the same gateway (fastRouter):
-# 3s to the first token instead of 5.7s, two or three times per answer.
-base.update(llm_fast_model='gemini-3.5-flash-lite')
 base.update(memory_backend='shared', shared_memory_endpoint=s['shared_memory_endpoint'],
             shared_memory_namespace='hive', max_rounds=-1, headless=True, disable_browser=True,
             workspace_dir='/data/workspace',
