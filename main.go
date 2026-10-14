@@ -35,6 +35,12 @@ func main() {
 		app.AgentMain(os.Args[2:])
 		return
 	}
+	// Minting the post-only tokens integrations deliver notifications with
+	// (internal/app/integrations.go).
+	if len(os.Args) > 1 && os.Args[1] == "integration-token" {
+		app.IntegrationTokenMain(os.Args[2:])
+		return
+	}
 	// This machine as an agent node another SuperAI drives (internal/app/node.go).
 	if len(os.Args) > 1 && os.Args[1] == "node" {
 		app.NodeMain(os.Args[2:])

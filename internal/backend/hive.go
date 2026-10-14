@@ -93,6 +93,15 @@ type HiveSettings struct {
 	// it a turn is refused rather than queued, so the queen's scheduler moves
 	// the order to a worker that is free instead of waiting on one that is not.
 	MaxConcurrentOrders int `json:"max_concurrent_orders,omitempty"`
+	// Delegation is how much of the work a queen hands to her workers:
+	// "max" (the default for a queen), "auto" or "off". See hive_delegate.go.
+	// $SUPERAI_HIVE_DELEGATION, when set, wins: in a cluster the settings
+	// come from a Secret, and turning delegation down should not need one.
+	Delegation string `json:"delegation,omitempty"`
+	// DelegateTimeoutSeconds bounds one delegated piece of work on one worker
+	// before it is given to another (or done by the queen). Zero takes
+	// DefaultDelegateTimeout.
+	DelegateTimeoutSeconds int `json:"delegate_timeout_seconds,omitempty"`
 }
 
 // DefaultMaxConcurrentOrders is the worker's concurrency when the settings
@@ -130,6 +139,10 @@ type HiveHello struct {
 	// Node is the machine the worker runs on ($SUPERAI_NODE; in k3s the pod's
 	// node), so a client can draw workers where they really are.
 	Node string `json:"node,omitempty"`
+	// MCP names the MCP servers whose tools this worker can call right now, so
+	// the queen sends noted work to a worker that has noted. Nil is a worker
+	// too old to say, which the queen treats as "may have anything".
+	MCP []string `json:"mcp"`
 }
 
 // HiveWelcome is the queen's answer.
@@ -155,7 +168,9 @@ type HiveMember struct {
 	StartedAt time.Time `json:"started_at"`
 	Engine    string    `json:"engine,omitempty"`
 	Node      string    `json:"node,omitempty"`
-	about     string
+	// MCP is what the worker last said it can reach (HiveHello.MCP).
+	MCP   []string `json:"mcp"`
+	about string
 	// State is "live" or "lost", computed when asked rather than stored, so it
 	// cannot go stale between sweeps.
 	State string `json:"state"`
@@ -222,6 +237,10 @@ func (h *Hive) Join(hello HiveHello) (HiveWelcome, error) {
 	}
 	m.Role, m.URL, m.Version, m.token, m.LastSeen = hello.Role, strings.TrimRight(hello.URL, "/"), hello.Version, hello.Token, now
 	m.StartedAt, m.Engine, m.about, m.Node = hello.StartedAt, hello.Engine, hello.About, hello.Node
+	m.MCP = nil
+	if hello.MCP != nil {
+		m.MCP = append([]string{}, hello.MCP...)
+	}
 	return HiveWelcome{
 		Protocol: HiveProtocol, Queen: h.name,
 		IntervalMS: int(h.interval / time.Millisecond), Members: len(h.members),
@@ -319,6 +338,9 @@ type Announcer struct {
 	// Engine and About label a worker that is not a SuperAI. See HiveHello.
 	Engine string
 	About  string
+	// Capabilities, when set, names the MCP servers this worker can call,
+	// asked again for every hello so a server that came up later is offered.
+	Capabilities func() []string
 
 	started time.Time
 	client  *http.Client
@@ -402,11 +424,17 @@ func (a *Announcer) Once(ctx context.Context) (HiveWelcome, error) {
 	if a.started.IsZero() {
 		a.started = time.Now()
 	}
-	body, _ := json.Marshal(HiveHello{
+	hello := HiveHello{
 		Protocol: HiveProtocol, Name: a.Name(), Role: HiveRoleWorker, URL: a.advertise(),
 		Token: a.Token, Version: a.Version, StartedAt: a.started, Engine: a.Engine, About: a.About,
 		Node: os.Getenv("SUPERAI_NODE"),
-	})
+	}
+	if a.Capabilities != nil {
+		// Never nil once asked: an empty list is "none", which is not the
+		// same as a worker that does not say.
+		hello.MCP = append([]string{}, a.Capabilities()...)
+	}
+	body, _ := json.Marshal(hello)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
 		strings.TrimRight(a.Settings.JoinURL, "/")+"/api/hive/join", bytes.NewReader(body))
 	if err != nil {

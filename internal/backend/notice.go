@@ -62,9 +62,44 @@ type Notice struct {
 	// is worth interrupting a person who is somewhere else, and only the caller
 	// knows.
 	Push bool `json:"-"`
-	// At is stamped at publish time.
+	// At is stamped at publish time, unless the author says when the thing
+	// happened.
 	At string `json:"at,omitempty"`
+
+	// ID names the notice in the notification centre, when its author needs
+	// to hand that name back to somebody (PostNotification answers with it).
+	// Empty lets the centre derive one from Key or the text.
+	ID string `json:"id,omitempty"`
+	// Kind is what an integration says this is: "brief", "reminder", "alert"
+	// or "info". It decides how hard a phone is interrupted for it. Empty is
+	// "info".
+	Kind string `json:"kind,omitempty"`
+	// Deeplink is where tapping it goes: noted://alarm/<id>,
+	// superai://chat?prompt=….
+	Deeplink string `json:"deeplink,omitempty"`
+	// Actions are buttons on it; each says something to the agent when tapped.
+	Actions []NoticeAction `json:"actions,omitempty"`
+	// External marks a notice that came from outside (PostNotification). The
+	// sender already has its own channels — openclaw posts to the same
+	// Telegram chat the webhook relays to — so the webhook skips it, or every
+	// message would arrive there twice. Every other surface still gets it.
+	External bool `json:"-"`
 }
+
+// NoticeAction is one button on a notice. Say is the text the app sends to
+// the agent, as if typed, when the button is tapped.
+type NoticeAction struct {
+	Label string `json:"label"`
+	Say   string `json:"say"`
+}
+
+// Notice kinds, as integrations post them.
+const (
+	KindInfo     = "info"
+	KindBrief    = "brief"
+	KindReminder = "reminder"
+	KindAlert    = "alert"
+)
 
 // NoticeEvent is the frontend event name. One name for every notice, because a
 // UI that has to know which of six event names carries a message is a UI that
@@ -185,7 +220,7 @@ func (p *Notices) Subscribers() []string {
 // last to know, and the reader is already looking at it.
 func uiSink(emit func(name string, payload map[string]any)) Subscriber {
 	return func(_ context.Context, n Notice) {
-		emit(NoticeEvent, map[string]any{
+		payload := map[string]any{
 			"level":   string(n.Level),
 			"title":   n.Title,
 			"message": n.Message,
@@ -193,14 +228,29 @@ func uiSink(emit func(name string, payload map[string]any)) Subscriber {
 			"session": n.Session,
 			"key":     n.Key,
 			"at":      n.At,
-		})
+		}
+		// Only when there is something to say, so a page that predates them
+		// sees exactly the payload it always did.
+		if n.ID != "" {
+			payload["id"] = n.ID
+		}
+		if n.Kind != "" {
+			payload["kind"] = n.Kind
+		}
+		if n.Deeplink != "" {
+			payload["deeplink"] = n.Deeplink
+		}
+		if len(n.Actions) > 0 {
+			payload["actions"] = n.Actions
+		}
+		emit(NoticeEvent, payload)
 	}
 }
 
 // webhookSink sends a notice onward to whoever is not at the screen.
 func webhookSink(notifier *Notifier) Subscriber {
 	return func(ctx context.Context, n Notice) {
-		if !n.Push || !notifier.Enabled() {
+		if !n.Push || n.External || !notifier.Enabled() {
 			return
 		}
 		payload := WebhookPayload{

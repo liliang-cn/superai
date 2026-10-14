@@ -37,6 +37,26 @@ type App struct {
 	openTurns sync.Map
 	// abilities is what the last sync of the queen's skills and MCP did.
 	abilities AbilitiesState
+	// taps are in-process listeners on every emitted event, by id. See
+	// mcp_ask.go. askFn starts a turn for superai_ask; nil means SendChat. A
+	// test sets it to a stub queen.
+	taps  sync.Map
+	askFn func(sessionID, message string) string
+	// Direct MCP calls from chat-block buttons and home tiles. See
+	// app_actions.go.
+	actionsOnce sync.Once
+	actionsV    *backend.MCPActions
+	// The alarm watcher and the APNs client it pushes with. See
+	// app_alarms.go.
+	alarmsOnce sync.Once
+	alarmsV    *alarmWatcher
+	alarmsMu   sync.Mutex
+	alarmsStop context.CancelFunc
+	alarmsErr  string
+	pushMu     sync.Mutex
+	pushBuilt  bool
+	pushKey    string
+	pushV      alarmPusher
 
 	mu       sync.Mutex
 	svc      *backend.Service
@@ -220,6 +240,7 @@ func (a *App) boot() {
 	a.startScheduler()
 	a.startTelegram()
 	a.startHive()
+	a.startAlarmWatch()
 }
 
 // syncProxy brings the embedded CLIProxyAPI in line with the current settings:
@@ -263,6 +284,7 @@ func (a *App) Shutdown(ctx context.Context) {
 	// the same reason — it may be in the middle of a turn.
 	a.stopTelegram()
 	a.stopHive()
+	a.stopAlarmWatch()
 	a.stopScheduler()
 	// Also before the lock, and both for the same reason as the scheduler: each
 	// takes a lock that is not a.mu — the view waits for its HTTP server to
@@ -270,6 +292,7 @@ func (a *App) Shutdown(ctx context.Context) {
 	// browser tab must not outlive the app it is a window onto.
 	_ = a.graphs.Close()
 	a.stopCompanion()
+	a.actionsV.Close() // nil-safe: never built when no button was pressed
 
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -308,7 +331,8 @@ func (a *App) rebuild() {
 	a.resetRemote()
 	// The run wall watches this service the way it watched the last one, and
 	// so does the meter beside it.
-	svc.Agent().RegisterObserver(a.runWall(), a.livePulse())
+	// And a noted alarm tool it runs sends the alarm watcher to look.
+	svc.Agent().RegisterObserver(a.runWall(), a.livePulse(), alarmToolObserver{poke: a.alarmsMayHaveChanged})
 	// The service is built with its approval gate already installed but with
 	// nobody to ask; this is where the app volunteers. Done on every rebuild
 	// because SaveSettings constructs a whole new Service, and a gate that
@@ -324,6 +348,9 @@ func (a *App) rebuild() {
 	// other. Registered under a name so a rebuild replaces it rather than
 	// stacking a second one that would draw every notification twice.
 	svc.Notices().Subscribe("banner", a.bannerSink)
+	// And the phones: a notice marked Push becomes a notification on every
+	// paired phone that registered for them (postnotify.go).
+	svc.Notices().Subscribe("apns", a.apnsNoticeSink())
 	// The character on the window, and the two calls that let a turn use it.
 	// Also per rebuild: these are registered on the agent, and a new agent
 	// starts with none of them.
@@ -336,6 +363,10 @@ func (a *App) rebuild() {
 	a.registerScheduleTools(svc)
 	a.registerSelfTools(svc)
 	a.registerHiveTools(svc, cfg)
+	// A queen in max delegation keeps her work tools out of her own runs
+	// while a worker is live (app_hive_delegate.go). Asked per run, so a
+	// worker joining or leaving counts from the next turn.
+	svc.SetRunToolFilter(a.queenRunFilter)
 	a.registerLongTaskTools(svc, cfg)
 	// The first question after a start paid for everything the service opens
 	// lazily — the model's connection, the shared brain's connection and its
@@ -640,6 +671,11 @@ func (a *App) emit(name string, payload map[string]any) {
 	if a.emitFn != nil {
 		a.emitFn(name, payload)
 	}
+	// In-process listeners: an MCP caller waiting on its answer (mcp_ask.go).
+	a.taps.Range(func(_, fn any) bool {
+		fn.(func(string, map[string]any))(name, payload)
+		return true
+	})
 	if hub := a.companionHub.Load(); hub != nil {
 		hub.broadcast(name, payload)
 	}
@@ -826,7 +862,7 @@ func (a *App) SendChat(sessionID, message string, imagePaths []string) string {
 	// never a decision about this app: they cut off real work mid-sentence and
 	// reported it as a turn the user had cancelled, which is a lie the
 	// transcript then kept.
-	ctx, cancel := context.WithCancel(backend.WithChatSession(context.Background(), sessionID))
+	ctx, cancel := context.WithCancel(withChatRequest(backend.WithChatSession(context.Background(), sessionID), requestID))
 	a.trackRun(requestID, cancel)
 	a.runSession(requestID, sessionID)
 	a.openTurns.Store(requestID, backend.ChatSessionInfo{ID: sessionID, Title: firstLineOf(message, 80),
@@ -846,6 +882,10 @@ func (a *App) SendChat(sessionID, message string, imagePaths []string) string {
 		if n := a.mailbox().Unread(); n > 0 {
 			message += fmt.Sprintf("\n\n(You have %d unread hive message(s); hive_inbox shows them.)", n)
 		}
+	}
+
+	if taskID == "" {
+		a.noteNoWorkers(requestID)
 	}
 
 	asked, askedAt := message, time.Now()
@@ -1107,12 +1147,25 @@ func (a *App) ReadWorkspaceFile(path string) string {
 // ChatSessions lists past conversations, most recent first.
 func (a *App) ChatSessions() []backend.ChatSessionInfo {
 	a.mu.Lock()
-	svc := a.svc
+	svc, queen := a.svc, a.hive != nil
 	a.mu.Unlock()
 	if svc == nil {
 		return []backend.ChatSessionInfo{}
 	}
-	return withOpenTurns(svc.Sessions(200), &a.openTurns)
+	saved := svc.Sessions(200)
+	if queen {
+		// A queen is never given orders, so a hive: conversation on her is a
+		// piece she did herself for one of the person's (app_hive_delegate.go),
+		// not a conversation of theirs to list.
+		kept := saved[:0]
+		for _, c := range saved {
+			if !strings.HasPrefix(c.ID, backend.HiveSessionPrefix) {
+				kept = append(kept, c)
+			}
+		}
+		saved = kept
+	}
+	return withOpenTurns(saved, &a.openTurns)
 }
 
 // withOpenTurns adds the conversations whose turn is still running and that
@@ -1144,7 +1197,7 @@ func (a *App) ChatHistory(sessionID string) []backend.ChatTurn {
 	if svc == nil {
 		return []backend.ChatTurn{}
 	}
-	return withTurnTimes(sessionID, svc.SessionTurns(sessionID))
+	return withChatActions(sessionID, withTurnTimes(sessionID, svc.SessionTurns(sessionID)))
 }
 
 // SearchMCPServers finds installable MCP servers in the official registry, so

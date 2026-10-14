@@ -80,6 +80,11 @@ func (a *App) remoteRunner() *backend.RemoteRunner {
 		if s.Hive.Role == backend.HiveRoleWorker {
 			a.remote.SetOrigin(a.hiveNameOf(s))
 		}
+		if s.Hive.Role == backend.HiveRoleQueen {
+			// A worker's held tool call reaches the person through the
+			// queen, who is the one talking to them.
+			a.remote.SetApprover(a.relayWorkerApproval)
+		}
 	})
 	return a.remote
 }

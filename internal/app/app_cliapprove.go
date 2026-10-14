@@ -119,6 +119,7 @@ func (a *App) cliApprove1(ctx context.Context, runID string, in cliApproveIn) *m
 		Args:      in.Input,
 		SessionID: run.Thread,
 		AgentID:   run.Agent,
+		Workdir:   run.Cwd,
 		AskedAt:   now,
 		ExpiresAt: now.Add(cliApproveWait),
 	}

@@ -345,6 +345,14 @@ func (a *App) startHive() {
 		return
 	}
 	ann := &backend.Announcer{Settings: s.Hive, Token: creds.Token}
+	// What this worker can reach, said with every hello, so the queen sends
+	// noted work only where noted is (see backend/hive_delegate.go).
+	ann.Capabilities = func() []string {
+		a.mu.Lock()
+		svc := a.svc
+		a.mu.Unlock()
+		return svc.MCPServersWithTools()
+	}
 	if err := ann.Validate(); err != nil {
 		log.Printf("hive: not joining: %v", err)
 		return
@@ -424,6 +432,7 @@ func (a *App) registerHiveTools(svc *backend.Service, cfg *backend.Settings) {
 
 	if a.hive != nil {
 		a.registerMailTools(inner)
+		a.registerDelegateTool(inner, h.DelegationMode())
 		inner.AddToolWithMetadata("hive_spawn",
 			"Make more workers for this hive. Returns once they have joined and are live, and says who they are."+
 				" Use it when there is more to do than the workers you have can do at once, and check hive_members first:"+

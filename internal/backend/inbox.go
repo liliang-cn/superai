@@ -55,6 +55,11 @@ type Notification struct {
 	Session string `json:"session,omitempty"`
 	At      string `json:"at"`
 	Read    bool   `json:"read"`
+	// Kind, Deeplink and Actions come from an integration's notice
+	// (PostNotification); absent on everything else.
+	Kind     string         `json:"kind,omitempty"`
+	Deeplink string         `json:"deeplink,omitempty"`
+	Actions  []NoticeAction `json:"actions,omitempty"`
 }
 
 // Inbox is the store behind the notification centre.
@@ -95,7 +100,8 @@ func (b *Inbox) Sink() Subscriber {
 		return func(context.Context, Notice) {}
 	}
 	return func(_ context.Context, n Notice) {
-		if strings.TrimSpace(n.Message) == "" {
+		// A title alone is something to read; nothing at all is not.
+		if strings.TrimSpace(n.Message) == "" && strings.TrimSpace(n.Title) == "" {
 			return
 		}
 		if err := b.add(n); err != nil {
@@ -115,7 +121,10 @@ func (b *Inbox) add(n Notice) error {
 		return err
 	}
 
-	id := strings.TrimSpace(n.Key)
+	id := strings.TrimSpace(n.ID)
+	if id == "" {
+		id = strings.TrimSpace(n.Key)
+	}
 	if id == "" {
 		// No key means nothing to deduplicate against, so the timestamp and
 		// the text are the identity. Two identical messages in the same second
@@ -125,6 +134,7 @@ func (b *Inbox) add(n Notice) error {
 	entry := Notification{
 		ID: id, Level: n.Level, Title: n.Title, Message: n.Message,
 		Source: n.Source, Session: n.Session, At: n.At,
+		Kind: n.Kind, Deeplink: n.Deeplink, Actions: n.Actions,
 	}
 	if entry.At == "" {
 		entry.At = time.Now().Format(time.RFC3339)
@@ -177,6 +187,27 @@ func (b *Inbox) Unread() int {
 		if !item.Read {
 			n++
 		}
+	}
+	return n
+}
+
+// UnreadIncluding is the unread count once the message named id is stored.
+//
+// For a subscriber running beside the inbox's own: the fan-out calls them in
+// no particular order, so the message may or may not be on disk yet, and the
+// count it puts on the phone's icon must include it either way.
+func (b *Inbox) UnreadIncluding(id string) int {
+	n, found := 0, false
+	for _, item := range b.List(0) {
+		if !item.Read {
+			n++
+		}
+		if item.ID == id {
+			found = true
+		}
+	}
+	if !found {
+		n++
 	}
 	return n
 }

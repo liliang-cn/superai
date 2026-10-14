@@ -12,8 +12,13 @@ func TestUIRulesRoundTrip(t *testing.T) {
 	if got := LoadUIRules(); got != "" {
 		t.Fatalf("fresh install should have no rules, got %q", got)
 	}
-	if uiRulesSection() != "" {
-		t.Error("persona must not gain a section when no rules are stored")
+	// The backend's own blocks are named even before any frontend announced
+	// its rules: the iOS app draws them and never announces anything.
+	fresh := uiRulesSection()
+	for _, name := range []string{"card", "timeline", "stat"} {
+		if !strings.Contains(fresh, name) {
+			t.Errorf("fresh persona section must name %s:\n%s", name, fresh)
+		}
 	}
 
 	rules := "Charts (fenced): ```chart <ECharts option JSON>```."
@@ -47,6 +52,14 @@ func TestUIRulesRoundTrip(t *testing.T) {
 	persona := buildPersona(time.Now(), true, false) + uiRulesSection()
 	if !strings.Contains(persona, "chart") || !strings.Contains(persona, "sources") || !strings.Contains(persona, "ui_block_rules") {
 		t.Errorf("persona must name the blocks and the tool that describes them:\n%s", persona)
+	}
+	for _, name := range []string{"card", "timeline", "stat"} {
+		if !strings.Contains(persona, name) {
+			t.Errorf("persona must still name the backend's %s block", name)
+		}
+	}
+	if all := AllUIRules(); !strings.Contains(all, rules) || !strings.Contains(all, "```card") || !strings.Contains(all, "```stat") {
+		t.Errorf("ui_block_rules must hand over the frontend's rules and the backend's blocks:\n%s", all)
 	}
 	if strings.Contains(persona, "```chart") {
 		t.Error("the full rendering rules went into the prompt")

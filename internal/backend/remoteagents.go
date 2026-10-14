@@ -262,6 +262,15 @@ type RemoteRunner struct {
 	mu      sync.Mutex
 	where   map[string]resolvedHost
 	bracket Bracket
+	// approve answers a worker's held tool calls (see workerTarget.approve).
+	// The worker is named, so the person is told who is asking.
+	approve func(ctx context.Context, worker string, req map[string]any) bool
+}
+
+// SetApprover says who answers the approvals a worker holds while it works on
+// an order from here. Called once, before use.
+func (r *RemoteRunner) SetApprover(f func(ctx context.Context, worker string, req map[string]any) bool) {
+	r.approve = f
 }
 
 type resolvedHost struct {
@@ -404,9 +413,13 @@ func (r *RemoteRunner) Run(ctx context.Context, name, prompt string) (res Remote
 		id := NewTaskID()
 		r.board.StartAs(id, name, from, dir, prompt)
 		r.board.InSession(id, ChatSessionFrom(ctx))
-		out := askWorker(ctx, workerTarget{name: name, url: agent.URL, token: agent.Token, timeout: limit, taskID: id,
-			pulse: func(kind, tool string, n int) { r.board.Pulse(id, kind, tool, n) }}, prompt,
-			func(phase, tool string) { r.board.Progress(id, phase, tool) })
+		target := workerTarget{name: name, url: agent.URL, token: agent.Token, timeout: limit, taskID: id,
+			pulse: func(kind, tool string, n int) { r.board.Pulse(id, kind, tool, n) },
+			tools: WorkerTraceFrom(ctx)}
+		if r.approve != nil {
+			target.approve = func(ctx context.Context, req map[string]any) bool { return r.approve(ctx, name, req) }
+		}
+		out := askWorker(ctx, target, prompt, func(phase, tool string) { r.board.Progress(id, phase, tool) })
 		out.MS = time.Since(started).Milliseconds()
 		out.TaskID = id
 		switch {

@@ -354,7 +354,8 @@ func (a *App) relayRemoteApproval(ctx context.Context, cancel context.CancelFunc
 	now := time.Now()
 	dec, _ := a.askToolApproval(ctx, backend.ApprovalRequest{
 		ID: uuid.NewString(), Tool: run.Agent + " · " + short, Command: command, Args: args,
-		SessionID: run.Thread, AgentID: run.Agent, AskedAt: now, ExpiresAt: now.Add(cliApproveWait),
+		SessionID: run.Thread, AgentID: run.Agent, Machine: run.Remote, Workdir: run.Cwd,
+		AskedAt: now, ExpiresAt: now.Add(cliApproveWait),
 	})
 	if ctx.Err() != nil && !dec.Allowed {
 		return // answered on the other machine, or gone

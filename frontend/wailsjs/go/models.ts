@@ -182,6 +182,22 @@ export namespace agent {
 
 export namespace app {
 	
+	export class ActionOptions {
+	    confirmed: boolean;
+	    sessionId: string;
+	    label: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ActionOptions(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.confirmed = source["confirmed"];
+	        this.sessionId = source["sessionId"];
+	        this.label = source["label"];
+	    }
+	}
 	export class AgentLinkOptions {
 	    Core: string;
 	    Token: string;
@@ -710,6 +726,44 @@ export namespace app {
 		    return a;
 		}
 	}
+	export class IntegrationToken {
+	    id: string;
+	    name: string;
+	    // Go type: time
+	    created_at: any;
+	    // Go type: time
+	    last_used: any;
+	
+	    static createFrom(source: any = {}) {
+	        return new IntegrationToken(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.created_at = this.convertValues(source["created_at"], null);
+	        this.last_used = this.convertValues(source["last_used"], null);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class LinkedAgent {
 	    name: string;
 	    host: string;
@@ -777,6 +831,46 @@ export namespace app {
 	    }
 	}
 	
+	export class NewIntegrationToken {
+	    id: string;
+	    name: string;
+	    // Go type: time
+	    created_at: any;
+	    // Go type: time
+	    last_used: any;
+	    token: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new NewIntegrationToken(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.created_at = this.convertValues(source["created_at"], null);
+	        this.last_used = this.convertValues(source["last_used"], null);
+	        this.token = source["token"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class PairCode {
 	    code: string;
 	    // Go type: time
@@ -847,6 +941,66 @@ export namespace app {
 		    }
 		    return a;
 		}
+	}
+	export class PostNotificationRequest {
+	    title: string;
+	    body: string;
+	    source: string;
+	    kind: string;
+	    key?: string;
+	    deeplink?: string;
+	    time?: string;
+	    actions?: backend.NoticeAction[];
+	
+	    static createFrom(source: any = {}) {
+	        return new PostNotificationRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.title = source["title"];
+	        this.body = source["body"];
+	        this.source = source["source"];
+	        this.kind = source["kind"];
+	        this.key = source["key"];
+	        this.deeplink = source["deeplink"];
+	        this.time = source["time"];
+	        this.actions = this.convertValues(source["actions"], backend.NoticeAction);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class PostedNotification {
+	    ok: boolean;
+	    id: string;
+	    duplicate: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new PostedNotification(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ok = source["ok"];
+	        this.id = source["id"];
+	        this.duplicate = source["duplicate"];
+	    }
 	}
 	export class RemoteAgentStatus {
 	    name: string;
@@ -977,6 +1131,26 @@ export namespace app {
 
 export namespace backend {
 	
+	export class APNsSettings {
+	    key_path?: string;
+	    key_id?: string;
+	    team_id?: string;
+	    topic?: string;
+	    env?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new APNsSettings(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key_path = source["key_path"];
+	        this.key_id = source["key_id"];
+	        this.team_id = source["team_id"];
+	        this.topic = source["topic"];
+	        this.env = source["env"];
+	    }
+	}
 	export class CLIProxyAccount {
 	    file: string;
 	    provider: string;
@@ -1041,6 +1215,8 @@ export namespace backend {
 	    emotion?: string;
 	    kind?: string;
 	    steps?: string[];
+	    at?: string;
+	    elapsed_ms?: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new ChatTurn(source);
@@ -1053,6 +1229,8 @@ export namespace backend {
 	        this.emotion = source["emotion"];
 	        this.kind = source["kind"];
 	        this.steps = source["steps"];
+	        this.at = source["at"];
+	        this.elapsed_ms = source["elapsed_ms"];
 	    }
 	}
 	export class Dashboard {
@@ -1358,6 +1536,40 @@ export namespace backend {
 	        this.text = source["text"];
 	    }
 	}
+	export class MCPCallResult {
+	    ok: boolean;
+	    text: string;
+	    structured: any;
+	    error?: string;
+	    code?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPCallResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ok = source["ok"];
+	        this.text = source["text"];
+	        this.structured = source["structured"];
+	        this.error = source["error"];
+	        this.code = source["code"];
+	    }
+	}
+	export class NoticeAction {
+	    label: string;
+	    say: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new NoticeAction(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.label = source["label"];
+	        this.say = source["say"];
+	    }
+	}
 	export class Notification {
 	    id: string;
 	    level: string;
@@ -1367,6 +1579,9 @@ export namespace backend {
 	    session?: string;
 	    at: string;
 	    read: boolean;
+	    kind?: string;
+	    deeplink?: string;
+	    actions?: NoticeAction[];
 	
 	    static createFrom(source: any = {}) {
 	        return new Notification(source);
@@ -1382,7 +1597,28 @@ export namespace backend {
 	        this.session = source["session"];
 	        this.at = source["at"];
 	        this.read = source["read"];
+	        this.kind = source["kind"];
+	        this.deeplink = source["deeplink"];
+	        this.actions = this.convertValues(source["actions"], NoticeAction);
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class PreviewMessage {
 	    role: string;
@@ -1809,6 +2045,7 @@ export namespace backend {
 	    llm_model: string;
 	    llm_context_tokens?: number;
 	    llm_max_output_tokens?: number;
+	    llm_reasoning_effort?: string;
 	    embed_base_url: string;
 	    embed_key: string;
 	    embed_model: string;
@@ -1819,6 +2056,7 @@ export namespace backend {
 	    search_base_url: string;
 	    search_key: string;
 	    search_model: string;
+	    search_native: string;
 	    searxng_url: string;
 	    disable_self_install: boolean;
 	    disable_tool_approval: boolean;
@@ -1846,6 +2084,8 @@ export namespace backend {
 	    external_agents: ExternalAgents;
 	    hive: HiveSettings;
 	    remote_agents: RemoteAgents;
+	    action_mcp_servers?: string[];
+	    apns: APNsSettings;
 	
 	    static createFrom(source: any = {}) {
 	        return new Settings(source);
@@ -1858,6 +2098,7 @@ export namespace backend {
 	        this.llm_model = source["llm_model"];
 	        this.llm_context_tokens = source["llm_context_tokens"];
 	        this.llm_max_output_tokens = source["llm_max_output_tokens"];
+	        this.llm_reasoning_effort = source["llm_reasoning_effort"];
 	        this.embed_base_url = source["embed_base_url"];
 	        this.embed_key = source["embed_key"];
 	        this.embed_model = source["embed_model"];
@@ -1868,6 +2109,7 @@ export namespace backend {
 	        this.search_base_url = source["search_base_url"];
 	        this.search_key = source["search_key"];
 	        this.search_model = source["search_model"];
+	        this.search_native = source["search_native"];
 	        this.searxng_url = source["searxng_url"];
 	        this.disable_self_install = source["disable_self_install"];
 	        this.disable_tool_approval = source["disable_tool_approval"];
@@ -1895,6 +2137,8 @@ export namespace backend {
 	        this.external_agents = this.convertValues(source["external_agents"], ExternalAgents);
 	        this.hive = this.convertValues(source["hive"], HiveSettings);
 	        this.remote_agents = this.convertValues(source["remote_agents"], RemoteAgents);
+	        this.action_mcp_servers = source["action_mcp_servers"];
+	        this.apns = this.convertValues(source["apns"], APNsSettings);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -2096,6 +2340,7 @@ export namespace domain {
 	    completion_tokens: number;
 	    cached_prompt_tokens?: number;
 	    cache_write_tokens?: number;
+	    reasoning_tokens?: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new TokenUsage(source);
@@ -2107,6 +2352,7 @@ export namespace domain {
 	        this.completion_tokens = source["completion_tokens"];
 	        this.cached_prompt_tokens = source["cached_prompt_tokens"];
 	        this.cache_write_tokens = source["cache_write_tokens"];
+	        this.reasoning_tokens = source["reasoning_tokens"];
 	    }
 	}
 

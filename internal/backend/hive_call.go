@@ -52,6 +52,15 @@ type workerTarget struct {
 	// timeout of zero means none. A worker's turn ends when its model stops, not
 	// when a clock does; only an explicit setting cuts one off.
 	timeout time.Duration
+	// tools, when set, is told about every tool the worker calls for this
+	// order and how each came out, so the queen's own run can show who is
+	// doing what while it waits.
+	tools func(WorkerToolEvent)
+	// approve, when set, is asked about every tool call the worker holds for
+	// a person's approval in this order's conversation, and its answer is
+	// sent back. Without it such a call waits on the worker, where nobody is
+	// looking, until it times out denied.
+	approve func(ctx context.Context, req map[string]any) bool
 }
 
 var workerHTTP = &http.Client{
@@ -98,8 +107,13 @@ func askWorker(ctx context.Context, t workerTarget, prompt string, progress func
 	defer stopSSE()
 	// Only the conversation events: the worker's meter, pulse and every other
 	// run's tokens are nothing this order needs. A worker too old to read the
-	// filter sends everything, as before.
-	req, _ := http.NewRequestWithContext(sseCtx, http.MethodGet, base.String()+"/api/events?only=chat:", nil)
+	// filter sends everything, as before. Approvals too, when someone here
+	// can answer them.
+	only := "chat:"
+	if t.approve != nil {
+		only = "chat:,tool:approval"
+	}
+	req, _ := http.NewRequestWithContext(sseCtx, http.MethodGet, base.String()+"/api/events?only="+only, nil)
 	auth(req)
 	resp, err := workerHTTP.Do(req)
 	if err != nil {
@@ -110,7 +124,13 @@ func askWorker(ctx context.Context, t workerTarget, prompt string, progress func
 		return fail("the worker refused the event stream: %s", resp.Status)
 	}
 
+	if t.taskID == "" {
+		t.taskID = uuid.NewString()
+	}
+	session := HiveSessionPrefix + t.taskID
+
 	events := make(chan workerEvent, 64)
+	approvals := make(chan map[string]any, 8)
 	lastPhase := map[string]string{}
 	// The id of the turn this call started, known only once the worker has
 	// answered the command. Pulses are for that turn and no other: the stream
@@ -131,6 +151,15 @@ func askWorker(ctx context.Context, t workerTarget, prompt string, progress func
 				continue
 			}
 			switch ev.Name {
+			case "tool:approval":
+				// Only this order's: the worker asks about every
+				// conversation it has on the one stream.
+				if s, _ := ev.Payload["session"].(string); s == session && t.approve != nil {
+					select {
+					case approvals <- ev.Payload:
+					default:
+					}
+				}
 			case "chat:done", "chat:error", "chat:cancelled":
 				// The end of a turn must arrive, so this waits for room.
 				select {
@@ -165,6 +194,19 @@ func askWorker(ctx context.Context, t workerTarget, prompt string, progress func
 					phase = PhaseThinking
 				case "partial":
 					phase = PhaseWriting
+				case "tool_result":
+					// Not a phase, but how a call came out is part of the
+					// picture the queen shows while she waits, and its data
+					// goes back with the report (toolEvidence), so it waits
+					// for room rather than being dropped.
+					if rid != "" && t.tools != nil {
+						select {
+						case events <- ev:
+						case <-sseCtx.Done():
+							return
+						}
+					}
+					continue
 				}
 				if phase == "" || rid == "" {
 					continue
@@ -182,10 +224,6 @@ func askWorker(ctx context.Context, t workerTarget, prompt string, progress func
 		streamErr <- sc.Err()
 	}()
 
-	if t.taskID == "" {
-		t.taskID = uuid.NewString()
-	}
-	session := HiveSessionPrefix + t.taskID
 	body, _ := json.Marshal([]any{session, prompt, []string{}})
 	post, _ := http.NewRequestWithContext(ctx, http.MethodPost, base.String()+"/api/rpc/SendChat", bytes.NewReader(body))
 	post.Header.Set("Content-Type", "application/json")
@@ -204,9 +242,18 @@ func askWorker(ctx context.Context, t workerTarget, prompt string, progress func
 		return fail("the worker did not start a turn: %s", strings.TrimSpace(string(raw)))
 	}
 	turn.Store(id)
+	var evidence toolEvidence
 
 	for {
 		select {
+		case p := <-approvals:
+			// Asked on its own goroutine: a person takes minutes, and the
+			// order's progress and its end must not wait behind the question.
+			go func() {
+				allow := t.approve(ctx, p)
+				id, _ := p["id"].(string)
+				resolveWorkerApproval(base.String(), t.token, id, allow)
+			}()
 		case ev, ok := <-events:
 			if !ok {
 				err := errors.New("stream closed")
@@ -220,9 +267,21 @@ func askWorker(ctx context.Context, t workerTarget, prompt string, progress func
 				continue
 			}
 			if ev.Name == "chat:event" {
+				tool, _ := ev.Payload["tool"].(string)
+				typ, _ := ev.Payload["type"].(string)
+				if t.tools != nil {
+					switch typ {
+					case "tool_call":
+						args, _ := ev.Payload["args"].(map[string]any)
+						t.tools(WorkerToolEvent{Worker: t.name, Kind: "tool_call", Tool: tool, Args: args, OK: true})
+					case "tool_result":
+						r := ev.Payload["result"]
+						t.tools(WorkerToolEvent{Worker: t.name, Kind: "tool_result", Tool: tool,
+							OK: !ToolResultFailed(r), Error: toolResultError(r)})
+						evidence.add(tool, r)
+					}
+				}
 				if progress != nil {
-					tool, _ := ev.Payload["tool"].(string)
-					typ, _ := ev.Payload["type"].(string)
 					switch typ {
 					case "tool_call":
 						progress(PhaseTool, tool)
@@ -236,6 +295,9 @@ func askWorker(ctx context.Context, t workerTarget, prompt string, progress func
 			}
 			text, _ := ev.Payload["final"].(string)
 			res.Text = strings.TrimSpace(text)
+			if res.Text != "" {
+				res.Text += evidence.String()
+			}
 			readTurnUsage(ev.Payload, &res)
 			switch ev.Name {
 			case "chat:error":
@@ -264,6 +326,29 @@ func cancelWorker(base, token, requestID string) {
 	defer cancel()
 	body, _ := json.Marshal([]any{requestID})
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, base+"/api/rpc/CancelChat", bytes.NewReader(body))
+	if err != nil {
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	if resp, err := workerHTTP.Do(req); err == nil {
+		resp.Body.Close()
+	}
+}
+
+// resolveWorkerApproval answers a worker's held tool call. Best effort, on its
+// own short context: the order may already be over, and then the call it was
+// about is gone and the worker says so.
+func resolveWorkerApproval(base, token, id string, allow bool) {
+	if id == "" {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	body, _ := json.Marshal([]any{id, allow})
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, base+"/api/rpc/ResolveToolApproval", bytes.NewReader(body))
 	if err != nil {
 		return
 	}
@@ -343,3 +428,43 @@ func (e *eventLines) Scan() bool {
 
 func (e *eventLines) Text() string { return e.line }
 func (e *eventLines) Err() error   { return e.err }
+
+// toolEvidence is what a worker's work tools returned during one order. A
+// worker's reply is often a one-line summary ("详情已整理完毕") of data it never
+// repeats, and the queen, who sees only the reply, then asks again for what
+// was already fetched. So the data rides back with the reply, trimmed.
+type toolEvidence struct {
+	items []string
+	size  int
+}
+
+const (
+	evidenceEach  = 6000
+	evidenceTotal = 12000
+)
+
+func (e *toolEvidence) add(tool string, result any) {
+	if tool == "" || result == nil || queenKeeps[tool] || strings.HasPrefix(tool, "tool_search") || e.size >= evidenceTotal {
+		return
+	}
+	b, err := json.Marshal(result)
+	if err != nil || len(b) <= 2 {
+		return
+	}
+	text := string(b)
+	if rs := []rune(text); len(rs) > evidenceEach {
+		text = string(rs[:evidenceEach]) + "…"
+	}
+	if room := evidenceTotal - e.size; len(text) > room {
+		text = string([]rune(text)[:room/3]) + "…"
+	}
+	e.size += len(text)
+	e.items = append(e.items, tool+" → "+text)
+}
+
+func (e *toolEvidence) String() string {
+	if len(e.items) == 0 {
+		return ""
+	}
+	return "\n\n[what the worker's tools returned, verbatim and trimmed]\n" + strings.Join(e.items, "\n")
+}

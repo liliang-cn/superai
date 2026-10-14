@@ -171,10 +171,22 @@ func visibleTurns(messages []domain.Message) []ChatTurn {
 	// Steps collected from transcripts that were hidden, waiting for the answer
 	// they led to.
 	var pending []string
+	// The calls a turn handed to workers, by id: their reports say who called
+	// what, which is the step a reopened conversation should show.
+	delegations := map[string]bool{}
 	for i := range messages {
 		role := messages[i].Role
+		if role == "tool" && delegations[messages[i].ToolCallID] {
+			pending = append(pending, DelegatedSteps(messages[i].Content)...)
+			continue
+		}
 		if role != "user" && role != "assistant" {
 			continue
+		}
+		for _, c := range messages[i].ToolCalls {
+			if c.Function.Name == DelegateToolName && c.ID != "" {
+				delegations[c.ID] = true
+			}
 		}
 		// An assistant turn that only carried tool calls has no text to show —
 		// but it is the record of the agent working, so it becomes progress.

@@ -35,6 +35,13 @@ func (a *App) askToolApproval(ctx context.Context, req backend.ApprovalRequest) 
 	if req.By == "" {
 		req.By = a.standingNameForSession(req.SessionID)
 	}
+	// YOLO, then a remembered "以后同类不用问我" rule, before any card.
+	if dec, ok := a.preanswerApproval(req); ok {
+		if !req.Gated {
+			a.recordApproval(req, dec)
+		}
+		return dec, nil
+	}
 	p := &pendingApproval{req: req, answer: make(chan backend.ApprovalDecision, 1)}
 
 	a.approvalMu.Lock()
@@ -63,6 +70,11 @@ func (a *App) askToolApproval(ctx context.Context, req backend.ApprovalRequest) 
 
 	select {
 	case dec := <-p.answer:
+		// The gate audits its own calls; a coding agent's prompt or a hive
+		// worker's held call is written down here.
+		if !req.Gated {
+			a.recordApproval(req, dec)
+		}
 		return dec, nil
 	case <-ctx.Done():
 		// The gate gave up (deadline) or the run ended. It has already decided
@@ -77,7 +89,7 @@ func (a *App) askToolApproval(ctx context.Context, req backend.ApprovalRequest) 
 // user is being asked to vouch for this command, and a command they cannot
 // read in full is one they cannot vouch for.
 func approvalPayload(req backend.ApprovalRequest) map[string]any {
-	return map[string]any{
+	out := map[string]any{
 		// Who is asking, in words: a standing agent by its name; empty is
 		// SuperAI itself.
 		"by":        req.By,
@@ -90,6 +102,15 @@ func approvalPayload(req backend.ApprovalRequest) map[string]any {
 		"askedAt":   req.AskedAt.Format(time.RFC3339),
 		"expiresAt": req.ExpiresAt.Format(time.RFC3339),
 	}
+	if req.Machine != "" {
+		out["machine"] = req.Machine
+	}
+	// What "以后同类不用问我" could mean for this call, narrowest first; the
+	// answer names one by its scope (ResolveToolApprovalRemember).
+	if sug := backend.SuggestApprovalRules(req); len(sug) > 0 {
+		out["rule_suggestions"] = sug
+	}
+	return out
 }
 
 // PendingToolApprovals lists the prompts still waiting for an answer.

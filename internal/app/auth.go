@@ -77,6 +77,8 @@ type credentials struct {
 
 	// devices is the paired phones (pairing.go), kept in their own file.
 	devices *deviceStore
+	// integrations is the post-only tokens (integrations.go), likewise.
+	integrations *integrationStore
 }
 
 func authPath() string { return filepath.Join(backend.DataDir(), authFileName) }
@@ -96,6 +98,9 @@ func loadOrCreateCredentials() (*credentials, error) {
 			c.User = "superai"
 		}
 		if c.devices, err = openDevices(devicesPath()); err != nil {
+			return nil, err
+		}
+		if c.integrations, err = openIntegrations(integrationsPath()); err != nil {
 			return nil, err
 		}
 		// Installs that predate the login form have no signing key. Mint one
@@ -124,6 +129,9 @@ func loadOrCreateCredentials() (*credentials, error) {
 		return nil, err
 	}
 	if c.devices, err = openDevices(devicesPath()); err != nil {
+		return nil, err
+	}
+	if c.integrations, err = openIntegrations(integrationsPath()); err != nil {
 		return nil, err
 	}
 
@@ -345,6 +353,16 @@ func requireAuth(c *credentials, next http.Handler) http.Handler {
 			bearer = strings.TrimSpace(bearer)
 			if subtle.ConstantTimeCompare([]byte(bearer), want) == 1 || (c.devices != nil && c.devices.authenticate(bearer)) {
 				next.ServeHTTP(w, r)
+				return
+			}
+			// An integration's token opens one door. Known, so not a 401
+			// that would send it looking for a login form; just not here.
+			if c.integrations != nil && c.integrations.authenticate(bearer) {
+				if r.URL.Path == postNotificationPath {
+					next.ServeHTTP(w, r)
+					return
+				}
+				writeJSONStatus(w, http.StatusForbidden, map[string]any{"error": "an integration token may only call PostNotification"})
 				return
 			}
 		}

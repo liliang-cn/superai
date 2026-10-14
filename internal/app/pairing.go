@@ -54,6 +54,12 @@ type Device struct {
 	TokenHash string    `json:"token_hash"`
 	CreatedAt time.Time `json:"created_at"`
 	LastSeen  time.Time `json:"last_seen,omitzero"`
+	// PushToken is the APNs device token the app registered, and PushEnv the
+	// environment its build talks to ("sandbox" or "production"; empty means
+	// the server's default). See app_alarms.go.
+	PushToken   string    `json:"push_token,omitempty"`
+	PushEnv     string    `json:"push_env,omitempty"`
+	PushUpdated time.Time `json:"push_updated,omitzero"`
 }
 
 // deviceStore is the paired devices and the codes waiting to be claimed.
@@ -201,6 +207,94 @@ func (s *deviceStore) authenticate(tok string) bool {
 	return false
 }
 
+// deviceFor is the device a bearer token belongs to.
+func (s *deviceStore) deviceFor(tok string) (string, bool) {
+	if tok == "" {
+		return "", false
+	}
+	h := hashToken(tok)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, d := range s.devices {
+		if subtle.ConstantTimeCompare([]byte(d.TokenHash), []byte(h)) == 1 {
+			return d.ID, true
+		}
+	}
+	return "", false
+}
+
+// setPushToken records where device id is reached by push, replacing what it
+// had. An empty token unregisters it. A token another device still holds is
+// taken from it: the same phone paired twice must not be woken twice.
+func (s *deviceStore) setPushToken(id, token, env string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	at := -1
+	for i := range s.devices {
+		if s.devices[i].ID == id {
+			at = i
+		}
+	}
+	if at < 0 {
+		return fmt.Errorf("没有这个设备")
+	}
+	now := s.now().UTC()
+	if token == "" {
+		env = ""
+	}
+	changed := false
+	if token != "" {
+		for i := range s.devices {
+			if i != at && s.devices[i].PushToken == token {
+				s.devices[i].PushToken, s.devices[i].PushEnv, s.devices[i].PushUpdated = "", "", now
+				changed = true
+			}
+		}
+	}
+	if d := &s.devices[at]; d.PushToken != token || d.PushEnv != env {
+		d.PushToken, d.PushEnv, d.PushUpdated = token, env, now
+		changed = true
+	}
+	if !changed {
+		return nil
+	}
+	return s.saveLocked()
+}
+
+// pushTarget is one device to wake.
+type pushTarget struct {
+	DeviceID string
+	Token    string
+	Env      string
+}
+
+// pushTargets is every device with a push token.
+func (s *deviceStore) pushTargets() []pushTarget {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var out []pushTarget
+	for _, d := range s.devices {
+		if d.PushToken != "" {
+			out = append(out, pushTarget{DeviceID: d.ID, Token: d.PushToken, Env: d.PushEnv})
+		}
+	}
+	return out
+}
+
+// dropPushToken forgets a token APNs refused, unless the device has meanwhile
+// registered another one.
+func (s *deviceStore) dropPushToken(id, token string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i := range s.devices {
+		if s.devices[i].ID == id && s.devices[i].PushToken == token {
+			s.devices[i].PushToken, s.devices[i].PushEnv, s.devices[i].PushUpdated = "", "", s.now().UTC()
+			return s.saveLocked()
+		}
+	}
+	return nil
+}
+
 func (s *deviceStore) list() []Device {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -259,6 +353,68 @@ func pairRoutes(mux *http.ServeMux, c *credentials) {
 	})
 }
 
+// registerPushPath is RegisterPushToken. It sits among the RPC methods and
+// takes its arguments the same way, but is a route of its own: the method has
+// to know which paired device is calling, and only the request knows that.
+const registerPushPath = "/api/rpc/RegisterPushToken"
+
+// registerPushRoute records a paired phone's APNs token.
+//
+//	POST /api/rpc/RegisterPushToken  ["<hex device token>","sandbox"|"production"|""]
+//	→ {"ok":true,"device_id":"…"}
+//
+// Only a paired device's own token may call it (403 otherwise): a push token
+// belongs to a device, and the shared token and a browser session are not
+// one. An empty device token unregisters. Unpairing the device drops its push
+// token with it.
+func registerPushRoute(mux *http.ServeMux, c *credentials) {
+	mux.HandleFunc(registerPushPath, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "POST only", http.StatusMethodNotAllowed)
+			return
+		}
+		bearer, _ := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
+		var id string
+		ok := false
+		if c.devices != nil {
+			id, ok = c.devices.deviceFor(strings.TrimSpace(bearer))
+		}
+		if !ok {
+			http.Error(w, "RegisterPushToken: only a paired device can register for pushes", http.StatusForbidden)
+			return
+		}
+		var args []string
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<10)).Decode(&args); err != nil || len(args) != 2 {
+			http.Error(w, "RegisterPushToken takes 2 arguments: token, env", http.StatusBadRequest)
+			return
+		}
+		token, env := strings.ToLower(strings.TrimSpace(args[0])), strings.ToLower(strings.TrimSpace(args[1]))
+		if token != "" && !validPushToken(token) {
+			http.Error(w, "token is not an APNs device token (hex)", http.StatusBadRequest)
+			return
+		}
+		if env != "" && env != "sandbox" && env != "production" {
+			http.Error(w, `env must be "sandbox" or "production"`, http.StatusBadRequest)
+			return
+		}
+		if err := c.devices.setPushToken(id, token, env); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, map[string]any{"ok": true, "device_id": id})
+	})
+}
+
+// validPushToken is hex of a plausible length: 32 bytes today, and Apple says
+// not to count on that.
+func validPushToken(t string) bool {
+	if len(t) < 32 || len(t) > 400 || len(t)%2 != 0 {
+		return false
+	}
+	_, err := hex.DecodeString(t)
+	return err == nil
+}
+
 // PairCode is a code a phone can be paired with.
 type PairCode struct {
 	Code      string    `json:"code"`
@@ -296,7 +452,8 @@ func (a *App) PairedDevices() ([]PairedDevice, error) {
 	return out, nil
 }
 
-// UnpairDevice revokes one phone's token.
+// UnpairDevice revokes one phone's token, and with the device goes its push
+// token: nothing is sent to a phone that was shut out.
 func (a *App) UnpairDevice(id string) error {
 	s, err := openDevices(devicesPath())
 	if err != nil {

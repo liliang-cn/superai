@@ -54,6 +54,10 @@ export function CLIRuns() {
   return window['go']['app']['App']['CLIRuns']();
 }
 
+export function CallTool(arg1, arg2, arg3, arg4) {
+  return window['go']['app']['App']['CallTool'](arg1, arg2, arg3, arg4);
+}
+
 export function CancelAllChats() {
   return window['go']['app']['App']['CancelAllChats']();
 }
@@ -84,6 +88,10 @@ export function CheckRemoteAgents() {
 
 export function ClearNotifications() {
   return window['go']['app']['App']['ClearNotifications']();
+}
+
+export function CreateIntegrationToken(arg1) {
+  return window['go']['app']['App']['CreateIntegrationToken'](arg1);
 }
 
 export function Dashboard() {
@@ -226,6 +234,10 @@ export function LinkedSuperAIs() {
   return window['go']['app']['App']['LinkedSuperAIs']();
 }
 
+export function ListIntegrationTokens() {
+  return window['go']['app']['App']['ListIntegrationTokens']();
+}
+
 export function LongRunList() {
   return window['go']['app']['App']['LongRunList']();
 }
@@ -256,6 +268,26 @@ export function MemoryRecall(arg1) {
 
 export function MemorySkills() {
   return window['go']['app']['App']['MemorySkills']();
+}
+
+export function NotedAlarms() {
+  return window['go']['app']['App']['NotedAlarms']();
+}
+
+export function NotedHoldings() {
+  return window['go']['app']['App']['NotedHoldings']();
+}
+
+export function NotedHolidays(arg1) {
+  return window['go']['app']['App']['NotedHolidays'](arg1);
+}
+
+export function NotedTimeWeek() {
+  return window['go']['app']['App']['NotedTimeWeek']();
+}
+
+export function NotedToday() {
+  return window['go']['app']['App']['NotedToday']();
 }
 
 export function Notifications() {
@@ -296,6 +328,10 @@ export function PetStage(arg1, arg2) {
 
 export function PickFiles() {
   return window['go']['app']['App']['PickFiles']();
+}
+
+export function PostNotification(arg1) {
+  return window['go']['app']['App']['PostNotification'](arg1);
 }
 
 export function PreviewPrompt(arg1, arg2) {
@@ -344,6 +380,10 @@ export function ResolveToolApproval(arg1, arg2) {
 
 export function ResumeStandingAgent(arg1) {
   return window['go']['app']['App']['ResumeStandingAgent'](arg1);
+}
+
+export function RevokeIntegrationToken(arg1) {
+  return window['go']['app']['App']['RevokeIntegrationToken'](arg1);
 }
 
 export function RunAgentLink(arg1, arg2) {

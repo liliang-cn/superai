@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"context"
 	"testing"
 
 	"github.com/liliang-cn/agent-go/v3/pkg/agent"
@@ -8,7 +9,7 @@ import (
 
 func runConfigOf(s *Service) *agent.RunConfig {
 	cfg := agent.DefaultRunConfig()
-	for _, o := range s.chatRunOptions("chat-1", nil) {
+	for _, o := range s.chatRunOptions(context.Background(), "chat-1", nil) {
 		o(cfg)
 	}
 	return cfg

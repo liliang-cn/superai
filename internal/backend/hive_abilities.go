@@ -172,11 +172,20 @@ func ApplyAbilities(ab HiveAbilities, lookPath func(string) (string, error)) (Ap
 	}
 	sort.Strings(out.Skills)
 
-	// MCP: the servers this worker can run, in a file of their own.
+	// MCP: the servers this worker can run, in a file of their own. One the
+	// worker already has under the same name — the cluster gives every member
+	// noted and cortexdb in its own file — is left to that entry: the same
+	// server from two files is two copies of every tool, or one silently
+	// shadowing the other depending on load order.
+	own := localMCPNames()
 	servers := map[string]mcpServerEntry{}
 	for name, v := range ab.MCP {
 		entry, _ := v.(map[string]any)
 		if entry == nil {
+			continue
+		}
+		if own[name] {
+			out.Skipped[name] = "configured here already"
 			continue
 		}
 		if cmd := mcpCommandOf(entry); cmd != "" {
@@ -184,6 +193,12 @@ func ApplyAbilities(ab HiveAbilities, lookPath func(string) (string, error)) (Ap
 				out.Skipped[name] = cmd + " is not installed here"
 				continue
 			}
+		}
+		// A secret the queen's entry refers to by name (${NOTED_TOKEN}) has to
+		// be in this worker's own environment; the queen never sends the value.
+		if missing := mcpMissingEnv(entry, os.LookupEnv); len(missing) > 0 {
+			out.Skipped[name] = strings.Join(missing, ", ") + " not set here"
+			continue
 		}
 		servers[name] = entry
 		out.MCP = append(out.MCP, name)
@@ -201,6 +216,26 @@ func ApplyAbilities(ab HiveAbilities, lookPath func(string) (string, error)) (Ap
 		}
 	}
 	return out, nil
+}
+
+// localMCPNames are the MCP servers this member configures itself: its own
+// file and the one the cluster writes, not what came from the queen.
+func localMCPNames() map[string]bool {
+	out := map[string]bool{}
+	for _, src := range []string{mcpConfigPath(), filepath.Join(DataDir(), "data", "mcpServers.json")} {
+		raw, err := os.ReadFile(src)
+		if err != nil {
+			continue
+		}
+		var f mcpServersFile
+		if json.Unmarshal(raw, &f) != nil {
+			continue
+		}
+		for name := range f.MCPServers {
+			out[name] = true
+		}
+	}
+	return out
 }
 
 // writeSkill makes dir hold exactly files, marked as the queen's. It reports

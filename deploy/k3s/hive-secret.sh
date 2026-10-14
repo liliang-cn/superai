@@ -82,6 +82,15 @@ worker = dict(base, disable_tool_approval=True,
 out = {'token': token, 'user': a.get('user') or 'superai', 'password_hash': a.get('password_hash', ''), 'cortexdb_token': s['shared_memory_token'],
                   'settings-queen.json': json.dumps(queen), 'settings-worker.json': json.dumps(worker)}
 if os.environ.get('PW'): out['password_hash'] = os.environ['PW']
+# The queen's noted token (minted with `noted token new <user> -label SuperAI`).
+if os.path.exists('/opt/superai/data/noted_token'):
+    out['noted_token'] = open('/opt/superai/data/noted_token').read().strip()
+# The APNs key the queen pushes alarm changes to the iOS app with: the .p8 from
+# the developer account, and its key id. Neither is required.
+if os.path.exists('/opt/superai/data/apns_key.p8'):
+    out['apns_key'] = open('/opt/superai/data/apns_key.p8').read().strip() + '\n'
+if os.path.exists('/opt/superai/data/apns_key_id'):
+    out['apns_key_id'] = open('/opt/superai/data/apns_key_id').read().strip()
 print(json.dumps(out))
 PY" | python3 -c '
 import json, os, sys

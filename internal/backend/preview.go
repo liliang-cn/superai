@@ -81,7 +81,7 @@ func (s *Service) PreviewPrompt(ctx context.Context, sessionID, goal string) Pro
 		return out
 	}
 
-	p, err := s.svc.Preview(ctx, goal, s.chatRunOptions(sessionID, nil)...)
+	p, err := s.svc.Preview(ctx, goal, s.chatRunOptions(ctx, sessionID, nil)...)
 	if err != nil {
 		out.Error = err.Error()
 		return out

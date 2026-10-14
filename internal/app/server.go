@@ -294,6 +294,7 @@ func newAPIMux(app *App, hub *eventHub, creds *credentials, handoff *handoffStor
 	// like any other; requireAuth lets exactly these four through. See auth.go.
 	authRoutes(mux, creds)
 	pairRoutes(mux, creds)
+	registerPushRoute(mux, creds)
 	agentHookRoute(mux, app)
 	// The desktop app's "Open in Browser" hands the tab it opens a one-shot
 	// token here, so nobody is asked for a password they never chose. nil in

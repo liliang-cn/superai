@@ -248,3 +248,82 @@ func TestWebhookIsSubscribedByDefault(t *testing.T) {
 		t.Errorf("subscribers = %v, want none", got)
 	}
 }
+
+// The page hears an integration's notice with what it needs to draw it, and an
+// ordinary notice with exactly the keys it always had.
+func TestTheUIEventCarriesKindLinkAndActionsOnlyWhenSet(t *testing.T) {
+	ui := &emitted{}
+	n := NewNotices(nil)
+	n.SetEmitter(ui.sink())
+	n.Raise(context.Background(), Notice{
+		ID: "post-1", Title: "价格提醒", Message: "NVDA 跌破 160", Kind: KindAlert,
+		Deeplink: "superai://chat?prompt=NVDA", Actions: []NoticeAction{{Label: "看看", Say: "NVDA 怎么了"}},
+	})
+	n.Raise(context.Background(), Notice{Message: "plain"})
+	ev := ui.list()
+	if len(ev) != 2 {
+		t.Fatalf("events %v", ev)
+	}
+	if ev[0]["id"] != "post-1" || ev[0]["kind"] != KindAlert || ev[0]["deeplink"] != "superai://chat?prompt=NVDA" {
+		t.Errorf("payload %#v", ev[0])
+	}
+	if acts, _ := ev[0]["actions"].([]NoticeAction); len(acts) != 1 || acts[0].Say != "NVDA 怎么了" {
+		t.Errorf("actions %#v", ev[0]["actions"])
+	}
+	for _, k := range []string{"id", "kind", "deeplink", "actions"} {
+		if _, ok := ev[1][k]; ok {
+			t.Errorf("plain notice has %q: %#v", k, ev[1])
+		}
+	}
+}
+
+// notify_user is the queen's way to reach someone mid-task, and that someone
+// has usually walked away: its notice is marked for pushing, which is what the
+// phone's subscriber reads.
+func TestNotifyUserRaisesAPushedNotice(t *testing.T) {
+	s := newTestLongRunService(t)
+	s.notices = NewNotices(nil)
+	var got []Notice
+	s.notices.Subscribe("probe", func(_ context.Context, n Notice) { got = append(got, n) })
+	s.registerNotifyTool()
+	out, err := s.svc.GetToolRegistry().Call(context.Background(), "notify_user", map[string]any{"message": "第一段跑完了"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m, _ := out.(map[string]any); m["delivered"] != true {
+		t.Errorf("result %v", out)
+	}
+	if len(got) != 1 || !got[0].Push || got[0].Message != "第一段跑完了" {
+		t.Errorf("raised %+v", got)
+	}
+}
+
+// A notice from outside is not relayed to the webhook: its sender already
+// posts to the chat the webhook leads to, and the message would arrive twice.
+// The page, the centre and anything else still get it.
+func TestTheWebhookSkipsExternalNotices(t *testing.T) {
+	rec := &recorder{}
+	srv := httptest.NewServer(rec.handler())
+	defer srv.Close()
+
+	ui := &emitted{}
+	box := NewInbox(t.TempDir())
+	n := NewNotices(NewNotifier(&Settings{WebhookURL: srv.URL}))
+	n.SetEmitter(ui.sink())
+	n.Subscribe("inbox", box.Sink())
+	var phone []Notice
+	n.Subscribe("apns", func(_ context.Context, x Notice) { phone = append(phone, x) })
+
+	n.Raise(context.Background(), Notice{ID: "ntf_1", Title: "起立喝水", Message: "喝水", Source: "openclaw", Push: true, External: true})
+	n.Raise(context.Background(), Notice{Message: "our own", Push: true})
+
+	rec.waitForCalls(t, 1)
+	time.Sleep(100 * time.Millisecond) // room for a second call that must not come
+	calls := rec.calls()
+	if len(calls) != 1 || calls[0].Message != "our own" {
+		t.Errorf("webhook got %#v, want only the notice raised here", calls)
+	}
+	if len(ui.list()) != 2 || len(box.List(0)) != 2 || len(phone) != 2 || !phone[0].External {
+		t.Errorf("page %d, centre %d, phone %d", len(ui.list()), len(box.List(0)), len(phone))
+	}
+}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -183,5 +184,61 @@ func TestTheStoreCanBeOpenedWithoutAService(t *testing.T) {
 	items := app.List(0)
 	if len(items) != 1 || items[0].Message != "raised by the other process" {
 		t.Fatalf("OpenInbox read %+v, want the message the daemon filed", items)
+	}
+}
+
+// An integration's notice keeps what the phone needs to act on it, under the
+// id its author was given; and a title with no body is still worth keeping.
+func TestAnIntegrationsNoticeKeepsItsKindLinkAndActions(t *testing.T) {
+	b := testInbox(t)
+	raise(b, Notice{
+		ID: "post-1", Key: "memo-2026-10-14", Title: "今日备忘", Message: "**三件事**",
+		Source: "openclaw", Kind: KindBrief, Deeplink: "superai://chat?prompt=hi",
+		Actions: []NoticeAction{{Label: "展开", Say: "把今天的备忘展开讲讲"}},
+	})
+	raise(b, Notice{ID: "post-2", Title: "起立喝水"})
+	got := b.List(0)
+	if len(got) != 2 {
+		t.Fatalf("got %+v", got)
+	}
+	byID := map[string]Notification{}
+	for _, n := range got {
+		byID[n.ID] = n
+	}
+	n := byID["post-1"]
+	if n.Kind != KindBrief || n.Deeplink != "superai://chat?prompt=hi" || n.Source != "openclaw" ||
+		len(n.Actions) != 1 || n.Actions[0].Say != "把今天的备忘展开讲讲" {
+		t.Errorf("kept %+v", n)
+	}
+	if byID["post-2"].Title != "起立喝水" {
+		t.Errorf("title-only notice: %+v", byID["post-2"])
+	}
+	// The file a client reads is the same shape, and plain notices do not
+	// grow empty fields.
+	raw, _ := os.ReadFile(filepath.Join(b.path))
+	if !strings.Contains(string(raw), `"deeplink": "superai://chat?prompt=hi"`) {
+		t.Errorf("file: %s", raw)
+	}
+	raise(b, Notice{Message: "plain"})
+	for _, n := range b.List(0) {
+		if n.Message == "plain" && (n.Kind != "" || n.Actions != nil) {
+			t.Errorf("plain notice grew %+v", n)
+		}
+	}
+}
+
+// The phone's badge is counted beside the centre filing the notice, in no
+// particular order; either way the notice is in the count, once.
+func TestUnreadIncludingCountsTheNewNoticeOnce(t *testing.T) {
+	b := testInbox(t)
+	raise(b, Notice{ID: "old", Message: "old"})
+	raise(b, Notice{ID: "seen", Message: "seen"})
+	_ = b.MarkRead("seen")
+	if got := b.UnreadIncluding("new"); got != 2 {
+		t.Errorf("before it is filed: %d, want 2", got)
+	}
+	raise(b, Notice{ID: "new", Message: "new"})
+	if got := b.UnreadIncluding("new"); got != 2 {
+		t.Errorf("after it is filed: %d, want 2", got)
 	}
 }

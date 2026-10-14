@@ -25,6 +25,7 @@ func pairingServer(t *testing.T) (http.Handler, *credentials, string) {
 	mux := http.NewServeMux()
 	authRoutes(mux, c)
 	pairRoutes(mux, c)
+	registerPushRoute(mux, c)
 	mux.HandleFunc("/api/rpc/", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("ok")) })
 	return requireAuth(c, mux), c, path
 }

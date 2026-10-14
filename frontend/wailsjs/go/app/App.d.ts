@@ -32,6 +32,8 @@ export function CLIRunDetail(arg1:string):Promise<app.CLIRun>;
 
 export function CLIRuns():Promise<Array<app.CLIRun>>;
 
+export function CallTool(arg1:string,arg2:string,arg3:any,arg4:app.ActionOptions):Promise<backend.MCPCallResult>;
+
 export function CancelAllChats():Promise<string>;
 
 export function CancelCLIRun(arg1:string):Promise<string>;
@@ -47,6 +49,8 @@ export function ChatSessions():Promise<Array<backend.ChatSessionInfo>>;
 export function CheckRemoteAgents():Promise<Array<app.RemoteAgentStatus>>;
 
 export function ClearNotifications():Promise<Record<string, any>>;
+
+export function CreateIntegrationToken(arg1:string):Promise<app.NewIntegrationToken>;
 
 export function Dashboard():Promise<Record<string, any>>;
 
@@ -118,6 +122,8 @@ export function LinkedAgents():Promise<Array<app.LinkedAgent>>;
 
 export function LinkedSuperAIs():Promise<Array<app.LinkedSuperAI>>;
 
+export function ListIntegrationTokens():Promise<Array<app.IntegrationToken>>;
+
 export function LongRunList():Promise<Array<backend.TaskSummary>>;
 
 export function LongRunStart(arg1:string,arg2:number,arg3:number,arg4:number,arg5:number,arg6:string,arg7:boolean):Promise<string>;
@@ -133,6 +139,16 @@ export function MarkNotificationsRead(arg1:Array<string>):Promise<Record<string,
 export function MemoryRecall(arg1:string):Promise<string>;
 
 export function MemorySkills():Promise<Array<string>>;
+
+export function NotedAlarms():Promise<any>;
+
+export function NotedHoldings():Promise<any>;
+
+export function NotedHolidays(arg1:number):Promise<any>;
+
+export function NotedTimeWeek():Promise<any>;
+
+export function NotedToday():Promise<any>;
 
 export function Notifications():Promise<Array<backend.Notification>>;
 
@@ -153,6 +169,8 @@ export function PendingToolApprovals():Promise<Array<Record<string, any>>>;
 export function PetStage(arg1:string,arg2:Array<Record<string, string>>):Promise<void>;
 
 export function PickFiles():Promise<Array<string>>;
+
+export function PostNotification(arg1:app.PostNotificationRequest):Promise<app.PostedNotification>;
 
 export function PreviewPrompt(arg1:string,arg2:string):Promise<backend.PromptPreview>;
 
@@ -177,6 +195,8 @@ export function RenameDashboard(arg1:string,arg2:string):Promise<Record<string, 
 export function ResolveToolApproval(arg1:string,arg2:boolean):Promise<string>;
 
 export function ResumeStandingAgent(arg1:string):Promise<void>;
+
+export function RevokeIntegrationToken(arg1:string):Promise<void>;
 
 export function RunAgentLink(arg1:context.Context,arg2:app.AgentLinkOptions):Promise<void>;
 

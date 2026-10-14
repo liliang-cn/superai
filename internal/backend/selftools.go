@@ -83,13 +83,10 @@ func (s *Service) registerSelfTools() {
 	// --- ui_block_rules ---
 	svc.AddToolWithMetadata(
 		"ui_block_rules",
-		"The exact format of the screen's rich blocks (charts, tables, diagrams, dashboards, interfaces). Call once before drawing any of them.",
+		"The exact format of the screen's rich blocks (cards, timelines, stats, charts, tables, diagrams, dashboards, interfaces). Call once before drawing any of them.",
 		map[string]interface{}{"type": "object", "properties": map[string]interface{}{}},
 		func(context.Context, map[string]interface{}) (interface{}, error) {
-			if r := LoadUIRules(); r != "" {
-				return r, nil
-			}
-			return "No rich blocks are announced by this screen; answer in markdown.", nil
+			return AllUIRules(), nil
 		},
 		agent.ToolMetadata{ReadOnly: true, ConcurrencySafe: true},
 	)

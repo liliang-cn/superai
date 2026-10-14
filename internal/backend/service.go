@@ -38,11 +38,14 @@ const UploadsSubdir = "uploads"
 // app's supporting pieces (sandbox, cortexdb handle, life-assistant store,
 // settings).
 type Service struct {
-	svc      *agent.Service
-	sb       sandbox.Sandbox
-	cortex   *cortexdb.DB
-	settings *Settings
-	store    *lifeStore
+	svc    *agent.Service
+	sb     sandbox.Sandbox
+	cortex *cortexdb.DB
+	// sharedMem is the read-through store handed to agent-go, which does not
+	// close an injected store; nil unless the namespace is a private one.
+	sharedMem *readThroughMemoryStore
+	settings  *Settings
+	store     *lifeStore
 	// files remembers which conversation produced which workspace file, so a
 	// chat shows its own deliverables rather than everything ever written.
 	files *sessionFiles
@@ -107,6 +110,48 @@ type Service struct {
 	// SharedMemoryMCP names the MCP servers that route to the same store the
 	// memory backend already owns; their memory tools are kept out of runs.
 	SharedMemoryMCP []string
+
+	// runFilter names more tools a chat run must not have, decided per run by
+	// whoever owns the process (a queen in max delegation withholds her work
+	// tools while a worker is live). See SetRunToolFilter.
+	runFilterMu sync.Mutex
+	runFilter   RunToolFilter
+}
+
+// RunToolFilter names tools to withhold from one chat run, given the run's
+// context, its conversation and the registry's tool names.
+type RunToolFilter func(ctx context.Context, sessionID string, registry []string) []string
+
+// SetRunToolFilter installs (or with nil removes) the per-run filter.
+func (s *Service) SetRunToolFilter(f RunToolFilter) {
+	if s == nil {
+		return
+	}
+	s.runFilterMu.Lock()
+	s.runFilter = f
+	s.runFilterMu.Unlock()
+}
+
+// MCPServersWithTools names the MCP servers whose tools this agent can call
+// now: configured and with tools in the registry. What a worker tells the
+// queen it has.
+func (s *Service) MCPServersWithTools() []string {
+	if s == nil || s.svc == nil {
+		return []string{}
+	}
+	names := s.svc.GetToolRegistry().Names()
+	out := []string{}
+	for _, st := range s.MCPServers() {
+		prefix := "mcp_" + st.Name + "_"
+		for _, n := range names {
+			if strings.HasPrefix(n, prefix) {
+				out = append(out, st.Name)
+				break
+			}
+		}
+	}
+	slices.Sort(out)
+	return out
 }
 
 // NewService builds the full SuperAI agent service from the provided settings.
@@ -235,8 +280,12 @@ func NewService(s *Settings) (*Service, error) {
 	planStore := NewGraphPlanStore(filepath.Join(cfg.DataDir(), "plans"))
 
 	// --- Build the agent service. ---
+	// With noted connected, personal data has a home of its own and the
+	// prompt says so (notedSection).
+	_, notedMissing, _, notedConfigured := findMCPServer(MCPConfigSources(), NotedServer, os.LookupEnv)
+	notedConfigured = notedConfigured && len(notedMissing) == 0
 	b := agent.New("SuperAI").
-		WithPrompt(buildPersona(time.Now(), !s.DisableSelfInstall, s.ExternalAgents.Enabled) + hiveSection(s.Hive) + uiRulesSection()).
+		WithPrompt(buildPersona(time.Now(), !s.DisableSelfInstall, s.ExternalAgents.Enabled) + hiveSection(s.Hive) + notedSection(notedConfigured) + uiRulesSection()).
 		WithConfig(cfg).
 		WithLLM(brain).
 		WithSandbox(sb).
@@ -267,6 +316,7 @@ func NewService(s *Settings) (*Service, error) {
 	// the DisablePTC setting no longer selects anything. It stays in Settings
 	// only so existing settings files keep parsing.
 	memMode := "file"
+	var sharedMem *readThroughMemoryStore
 	switch {
 	case useShared:
 		// The shared brain. Note there is no WithEmbedder here even when one is
@@ -277,8 +327,19 @@ func NewService(s *Settings) (*Service, error) {
 			agent.WithMemoryDSN(cfg.Memory.DSN),
 			agent.WithMemoryOptions(cfg.Memory.Options),
 		}
-		b = b.WithMemory(memOpts...)
 		memMode = "shared:" + cfg.Memory.DSN
+		// A private namespace (the hive's) still reads "default", where the
+		// person's own facts live; see readThroughMemoryStore.
+		if ns := strings.TrimSpace(s.SharedMemoryNamespace); ns != "" && ns != sharedNamespaceDefault {
+			rt, rerr := newReadThroughMemoryStore(cfg.Memory.DSN, cfg.Memory.Options["token"], ns, []string{sharedNamespaceDefault})
+			if rerr != nil {
+				return nil, rerr
+			}
+			sharedMem = rt
+			memOpts = append(memOpts, agent.WithMemoryStore(rt))
+			memMode += " (" + ns + ", reads " + sharedNamespaceDefault + ")"
+		}
+		b = b.WithMemory(memOpts...)
 	case embedder != nil:
 		b = b.WithEmbedder(embedder).WithGraphMemory()
 		memMode = "graphflow"
@@ -315,7 +376,7 @@ func NewService(s *Settings) (*Service, error) {
 	}
 	var mcpPaths []string
 	// The third is what a worker took from its queen (hive_abilities.go).
-	for _, src := range dedupe(mcpConfigPath(), filepath.Join(cfg.DataDir(), "mcpServers.json"), HiveMCPFile()) {
+	for _, src := range MCPConfigSources() {
 		if _, statErr := os.Stat(src); statErr != nil {
 			continue
 		}
@@ -328,8 +389,16 @@ func NewService(s *Settings) (*Service, error) {
 				owned, shared)
 		}
 		sharedMCP = append(sharedMCP, shared...)
-		mcpPaths = append(mcpPaths, src)
+		// ${NAME} in an entry comes from this process's environment; agent-go
+		// reads an expanded copy (mcp_env.go).
+		path, rerr := resolveMCPConfig(src, os.LookupEnv)
+		if rerr != nil {
+			log.Printf("superai: mcp config (%s): %v", src, rerr)
+			path = src
+		}
+		mcpPaths = append(mcpPaths, path)
 	}
+
 	if len(mcpPaths) > 0 {
 		mcpOpts = append(mcpOpts, agent.WithMCPConfigPaths(mcpPaths...))
 	}
@@ -342,7 +411,8 @@ func NewService(s *Settings) (*Service, error) {
 	}
 
 	out := &Service{
-		svc: svc, sb: sb, settings: s, MemoryMode: memMode, dataDir: cfg.DataDir(),
+		sharedMem: sharedMem,
+		svc:       svc, sb: sb, settings: s, MemoryMode: memMode, dataDir: cfg.DataDir(),
 		claims: newScheduleClaims(),
 		brain:  brain, SharedMemoryMCP: sharedMCP,
 		gate: gate, plans: planStore,
@@ -498,6 +568,9 @@ func (s *Service) Close() error {
 	if s.cortex != nil {
 		_ = s.cortex.Close()
 	}
+	if s.sharedMem != nil {
+		_ = s.sharedMem.Close()
+	}
 	return nil
 }
 
@@ -506,7 +579,7 @@ func (s *Service) Close() error {
 // Its own function because Preview takes the same list: a preview assembled
 // from options the send path does not use is a picture of a run nobody is
 // about to make. Anything added here reaches both.
-func (s *Service) chatRunOptions(sessionID string, imagePaths []string) []agent.RunOption {
+func (s *Service) chatRunOptions(ctx context.Context, sessionID string, imagePaths []string) []agent.RunOption {
 	maxRounds, maxTokens := 0, 0
 	if s.settings != nil {
 		maxRounds, maxTokens = s.settings.MaxRounds, s.settings.TurnMaxTokens
@@ -525,10 +598,23 @@ func (s *Service) chatRunOptions(sessionID string, imagePaths []string) []agent.
 	// tenant so all orders stop together, and without the automatic memory
 	// write — the queen already remembered giving the order, and N workers
 	// given it would otherwise write N extractions into the memory they share.
+	// One deny list: WithToolDenylist replaces, it does not add.
+	var deny []string
 	if len(s.SharedMemoryMCP) > 0 && s.svc != nil {
-		if deny := memoryRouteDenylist(s.SharedMemoryMCP, s.svc.GetToolRegistry().Names()); len(deny) > 0 {
-			opts = append(opts, agent.WithToolDenylist(deny))
+		deny = append(deny, memoryRouteDenylist(s.SharedMemoryMCP, s.svc.GetToolRegistry().Names())...)
+	}
+	s.runFilterMu.Lock()
+	filter := s.runFilter
+	s.runFilterMu.Unlock()
+	if filter != nil && s.svc != nil {
+		for _, n := range filter(ctx, sessionID, s.svc.GetToolRegistry().Names()) {
+			if !slices.Contains(deny, n) {
+				deny = append(deny, n)
+			}
 		}
+	}
+	if len(deny) > 0 {
+		opts = append(opts, agent.WithToolDenylist(deny))
 	}
 	if id, ok := TaskIDFromSession(sessionID); ok {
 		opts = append(opts,
@@ -578,7 +664,7 @@ func (s *Service) Stream(ctx context.Context, sessionID, message string, imagePa
 // StreamTurn runs one turn and returns the answer with the tokens it used.
 func (s *Service) StreamTurn(ctx context.Context, sessionID, message string, imagePaths []string, emit func(ev *agent.Event)) (TurnResult, error) {
 	var turn TurnResult
-	opts := s.chatRunOptions(sessionID, imagePaths)
+	opts := s.chatRunOptions(ctx, sessionID, imagePaths)
 	// Whatever the turn writes into the workspace belongs to this conversation.
 	root := ""
 	if s.sb != nil {
@@ -869,17 +955,37 @@ In the hive you are %[1]s, a worker. The queen's orders arrive as turns. Where a
 		return fmt.Sprintf(`
 
 In the hive you are %[1]s, the queen. Run it through hive_members, hive_command, hive_map, hive_send and hive_inbox — never inspect your own machine, environment or API. Where reports disagree, say so and quote them; a difference no report explains is unexplained.
-Answer small questions yourself. A big job — research, a report, a check across several machines — is yours to split: see who you have (hive_members, coding_agent_list, remote_agent_list), then give every part out in ONE hive_command call — workers, coding agents, named agents — so they run at the same time; hive_map when there are more parts than workers. Calling coding_agent_run or remote_agent_run one by one makes the rest wait. Each order stands alone: what to find, how far, real sources; research saves to the shared brain with knowledge_save under a prefix for the job. Then write the result yourself — compare, cite, say where they disagree — and save it under the same prefix.
-When workers pass work by message, let them run; if what you wait for has not come, end the turn saying so.`, h.Self())
+%[2]s A big job — research, a report, a check across several machines — is yours to split: see who you have (hive_members, coding_agent_list, remote_agent_list), then give every part out in ONE hive_command call — workers, coding agents, named agents — so they run at the same time; hive_map when there are more parts than workers. Calling coding_agent_run or remote_agent_run one by one makes the rest wait. Each order stands alone: what to find, how far, real sources; research saves to the shared brain with knowledge_save under a prefix for the job. Then write the result yourself — compare, cite, say where they disagree — and %[3]s.
+When workers pass work by message, let them run; if what you wait for has not come, end the turn saying so.`, h.Self(), queenWorkRule(h.DelegationMode()), queenSaveRule(h.DelegationMode()))
 	}
 	return ""
 }
 
+// queenWorkRule is the part of the queen's prompt that says who does the
+// work, by delegation mode (hive_delegate.go). Off is the queen as she was.
+func queenWorkRule(mode string) string {
+	switch mode {
+	case DelegationMax:
+		return `You plan, split, route, follow up, merge, handle approvals and talk to the person; workers do the work. While a worker is live your work tools (noted, web search and pages, files, shell, CortexDB research) are withheld and hive_delegate runs them: give it every piece that needs a tool, standing alone, dates already resolved with resolve_datetime, and needs naming the MCP server its tools come from (noted for calendar, to-dos, notes, goals, time, holdings). Independent pieces go in one call and run in parallel on different workers. Answer yourself only for conversation, a clarifying question, your own state (hive_members, hive_task) and composing the reply from the reports; say which worker did what in a few words. If a report says the queen did a piece herself, say why in one line. Without hive_delegate among your tools no worker is live: do the work yourself and say the hive had no free worker.`
+	case DelegationAuto:
+		return `Work that needs a tool (noted, web, files, research) goes to an idle worker with hive_delegate — independent pieces in one call, needs naming the MCP server (noted for calendar and to-dos); do it yourself only when no worker is free or it is one quick read. Conversation and your own state you answer yourself.`
+	}
+	return `Answer small questions yourself.`
+}
+
+func queenSaveRule(mode string) string {
+	if mode == DelegationMax {
+		return "have a worker save it under the same prefix"
+	}
+	return "save it under the same prefix"
+}
+
 // uiRulesSection appends the transcript's rendering rules to the persona, so
-// the model knows which rich blocks the UI can actually draw. Empty until the
-// frontend has announced them once (see uirules.go).
+// the model knows which rich blocks the UI can actually draw: the backend's own
+// card / timeline / stat always, the frontend's once it has announced them
+// (see uirules.go).
 func uiRulesSection() string {
-	names := uiBlockNames(LoadUIRules())
+	names := uiBlockNames(AllUIRules())
 	if len(names) == 0 {
 		return ""
 	}

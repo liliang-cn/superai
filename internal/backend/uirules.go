@@ -1,6 +1,7 @@
 package backend
 
 import (
+	_ "embed"
 	"os"
 	"path/filepath"
 	"strings"
@@ -18,6 +19,14 @@ import (
 // and plugins) and hands them here; NewService appends them to the persona.
 // Keeping the file on disk means the agent is built with the right rules on the
 // very first turn after a restart, before the UI has had a chance to call in.
+//
+// The card / timeline / stat blocks are the exception: every client renders
+// them natively (the iOS app above all, which never announces rules of its
+// own), so their spec ships with the backend (uirules_app.md) and is added to
+// whatever the frontend announced. See AllUIRules.
+
+//go:embed uirules_app.md
+var appBlockRules string
 
 func uiRulesPath() string { return filepath.Join(DataDir(), "ui-rules.md") }
 
@@ -28,6 +37,20 @@ func LoadUIRules() string {
 		return ""
 	}
 	return strings.TrimSpace(string(raw))
+}
+
+// AppBlockRules is the spec of the blocks the backend itself defines: card,
+// timeline and stat, with their actions.
+func AppBlockRules() string { return strings.TrimSpace(appBlockRules) }
+
+// AllUIRules is what the model is told can be drawn: the frontend's rules
+// followed by the backend's own blocks.
+func AllUIRules() string {
+	front := LoadUIRules()
+	if front == "" {
+		return AppBlockRules()
+	}
+	return front + "\n\n" + AppBlockRules()
 }
 
 // SaveUIRules persists the rules and reports whether they actually changed, so

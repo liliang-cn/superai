@@ -299,6 +299,18 @@ DEEPSEEK_API_KEY=… SUPERAI_LLM_BASE_URL=https://api.deepseek.com \
 
 可选项：`SUPERAI_LLM_CONTEXT_TOKENS`、`SUPERAI_LLM_MAX_OUTPUT_TOKENS`（模型的上下文窗口和最大输出，按服务商页面填写）、`SUPERAI_LLM_REASONING_EFFORT`、`SUPERAI_NEW_TOKEN=1`（换一个新 token，之后所有客户端都要更新）。改完 Secret 后执行一次 `rollout.sh`，pod 才会读到新值。
 
+### 谁来干活：`hive.delegation`
+
+queen 只负责计划、拆分、派活、跟进、合并结果、审批和跟人说话，用到工具的活交给 worker。由 `settings-queen.json` 里的 `hive.delegation` 决定（环境变量 `SUPERAI_HIVE_DELEGATION` 优先）：
+
+| 值 | 行为 |
+|---|---|
+| `max`（queen 默认） | 只要有活着的 worker，queen 自己这一轮就拿不到干活的工具（noted、搜索、网页、文件、shell、CortexDB 检索等），只能通过 `hive_delegate` 交给 worker：空闲的优先，几件互不相干的事同时分给不同的 worker，结果合在一起再回答。要 noted 的活只派给有 noted 的 worker（worker 每次心跳都报告自己有哪些 MCP 服务器）。worker 失败或超时（`hive.delegate_timeout_seconds`，默认 300）就换一个，再不行 queen 自己做，并在回答和事件里说明。一个 worker 都没有时 queen 照常自己做 |
+| `auto` | 提供 `hive_delegate` 并优先用它，但不收走 queen 的工具 |
+| `off` | 和以前一样，小事 queen 自己做 |
+
+worker 做的每一步都会以 `worker · 工具名`（例如 `superai-worker-0 · mcp_noted_list_events`）出现在 queen 这一轮的 `chat:event` 里（另带 `worker`、`workerTool` 字段），也出现在 `ChatHistory` 的步骤和 `superai_ask` 的 `tools` 里。worker 上需要人批准的工具调用会转到 queen 这边，在手机上批。App 首页和按钮用的 `NotedToday`、`NotedTimeWeek`、`NotedHoldings`、`CallTool` 等仍由 queen 直接读，不经过 worker。
+
 ### 更新
 
 ```sh
@@ -306,6 +318,120 @@ DEEPSEEK_API_KEY=… SUPERAI_LLM_BASE_URL=https://api.deepseek.com \
 ```
 
 镜像标签固定为 `superai:hive`，拉取策略是 `IfNotPresent`，所以是重启这一步让 pod 换上新镜像。
+
+---
+
+## 7. MCP
+
+### 让 Claude Code / Codex 直接和 SuperAI 说话
+
+core（hive 里就是 queen）在 `/mcp` 上提供一个 Streamable HTTP 的 MCP 服务器，和 API 用同一道门：请求要带 `auth.json` 里的 token（或配对设备的 token），`Authorization: Bearer <token>`，没带就是 401。
+
+```sh
+# Claude Code
+claude mcp add --scope user --transport http superai https://ai.example.com/mcp --header "Authorization: Bearer <token>"
+```
+
+```toml
+# Codex：~/.codex/config.toml，token 放在环境变量 SUPERAI_TOKEN 里
+[mcp_servers.superai]
+url = "https://ai.example.com/mcp"
+bearer_token_env_var = "SUPERAI_TOKEN"
+```
+
+工具：
+
+| 工具 | 作用 |
+|---|---|
+| `superai_ask` | 像在 App 里打字一样问 SuperAI，等它答完。返回答案、它调用过的工具（名字和成败）和会话 id；把 `conversation` 传回去就是接着聊，不传就开一个新会话（id 以 `mcp-` 开头）。`timeout_seconds` 默认 180，最多 600；超时了这一轮照样在跑，返回已经写出来的部分和 `pending: true`，之后用 `superai_chat_history` 看结果。需要人批准的工具调用列在 `needs_approval` 里，只能在手机上批，这里不会替你批。客户端带了 progress token 的话，等待期间会收到进度通知 |
+| `superai_conversations` | 最近的会话：id、标题、条数、更新时间 |
+| `superai_chat_history` | 一个会话最近的消息：角色、文字、时间 |
+| `superai_schedule_*` | 定时任务的增删改查和立即运行 |
+| `superai_hive_*` | hive 的成员、扩缩容、派活和消息（只在 queen 上有意义） |
+
+### 给 SuperAI 接 MCP 服务器
+
+SuperAI 读 `mcpServers.json`（`~/.superai/mcpServers.json`，以及集群写的 `~/.superai/data/mcpServers.json`）。远程服务器写 `url` 和 `headers`；密钥不要写死在文件里，写成 `${变量名}`，启动时从进程的环境变量里取：
+
+```json
+{"mcpServers":{"noted":{"type":"http","url":"https://noted.example.com/mcp","headers":{"Authorization":"Bearer ${NOTED_TOKEN}"}}}}
+```
+
+`~/.superai/mcpServers.json` 会原样同步给 hive 里的每个 worker，所以里面只有变量名，没有值；哪个成员的环境里没有这个变量，就不启动这个服务器（worker 的同步结果里会写明缺了什么）。worker 自己（或集群的 `SUPERAI_MCP_JSON`）已经配了同名服务器的，以 worker 自己的为准，不会多出第二份。
+
+接上 noted 以后，待办、日程、笔记、项目、目标、时间记录和持仓都交给 noted 的工具，回答里用 `card` / `timeline` / `stat` 块展示，块上的按钮通过 `CallTool` RPC 直接调用 noted 的工具，不再经过模型；只有 `action_mcp_servers`（默认只有 `noted`）里的服务器能这样调用，`delete_*` 要客户端确认过才执行。首页的数据来自 `NotedToday`、`NotedTimeWeek`、`NotedHoldings` 三个 RPC。
+
+---
+
+## 8. 外部通知：`PostNotification`
+
+别的程序（比如 openclaw 的定时任务：早上的备忘、"该出发接三宝了"、起立喝水、价格提醒）可以把通知发给 SuperAI。每一条都会：出现在打开的网页上（SSE 的 `notice` 事件）、留在通知中心（`Notifications`），并以**真正的手机通知**推到每台配对过、注册了推送的 iPhone 上。它们**不发给 webhook**：发送方自己已经发到了 webhook 转去的那个聊天（例如 Telegram），再转一次就重复了。
+
+### 接口
+
+```
+POST /api/rpc/PostNotification
+Authorization: Bearer <integration token 或 core 的 token>
+
+[{"title":"该出发接三宝了","body":"**17:10** 出发，带水壶","source":"openclaw","kind":"reminder",
+  "key":"pickup-2026-10-14","deeplink":"noted://alarm/<id>","time":"2026-10-14T17:05:00+08:00",
+  "actions":[{"label":"推迟 10 分钟","say":"接三宝的提醒推迟 10 分钟"}]}]
+
+→ {"ok":true,"id":"ntf_…","duplicate":false}
+```
+
+请求体是只有一个对象的 JSON 数组（和其它 RPC 一样）：
+
+| 字段 | 必填 | 说明 |
+|---|---|---|
+| `title` | 是 | 最多 120 字 |
+| `body` | | 最多 4000 字，可以写 Markdown。推到锁屏上的是去掉 Markdown 的前 180 字左右，全文在通知中心 |
+| `source` | | 发送方，例如 `openclaw`，最多 60 字 |
+| `kind` | | `brief`、`reminder`、`alert`、`info`（默认）。决定手机被打扰的程度，见下表 |
+| `key` | | 去重：同一个 `source` + `key` 在 24 小时内只送达一次，重复的请求返回 `duplicate: true` 和第一次的 `id`。窗口存在磁盘上，重启不丢。手机上同一个 key 的通知会互相替换（`apns-collapse-id`） |
+| `deeplink` | | 点开通知去哪，例如 `noted://alarm/<id>`、`superai://chat?prompt=…` |
+| `time` | | 事情发生的时间，RFC 3339；默认是现在 |
+| `actions` | | 最多 3 个按钮 `{"label","say"}`；点了之后 App 把 `say` 当作一句话发给 queen |
+
+校验不过返回 400，正文写着原因。`id` 就是通知中心里这一条的 id（`MarkNotificationsRead` 用它），也在推送的数据里。
+
+手机上的样子：
+
+| kind | 优先级 | 声音 | interruption-level |
+|---|---|---|---|
+| `reminder`、`alert` | 10 | default | `time-sensitive` |
+| `brief` | 10 | 无 | `active` |
+| `info` | 5 | 无 | `active` |
+
+推送的 payload：`aps.alert {title, body}`、`aps.thread-id` = kind、`aps.badge` = 通知中心的未读数（算上这一条），自定义数据 `superai: {"kind":"notice","id":…,"source":…,"deeplink":…}`。queen 的 `notify_user` 和定时任务的结果也走同一条路推到手机（它们没有 kind，按 `info` 处理）。
+
+推送要配好 APNs（`APNS_KEY` 或 `APNS_KEY_PATH`、`APNS_KEY_ID`，可选 `APNS_TEAM_ID`、`APNS_TOPIC`、`APNS_ENV`；hive 里放在 Secret 的 `apns_key`、`apns_key_id`）。没配的话手机推送跳过（日志里一行），其余照常。
+
+### integration token
+
+`PostNotification` 可以用 core 的 token 调用，但给外部程序的应该是 **integration token**：它**只能**调用 `PostNotification`，调别的接口一律 403；可以单独撤销，撤销后就是 401。服务器上只存它的 sha256，原文只在创建时显示一次。
+
+在 core 所在的机器上（数据目录就是 `SUPERAI_HOME`）：
+
+```sh
+superai integration-token create openclaw   # token 打印到 stdout，只有这一次
+superai integration-token list
+superai integration-token revoke <id>
+```
+
+hive 上在 queen 的 pod 里执行（镜像里 `SUPERAI_HOME=/data`）：
+
+```sh
+ssh node1 'sudo k3s kubectl -n superai exec superai-queen-0 -- superai integration-token create openclaw'
+```
+
+命令直接写 `integrations.json`，正在运行的服务马上生效，不用重启。也可以用 RPC 管理（需要 core 的 token、配对设备或已登录的网页）：
+
+```
+POST /api/rpc/CreateIntegrationToken  ["openclaw"]  → {"id":"…","name":"openclaw","created_at":"…","token":"sai_int_…"}
+POST /api/rpc/ListIntegrationTokens   []            → [{"id":"…","name":"openclaw","created_at":"…","last_used":"…"}]
+POST /api/rpc/RevokeIntegrationToken  ["<id>"]      → null（id 不存在是 404）
+```
 
 ---
 
@@ -325,9 +451,10 @@ DEEPSEEK_API_KEY=… SUPERAI_LLM_BASE_URL=https://api.deepseek.com \
 | 路径 | 内容 |
 |---|---|
 | `auth.json` | 登录凭据（权限 600） |
+| `devices.json`、`integrations.json` | 配对的手机、integration token（都只存 token 的 sha256） |
 | `settings.json` | 所有设置，包括模型 key |
 | `cliproxy/` | CLI 代理登录的账号 |
-| `data/` | 会话、任务、定时任务、本地记忆、MCP 配置 |
+| `data/` | 会话、任务、定时任务、本地记忆、MCP 配置、通知中心（`notifications.json`）和通知去重窗口（`notification-keys.json`） |
 | `workspace/` | agent 的工作目录 |
 
 备份时，停掉服务，把整个目录拷走即可。

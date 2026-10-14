@@ -253,6 +253,67 @@ type Settings struct {
 	// what they can hurt: one spends a subscription on this laptop, the other
 	// runs commands on a cluster.
 	RemoteAgents RemoteAgents `json:"remote_agents"`
+
+	// ActionMCPServers are the MCP servers a button in a chat block may call
+	// directly, without a model turn (CallTool). Unset means just noted. Each
+	// one listed hands every client holding the token a way to run its tools,
+	// so the list is short on purpose; an empty list (not unset) turns
+	// direct calls off.
+	ActionMCPServers *[]string `json:"action_mcp_servers,omitempty"`
+
+	// APNs is how this instance reaches Apple's push service, for the silent
+	// push that tells the iOS app its alarms changed. See PushSettings.
+	APNs APNsSettings `json:"apns,omitzero"`
+}
+
+// Defaults for APNsSettings: the developer team and the SuperAI iOS app.
+const (
+	DefaultAPNsTeamID = "NUDL4XSA6J"
+	DefaultAPNsTopic  = "cn.superleo.superai.ios"
+)
+
+// APNsSettings configures silent pushes to the paired iOS app. Every field
+// falls back to an environment variable. The key itself can also arrive as
+// PEM text in APNS_KEY (from a Secret); that text is never written to
+// settings.json, which the settings page reads back.
+type APNsSettings struct {
+	// KeyPath is the .p8 file (APNS_KEY_PATH).
+	KeyPath string `json:"key_path,omitempty"`
+	// KeyID is the key's id from the developer account (APNS_KEY_ID).
+	KeyID string `json:"key_id,omitempty"`
+	// TeamID (APNS_TEAM_ID) defaults to DefaultAPNsTeamID.
+	TeamID string `json:"team_id,omitempty"`
+	// Topic is the app's bundle id (APNS_TOPIC), DefaultAPNsTopic by default.
+	Topic string `json:"topic,omitempty"`
+	// Env is "sandbox" or "production" (APNS_ENV), for a device that did not
+	// say which build it runs. Production when unset.
+	Env string `json:"env,omitempty"`
+}
+
+// PushSettings is the APNs configuration with the environment and defaults
+// applied, and the key's PEM text when APNS_KEY carries it. Never log keyPEM.
+func (s *Settings) PushSettings() (cfg APNsSettings, keyPEM string) {
+	if s != nil {
+		cfg = s.APNs
+	}
+	pick := func(v *string, env, def string) {
+		*v = firstNonEmpty(*v, os.Getenv(env), def)
+	}
+	pick(&cfg.KeyPath, "APNS_KEY_PATH", "")
+	pick(&cfg.KeyID, "APNS_KEY_ID", "")
+	pick(&cfg.TeamID, "APNS_TEAM_ID", DefaultAPNsTeamID)
+	pick(&cfg.Topic, "APNS_TOPIC", DefaultAPNsTopic)
+	pick(&cfg.Env, "APNS_ENV", "production")
+	cfg.KeyPath = expandHome(cfg.KeyPath)
+	return cfg, strings.TrimSpace(os.Getenv("APNS_KEY"))
+}
+
+// ActionServers is the effective allowlist for direct MCP calls.
+func (s *Settings) ActionServers() []string {
+	if s == nil || s.ActionMCPServers == nil {
+		return []string{NotedServer}
+	}
+	return append([]string(nil), (*s.ActionMCPServers)...)
 }
 
 // ExternalAgents configures handing work to agent CLIs installed on this

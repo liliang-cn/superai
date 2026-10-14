@@ -10,10 +10,10 @@
 // scheduler, and two holders of an advisory lock designed for one — the same
 // reason `superai-daemon` waits for the lock instead of taking it.
 //
-// Transport is streamable HTTP at /mcp. Authentication is the edge's job: this
-// endpoint inherits whatever sits in front of the server, which today is Caddy's
-// basic_auth on superai.superleo.app and loopback everywhere else. It does not
-// add a second, weaker gate of its own.
+// Transport is streamable HTTP at /mcp, behind the same credential gate as the
+// RPC surface (requireAuth in auth.go): a request needs the Bearer token from
+// auth.json, a paired device's token, or a signed-in browser session. The
+// gate is this process's own, whatever sits in front of it.
 
 package app
 
@@ -34,7 +34,7 @@ const mcpPath = "/mcp"
 // mcpServerVersion is what a client sees in the initialize handshake. The app
 // itself carries no version string, so this tracks the tool surface: bump it
 // when a tool is added, removed, or changes shape.
-const mcpServerVersion = "0.5.0"
+const mcpServerVersion = "0.6.0"
 
 // nextRunsShown is how many upcoming times a create/validate answer names.
 //
@@ -106,6 +106,7 @@ func newMCPHandler(app *App, version string) http.Handler {
 		&mcp.ServerOptions{Instructions: mcpInstructions},
 	)
 	addSelfMCPTools(s, app)
+	addAskMCPTools(s, app)
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:  "superai_schedule_create",
@@ -288,7 +289,12 @@ func newMCPHandler(app *App, version string) http.Handler {
 	)
 }
 
-const mcpInstructions = `SuperAI runs prompts on a clock and keeps the answers in a conversation.
+const mcpInstructions = `SuperAI is a personal assistant with its own tools, memory and data (to-dos,
+calendar, notes, holdings through noted). superai_ask talks to it as the person
+would in the app and returns its answer and conversation id; pass the id back
+to continue. superai_conversations and superai_chat_history read what was said.
+
+SuperAI also runs prompts on a clock and keeps the answers in a conversation.
 
 Use superai_schedule_create for anything of the shape "every <when>, <do something>".
 Translate the human's words into a five-field cron yourself, then read back the

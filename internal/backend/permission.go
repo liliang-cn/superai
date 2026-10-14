@@ -75,6 +75,18 @@ type ApprovalRequest struct {
 	// ExpiresAt lets the UI show a countdown, so the user knows the prompt is
 	// on a clock rather than wondering why the card vanished.
 	ExpiresAt time.Time `json:"expiresAt"`
+	// Machine is where the call would run, when that is not this SuperAI: the
+	// remote node a coding run is on. Remembered rules are scoped by it.
+	Machine string `json:"machine,omitempty"`
+	// Workdir is the run's working directory, when there is one; a "files
+	// here" rule covers it.
+	Workdir string `json:"workdir,omitempty"`
+	// Gated: raised by the ToolGate, which has already weighed YOLO and
+	// writes the audit line itself.
+	Gated bool `json:"-"`
+	// MustAsk: a session rule insists on asking; neither YOLO nor a
+	// remembered rule may answer it.
+	MustAsk bool `json:"-"`
 }
 
 // ApprovalDecision is an answer to an ApprovalRequest.
@@ -319,6 +331,7 @@ func (g *ToolGate) decide(ctx context.Context, req agent.PermissionRequest) (*ag
 		SessionID: req.SessionID,
 		AgentID:   req.AgentID,
 		AskedAt:   g.now(),
+		Gated:     true,
 	}
 	ask.ExpiresAt = ask.AskedAt.Add(wait)
 
@@ -332,6 +345,7 @@ func (g *ToolGate) decide(ctx context.Context, req agent.PermissionRequest) (*ag
 		return g.answer(ask, ApprovalDecision{Allowed: true, By: DecidedByRule, Reason: why})
 	}
 	if verdict == VerdictAsk {
+		ask.MustAsk = true
 		if wait < RuleAskWait {
 			wait = RuleAskWait
 		}
@@ -457,6 +471,18 @@ func (g *ToolGate) answer(ask ApprovalRequest, dec ApprovalDecision) (*agent.Per
 	// nineteen minutes, asked for a shell nobody was watching, and answered
 	// with nothing but "nobody approved bash".
 	return &agent.PermissionResponse{Allowed: dec.Allowed, Reason: dec.Reason, ContinueRun: true}, nil
+}
+
+// Record writes an audit line for a decision made outside the gate: a coding
+// agent's permission prompt, a hive worker's held call.
+func (g *ToolGate) Record(ask ApprovalRequest, dec ApprovalDecision) {
+	if g == nil {
+		return
+	}
+	if dec.By == "" {
+		dec.By = DecidedByUser
+	}
+	g.record(ask, dec)
 }
 
 func (g *ToolGate) record(ask ApprovalRequest, dec ApprovalDecision) {
