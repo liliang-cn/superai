@@ -278,7 +278,30 @@ func (a *App) SetAway(away bool) (CCPresence, error) {
 	if err := os.Rename(tmp, presencePath()); err != nil {
 		return CCPresence{}, err
 	}
+	go a.hintCCAway(away)
 	return p, nil
+}
+
+// hintCCAway tells every linked machine where the away switch stands.
+func (a *App) hintCCAway(away bool) {
+	h := a.agents()
+	h.mu.Lock()
+	conns := make([]*agentConn, 0, len(h.agents))
+	for _, c := range h.agents {
+		conns = append(conns, c)
+	}
+	h.mu.Unlock()
+	for _, c := range conns {
+		go hintCCAwayTo(c, away)
+	}
+}
+
+func hintCCAwayTo(c *agentConn, away bool) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := c.call(ctx, "CCAwayHint", []any{away}, nil); err != nil {
+		log.Printf("cc relay: away hint to %s: %v", c.name(), err)
+	}
 }
 
 // CCReplyRequest is an answer typed on a session's notice.

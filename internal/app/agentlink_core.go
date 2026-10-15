@@ -383,6 +383,7 @@ func (s *agentLinkServer) Connect(stream agentlinkpb.AgentLink_ConnectServer) er
 	hub.mu.Unlock()
 	s.app.agentsChanged()
 	log.Printf("agent %s connected from %s (%s/%s), clis %v", hello.GetName(), hello.GetHost(), hello.GetOs(), hello.GetArch(), hello.GetClis())
+	go hintCCAwayTo(c, s.app.Presence().Away)
 
 	// An agent that closes its side said goodbye: it is stopping, not lost.
 	bye := false

@@ -53,6 +53,9 @@ var agentCallable = map[string]bool{
 	// Core's word on a terminal permission prompt this machine is holding
 	// (cchook_perm.go): pass, asking, allow or deny.
 	"AnswerCCPermission": true,
+	// Core's away switch, pushed when it changes and on connect, so a
+	// permission prompt is passed on the spot when somebody is at this machine.
+	"CCAwayHint": true,
 }
 
 // agentQuiet are events too frequent to be worth the line.

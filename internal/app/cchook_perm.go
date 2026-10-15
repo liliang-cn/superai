@@ -30,6 +30,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -103,6 +104,24 @@ func permissionWait(argv []string) time.Duration {
 		d = time.Duration(n) * time.Second
 	}
 	return min(max(d, ccPermMinWait), ccPermMaxWait)
+}
+
+// ccAwayHintV is core's away switch as last pushed to this machine.
+var ccAwayHintV atomic.Bool
+
+// CCAwayHint is core telling this machine where its away switch stands.
+func (a *App) CCAwayHint(away bool) map[string]any {
+	ccAwayHintV.Store(away)
+	return map[string]any{"ok": true}
+}
+
+// ccAway is the away switch as this process knows it: its own when it is the
+// core, else the last hint from core.
+func (a *App) ccAway() bool {
+	if a.agentTap.Load() == nil {
+		return a.Presence().Away
+	}
+	return ccAwayHintV.Load()
 }
 
 // permissionHook is `superai hook PermissionRequest`.
@@ -239,6 +258,15 @@ func (a *App) handleCCPermission(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 	l := ccLocalState()
 	l.observe(&ev, now)
+	// Somebody at this machine, and the phone has not said away: the
+	// terminal's own dialog is the answer, at once — asking core first cost
+	// every prompt a round trip.
+	if !a.ccAway() {
+		if idle := ccIdleSeconds(); idle >= 0 && time.Duration(idle)*time.Second < ccAwayAfter {
+			writeJSON(w, ccPermAnswer{})
+			return
+		}
+	}
 	ev.Request = "ccp_" + randomSecret(8)
 	deadline := now.Add(wait - ccPermMargin)
 	ev.Expires = deadline.Format(time.RFC3339)

@@ -110,6 +110,10 @@ func TestCoreRoutesThroughALinkedAgent(t *testing.T) {
 			if c == nil {
 				continue
 			}
+			if c.GetMethod() == "CCAwayHint" { // core's away switch, sent on connect
+				_ = stream.Send(&agentlinkpb.AgentFrame{Kind: &agentlinkpb.AgentFrame_Reply{Reply: &agentlinkpb.Reply{Id: c.GetId(), ResultJson: `{"ok":true}`}}})
+				continue
+			}
 			var args []string
 			_ = json.Unmarshal([]byte(c.GetArgsJson()), &args)
 			out, _ := json.Marshal(map[string]any{"agent": args[0], "text": "pong to " + args[1]})
