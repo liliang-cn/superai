@@ -277,7 +277,7 @@ export function screen(w: number, h: number, px = 256) {
   const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: tex, toneMapped: false }));
   m.userData.isScreen = true;
   m.userData.w = w;
-  const caret = new THREE.Mesh(geo("caret", () => new THREE.PlaneGeometry(1, 1)), new THREE.MeshBasicMaterial({ color: 0x7ef0a8, toneMapped: false }));
+  const caret = new THREE.Mesh(geo("caret", () => new THREE.PlaneGeometry(1, 1)), new THREE.MeshBasicMaterial({ color: 0x5b8dff, toneMapped: false }));
   caret.visible = false;
   caret.raycast = () => {};
   m.add(caret);

@@ -144,34 +144,56 @@ type Screen = ReturnType<typeof screen>;
 /** Paints a computer's screen: who it is, what it is doing, the last lines
  *  of the work, and a cursor while it is busy. */
 function paint(s: Screen, title: string, status: string, lines: string[], busy: boolean, _blink = true) {
-  // A terminal, as a good display shows one: deep ink glass, phosphor-green
-  // type with only a breath of glow, a prompt per line. The cursor is the
-  // screen's own quad, so blinking it never repaints this.
+  // Dark glass with white type and one blue, as the phone draws it: the
+  // name and a blue prompt, what it is doing, a hairline, the last lines of
+  // the work with a blue chevron each. The cursor is the screen's own quad,
+  // so blinking it never repaints this.
   let caret: { x: number; y: number; w: number; h: number } | null = null;
   s.draw((c, w, h) => {
+    const k = w / 768; // laid out on the phone's 768-wide screen
+    const blue = "#5b8dff";
+    const pad = 36 * k, lineH = 46 * k, top = 150 * k;
     const bg = c.createLinearGradient(0, 0, 0, h);
-    bg.addColorStop(0, "#0d1a16"); bg.addColorStop(1, "#08110e");
+    bg.addColorStop(0, "#17212c"); bg.addColorStop(1, "#0c131b");
     c.fillStyle = bg; c.fillRect(0, 0, w, h);
-    const ink = busy ? "#86f5b0" : "#5fd894";
-    c.shadowColor = "rgba(110, 240, 160, 0.55)"; c.shadowBlur = 6;
-    c.fillStyle = ink;
-    c.font = "600 38px 'Geist Mono', 'SF Mono', Menlo, monospace";
-    c.fillText(`${title}:~$`, 26, 58);
-    c.font = "400 29px 'Geist Mono', 'SF Mono', Menlo, 'PingFang SC', monospace";
-    c.globalAlpha = 0.72;
-    c.fillText(`# ${status}`, 26, 102);
-    c.globalAlpha = 1;
-    const wrapped: string[] = [];
-    for (const l of lines) for (let i = 0; i < l.length && wrapped.length < 8; i += 30) wrapped.push((i ? "  " : "> ") + l.slice(i, i + 30));
-    const shown = wrapped.slice(0, 5);
-    shown.forEach((l, i) => c.fillText(l, 26, 148 + i * 38));
-    c.shadowBlur = 0;
-    if (busy) caret = { x: 26, y: 148 + shown.length * 38 - 27, w: 16, h: 30 };
-    // The faintest raster, and a sheen across the glass from the top left.
-    c.fillStyle = "rgba(0, 0, 0, 0.08)";
-    for (let y = 0; y < h; y += 4) c.fillRect(0, y, w, 1);
+    c.textBaseline = "top";
+    const mono = (px: number, weight: number) => `${weight} ${px * k}px 'Geist Mono', 'SF Mono', Menlo, 'PingFang SC', monospace`;
+    c.font = mono(38, 600);
+    c.fillStyle = "rgba(255,255,255,0.95)";
+    c.fillText(title, pad, 30 * k);
+    c.fillStyle = blue;
+    c.fillText(" ~$", pad + c.measureText(title).width, 30 * k);
+    c.font = mono(26, 400);
+    c.fillStyle = "rgba(255,255,255,0.5)";
+    c.fillText(status, pad, 84 * k);
+    // What it is on: a dot, blue while busy.
+    c.fillStyle = busy ? blue : "rgba(255,255,255,0.22)";
+    c.beginPath(); c.arc(w - pad - 9 * k, 53 * k, 9 * k, 0, Math.PI * 2); c.fill();
+    c.fillStyle = "rgba(255,255,255,0.09)";
+    c.fillRect(pad, 130 * k, w - pad * 2, 2 * k);
+    c.font = mono(29, 400);
+    const maxW = w - pad * 2 - 34 * k;
+    const rows: [string, boolean][] = [];
+    for (const l of lines) {
+      let row = "", first = true;
+      for (const ch of l) {
+        if (c.measureText(row + ch).width > maxW) { rows.push([row, first]); first = false; row = ch; if (rows.length >= 5) break; }
+        else row += ch;
+      }
+      if (rows.length >= 5) break;
+      if (row) rows.push([row, first]);
+    }
+    const shown = rows.slice(0, 5);
+    shown.forEach(([text, first], i) => {
+      const y = top + i * lineH;
+      if (first) { c.fillStyle = blue; c.fillText("›", pad, y); }
+      c.fillStyle = "rgba(255,255,255,0.86)";
+      c.fillText(text, pad + 34 * k, y);
+    });
+    if (busy) caret = { x: pad + 34 * k, y: top + shown.length * lineH + 6 * k, w: 16 * k, h: 30 * k };
+    // A sheen across the glass from the top left; no raster, no glow.
     const sheen = c.createLinearGradient(0, 0, w * 0.6, h);
-    sheen.addColorStop(0, "rgba(255,255,255,0.07)"); sheen.addColorStop(0.45, "rgba(255,255,255,0.015)"); sheen.addColorStop(0.46, "rgba(255,255,255,0)");
+    sheen.addColorStop(0, "rgba(255,255,255,0.06)"); sheen.addColorStop(0.45, "rgba(255,255,255,0.012)"); sheen.addColorStop(0.46, "rgba(255,255,255,0)");
     c.fillStyle = sheen; c.fillRect(0, 0, w, h);
   });
   s.cursor(caret);
