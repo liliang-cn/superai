@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 
 // Work as data on the move: while an agent spends tokens, packets run both
 // ways along its path to the core — the prompt going out (blue), the answer
@@ -6,7 +7,7 @@ import * as THREE from "three";
 // pool of packets serves every path in the world.
 
 const OUT = 0x2f8bff, BACK = 0x22c58b;
-const GEO = new THREE.BoxGeometry(0.34, 0.14, 0.14);
+const GEO = new RoundedBoxGeometry(0.34, 0.14, 0.14, 2, 0.05);
 const mats = new Map<number, THREE.MeshBasicMaterial>();
 const matOf = (c: number) => {
   let m = mats.get(c);
@@ -83,7 +84,12 @@ export class Packets {
         continue;
       }
       p.m.visible = p.trail.visible = true;
-      const k = p.back ? 1 - p.t : p.t;
+      // Eased along the path, and grown in and out at its ends instead of
+      // popping into being.
+      const e = p.t * p.t * (3 - 2 * p.t) * 0.5 + p.t * 0.5;
+      const k = p.back ? 1 - e : e;
+      const sc = Math.min(1, p.t * 7, (1 - p.t) * 7);
+      p.m.scale.setScalar(sc);
       p.curve.getPointAt(k, pos);
       p.curve.getPointAt(Math.min(1, Math.max(0, k + (p.back ? -0.01 : 0.01))), ahead);
       pos.y += p.lift;
@@ -95,6 +101,7 @@ export class Packets {
       const dir = ahead.clone().sub(pos).normalize();
       p.trail.position.copy(pos).addScaledVector(dir, -0.45);
       p.trail.quaternion.copy(p.m.quaternion);
+      p.trail.scale.set(2.4 * sc, 0.6 * sc, 0.6 * sc);
     }
   }
 }

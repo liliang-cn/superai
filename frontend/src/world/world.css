@@ -270,3 +270,21 @@
 .wl-stats-chev { margin-left: auto; color: #5f6d77; flex: none; align-self: center; transition: transform 0.2s; }
 .wl-stats:not(.folded) .wl-stats-chev { transform: rotate(180deg); }
 .wl-stats.folded .wl-stats-chev { margin-left: 4px; }
+
+/* ── Motion and finish (one curve everywhere: quick to leave, soft landing) ── */
+.wl-root { --wl-ease: cubic-bezier(0.2, 0.8, 0.2, 1); background: #f3f5f8; }
+/* Labels ride on their own compositor layers, so following the camera never
+   re-rasterises their text; state changes cross-fade rather than snap. */
+.wl-labels > div { will-change: transform; }
+.wl-pill {
+  transition: opacity 0.28s var(--wl-ease), background-color 0.3s var(--wl-ease), color 0.3s var(--wl-ease), box-shadow 0.3s var(--wl-ease);
+  box-shadow: 0 1px 2px rgba(22, 32, 43, 0.06), 0 4px 14px rgba(22, 32, 43, 0.08), 0 0 0 0.5px rgba(22, 32, 43, 0.1);
+  -webkit-font-smoothing: antialiased;
+}
+.wl-pill b, .wl-pill span { transition: color 0.3s var(--wl-ease); }
+.wl-callout .wl-detail { animation: wl-card 0.32s var(--wl-ease) both; transform-origin: 0 50%; }
+@keyframes wl-card { from { opacity: 0; transform: translateY(4px) scale(0.98); } }
+.wl-lead line { transition: opacity 0.3s var(--wl-ease); }
+.wl-cam button { transition: background-color 0.18s var(--wl-ease), color 0.18s var(--wl-ease), transform 0.18s var(--wl-ease); }
+.wl-cam button:active { transform: scale(0.92); }
+@media (prefers-reduced-motion: reduce) { .wl-callout .wl-detail { animation: none; } .wl-pill { transition: none; } }

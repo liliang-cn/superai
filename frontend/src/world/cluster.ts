@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import type { District, DistrictCtx, Label } from "./engine";
-import { box, cyl, hash01, mat, ownMat, rbox, screen } from "./kit";
+import { FIN, box, contact, cyl, hash01, mat, ownMat, rbox, screen, smooth } from "./kit";
 import { INK, pose, robot, setState, type RobotState } from "./robots";
 import { forgetActor, registerActor } from "./bubbles";
 import { Packets, type Link } from "./packets";
@@ -143,33 +143,38 @@ type Screen = ReturnType<typeof screen>;
 
 /** Paints a computer's screen: who it is, what it is doing, the last lines
  *  of the work, and a cursor while it is busy. */
-function paint(s: Screen, title: string, status: string, lines: string[], busy: boolean, blink: boolean) {
-  // An old terminal: green phosphor on near-black, a prompt per line, a block
-  // cursor, scanlines and a soft glow round the edges.
+function paint(s: Screen, title: string, status: string, lines: string[], busy: boolean, _blink = true) {
+  // A terminal, as a good display shows one: deep ink glass, phosphor-green
+  // type with only a breath of glow, a prompt per line. The cursor is the
+  // screen's own quad, so blinking it never repaints this.
+  let caret: { x: number; y: number; w: number; h: number } | null = null;
   s.draw((c, w, h) => {
-    c.fillStyle = "#06120a"; c.fillRect(0, 0, w, h);
-    const ink = busy ? "#5cff8f" : "#3fd170";
-    c.shadowColor = ink; c.shadowBlur = busy ? 14 : 8;
+    const bg = c.createLinearGradient(0, 0, 0, h);
+    bg.addColorStop(0, "#0d1a16"); bg.addColorStop(1, "#08110e");
+    c.fillStyle = bg; c.fillRect(0, 0, w, h);
+    const ink = busy ? "#86f5b0" : "#5fd894";
+    c.shadowColor = "rgba(110, 240, 160, 0.55)"; c.shadowBlur = 6;
     c.fillStyle = ink;
-    c.font = "700 40px 'Geist Mono', 'SF Mono', Menlo, monospace";
-    c.fillText(`${title}:~$`, 24, 56);
-    c.font = "500 30px 'Geist Mono', 'SF Mono', Menlo, 'PingFang SC', monospace";
-    c.globalAlpha = 0.85;
-    c.fillText(`# ${status}`, 24, 100);
+    c.font = "600 38px 'Geist Mono', 'SF Mono', Menlo, monospace";
+    c.fillText(`${title}:~$`, 26, 58);
+    c.font = "400 29px 'Geist Mono', 'SF Mono', Menlo, 'PingFang SC', monospace";
+    c.globalAlpha = 0.72;
+    c.fillText(`# ${status}`, 26, 102);
     c.globalAlpha = 1;
     const wrapped: string[] = [];
     for (const l of lines) for (let i = 0; i < l.length && wrapped.length < 8; i += 30) wrapped.push((i ? "  " : "> ") + l.slice(i, i + 30));
     const shown = wrapped.slice(0, 5);
-    shown.forEach((l, i) => c.fillText(l, 24, 146 + i * 38));
-    if (blink) { c.fillRect(24 + (busy ? 0 : 0), 146 + shown.length * 38 - 28, 18, 32); }
+    shown.forEach((l, i) => c.fillText(l, 26, 148 + i * 38));
     c.shadowBlur = 0;
-    // Scanlines and the glass's dark corners.
-    c.fillStyle = "rgba(0,0,0,0.22)";
-    for (let y = 0; y < h; y += 4) c.fillRect(0, y, w, 1.5);
-    const v = c.createRadialGradient(w / 2, h / 2, h * 0.3, w / 2, h / 2, w * 0.7);
-    v.addColorStop(0, "rgba(0,0,0,0)"); v.addColorStop(1, "rgba(0,0,0,0.55)");
-    c.fillStyle = v; c.fillRect(0, 0, w, h);
+    if (busy) caret = { x: 26, y: 148 + shown.length * 38 - 27, w: 16, h: 30 };
+    // The faintest raster, and a sheen across the glass from the top left.
+    c.fillStyle = "rgba(0, 0, 0, 0.08)";
+    for (let y = 0; y < h; y += 4) c.fillRect(0, y, w, 1);
+    const sheen = c.createLinearGradient(0, 0, w * 0.6, h);
+    sheen.addColorStop(0, "rgba(255,255,255,0.07)"); sheen.addColorStop(0.45, "rgba(255,255,255,0.015)"); sheen.addColorStop(0.46, "rgba(255,255,255,0)");
+    c.fillStyle = sheen; c.fillRect(0, 0, w, h);
   });
+  s.cursor(caret);
 }
 
 /** A computer at a desk, monitor (or laptop) facing the room. Its screens and
@@ -181,21 +186,23 @@ function workstation(kind: "desktop" | "laptop" | "console") {
   // The surface: at a robot's hands where one types (a worker's shoulder is
   // about 1.57 up), higher at the queen's console, which she stands before.
   const surface = kind === "console" ? 1.75 : 1.15;
-  const top = rbox(wide, 0.2, 3, mat(0xffffff, { rough: 0.5 }), 0.08);
+  const top = rbox(wide, 0.16, 3, FIN.satin(), 0.07);
   top.position.y = surface - 0.2;
   g.add(top);
   for (const [x, z] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
-    const leg = box(0.14, surface - 0.2, 0.14, mat(INK), true);
-    leg.position.set(x * (wide / 2 - 0.3), 0, z * 1.25);
+    // Slim aluminium legs, as a good desk has.
+    const leg = cyl(0.06, 0.06, surface - 0.16, 16, FIN.alu(), true);
+    leg.position.set(x * (wide / 2 - 0.35), 0, z * 1.2);
     g.add(leg);
   }
   const screens: Screen[] = [];
   const monitor = (x: number, tilt = 0) => {
     const m = new THREE.Group();
-    const foot = rbox(1, 0.08, 0.7, mat(0xdfe4ea), 0.04, false);
-    const neck = box(0.16, 0.8, 0.12, mat(0xdfe4ea), true);
-    neck.position.set(0, 0.05, -0.15);
-    const bezel = rbox(3.3, 2.05, 0.14, mat(0x1b2430, { rough: 0.4 }), 0.06);
+    const foot = rbox(1, 0.06, 0.7, FIN.alu(), 0.03, false);
+    const neck = rbox(0.5, 0.85, 0.06, FIN.alu(), 0.025);
+    neck.position.set(0, 0.04, -0.15);
+    neck.rotation.x = -0.12;
+    const bezel = rbox(3.3, 2.05, 0.12, FIN.glass(), 0.05);
     bezel.position.set(0, 0.75, -0.2);
     const sc = screen(3.05, 1.8, 640);
     sc.mesh.position.set(0, 0.75 + 1.025, -0.12);
@@ -206,13 +213,16 @@ function workstation(kind: "desktop" | "laptop" | "console") {
     g.add(m);
   };
   if (kind === "laptop") {
-    const base = rbox(3, 0.12, 2.1, mat(0xe8ebef, { rough: 0.4, metal: 0.2 }), 0.06);
+    const base = rbox(3, 0.1, 2.1, FIN.alu(), 0.05);
     base.position.set(0, surface, 0.1);
     const lid = new THREE.Group();
     lid.position.set(0, surface + 0.12, -0.95);
-    const back = rbox(3, 2, 0.08, mat(0xe8ebef, { rough: 0.4, metal: 0.2 }), 0.05);
+    const back = rbox(3, 2, 0.07, FIN.alu(), 0.05);
+    const glassL = rbox(2.92, 1.92, 0.02, FIN.glass(), 0.04, false);
+    glassL.position.set(0, 0.04, 0.04);
+    lid.add(glassL);
     const sc = screen(2.75, 1.7, 640);
-    sc.mesh.position.set(0, 1, 0.05);
+    sc.mesh.position.set(0, 1, 0.068);
     lid.add(back, sc.mesh);
     lid.rotation.x = -0.18;
     screens.push(sc);
@@ -221,16 +231,20 @@ function workstation(kind: "desktop" | "laptop" | "console") {
     monitor(-3.3, 0.25); monitor(0); monitor(3.3, -0.25);
   } else {
     monitor(0);
-    const keys = rbox(2.4, 0.07, 0.8, mat(0x2a3442), 0.03, false);
+    const keys = rbox(2.4, 0.05, 0.8, FIN.alu(), 0.025, false);
     keys.position.set(0, surface, 0.65);
     g.add(keys);
   }
   // The case on the floor beside the desk, with its light.
-  const tower = rbox(1.2, 2.5, 2.3, mat(0xffffff, { rough: 0.5 }), 0.12);
+  const tower = rbox(1.2, 2.5, 2.3, FIN.shell(), 0.12);
   tower.position.set(wide / 2 + 0.9, 0, -0.2);
   const strip = box(0.08, 1.6, 0.06, ownMat(0xd8dee6, { emissive: accentColor, glow: 0 }));
   strip.position.set(wide / 2 + 0.9, 0.5, 0.96);
   if (kind !== "laptop") g.add(tower, strip);
+  // The soft dark where the desk and its case meet the floor.
+  const under = contact(wide + 1.6, 4.2, 0.13);
+  under.position.x = kind === "laptop" ? 0 : 0.5;
+  g.add(under);
   g.userData.tower = tower;
   g.userData.screens = screens;
   g.userData.strip = strip;
@@ -300,10 +314,12 @@ function beacon(bad: boolean) {
 /** A low round stand an icon floats over. */
 function pedestal(r = 1.2) {
   const g = new THREE.Group();
-  const p = cyl(r, r * 1.1, 0.5, 32, mat(0xffffff, { rough: 0.5 }));
-  const ring = cyl(r * 1.02, r * 1.02, 0.08, 32, ownMat(0xd8dee6, { emissive: ROUTE, glow: 0.4 }), false);
-  ring.position.y = 0.45;
-  g.add(p, ring);
+  const p = cyl(r, r * 1.1, 0.5, 64, FIN.satin());
+  // A single fine ring of light round its top edge.
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(r * 0.97, 0.035, 8, 96), ownMat(0xd8e4ff, { emissive: ROUTE, glow: 0.9 }));
+  ring.rotation.x = Math.PI / 2;
+  ring.position.y = 0.5;
+  g.add(p, ring, contact(r * 3.2, r * 3.2, 0.16));
   return g;
 }
 
@@ -317,10 +333,13 @@ export const cluster: District<WorldData> = {
     const g = ctx.group;
 
     // ── The core: the queen's machine, her console, the shared brain ───────
-    const dais = cyl(7.5, 7.8, 0.35, 48, mat(0xffffff, { rough: 0.6 }), false);
+    const dais = cyl(7.5, 7.8, 0.35, 96, FIN.satin(), false);
     dais.receiveShadow = true;
-    const rim = cyl(7.85, 7.85, 0.12, 48, mat(INK, { rough: 0.6 }), false);
-    g.add(dais, rim);
+    // Its edge a single fine line of ink, drawn round the top.
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(7.5, 0.03, 8, 160), mat(INK, { rough: 0.5 }));
+    rim.rotation.x = Math.PI / 2;
+    rim.position.y = 0.35;
+    g.add(dais, rim, contact(19, 19, 0.12));
     const core = workstation("console");
     core.position.set(0, 0.35, -2.2);
     core.rotation.y = 0;
@@ -340,12 +359,13 @@ export const cluster: District<WorldData> = {
 
     const brain = new THREE.Group();
     for (let i = 0; i < 4; i++) {
-      const disk = cyl(1.6, 1.6, 0.55, 32, mat(i % 2 ? 0xffffff : 0xeef2f6, { rough: 0.4 }));
+      const disk = cyl(1.6, 1.6, 0.55, 64, i % 2 ? FIN.shell() : mat(0xe4e8ed, { rough: 0.35, clear: 0.4 }));
       disk.position.y = 0.35 + i * 0.62;
-      const ring = cyl(1.62, 1.62, 0.08, 32, ownMat(0xd8dee6, { emissive: accentColor, glow: 0.0 }), false);
+      const ring = cyl(1.62, 1.62, 0.06, 64, ownMat(0xd8dee6, { emissive: accentColor, glow: 0.0 }), false);
       ring.position.y = 0.35 + i * 0.62 + 0.5;
       brain.add(disk, ring);
     }
+    brain.add(contact(5, 5, 0.16));
     brain.position.set(-4.6, 0, 3.4);
     g.add(brain);
     ctx.pickable(brain, { kind: "brain", id: "brain", title: "Shared brain" });
@@ -449,8 +469,8 @@ export const cluster: District<WorldData> = {
     const wallScreens: { node: THREE.Group; sc: Screen; id: string }[] = [];
     for (let i = 0; i < 4; i++) {
       const node = new THREE.Group();
-      const post = box(0.2, 2.6, 0.2, mat(INK), true);
-      const bezel = rbox(4, 2.5, 0.18, mat(0x1b2430, { rough: 0.4 }), 0.06);
+      const post = cyl(0.09, 0.09, 2.6, 16, FIN.alu(), true);
+      const bezel = rbox(4, 2.5, 0.14, FIN.glass(), 0.06);
       bezel.position.y = 2.4;
       const sc = screen(3.7, 2.2, 640);
       sc.mesh.position.set(0, 3.65, 0.1);
@@ -464,12 +484,12 @@ export const cluster: District<WorldData> = {
     // ── noted: a board with what today still holds, on its own route from
     //    the core; a noted tool call runs along it ──────────────────────
     const board = new THREE.Group();
-    const boardPost = box(0.25, 2.2, 0.25, mat(INK), true);
-    const boardBezel = rbox(5.4, 3.4, 0.2, mat(0xffffff, { rough: 0.5 }), 0.1);
+    const boardPost = cyl(0.11, 0.11, 2.2, 16, FIN.alu(), true);
+    const boardBezel = rbox(5.4, 3.4, 0.18, FIN.shell(), 0.1);
     boardBezel.position.y = 2;
     const boardScreen = screen(5, 3, 640);
     boardScreen.mesh.position.set(0, 3.7, 0.11);
-    board.add(boardPost, boardBezel, boardScreen.mesh);
+    board.add(boardPost, boardBezel, boardScreen.mesh, contact(3, 2, 0.12));
     board.position.set(-3.5, 0, -19);
     g.add(board);
     ctx.pickable(board, { kind: "records", id: "records", title: "Today" });
@@ -500,7 +520,7 @@ export const cluster: District<WorldData> = {
     const cables = new THREE.Group();
     g.add(cables);
     const work = new Map<string, Work>();
-    const cubeGeo = new THREE.SphereGeometry(0.32, 20, 14);
+    const cubeGeo = new THREE.SphereGeometry(0.32, 32, 20);
 
     const nodeSpot = (i: number, n: number) => {
       const a = THREE.MathUtils.degToRad(n === 1 ? 225 : 150 + (i * 150) / Math.max(1, n - 1));
@@ -549,6 +569,7 @@ export const cluster: District<WorldData> = {
     const bits = new THREE.Group();
     g.add(bits);
     const bitGeo = new THREE.BoxGeometry(0.12, 0.12, 0.12);
+    const bitPool: THREE.Object3D[] = [];
     const bitMat = new THREE.MeshBasicMaterial({ color: accentColor, transparent: true, opacity: 0.9, toneMapped: false });
     let bitAt = 0;
     ctx.tick((dt, t) => {
@@ -561,7 +582,7 @@ export const cluster: District<WorldData> = {
             .filter((r) => r.userData.desk && r.userData.state === "work");
           for (const r of typing) {
             if (bits.children.length > 60) break;
-            const b = new THREE.Mesh(bitGeo, bitMat.clone());
+            const b = (bitPool.pop() as THREE.Mesh | undefined) ?? new THREE.Mesh(bitGeo, bitMat);
             // From under the hands, on the keys.
             const p = r.localToWorld(new THREE.Vector3((Math.random() - 0.5) * 0.8, 0.95, 0.62));
             b.position.copy(p);
@@ -575,8 +596,10 @@ export const cluster: District<WorldData> = {
           b.userData.life += dt;
           b.position.addScaledVector(b.userData.v, dt);
           b.rotation.x += dt * 4; b.rotation.y += dt * 3;
-          (b.material as THREE.MeshBasicMaterial).opacity = Math.max(0, 0.9 - b.userData.life * 0.9);
-          if (b.userData.life > 1) { bits.remove(b); (b.material as THREE.Material).dispose(); }
+          // Grows in, then shrinks away as it rises: no material per bit.
+          const L = b.userData.life;
+          b.scale.setScalar(Math.max(0.001, Math.min(1, L * 8) * (1 - smooth(Math.min(1, L)))));
+          if (L > 1) { bits.remove(b); bitPool.push(b); }
         }
       }
       for (const b of beacons.values()) {
@@ -587,7 +610,7 @@ export const cluster: District<WorldData> = {
       if (t - blinkAt > 0.5) {
         blinkAt = t;
         const on = Math.floor(t * 2) % 2 === 0;
-        for (const [sc, x] of displays) if (x.busy) paint(sc, x.title, x.status, x.lines, true, on);
+        for (const sc of displays.keys()) sc.caret.visible = on && !!sc.mesh.userData.caret;
       }
       pose(queen, t, ctx.reduced);
       for (const w of workers.values()) pose(w.r, t, ctx.reduced);
@@ -605,7 +628,8 @@ export const cluster: District<WorldData> = {
       for (const [id, w] of work) {
         if (w.t < 1) {
           w.t = Math.min(1, w.t + dt / 1.8);
-          const k = w.back ? 1 - w.t : w.t;
+          const e = smooth(w.t);
+          const k = w.back ? 1 - e : e;
           const p = w.curve.getPoint(k);
           w.node.position.set(p.x, 0.45 + Math.sin(w.t * Math.PI) * 0.35, p.z);
           w.node.rotation.y += dt * 4;

@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { box, cyl, mat, ownMat, rbox } from "./kit";
+import { FIN, box, contact, cyl, damp, mat, ownMat, rbox } from "./kit";
 
 // The agents: every agent in SuperAI is a robot, and only agents are. The
 // machines they run on stay machines. A robot says what it is doing with its
@@ -30,11 +30,15 @@ const collar = () => (collarGeo ??= (() => {
   s.lineTo(x + w, y + d - r); s.quadraticCurveTo(x + w, y + d, x + w - r, y + d);
   s.lineTo(x + r, y + d); s.quadraticCurveTo(x, y + d, x, y + d - r);
   s.lineTo(x, y + r); s.quadraticCurveTo(x, y, x + r, y);
-  const g = new THREE.ExtrudeGeometry(s, { depth: 0.05, bevelEnabled: true, bevelThickness: 0.025, bevelSize: 0.025, bevelSegments: 4, curveSegments: 10 });
+  const g = new THREE.ExtrudeGeometry(s, { depth: 0.05, bevelEnabled: true, bevelThickness: 0.025, bevelSize: 0.025, bevelSegments: 6, curveSegments: 24 });
   g.rotateX(-Math.PI / 2);
   return g;
 })());
-const arm = () => (capsule ??= (() => { const c = new THREE.CapsuleGeometry(0.11, 0.42, 4, 10); c.translate(0, -0.3, 0); return c; })());
+const arm = () => (capsule ??= (() => { const c = new THREE.CapsuleGeometry(0.11, 0.42, 8, 20); c.translate(0, -0.3, 0); return c; })());
+let hg: THREE.BufferGeometry | null = null, eg: THREE.BufferGeometry | null = null, bg: THREE.BufferGeometry | null = null;
+const handGeo = () => (hg ??= new THREE.SphereGeometry(0.13, 24, 16));
+const eyeGeo = () => (eg ??= new THREE.CapsuleGeometry(0.055, 0.08, 6, 16));
+const bulbGeo = () => (bg ??= new THREE.SphereGeometry(0.08, 20, 14));
 
 /**
  * One robot. `trim` colours its visor band — how CLIs of different makers
@@ -42,26 +46,29 @@ const arm = () => (capsule ??= (() => { const c = new THREE.CapsuleGeometry(0.11
  */
 export function robot(kind: RobotKind, trim = accent) {
   const g = new THREE.Group();
-  const shell = ownMat(SHELL, { rough: 0.45 });
-  const joint = mat(JOINT, { rough: 0.5 });
+  // Satin white with a light clear coat; joints in a soft dark graphite.
+  const shell = ownMat(SHELL, { rough: 0.4, clear: 0.6, clearRough: 0.22 });
+  const joint = mat(JOINT, { rough: 0.38, metal: 0.25 });
 
   if (kind === "bee") {
     // A small hovering one: a thruster where the legs would be, a rotor on top.
-    const thruster = cyl(0.18, 0.3, 0.3, 14, joint, false);
+    const thruster = cyl(0.18, 0.3, 0.3, 28, joint, false);
     thruster.position.y = 0.05;
-    const glow = new THREE.Mesh(new THREE.CircleGeometry(0.22, 16), ownMat(accent, { emissive: accent, glow: 0.8 }));
+    const glow = new THREE.Mesh(new THREE.CircleGeometry(0.22, 32), ownMat(accent, { emissive: accent, glow: 0.8 }));
     glow.rotation.x = Math.PI / 2;
     glow.position.y = 0.04;
     g.add(thruster, glow);
     g.userData.glow = glow;
   } else {
     for (const x of [-0.2, 0.2]) {
-      const leg = cyl(0.12, 0.13, 0.45, 10, joint, true);
+      const leg = cyl(0.12, 0.13, 0.45, 24, joint, true);
       leg.position.set(x, 0, 0);
       const foot = rbox(0.28, 0.12, 0.36, joint, 0.05);
       foot.position.set(x, 0, 0.05);
       g.add(leg, foot);
     }
+    // Where it stands, the floor darkens a little.
+    g.add(contact(1.5, 1.2, 0.2));
   }
   const torso = rbox(0.92, 0.82, 0.62, shell, 0.18);
   torso.position.y = 0.42;
@@ -75,7 +82,8 @@ export function robot(kind: RobotKind, trim = accent) {
     pivot.position.set(x, 1.12, 0);
     const a = new THREE.Mesh(arm(), shell);
     a.castShadow = true;
-    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.13, 10, 8), joint);
+    const hand = new THREE.Mesh(handGeo(), joint);
+    hand.castShadow = true;
     hand.position.y = -0.62;
     pivot.add(a, hand);
     arms.push(pivot);
@@ -85,23 +93,24 @@ export function robot(kind: RobotKind, trim = accent) {
   const head = new THREE.Group();
   head.position.y = 1.32;
   const skull = rbox(0.86, 0.66, 0.72, shell, 0.2);
-  const face = rbox(0.7, 0.42, 0.06, mat(FACE, { rough: 0.25 }), 0.08, false);
+  // The visor: black glass, so the studio light runs across it.
+  const face = rbox(0.7, 0.42, 0.06, FIN.glass(), 0.08, false);
   face.position.set(0, 0.12, 0.36);
-  const band = new THREE.Mesh(collar(), mat(trim, { rough: 0.5 }));
+  const band = new THREE.Mesh(collar(), mat(trim, { rough: 0.32, clear: 0.5 }));
   band.position.y = 0.02;
   const eyeMat = ownMat(EYE_IDLE, { emissive: EYE_IDLE, glow: 0.9 });
   const eyes: THREE.Mesh[] = [];
   for (const x of [-0.15, 0.15]) {
-    const e = new THREE.Mesh(new THREE.CapsuleGeometry(0.055, 0.08, 4, 8), eyeMat);
+    const e = new THREE.Mesh(eyeGeo(), eyeMat);
     e.rotation.z = Math.PI / 2;
     e.position.set(x, 0.33, 0.4);
     eyes.push(e);
     head.add(e);
   }
   const antMat = ownMat(INK, { emissive: accent, glow: 0 });
-  const stalk = cyl(0.025, 0.025, 0.28, 6, joint, false);
+  const stalk = cyl(0.025, 0.025, 0.28, 12, FIN.aluDark(), false);
   stalk.position.y = 0.66;
-  const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.08, 10, 8), antMat);
+  const bulb = new THREE.Mesh(bulbGeo(), antMat);
   bulb.position.y = 0.98;
   head.add(skull, face, band, stalk, bulb);
   g.add(head);
@@ -160,7 +169,7 @@ export function pose(r: THREE.Object3D, t: number, reduced = false) {
   // Defaults: arms down, head level.
   let la = 0, ra = 0, lz = 0.08, rz = -0.08, hx = 0, hy = 0, bob = 0;
   if (s === "idle") {
-    if (!still) { la = Math.sin(k * 1.1) * 0.06; ra = -la; hy = Math.sin(k * 0.35) * 0.25; }
+    if (!still) { la = Math.sin(k * 1.1) * 0.05; ra = -la; hy = Math.sin(k * 0.35) * 0.22; bob = (Math.sin(k * 1.6) + 1) * 0.008; }
   } else if (s === "work" && u.desk) {
     // Typing in earnest: hands taking quick turns on the keys, the body
     // keeping time, the head sweeping the screen, the eyes reading along.
@@ -173,7 +182,7 @@ export function pose(r: THREE.Object3D, t: number, reduced = false) {
     if (!still) (u.eyes as THREE.Mesh[]).forEach((e, i) => { e.position.x = (i ? 0.15 : -0.15) + Math.sin(k * 3.2) * 0.04; });
   } else if (s === "work") {
     la = ra = -1.15; lz = 0.25; rz = -0.25;
-    if (!still) { bob = Math.abs(Math.sin(k * 5)) * 0.04; hy = Math.sin(k * 2.2) * 0.12; (u.cube as THREE.Object3D).rotation.y = k * 1.4; r.rotation.z = Math.sin(k * 2) * 0.03; }
+    if (!still) { bob = Math.abs(Math.sin(k * 5)) * 0.04; hy = Math.sin(k * 2.2) * 0.12; (u.cube as THREE.Object3D).rotation.y = k * 1.4; }
   } else if (s === "think") {
     // A hand to the chin, the head to one side, the antenna going.
     ra = -2.2; rz = -0.55; hx = -0.1; hy = 0.25;
@@ -192,19 +201,32 @@ export function pose(r: THREE.Object3D, t: number, reduced = false) {
   if (gesture) { ra = -2.9; rz = -0.35; }
   // Eating a coin: a quick chomp.
   if (!reduced && (u.chompUntil ?? 0) > t) hx = 0.25 * Math.abs(Math.sin(t * 28));
-  l.rotation.set(la, 0, lz);
-  rr.rotation.set(ra, 0, rz);
+  // Joints follow where the pose wants them rather than jumping there, so a
+  // change of state is a movement, not a cut.
+  const dt = Math.min(0.1, Math.max(0, t - (u.lastT ?? t)));
+  u.lastT = t;
+  const j = (u.joints ??= { la, ra, lz, rz, hx, hy, bob, tilt: 0 }) as Record<string, number>;
+  const rate = reduced ? 1e3 : 11;
+  const tilt = s === "work" && !u.desk && !reduced ? Math.sin(k * 2) * 0.03 : 0;
+  const want: Record<string, number> = { la, ra, lz, rz, hx, hy, bob, tilt };
+  for (const key in want) j[key] = damp(j[key], want[key], key === "bob" ? 18 : rate, dt);
+  l.rotation.set(j.la, 0, j.lz);
+  rr.rotation.set(j.ra, 0, j.rz);
   if (s !== "work") (u.eyes as THREE.Mesh[]).forEach((e, i) => { e.position.x = i ? 0.15 : -0.15; });
-  head.rotation.set(hx, hy, 0);
+  head.rotation.set(j.hx, j.hy, 0);
+  // (A robot at a desk was turned with lookAt, whose Euler angles may carry a
+  // half-turn in z; only free-standing ones sway.)
+  if (!u.desk) r.rotation.z = j.tilt;
   // Blink now and then.
   if (!still && s !== "lost") {
-    const blink = (k % 4.2) < 0.12 ? 0.15 : 1;
+    const ph = k % 4.2;
+    const blink = ph < 0.18 ? 1 - 0.85 * Math.sin((ph / 0.18) * Math.PI) : 1;
     (u.eyes as THREE.Mesh[]).forEach((e) => (e.scale.x = blink));
   }
   if (u.kind === "bee") {
     if (!still && u.rotor) (u.rotor as THREE.Object3D).rotation.y = k * (s === "lost" ? 0 : 18);
   } else {
     (u.base ??= r.position.y);
-    r.position.y = (u.base as number) + bob;
+    r.position.y = (u.base as number) + j.bob;
   }
 }

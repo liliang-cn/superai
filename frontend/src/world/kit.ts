@@ -38,29 +38,48 @@ export const C = {
 
 const mats = new Map<string, THREE.MeshStandardMaterial>();
 
+type Finish = { rough?: number; metal?: number; emissive?: number; glow?: number; opacity?: number; clear?: number; clearRough?: number };
+
+function make(color: number, opts: Finish, rough0: number) {
+  const base = {
+    color, roughness: opts.rough ?? rough0, metalness: opts.metal ?? 0,
+    emissive: opts.emissive ?? 0x000000, emissiveIntensity: opts.glow ?? 0,
+    transparent: (opts.opacity ?? 1) < 1, opacity: opts.opacity ?? 1,
+  };
+  // A clear coat is what makes a white shell read as finished plastic rather
+  // than chalk: a second, sharper highlight over the satin one.
+  return opts.clear
+    ? new THREE.MeshPhysicalMaterial({ ...base, clearcoat: opts.clear, clearcoatRoughness: opts.clearRough ?? 0.22 })
+    : new THREE.MeshStandardMaterial(base);
+}
+
 /** A shared material: the same colour and finish is one material, however
  *  many things wear it. */
-export function mat(color: number, opts: { rough?: number; metal?: number; emissive?: number; glow?: number; opacity?: number } = {}) {
-  const key = `${color}|${opts.rough ?? 0.78}|${opts.metal ?? 0}|${opts.emissive ?? 0}|${opts.glow ?? 0}|${opts.opacity ?? 1}`;
+export function mat(color: number, opts: Finish = {}) {
+  const key = `${color}|${opts.rough ?? 0.78}|${opts.metal ?? 0}|${opts.emissive ?? 0}|${opts.glow ?? 0}|${opts.opacity ?? 1}|${opts.clear ?? 0}|${opts.clearRough ?? 0}`;
   let m = mats.get(key);
-  if (!m) {
-    m = new THREE.MeshStandardMaterial({
-      color, roughness: opts.rough ?? 0.78, metalness: opts.metal ?? 0,
-      emissive: opts.emissive ?? 0x000000, emissiveIntensity: opts.glow ?? 0,
-      transparent: (opts.opacity ?? 1) < 1, opacity: opts.opacity ?? 1,
-    });
-    mats.set(key, m);
-  }
+  if (!m) { m = make(color, opts, 0.78); mats.set(key, m); }
   return m;
 }
 
 /** A material of its own, for something whose colour or glow is animated. */
-export function ownMat(color: number, opts: { rough?: number; emissive?: number; glow?: number; opacity?: number } = {}) {
-  return new THREE.MeshStandardMaterial({
-    color, roughness: opts.rough ?? 0.7, emissive: opts.emissive ?? 0x000000, emissiveIntensity: opts.glow ?? 0,
-    transparent: (opts.opacity ?? 1) < 1, opacity: opts.opacity ?? 1,
-  });
+export function ownMat(color: number, opts: Finish = {}) {
+  return make(color, opts, 0.7);
 }
+
+/**
+ * The world's few finishes, so the same part reads the same everywhere:
+ * satin white shells with a light clear coat, anodised aluminium for stands
+ * and legs, black glass for bezels and visors, matte white for surfaces.
+ */
+export const FIN = {
+  shell: () => mat(0xfbfcfd, { rough: 0.42, clear: 0.6, clearRough: 0.25 }),
+  satin: () => mat(0xfafbfc, { rough: 0.55 }),
+  matte: () => mat(0xf7f8fa, { rough: 0.85 }),
+  alu: () => mat(0xe9ecef, { rough: 0.3, metal: 0.55, clear: 0.3 }),
+  aluDark: () => mat(0x9aa1a9, { rough: 0.35, metal: 0.6 }),
+  glass: () => mat(0x0f151c, { rough: 0.18, clear: 1, clearRough: 0.06 }),
+};
 
 const geos = new Map<string, THREE.BufferGeometry>();
 function geo(key: string, make: () => THREE.BufferGeometry) {
@@ -73,7 +92,8 @@ function geo(key: string, make: () => THREE.BufferGeometry) {
 export function rbox(w: number, h: number, d: number, color: number | THREE.Material, radius?: number, shadow = true) {
   const r = radius ?? Math.min(w, h, d) * 0.08;
   const g = geo(`rb${w}|${h}|${d}|${r}`, () => {
-    const b = new RoundedBoxGeometry(w, h, d, 2, r);
+    // Four segments: enough that a bevel catches light as a curve, not a facet.
+    const b = new RoundedBoxGeometry(w, h, d, 4, r);
     b.translate(0, h / 2, 0);
     return b;
   });
@@ -242,24 +262,42 @@ export function plot(w: number, d: number) {
   return p;
 }
 
-/** A canvas-backed screen: a plane whose picture a district redraws. */
+/** A canvas-backed screen: a plane whose picture a district redraws. Its
+ *  cursor is a quad of its own over the picture, so blinking it costs
+ *  nothing: the canvas is repainted only when what it says changes. */
 export function screen(w: number, h: number, px = 256) {
   const canvas = document.createElement("canvas");
   canvas.width = px;
   canvas.height = Math.round((px * h) / w);
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
+  tex.anisotropy = 8;
+  tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
   const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: tex, toneMapped: false }));
   m.userData.isScreen = true;
   m.userData.w = w;
+  const caret = new THREE.Mesh(geo("caret", () => new THREE.PlaneGeometry(1, 1)), new THREE.MeshBasicMaterial({ color: 0x7ef0a8, toneMapped: false }));
+  caret.visible = false;
+  caret.raycast = () => {};
+  m.add(caret);
   const draw = (paint: (ctx: CanvasRenderingContext2D, w: number, h: number) => void) => {
     const ctx = canvas.getContext("2d")!;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     paint(ctx, canvas.width, canvas.height);
     tex.needsUpdate = true;
   };
-  return { mesh: m, draw };
+  /** Puts the cursor at a rectangle of the canvas (pixels), or hides it. */
+  const cursor = (r: { x: number; y: number; w: number; h: number; color?: string } | null) => {
+    m.userData.caret = !!r;
+    caret.visible = !!r;
+    if (!r) return;
+    const sx = w / canvas.width, sy = h / canvas.height;
+    caret.scale.set(r.w * sx, r.h * sy, 1);
+    caret.position.set(-w / 2 + (r.x + r.w / 2) * sx, h / 2 - (r.y + r.h / 2) * sy, 0.004);
+    if (r.color) (caret.material as THREE.MeshBasicMaterial).color.set(r.color);
+  };
+  return { mesh: m, draw, cursor, caret };
 }
 
 /** A ring thrown off something that just did a thing; grows and fades. */
@@ -271,6 +309,52 @@ export function spark(color = C.honey) {
 }
 
 export const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+
+/** cubic-bezier(x1, y1, x2, y2) as CSS has it, solved for y at x = t. */
+export function bezier(x1: number, y1: number, x2: number, y2: number) {
+  const cx = 3 * x1, bx = 3 * (x2 - x1) - cx, ax = 1 - cx - bx;
+  const cy = 3 * y1, by = 3 * (y2 - y1) - cy, ay = 1 - cy - by;
+  const fx = (s: number) => ((ax * s + bx) * s + cx) * s;
+  const dx = (s: number) => (3 * ax * s + 2 * bx) * s + cx;
+  return (t: number) => {
+    if (t <= 0) return 0;
+    if (t >= 1) return 1;
+    let s = t;
+    for (let i = 0; i < 6; i++) { const e = fx(s) - t; const d = dx(s); if (Math.abs(e) < 1e-5 || Math.abs(d) < 1e-6) break; s -= e / d; }
+    return ((ay * s + by) * s + cy) * s;
+  };
+}
+/** The one motion curve: quick to leave, long soft landing. */
+export const glide = bezier(0.2, 0.8, 0.2, 1);
+/** Moves `cur` toward `to` as a critically damped follower would, frame-rate
+ *  independent: `rate` is how quickly (per second) the gap closes. */
+export const damp = (cur: number, to: number, rate: number, dt: number) => cur + (to - cur) * (1 - Math.exp(-rate * dt));
+export const smooth = (t: number) => t * t * (3 - 2 * t);
+
+let blobTex: THREE.CanvasTexture | null = null;
+/** A soft contact shadow: the dark that gathers where a thing meets the floor,
+ *  which the sun's shadow alone does not give. Flat, cheap, unlit. */
+export function contact(w: number, d: number, strength = 0.22) {
+  if (!blobTex) {
+    const c = document.createElement("canvas");
+    c.width = c.height = 128;
+    const x = c.getContext("2d")!;
+    const g = x.createRadialGradient(64, 64, 0, 64, 64, 64);
+    g.addColorStop(0, "rgba(0,0,0,1)");
+    g.addColorStop(0.35, "rgba(0,0,0,0.55)");
+    g.addColorStop(0.7, "rgba(0,0,0,0.14)");
+    g.addColorStop(1, "rgba(0,0,0,0)");
+    x.fillStyle = g; x.fillRect(0, 0, 128, 128);
+    blobTex = new THREE.CanvasTexture(c);
+  }
+  const m = new THREE.Mesh(geo("contact", () => { const p = new THREE.PlaneGeometry(1, 1); p.rotateX(-Math.PI / 2); return p; }),
+    new THREE.MeshBasicMaterial({ map: blobTex, color: 0x1a2733, transparent: true, opacity: strength, depthWrite: false, toneMapped: false }));
+  m.scale.set(w, 1, d);
+  m.position.y = 0.012;
+  m.renderOrder = -1;
+  m.raycast = () => {};
+  return m;
+}
 export const hash01 = (s: string) => {
   let h = 2166136261;
   for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }

@@ -1,7 +1,9 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { CSS2DObject, CSS2DRenderer } from "three/examples/jsm/renderers/CSS2DRenderer.js";
-import { C, box, ease, flower, hash01, lamp, mat, plot, rbox, spark, tree, woodFence } from "./kit";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
+import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
+import { C, flower, glide, hash01, lamp, mat, plot, rbox, spark, tree, woodFence } from "./kit";
 
 // The world behind the whole app: one scene, a campus of districts (one per
 // page), an isometric camera that flies to whichever page is open. Districts
@@ -71,7 +73,12 @@ export class WorldEngine<D> {
   private raf = 0;
   private last = performance.now();
   private start = performance.now();
-  private flight: { from: THREE.Vector3; to: THREE.Vector3; z0: number; z1: number; t: number } | null = null;
+  private flight: { from: THREE.Vector3; to: THREE.Vector3; z0: number; z1: number; t: number; dur?: number } | null = null;
+  /** A turn of the camera round its target still to make (the turn buttons). */
+  private turn: { rad: number; done: number; t: number } | null = null;
+  /** Phones and small screens get a lighter frame: fewer pixels, a smaller
+   *  shadow map. */
+  private readonly light = window.matchMedia("(pointer: coarse)").matches || Math.min(window.innerWidth, window.innerHeight) < 600;
   private focus = "";
   private inset = 0;
   private size = { w: 1, h: 1 };
@@ -80,11 +87,14 @@ export class WorldEngine<D> {
 
   constructor(private host: HTMLElement) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this.light ? 1.5 : 2));
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    this.renderer.toneMapping = THREE.NoToneMapping;
+    // Khronos' neutral curve: whites stay white and the one blue stays that
+    // blue, while highlights roll off instead of clipping flat.
+    this.renderer.toneMapping = THREE.NeutralToneMapping;
+    this.renderer.toneMappingExposure = 0.84;
     host.appendChild(this.renderer.domElement);
     this.labels = new CSS2DRenderer();
     this.labels.domElement.className = "wl-labels";
@@ -94,7 +104,7 @@ export class WorldEngine<D> {
     this.camera.position.set(Math.cos(ELEV) * Math.sin(AZIM), Math.sin(ELEV), Math.cos(ELEV) * Math.cos(AZIM)).multiplyScalar(BASE);
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
-    this.controls.dampingFactor = 0.08;
+    this.controls.dampingFactor = 0.07;
     // Left drag turns the world, right drag slides it, the wheel or a pinch
     // comes closer; the camera may look straight down or skim the ground.
     this.controls.minPolarAngle = 0.08;
@@ -109,6 +119,8 @@ export class WorldEngine<D> {
     this.controls.screenSpacePanning = false;
     this.controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
     this.controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
+    // A hand on the world takes over from any flight under way.
+    this.controls.addEventListener("start", () => { this.flight = null; this.glide = null; this.turn = null; });
 
     this.lights();
     this.ground();
@@ -125,32 +137,46 @@ export class WorldEngine<D> {
   }
 
   private lights() {
-    this.scene.add(new THREE.HemisphereLight(0xffffff, 0xc9d2de, 1.25));
-    const sun = new THREE.DirectionalLight(0xffffff, 2.7);
-    sun.position.set(-25, 80, 60);
+    // A soft studio round everything: most of the fill, and what aluminium
+    // and glass have to reflect.
+    const pmrem = new THREE.PMREMGenerator(this.renderer);
+    const room = new RoomEnvironment();
+    this.scene.environment = pmrem.fromScene(room, 0.04).texture;
+    this.scene.environmentIntensity = 0.3;
+    room.dispose();
+    pmrem.dispose();
+    this.scene.add(new THREE.HemisphereLight(0xffffff, 0xd9e0e8, 0.3));
+    // One key light, high and to the left, for form and a soft shadow.
+    const sun = new THREE.DirectionalLight(0xfffcf7, 3.2);
+    sun.position.set(-30, 70, 42);
     sun.castShadow = true;
-    sun.shadow.mapSize.set(4096, 4096);
+    const size = this.light ? 2048 : 4096;
+    sun.shadow.mapSize.set(size, size);
     const s = sun.shadow.camera as THREE.OrthographicCamera;
-    s.left = -90; s.right = 90; s.top = 90; s.bottom = -90; s.near = 1; s.far = 220;
-    sun.shadow.bias = -0.0004;
-    sun.shadow.normalBias = 0.03;
-    sun.shadow.radius = 4;
+    // Fitted to the cluster, not the horizon: every texel goes where things are.
+    s.left = -46; s.right = 46; s.top = 46; s.bottom = -46; s.near = 20; s.far = 160;
+    sun.shadow.bias = -0.0002;
+    sun.shadow.normalBias = 0.025;
+    sun.shadow.radius = 6;
+    sun.shadow.intensity = 0.9;
     this.scene.add(sun);
   }
 
   private ground() {
     // One floor to the horizon, fading into the haze: no edge to fall off.
-    const haze = 0xeef1f5;
+    const haze = 0xf3f5f8;
     this.scene.background = new THREE.Color(haze);
-    this.scene.fog = new THREE.Fog(haze, 120, 300);
-    const g = new THREE.Mesh(new THREE.PlaneGeometry(1200, 1200), mat(0xf3f5f8, { rough: 1 }));
+    this.scene.fog = new THREE.Fog(haze, 110, 290);
+    const g = new THREE.Mesh(new THREE.PlaneGeometry(1200, 1200), mat(0xe2e7ed, { rough: 0.95 }));
     g.rotation.x = -Math.PI / 2;
     g.receiveShadow = true;
     this.scene.add(g);
-    const grid = new THREE.GridHelper(600, 300, 0xdde2e9, 0xe6eaef);
-    grid.position.y = 0.04;
+    // A fine survey grid, an instrument's, fading out with distance.
+    const grid = new THREE.GridHelper(600, 300, 0xd6dce4, 0xdde2e9);
+    grid.position.y = 0.02;
     (grid.material as THREE.Material).transparent = true;
-    (grid.material as THREE.Material).opacity = 0.9;
+    (grid.material as THREE.Material).opacity = 0.7;
+    (grid.material as THREE.Material).depthWrite = false;
     this.scene.add(grid);
   }
   private swayers: THREE.Object3D[] = [];
@@ -163,21 +189,38 @@ export class WorldEngine<D> {
    */
   private declutter() {
     const far = this.camera.position.distanceTo(this.controls.target) > 95;
-    this.labels.domElement.classList.toggle("far", far);
+    if (far !== this.labels.domElement.classList.contains("far")) {
+      this.labels.domElement.classList.toggle("far", far);
+      this.sizes = new WeakMap();
+    }
     const rank = (el: HTMLElement) => el.classList.contains("sel") || el.classList.contains("hint") ? 0
       : el.dataset.state === "wait" || el.dataset.state === "bad" ? 1 : el.dataset.state === "work" ? 2 : 3;
-    const items = this.labelOwners
-      .filter((l) => l.obj.visible && l.el.style.display !== "none" && l.el.classList.contains("wl-pill"))
-      .map((l) => ({ el: l.el, r: l.el.getBoundingClientRect(), k: rank(l.el), d: l.obj.getWorldPosition(new THREE.Vector3()).distanceTo(this.camera.position) }))
-      .filter((x) => x.r.width > 0)
-      .sort((a, b) => a.k - b.k || a.d - b.d);
-    const kept: DOMRect[] = [];
+    // Where each pill is, worked out from the camera rather than asked of the
+    // page: reading layout every few frames is what made the labels hitch.
+    const p = new THREE.Vector3();
+    const { w: W, h: H } = this.size;
+    const items: { el: HTMLElement; l: number; t: number; r: number; b: number; k: number; d: number }[] = [];
+    for (const o of this.labelOwners) {
+      const el = o.el;
+      if (!o.obj.visible || el.style.display === "none" || !el.classList.contains("wl-pill")) continue;
+      let sz = this.sizes.get(el);
+      if (!sz) { sz = { w: el.offsetWidth, h: el.offsetHeight }; this.sizes.set(el, sz); }
+      if (!sz.w) continue;
+      o.obj.getWorldPosition(p);
+      const d = p.distanceTo(this.camera.position);
+      p.project(this.camera);
+      const x = (p.x + 1) / 2 * W, y = (1 - p.y) / 2 * H;
+      items.push({ el, l: x - sz.w / 2, r: x + sz.w / 2, t: y - sz.h / 2, b: y + sz.h / 2, k: rank(el), d });
+    }
+    items.sort((a, b) => a.k - b.k || a.d - b.d);
+    const kept: typeof items = [];
     for (const x of items) {
-      const hit = kept.some((r) => x.r.left < r.right - 4 && x.r.right > r.left + 4 && x.r.top < r.bottom - 2 && x.r.bottom > r.top + 2);
-      x.el.classList.toggle("hidden", hit);
-      if (!hit) kept.push(x.r);
+      const hit = kept.some((r) => x.l < r.r - 4 && x.r > r.l + 4 && x.t < r.b - 2 && x.b > r.t + 2);
+      if (x.el.classList.contains("hidden") !== hit) x.el.classList.toggle("hidden", hit);
+      if (!hit) kept.push(x);
     }
   }
+  private sizes = new WeakMap<HTMLElement, { w: number; h: number }>();
 
   /** Adds a district: its plot, its name on the ground, and whatever it builds. */
   add(d: District<D>) {
@@ -264,10 +307,12 @@ export class WorldEngine<D> {
     const owner = { el, obj: o, district, on: true };
     this.labelOwners.push(owner);
     const set: Label["set"] = (nm, st = "", state = "idle") => {
+      if (n.textContent === nm && s.textContent === st && el.dataset.state === state) return;
       n.textContent = nm;
       s.textContent = st;
       s.style.display = st ? "" : "none";
       el.dataset.state = state;
+      this.sizes.delete(el);
     };
     set(name, status);
     this.applyFocus();
@@ -327,9 +372,21 @@ export class WorldEngine<D> {
 
   /** Back to the open page's view, as the camera buttons' home does. */
   home() { this.glide = null; if (this.lens) this.look(this.lens.x, this.lens.z, this.lens.zoom, this.focus); else this.fly(this.focus); }
-  zoomBy(f: number) { const z = this.zoomNow(); this.flight = { from: this.controls.target.clone(), to: this.controls.target.clone(), z0: z, z1: THREE.MathUtils.clamp(z * f, BASE / 150, BASE / 8), t: 0 }; }
+  zoomBy(f: number) {
+    // Pressed again mid-zoom, it carries on from where that zoom was going.
+    const z = this.flight && this.flight.from.equals(this.flight.to) ? this.flight.z1 : this.zoomNow();
+    this.glide = null;
+    this.flight = { from: this.controls.target.clone(), to: this.controls.target.clone(), z0: this.zoomNow(), z1: THREE.MathUtils.clamp(z * f, BASE / 150, BASE / 8), t: 0, dur: 0.55 };
+  }
   private zoomNow() { return BASE / Math.max(1, this.camera.position.distanceTo(this.controls.target)); }
+  /** Turns the camera round its target, gliding; pressed again mid-turn, the
+   *  new turn adds to what is left of the old one. */
   rotateBy(rad: number) {
+    if (this.reduced) { this.turnNow(rad); return; }
+    const left = this.turn ? this.turn.rad - this.turn.done : 0;
+    this.turn = { rad: rad + left, done: 0, t: 0 };
+  }
+  private turnNow(rad: number) {
     const off = this.camera.position.clone().sub(this.controls.target);
     off.applyAxisAngle(new THREE.Vector3(0, 1, 0), rad);
     this.camera.position.copy(this.controls.target).add(off);
@@ -449,6 +506,7 @@ export class WorldEngine<D> {
     const mark = (o: THREE.Object3D | null, on: boolean) => o?.traverse((c) => {
       if (c instanceof CSS2DObject) c.element.classList.toggle("sel", on);
     });
+    if (obj !== this.selected || !this.brackets.visible) this.selT = 0;
     mark(this.selected, false);
     this.selected = obj;
     mark(obj, true);
@@ -463,15 +521,19 @@ export class WorldEngine<D> {
     this.lastCard = "";
   }
 
+  private selT = 1;
   private makeBrackets() {
+    // Four fine corners in the signal blue: a reticle, not a fence.
     const g = new THREE.Group();
-    const m = new THREE.MeshBasicMaterial({ color: 0x2f5bea, transparent: true, opacity: 0.9 });
+    const m = new THREE.MeshBasicMaterial({ color: 0x1f5bff, transparent: true, opacity: 0.9, toneMapped: false, depthWrite: false });
+    const along = new RoundedBoxGeometry(1.1, 0.04, 0.11, 2, 0.02);
+    along.translate(0.5, 0, 0);
+    const across = new RoundedBoxGeometry(0.11, 0.04, 1.1, 2, 0.02);
+    across.translate(0, 0, 0.5);
     for (let i = 0; i < 4; i++) {
       const c = new THREE.Group();
-      const a = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.08, 0.24), m);
-      a.position.x = 0.65;
-      const b = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.08, 1.3), m);
-      b.position.z = 0.65;
+      const a = new THREE.Mesh(along, m);
+      const b = new THREE.Mesh(across, m);
       c.add(a, b);
       c.rotation.y = (-i * Math.PI) / 2;
       g.add(c);
@@ -546,27 +608,37 @@ export class WorldEngine<D> {
 
   private loop(now: number) {
     this.raf = requestAnimationFrame(this.loop);
-    if (document.hidden) return;
-    const dt = Math.min(0.1, (now - this.last) / 1000);
+    // Nothing is drawn while the tab is hidden, and coming back does not
+    // jump the clock.
+    if (document.hidden) { this.last = now; return; }
+    const dt = Math.min(1 / 20, Math.max(0, (now - this.last) / 1000));
     this.last = now;
     const t = (now - this.start) / 1000;
 
-    if (this.spin && !this.flight && !this.glide) this.rotateBy(this.spin * dt);
+    if (this.spin && !this.flight && !this.glide) this.turnNow(this.spin * dt);
+    if (this.turn) {
+      const tr = this.turn;
+      tr.t = Math.min(1, tr.t + dt / 0.6);
+      const want = tr.rad * glide(tr.t);
+      this.turnNow(want - tr.done);
+      tr.done = want;
+      if (tr.t >= 1) this.turn = null;
+    }
     if (this.glide) {
       const g = this.glide;
-      g.t = Math.min(1, g.t + dt / 1.1);
-      const k = ease(g.t);
+      g.t = Math.min(1, g.t + dt / 0.95);
+      const k = glide(g.t);
       this.camera.position.lerpVectors(g.p0, g.p1, k);
       this.controls.target.lerpVectors(g.t0, g.t1, k);
       if (g.t >= 1) this.glide = null;
     }
     if (this.flight) {
       const f = this.flight;
-      f.t = Math.min(1, f.t + dt / 1.1);
-      const k = ease(f.t);
+      f.t = Math.min(1, f.t + dt / (f.dur ?? 0.9));
+      const k = glide(f.t);
       const target = f.from.clone().lerp(f.to, k);
-      // A flight pulls back a little in the middle, so the campus passes by.
-      const dip = f.from.distanceTo(f.to) > 1 ? Math.sin(k * Math.PI) * 0.35 : 0;
+      // A flight lifts a little in the middle, so the campus passes by.
+      const dip = f.from.distanceTo(f.to) > 1 ? Math.sin(k * Math.PI) * 0.18 : 0;
       this.place(target, THREE.MathUtils.lerp(f.z0, f.z1, k) * (1 - dip));
       if (f.t >= 1) this.flight = null;
     }
@@ -575,20 +647,24 @@ export class WorldEngine<D> {
     for (let i = this.sparks.length - 1; i >= 0; i--) {
       const s = this.sparks[i];
       s.userData.life += dt;
-      const k = s.userData.life / 0.9;
-      s.scale.setScalar(0.6 + k * 2.6);
-      (s.material as THREE.MeshBasicMaterial).opacity = Math.max(0, 0.9 * (1 - k));
+      const k = Math.min(1, s.userData.life / 1.1);
+      s.scale.setScalar(0.6 + glide(k) * 2.4);
+      (s.material as THREE.MeshBasicMaterial).opacity = 0.85 * (1 - k) * (1 - k);
       if (k >= 1) { this.scene.remove(s); this.sparks.splice(i, 1); }
     }
     if (this.selected && this.brackets.visible) {
       const at = this.selected.getWorldPosition(new THREE.Vector3());
       const { sx, sz } = this.selBox;
-      this.brackets.position.set(at.x + this.selBox.cx, Math.max(0.08, at.y + 0.06), at.z + this.selBox.cz);
+      // The corners settle in from a little wider, then breathe.
+      this.selT = Math.min(1, this.selT + dt / 0.45);
+      const k = this.reduced ? 1 : glide(this.selT);
+      const open = 1 + 0.35 * (1 - k);
+      this.brackets.position.set(at.x + this.selBox.cx, Math.max(0.06, at.y + 0.05), at.z + this.selBox.cz);
       this.brackets.children.forEach((ch, i) => {
         const [x, z] = [[-1, -1], [1, -1], [1, 1], [-1, 1]][i];
-        ch.position.set(x * sx, 0, z * sz);
+        ch.position.set(x * sx * open, 0, z * sz * open);
       });
-      (this.brackets.userData.mat as THREE.MeshBasicMaterial).opacity = 0.6 + 0.35 * Math.sin(t * 3);
+      (this.brackets.userData.mat as THREE.MeshBasicMaterial).opacity = k * (this.reduced ? 0.9 : 0.8 + 0.12 * Math.sin(t * 2.2));
     }
     this.controls.update();
     this.placeCallout();
