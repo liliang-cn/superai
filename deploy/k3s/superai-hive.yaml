@@ -116,6 +116,9 @@ spec:
             # auto: the queen answers small things herself (a calendar look-up
             # went 46s -> one round) and hands real work to workers.
             - {name: SUPERAI_HIVE_DELEGATION, value: auto}
+            # The quote feed (home widgets, Quotes RPC) reaches Yahoo Finance
+            # through dell's proxy; pods have no route of their own.
+            - {name: SUPERAI_QUOTE_PROXY, value: "http://192.168.123.61:43127"}
             # APNs: the silent push that tells the iOS app its alarms changed.
             # The .p8 key's PEM text and its id; team and topic default to
             # NUDL4XSA6J and cn.superleo.superai.ios. Without them the queen
