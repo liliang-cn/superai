@@ -60,6 +60,9 @@ type Notification struct {
 	Kind     string         `json:"kind,omitempty"`
 	Deeplink string         `json:"deeplink,omitempty"`
 	Actions  []NoticeAction `json:"actions,omitempty"`
+	// Reply is the coding session an answer typed here goes to, for a notice
+	// raised by one (see NoticeReply).
+	Reply *NoticeReply `json:"reply,omitempty"`
 }
 
 // Inbox is the store behind the notification centre.
@@ -134,7 +137,7 @@ func (b *Inbox) add(n Notice) error {
 	entry := Notification{
 		ID: id, Level: n.Level, Title: n.Title, Message: n.Message,
 		Source: n.Source, Session: n.Session, At: n.At,
-		Kind: n.Kind, Deeplink: n.Deeplink, Actions: n.Actions,
+		Kind: n.Kind, Deeplink: n.Deeplink, Actions: n.Actions, Reply: n.Reply,
 	}
 	if entry.At == "" {
 		entry.At = time.Now().Format(time.RFC3339)

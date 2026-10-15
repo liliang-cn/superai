@@ -291,6 +291,9 @@ func (a *App) startCLIRun(o cliStart) (CLIRun, error) {
 	req := agentexec.Request{
 		RunID: id, Prompt: prompt, WorkspacePath: dir, Model: model,
 		ResumeSessionID: session, PermissionMode: agentexec.PermissionBypass,
+		// This run reports through cli:run already; `superai hook` sees this
+		// and stays out of it (cchook.go).
+		Env: map[string]string{"SUPERAI_CLI_RUN": id},
 	}
 	// Claude's MCP servers go on the command line as JSON, never as a file:
 	// agentexec writes its config into the working directory, where the agent

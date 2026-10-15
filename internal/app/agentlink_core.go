@@ -480,6 +480,10 @@ func (s *agentLinkServer) receive(stream agentlinkpb.AgentLink_ConnectServer, c 
 				s.app.notePulse(c.name(), k.Event.GetPayloadJson())
 				break
 			}
+			if k.Event.GetName() == ccSessionEvent {
+				s.app.noteCCSession(c.name(), k.Event.GetPayloadJson())
+				break
+			}
 			c.mu.Lock()
 			for _, ch := range c.subs {
 				select {

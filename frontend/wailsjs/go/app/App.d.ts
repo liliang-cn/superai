@@ -14,6 +14,8 @@ export function AskRemoteAgent(arg1:string,arg2:string):Promise<backend.RemoteRe
 
 export function Attention():Promise<Array<app.AttentionItem>>;
 
+export function CCSessions():Promise<Array<app.CCSession>>;
+
 export function CLIProxyAccounts():Promise<Array<backend.CLIProxyAccount>>;
 
 export function CLIProxyLogin(arg1:string,arg2:string):Promise<string>;
@@ -55,6 +57,8 @@ export function CreateIntegrationToken(arg1:string):Promise<app.NewIntegrationTo
 export function Dashboard():Promise<Record<string, any>>;
 
 export function Dashboards():Promise<Array<backend.Dashboard>>;
+
+export function DeleteApprovalRule(arg1:string):Promise<Record<string, any>>;
 
 export function DeleteChatSession(arg1:string):Promise<string>;
 
@@ -122,6 +126,8 @@ export function LinkedAgents():Promise<Array<app.LinkedAgent>>;
 
 export function LinkedSuperAIs():Promise<Array<app.LinkedSuperAI>>;
 
+export function ListApprovalRules():Promise<Array<backend.ApprovalRule>>;
+
 export function ListIntegrationTokens():Promise<Array<app.IntegrationToken>>;
 
 export function LongRunList():Promise<Array<backend.TaskSummary>>;
@@ -145,6 +151,8 @@ export function NotedAlarms():Promise<any>;
 export function NotedHoldings():Promise<any>;
 
 export function NotedHolidays(arg1:number):Promise<any>;
+
+export function NotedTimeEntries():Promise<any>;
 
 export function NotedTimeWeek():Promise<any>;
 
@@ -172,6 +180,8 @@ export function PickFiles():Promise<Array<string>>;
 
 export function PostNotification(arg1:app.PostNotificationRequest):Promise<app.PostedNotification>;
 
+export function Presence():Promise<app.CCPresence>;
+
 export function PreviewPrompt(arg1:string,arg2:string):Promise<backend.PromptPreview>;
 
 export function Pulse():Promise<backend.PulseSnapshot>;
@@ -192,7 +202,13 @@ export function RemoveSkill(arg1:string):Promise<string>;
 
 export function RenameDashboard(arg1:string,arg2:string):Promise<Record<string, any>>;
 
+export function ReplyToCCSession(arg1:app.CCReplyRequest):Promise<app.CCDelivery>;
+
+export function ReplyToSession(arg1:string,arg2:string):Promise<app.CCDelivery>;
+
 export function ResolveToolApproval(arg1:string,arg2:boolean):Promise<string>;
+
+export function ResolveToolApprovalRemember(arg1:string,arg2:boolean,arg3:backend.RememberOption):Promise<Record<string, any>>;
 
 export function ResumeStandingAgent(arg1:string):Promise<void>;
 
@@ -219,6 +235,8 @@ export function SearchMCPServers(arg1:string):Promise<Record<string, any>>;
 export function SearchSkills(arg1:string):Promise<Array<backend.SkillCandidate>>;
 
 export function SendChat(arg1:string,arg2:string,arg3:Array<string>):Promise<string>;
+
+export function SetAway(arg1:boolean):Promise<app.CCPresence>;
 
 export function SetDashboardCron(arg1:string,arg2:string):Promise<Record<string, any>>;
 

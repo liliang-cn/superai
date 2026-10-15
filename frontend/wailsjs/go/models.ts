@@ -477,6 +477,97 @@ export namespace app {
 		    return a;
 		}
 	}
+	export class CCDelivery {
+	    via: string;
+	    immediate: boolean;
+	    note?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new CCDelivery(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.via = source["via"];
+	        this.immediate = source["immediate"];
+	        this.note = source["note"];
+	    }
+	}
+	export class CCPresence {
+	    away: boolean;
+	    at?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new CCPresence(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.away = source["away"];
+	        this.at = source["at"];
+	    }
+	}
+	export class CCReplyRequest {
+	    agent: string;
+	    session: string;
+	    text: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new CCReplyRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.agent = source["agent"];
+	        this.session = source["session"];
+	        this.text = source["text"];
+	    }
+	}
+	export class CCSession {
+	    agent: string;
+	    session: string;
+	    host?: string;
+	    project?: string;
+	    cwd?: string;
+	    state: string;
+	    text?: string;
+	    // Go type: time
+	    at: any;
+	
+	    static createFrom(source: any = {}) {
+	        return new CCSession(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.agent = source["agent"];
+	        this.session = source["session"];
+	        this.host = source["host"];
+	        this.project = source["project"];
+	        this.cwd = source["cwd"];
+	        this.state = source["state"];
+	        this.text = source["text"];
+	        this.at = this.convertValues(source["at"], null);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class CLIRunEvent {
 	    seq: number;
 	    // Go type: time
@@ -1151,6 +1242,73 @@ export namespace backend {
 	        this.env = source["env"];
 	    }
 	}
+	export class RuleScope {
+	    path_prefix?: string;
+	    path?: string;
+	    command_prefix?: string;
+	    command?: string;
+	    machine?: string;
+	    agent?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new RuleScope(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path_prefix = source["path_prefix"];
+	        this.path = source["path"];
+	        this.command_prefix = source["command_prefix"];
+	        this.command = source["command"];
+	        this.machine = source["machine"];
+	        this.agent = source["agent"];
+	    }
+	}
+	export class ApprovalRule {
+	    id: string;
+	    // Go type: time
+	    created_at: any;
+	    tool: string;
+	    scope: RuleScope;
+	    decision: string;
+	    note?: string;
+	    created_from_approval_id?: string;
+	    label: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ApprovalRule(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.created_at = this.convertValues(source["created_at"], null);
+	        this.tool = source["tool"];
+	        this.scope = this.convertValues(source["scope"], RuleScope);
+	        this.decision = source["decision"];
+	        this.note = source["note"];
+	        this.created_from_approval_id = source["created_from_approval_id"];
+	        this.label = source["label"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class CLIProxyAccount {
 	    file: string;
 	    provider: string;
@@ -1398,6 +1556,7 @@ export namespace backend {
 	    started_at: any;
 	    engine?: string;
 	    node?: string;
+	    mcp: string[];
 	    state: string;
 	
 	    static createFrom(source: any = {}) {
@@ -1415,6 +1574,7 @@ export namespace backend {
 	        this.started_at = this.convertValues(source["started_at"], null);
 	        this.engine = source["engine"];
 	        this.node = source["node"];
+	        this.mcp = source["mcp"];
 	        this.state = source["state"];
 	    }
 	
@@ -1466,6 +1626,8 @@ export namespace backend {
 	    spawner?: SpawnerSettings;
 	    interval_seconds?: number;
 	    max_concurrent_orders?: number;
+	    delegation?: string;
+	    delegate_timeout_seconds?: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new HiveSettings(source);
@@ -1482,6 +1644,8 @@ export namespace backend {
 	        this.spawner = this.convertValues(source["spawner"], SpawnerSettings);
 	        this.interval_seconds = source["interval_seconds"];
 	        this.max_concurrent_orders = source["max_concurrent_orders"];
+	        this.delegation = source["delegation"];
+	        this.delegate_timeout_seconds = source["delegate_timeout_seconds"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -1570,6 +1734,20 @@ export namespace backend {
 	        this.say = source["say"];
 	    }
 	}
+	export class NoticeReply {
+	    agent: string;
+	    session: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new NoticeReply(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.agent = source["agent"];
+	        this.session = source["session"];
+	    }
+	}
 	export class Notification {
 	    id: string;
 	    level: string;
@@ -1582,6 +1760,7 @@ export namespace backend {
 	    kind?: string;
 	    deeplink?: string;
 	    actions?: NoticeAction[];
+	    reply?: NoticeReply;
 	
 	    static createFrom(source: any = {}) {
 	        return new Notification(source);
@@ -1600,6 +1779,7 @@ export namespace backend {
 	        this.kind = source["kind"];
 	        this.deeplink = source["deeplink"];
 	        this.actions = this.convertValues(source["actions"], NoticeAction);
+	        this.reply = this.convertValues(source["reply"], NoticeReply);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -1875,6 +2055,20 @@ export namespace backend {
 		}
 	}
 	
+	export class RememberOption {
+	    scope: string;
+	    note?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new RememberOption(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.scope = source["scope"];
+	        this.note = source["note"];
+	    }
+	}
 	export class RemoteAgent {
 	    about?: string;
 	    url?: string;
@@ -2013,6 +2207,7 @@ export namespace backend {
 	        this.failed = source["failed"];
 	    }
 	}
+	
 	export class SegmentStat {
 	    index: number;
 	    sessionId: string;

@@ -41,6 +41,12 @@ func main() {
 		app.IntegrationTokenMain(os.Args[2:])
 		return
 	}
+	// Claude Code's hooks, handed to the SuperAI serving on this machine
+	// (internal/app/cchook.go). Always exits 0, and fast.
+	if len(os.Args) > 1 && os.Args[1] == "hook" {
+		app.HookMain(os.Args[2:])
+		return
+	}
 	// This machine as an agent node another SuperAI drives (internal/app/node.go).
 	if len(os.Args) > 1 && os.Args[1] == "node" {
 		app.NodeMain(os.Args[2:])

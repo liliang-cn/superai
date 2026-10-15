@@ -18,6 +18,10 @@ export function Attention() {
   return window['go']['app']['App']['Attention']();
 }
 
+export function CCSessions() {
+  return window['go']['app']['App']['CCSessions']();
+}
+
 export function CLIProxyAccounts() {
   return window['go']['app']['App']['CLIProxyAccounts']();
 }
@@ -100,6 +104,10 @@ export function Dashboard() {
 
 export function Dashboards() {
   return window['go']['app']['App']['Dashboards']();
+}
+
+export function DeleteApprovalRule(arg1) {
+  return window['go']['app']['App']['DeleteApprovalRule'](arg1);
 }
 
 export function DeleteChatSession(arg1) {
@@ -234,6 +242,10 @@ export function LinkedSuperAIs() {
   return window['go']['app']['App']['LinkedSuperAIs']();
 }
 
+export function ListApprovalRules() {
+  return window['go']['app']['App']['ListApprovalRules']();
+}
+
 export function ListIntegrationTokens() {
   return window['go']['app']['App']['ListIntegrationTokens']();
 }
@@ -280,6 +292,10 @@ export function NotedHoldings() {
 
 export function NotedHolidays(arg1) {
   return window['go']['app']['App']['NotedHolidays'](arg1);
+}
+
+export function NotedTimeEntries() {
+  return window['go']['app']['App']['NotedTimeEntries']();
 }
 
 export function NotedTimeWeek() {
@@ -334,6 +350,10 @@ export function PostNotification(arg1) {
   return window['go']['app']['App']['PostNotification'](arg1);
 }
 
+export function Presence() {
+  return window['go']['app']['App']['Presence']();
+}
+
 export function PreviewPrompt(arg1, arg2) {
   return window['go']['app']['App']['PreviewPrompt'](arg1, arg2);
 }
@@ -374,8 +394,20 @@ export function RenameDashboard(arg1, arg2) {
   return window['go']['app']['App']['RenameDashboard'](arg1, arg2);
 }
 
+export function ReplyToCCSession(arg1) {
+  return window['go']['app']['App']['ReplyToCCSession'](arg1);
+}
+
+export function ReplyToSession(arg1, arg2) {
+  return window['go']['app']['App']['ReplyToSession'](arg1, arg2);
+}
+
 export function ResolveToolApproval(arg1, arg2) {
   return window['go']['app']['App']['ResolveToolApproval'](arg1, arg2);
+}
+
+export function ResolveToolApprovalRemember(arg1, arg2, arg3) {
+  return window['go']['app']['App']['ResolveToolApprovalRemember'](arg1, arg2, arg3);
 }
 
 export function ResumeStandingAgent(arg1) {
@@ -428,6 +460,10 @@ export function SearchSkills(arg1) {
 
 export function SendChat(arg1, arg2, arg3) {
   return window['go']['app']['App']['SendChat'](arg1, arg2, arg3);
+}
+
+export function SetAway(arg1) {
+  return window['go']['app']['App']['SetAway'](arg1);
 }
 
 export function SetDashboardCron(arg1, arg2) {
