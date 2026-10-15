@@ -230,6 +230,9 @@ func (l *ccLocal) deliver(ctx context.Context, sessionID, text string) (CCDelive
 				return CCDelivery{Via: "otty", Immediate: true}, nil
 			}
 			log.Printf("cc relay: typing into otty pane %s: %v", pane, err)
+			if errors.Is(err, errOttyLocked) && snap.State != ccWorking {
+				return CCDelivery{}, err
+			}
 		}
 	}
 	at := reach.For(sightings, l.liveTTYs(), sessionID)

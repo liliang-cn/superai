@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 )
 
@@ -25,6 +26,10 @@ func ottyPath() string {
 	}
 	return ""
 }
+
+// errOttyLocked is Otty refusing to be typed into: it does that until its
+// config says `ipc-allow-send-keys = true`.
+var errOttyLocked = errors.New("the session runs in Otty, which refuses to be typed into; set ipc-allow-send-keys = true in Otty's config")
 
 // ottyPaneFor is the Otty pane running that Claude Code session, or "".
 func ottyPaneFor(ctx context.Context, sessionID string) string {
@@ -82,6 +87,9 @@ func ottyType(ctx context.Context, pane, text string) error {
 	ctx, cancel := context.WithTimeout(ctx, 6*time.Second)
 	defer cancel()
 	if out, err := exec.CommandContext(ctx, cli, "pane", "send-text", "--pane", pane, "--from-file", f.Name()).CombinedOutput(); err != nil {
+		if strings.Contains(string(out), "ipc-allow-send-keys") {
+			return errOttyLocked
+		}
 		return errors.New(err.Error() + ": " + string(out))
 	}
 	// The TUI takes the paste before the key; Return right behind it can land
