@@ -83,6 +83,8 @@ type ccLocal struct {
 	paneAlive func(pane string) bool
 	typeTmux  func(pane, text string) error
 	typeITerm func(ctx context.Context, tty, text string) error
+	ottyPane  func(ctx context.Context, sessionID string) string
+	typeOtty  func(ctx context.Context, pane, text string) error
 }
 
 func newCCLocal() *ccLocal {
@@ -98,6 +100,8 @@ func newCCLocal() *ccLocal {
 			return tmux.SendKey(pane, "Enter")
 		},
 		typeITerm: iterm.SendText,
+		ottyPane:  ottyPaneFor,
+		typeOtty:  ottyType,
 	}
 }
 
@@ -218,6 +222,16 @@ func (l *ccLocal) deliver(ctx context.Context, sessionID, text string) (CCDelive
 		}
 		log.Printf("cc relay: typing into tmux pane %s: %v", snap.Pane, err)
 	}
+	if l.ottyPane != nil {
+		if pane := l.ottyPane(ctx, sessionID); pane != "" {
+			err := l.typeOtty(ctx, pane, text)
+			if err == nil {
+				l.setState(sessionID, ccWorking)
+				return CCDelivery{Via: "otty", Immediate: true}, nil
+			}
+			log.Printf("cc relay: typing into otty pane %s: %v", pane, err)
+		}
+	}
 	at := reach.For(sightings, l.liveTTYs(), sessionID)
 	if at.Gone {
 		return CCDelivery{}, fmt.Errorf("that Claude Code session is gone: %s", at.Reason)
@@ -234,7 +248,7 @@ func (l *ccLocal) deliver(ctx context.Context, sessionID, text string) (CCDelive
 		l.queue.Push(sessionID, text)
 		return CCDelivery{Via: "queued", Note: "handed over when its current turn ends"}, nil
 	}
-	return CCDelivery{}, errors.New("cannot type into that session's terminal (only tmux and iTerm2 can be reached) and it is not in a turn, so there is no turn end to hand the answer to")
+	return CCDelivery{}, errors.New("cannot type into that session's terminal (tmux, Otty and iTerm2 can be reached; this one is none of them) and it is not in a turn, so there is no turn end to hand the answer to")
 }
 
 func (l *ccLocal) setState(id, state string) {

@@ -100,6 +100,8 @@ type fakeTerminals struct {
 	itermErr error
 	tmuxGot  []string
 	itermGot []string
+	otty     map[string]string // session id -> Otty pane
+	ottyGot  []string
 }
 
 func testLocal(f *fakeTerminals) *ccLocal {
@@ -120,7 +122,41 @@ func testLocal(f *fakeTerminals) *ccLocal {
 		f.itermGot = append(f.itermGot, tty+"|"+text)
 		return nil
 	}
+	// Never the real Otty: a test must not type into this machine's panes.
+	l.ottyPane = func(_ context.Context, id string) string { return f.otty[id] }
+	l.typeOtty = func(_ context.Context, pane, text string) error {
+		f.ottyGot = append(f.ottyGot, pane+"|"+text)
+		return nil
+	}
 	return l
+}
+
+func TestAnIdleOttySessionIsTypedInto(t *testing.T) {
+	ctx := context.Background()
+	f := &fakeTerminals{otty: map[string]string{"s-otty": "p_1"}}
+	l := testLocal(f)
+	see(l, ccHookEvent{Event: "SessionStart", Session: "s-otty", Cwd: "/tmp/x"})
+	see(l, ccHookEvent{Event: "Stop", Session: "s-otty", Cwd: "/tmp/x"})
+	d, err := l.deliver(ctx, "s-otty", "keep going")
+	if err != nil || d.Via != "otty" || !d.Immediate {
+		t.Fatalf("deliver = %+v, %v; want typed into otty", d, err)
+	}
+	if len(f.ottyGot) != 1 || f.ottyGot[0] != "p_1|keep going" {
+		t.Errorf("typed %v", f.ottyGot)
+	}
+}
+
+func TestOttyPaneIsFoundBySessionID(t *testing.T) {
+	list := []byte(`{"ok":true,"data":[{"id":"p_a","agent_session_id":"aaa"},{"id":"p_b","agent_session_id":"bbb"},{"id":"p_c"}]}`)
+	if got := ottyPaneIn(list, "bbb"); got != "p_b" {
+		t.Errorf("pane for bbb = %q", got)
+	}
+	if got := ottyPaneIn(list, "zzz"); got != "" {
+		t.Errorf("pane for an unknown session = %q, want none", got)
+	}
+	if got := ottyPaneIn([]byte("not json"), "aaa"); got != "" {
+		t.Errorf("pane from garbage = %q", got)
+	}
 }
 
 func see(l *ccLocal, ev ccHookEvent) string { return l.observe(&ev, time.Now()) }
@@ -243,7 +279,7 @@ func TestANoticeIsAddressedBackToItsSession(t *testing.T) {
 	r := ccReport{ccHookEvent: ccHookEvent{Event: "Stop", Session: "s-1", Cwd: "/Users/me/superai", Text: "  all green  "}, Host: "mbp"}
 	n := ccNotice("mac", r, "", now)
 	if n.Title != "claude · mac · superai" || n.Key != "cc:s-1" || n.Message != "all green" || !n.Push ||
-		n.Reply == nil || n.Reply.Agent != "mac" || n.Reply.Session != "s-1" || n.Kind != backend.KindBrief {
+		n.Reply == nil || n.Reply.Agent != "mac" || n.Reply.Session != "s-1" || n.Kind != backend.KindInfo {
 		t.Errorf("stop notice %+v", n)
 	}
 	perm := ccNotice("mac", ccReport{ccHookEvent: ccHookEvent{Event: "Notification", Kind: "permission_prompt", Session: "s-1", Text: "needs Bash"}}, "", now)

@@ -179,7 +179,7 @@ func ccNotice(agent string, r ccReport, prevText string, now time.Time) backend.
 		Title:    strings.Join(parts, " · "),
 		Source:   "claude-code",
 		Key:      "cc:" + r.Session,
-		Kind:     backend.KindBrief,
+		Kind:     backend.KindInfo, // not a brief: the home card for the day's brief is not where a terminal turn goes
 		At:       now.Local().Format(time.RFC3339),
 		Push:     true,
 		External: true, // the phone, not the chat webhook: a turn is not a broadcast
