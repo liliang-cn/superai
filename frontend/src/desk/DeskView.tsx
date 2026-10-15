@@ -6,6 +6,7 @@ import {
   LayoutDashboardIcon, ChartColumnIcon, PanelRightCloseIcon, PanelRightOpenIcon, ActivityIcon, GaugeIcon,
 } from "lucide-react";
 import { useI18n } from "../lib/i18n";
+import { getQueenName, queenNamed, queenRef, queenTitle, useQueenName } from "../lib/queenName";
 import { useChat } from "../lib/useChat";
 import { usePulse } from "../components/Reactor";
 import LiveTurn from "./LiveTurn";
@@ -143,6 +144,7 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
   onSessionOpened?: () => void;
 }) {
   const { t } = useI18n();
+  const queen = useQueenName();
   const navigate = useNavigate();
   // Kept the way it was left; in a narrow window, where it would float over
   // the conversation, it starts folded.
@@ -317,7 +319,7 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
   const live = hive.members.filter((m) => m.state === "live" && !/queen/.test(m.name)).length;
   const workers = hive.members.filter((m) => !/queen/.test(m.name)).length;
   const status = !hive.loaded ? t("Finding the hive…") : !hive.role ? t("This Mac on its own") : `${live} of ${workers} workers up, ${busyWorkers} busy`;
-  const title = onQueen ? t("The queen") : recents.find((s) => s.id === chat.sessionId)?.title || t("Conversation");
+  const title = onQueen ? queenTitle(queen) : recents.find((s) => s.id === chat.sessionId)?.title || t("Conversation");
 
   return (
     <div ref={layoutRef} className={`${folded ? "dk folded" : "dk"}${resizing ? " dk-resizing" : ""}`} style={{ "--dk-side-width": `${sideWidth}px` } as CSSProperties}>
@@ -326,7 +328,7 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
           <b>SuperAI</b>
           <button className="dk-icon" title={t("New chat")} aria-label={t("New chat")} onClick={() => { chat.newSession(); setOnQueen(false); }}><SquarePenIcon size={17} /></button>
         </div>
-        <button className={onQueen ? "dk-row on" : "dk-row"} onClick={() => pickSession(QUEEN_SESSION)}><span className="dk-qhex">Q</span>{t("The queen")}</button>
+        <button className={onQueen ? "dk-row on" : "dk-row"} onClick={() => pickSession(QUEEN_SESSION)}><span className="dk-qhex">Q</span>{queenTitle(queen)}</button>
         {(needs > 0 || attentionError) && (
           <button className="dk-row need" onClick={() => navigate(PATHS.tasks)} title={attention.filter((i) => i.level === "needs").slice(0, 3).map(attentionTitle).join("\n")}>
             <TriangleAlertIcon size={16} />
@@ -398,7 +400,7 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
         </header>
         <div className="dk-msgs" ref={msgsRef}>
           {msgs.length === 0 && (
-            <div className="dk-empty">Ask the queen anything, or give the hive an order: “check disk on every worker and tell me the fullest”.</div>
+            <div className="dk-empty">{t("Ask {name} anything, or give the hive an order: “check disk on every worker and tell me the fullest”.", { name: queenRef(queen) })}</div>
           )}
           {msgs.map((m, index) =>
             m.role === "user" ? (
@@ -451,7 +453,7 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
           />
           <textarea
             ref={composerRef}
-            name="message" rows={1} value={draft} placeholder={t("Ask the queen, or give the hive an order. @ for an agent or a worker")}
+            name="message" rows={1} value={draft} placeholder={t("Ask {name}, or give the hive an order. @ for an agent or a worker", { name: queenRef(queen) })}
             onChange={(e) => { setDraft(e.target.value); mentions.update(e.target.value, e.target.selectionStart ?? e.target.value.length); }}
             onKeyDown={(e) => {
               if (mentions.onKeyDown(e)) return;
@@ -550,7 +552,7 @@ function Controls({ current, run, dash, busy, onOpenHive, onOpenStats }: { curre
   if (current === "hive" || current === "status") {
     return (
       <div className="dk-ctl">
-        <span>{busy > 0 ? "The queen has the hive" : "The hive is resting"}</span>
+        <span>{busy > 0 ? `${queenNamed() ? getQueenName().name : "The queen"} has the hive` : "The hive is resting"}</span>
         {busy > 0 && <button className="dk-btn ghost" onClick={() => CancelAllChats().catch((e) => setErr(String(e)))}>Stop all</button>}
         <button className="dk-btn light" onClick={onOpenHive}>Open the hive</button>
         {err && <em className="dk-ctl-err">{err}</em>}

@@ -11,6 +11,7 @@ import type { AttentionItem } from "../canvas/attention";
 import type { Member } from "../components/HiveMeter";
 import { translate } from "../lib/i18n";
 import { boardLine, touchesNoted, type AgendaEntry } from "./agenda";
+import { getQueenName, queenTitle } from "../lib/queenName";
 
 // The cluster, as it is: the core in the middle with the queen at its console
 // and the shared brain beside it; the nodes around it with their workers
@@ -324,7 +325,7 @@ export const cluster: District<WorldData> = {
     core.position.set(0, 0.35, -2.2);
     core.rotation.y = 0;
     g.add(core);
-    ctx.pickable(core, { kind: "hall", id: "queen", title: "The queen" });
+    ctx.pickable(core, { kind: "hall", id: "queen", title: queenTitle() });
     // The core's own case: where this core is set up.
     ctx.pickable(core.userData.tower, { kind: "settings", id: "core", title: "This core" });
     const queen = robot("queen");
@@ -334,8 +335,8 @@ export const cluster: District<WorldData> = {
     queen.userData.base = 0.35;
     queen.rotation.y = Math.PI / 4;
     g.add(queen);
-    ctx.pickable(queen, { kind: "hall", id: "queen", title: "The queen" });
-    const queenLab = ctx.label(queen, "queen", "", 3.4);
+    ctx.pickable(queen, { kind: "hall", id: "queen", title: queenTitle() });
+    const queenLab = ctx.label(queen, getQueenName().name, "", 3.4);
 
     const brain = new THREE.Group();
     for (let i = 0; i < 4; i++) {
@@ -836,13 +837,13 @@ export const cluster: District<WorldData> = {
         if (calls >= 0 && d.meter.total.calls > calls) { ctx.spark(new THREE.Vector3(0.8, 4.6, 1.4)); queen.userData.gestureUntil = clock + 0.9; }
         calls = d.meter.total.calls;
         const doing = d.meter.members.find((m) => m.live && m.doing)?.doing;
-        queenLab.set("queen", live ? clip(doing || "thinking", 26) : "idle", live ? "work" : queenState === "wait" ? "wait" : "idle");
+        queenLab.set(getQueenName().name, live ? clip(doing || "thinking", 26) : "idle", live ? "work" : queenState === "wait" ? "wait" : "idle");
         const coreStrip = (core.userData.strip as THREE.Mesh).material as THREE.MeshStandardMaterial;
         coreStrip.emissiveIntensity = live ? 1 : 0.15;
         const [s1, s2, s3] = core.userData.screens as Screen[];
         const fmt = (n: number) => (n >= 1e6 ? (n / 1e6).toFixed(2) + "M" : n >= 1e3 ? (n / 1e3).toFixed(1) + "k" : String(Math.round(n)));
         show(s1, "hive tokens", `${fmt(d.meter.total.tokens)}`, [`${Math.round(d.meter.total.tokPerSec)} tok/s`, `${d.meter.total.calls} tool calls`], d.meter.total.tokPerSec > 0.5);
-        show(s2, "queen", live ? "working" : "idle", live ? [doing || "thinking…"] : ["say something below"], live);
+        show(s2, getQueenName().name, live ? "working" : "idle", live ? [doing || "thinking…"] : ["say something below"], live);
         show(s3, "orders out", String(run.length), run.slice(0, 5).map((t) => `${short(t.worker)}: ${t.prompt}`), run.length > 0);
         // Marks over whatever needs you, each tied to the one it is about.
         const needs = d.attention.filter((a) => a.level === "needs");

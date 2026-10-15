@@ -5,6 +5,7 @@ import type { Snap } from "../components/Reactor";
 import type { ChatMessage } from "../lib/types";
 import { Bee, Hive, LinkedAgent, elapsed, isToday, oneLine, short } from "./data";
 import { withoutCallNotes } from "../lib/format";
+import { queenNamed, useQueenName } from "../lib/queenName";
 
 /** A tick every second, for clocks that count up. */
 function useNow(ms = 1000) {
@@ -169,17 +170,19 @@ export function Queen({ messages }: { messages: ChatMessage[] }) {
   const shown = messages.filter((m) => m.kind !== "context");
   const you = [...shown].reverse().find((m) => m.role === "user");
   const her = shown.length && shown[shown.length - 1].role === "assistant" ? shown[shown.length - 1] : undefined;
-  if (!you) return <p className="cv-quiet">Orders you give below go to the queen; her answer shows here.</p>;
+  const q = useQueenName();
+  const name = queenNamed(q) ? q.name : "Queen";
+  if (!you) return <p className="cv-quiet">Orders you give below go to {queenNamed(q) ? q.name : "the queen"}; her answer shows here.</p>;
   return (
     <div className="cv-queen">
       <div className="cv-queen-you"><b>You</b>{withoutCallNotes(you.content)}</div>
       {her && (
         <div className="cv-queen-her">
-          <b>Queen</b>
+          <b>{name}</b>
           {her.content ? <Response>{withoutCallNotes(her.content)}</Response> : <span className="cv-quiet">…</span>}
         </div>
       )}
-      {!her && <div className="cv-queen-her"><b>Queen</b><span className="cv-quiet">Working on it…</span></div>}
+      {!her && <div className="cv-queen-her"><b>{name}</b><span className="cv-quiet">Working on it…</span></div>}
     </div>
   );
 }

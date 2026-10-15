@@ -421,6 +421,9 @@ func (a *App) GetSettings() backend.Settings {
 
 // SaveSettings persists new settings and rebuilds the Service.
 func (a *App) SaveSettings(s backend.Settings) error {
+	if err := backend.ValidateQueenName(s.QueenName, s.QueenAliases); err != nil {
+		return err
+	}
 	if err := s.Save(); err != nil {
 		return err
 	}
@@ -718,6 +721,8 @@ func (a *App) GetStatus() map[string]any {
 	if a.settings != nil {
 		st["avatarPort"] = a.settings.AvatarPort
 	}
+	st["queenName"] = a.settings.QueenDisplayName()
+	st["queenAliases"] = a.settings.QueenAliasList()
 	if a.svc != nil {
 		st["skills"] = a.svc.InstalledSkills()
 		st["memoryMode"] = a.svc.MemoryMode
@@ -814,7 +819,11 @@ func (a *App) SendChat(sessionID, message string, imagePaths []string) string {
 	// model never runs. Checked before the readiness gate below on purpose: an
 	// unconfigured LLM is no reason not to forward a question to a machine that
 	// has one.
-	if name, rest, ok := addressedTo(message, a.addressable); ok {
+	//
+	// The queen's own names come first: "@queen" or "@<her name>" is this
+	// app's turn even when a worker or an agent happens to share the name.
+	toQueen := a.addressedToQueen(message)
+	if name, rest, ok := addressedTo(message, a.addressable); ok && !toQueen {
 		if a.isDrivenCLI(name) {
 			a.routeToCLI(requestID, sessionID, name, rest)
 		} else {
@@ -846,7 +855,8 @@ func (a *App) SendChat(sessionID, message string, imagePaths []string) string {
 	// Asked again while the queen is still answering here: a free worker takes
 	// it (see busy_dispatch.go). Pictures stay with the queen; a worker is
 	// asked in words only.
-	if len(imagePaths) == 0 && a.sessionBusy(sessionID) {
+	// Addressed to her by name, it stays with her.
+	if len(imagePaths) == 0 && !toQueen && a.sessionBusy(sessionID) {
 		if w := a.idleWorker(); w != "" {
 			a.routeToIdleWorker(requestID, sessionID, w, message)
 			return requestID

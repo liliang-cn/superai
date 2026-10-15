@@ -264,6 +264,13 @@ type Settings struct {
 	// APNs is how this instance reaches Apple's push service, for the silent
 	// push that tells the iOS app its alarms changed. See PushSettings.
 	APNs APNsSettings `json:"apns,omitzero"`
+
+	// QueenName is what the person calls the queen, shown by every client and
+	// told to the model; QueenAliases are other names she answers to. Only
+	// what people see changes: the role, the agent and the RPCs stay "queen".
+	// See queen_name.go.
+	QueenName    string   `json:"queen_name,omitempty"`
+	QueenAliases []string `json:"queen_aliases,omitempty"`
 }
 
 // Defaults for APNsSettings: the developer team and the SuperAI iOS app.
@@ -530,6 +537,7 @@ func defaults() *Settings {
 		MemoryBackend:         MemoryBackendLocal,
 		SharedMemoryEndpoint:  envOr("CORTEXDB_REMOTE", ""),
 		SharedMemoryNamespace: "default",
+		QueenName:             DefaultQueenName,
 	}
 	return s
 }
@@ -541,6 +549,7 @@ func LoadSettings() (*Settings, error) {
 	s, err := loadSettingsFrom(settingsPath())
 	if s != nil {
 		s.mergeLinked(LoadLinkedSuperAIs())
+		s.mergeQueenIdentity()
 	}
 	return s, err
 }
@@ -656,6 +665,7 @@ func (s *Settings) backfill(def *Settings) {
 	// filling the list in costs nothing while Enabled stays false.
 	s.RemoteAgents.backfill()
 	s.RemoteAgents.normalize()
+	s.normalizeQueen()
 }
 
 // Save writes the settings to ~/.superai/settings.json (creating the
@@ -682,11 +692,15 @@ func (s *Settings) Save() error {
 	// blank roots is a file nobody can read to answer "where may it write".
 	s.ExternalAgents.normalize()
 	s.RemoteAgents.normalize()
+	s.normalizeQueen()
 	raw, err := json.MarshalIndent(s, "", "  ")
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(settingsPath(), raw, 0o644)
+	if err := os.WriteFile(settingsPath(), raw, 0o644); err != nil {
+		return err
+	}
+	return s.saveQueenIdentity()
 }
 
 // WebSearch returns the endpoint the built-in web_search tool should use,

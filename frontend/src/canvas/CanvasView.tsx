@@ -19,6 +19,8 @@ import "./canvas.css";
 import { Response } from "@/components/ai-elements/response";
 import { withoutCallNotes } from "../lib/format";
 import type { ChatMessage } from "../lib/types";
+import { queenRef, queenTitle, useQueenName } from "../lib/queenName";
+import { translate } from "../lib/i18n";
 
 type Kind = "inFlight" | "machines" | "today" | "bees" | "later" | "coding" | "queen" | "generated";
 interface Tile { id: string; kind: Kind; span: 2 | 3 | 4 | 6 }
@@ -70,6 +72,7 @@ export default function CanvasView({ approvals }: { approvals: { pending: ToolAp
   const navigate = useNavigate();
   const hive = useHive();
   const bees = useBees();
+  const queen = useQueenName();
   const pulse = usePulse();
   const upcoming = useUpcoming();
   const codingRuns = useCodingRuns();
@@ -229,7 +232,7 @@ export default function CanvasView({ approvals }: { approvals: { pending: ToolAp
         {wide ? (
           <div className="cv-split">
             <section className="cv-glass cv-convo">
-              <h2>The queen</h2>
+              <h2>{queenTitle(queen)}</h2>
               <Conversation messages={chat.messages} />
               <div className="cv-say inner">
                 <input
@@ -363,6 +366,7 @@ function useWide() {
 
 /** The whole conversation with the queen, newest at the bottom. */
 function Conversation({ messages }: { messages: ChatMessage[] }) {
+  const queen = useQueenName();
   const box = useRef<HTMLDivElement>(null);
   const inner = useRef<HTMLDivElement>(null);
   const pinned = useRef(true);
@@ -378,7 +382,7 @@ function Conversation({ messages }: { messages: ChatMessage[] }) {
     stick();
     return () => ro.disconnect();
   }, [shown.length]);
-  if (!shown.length) return <div className="cv-conv"><p className="cv-quiet cv-conv-empty">Orders you give below go to the queen; her answers show here.</p></div>;
+  if (!shown.length) return <div className="cv-conv"><p className="cv-quiet cv-conv-empty">{translate("Orders you give below go to {name}; her answers show here.", { name: queenRef(queen) })}</p></div>;
   return (
     <div className="cv-conv" ref={box} onScroll={(e) => { const el = e.currentTarget; pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60; }}>
       <div className="cv-conv-in" ref={inner}>

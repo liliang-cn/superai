@@ -8,6 +8,7 @@ import {
 } from "../../wailsjs/go/app/App";
 import { QUEEN_SESSION } from "../canvas/data";
 import { useI18n } from "../lib/i18n";
+import { queenNamed, queenRef, useQueenName } from "../lib/queenName";
 import { toast } from "../lib/toasts";
 import { PATHS, attentionPath, taskPath } from "../lib/routes";
 import { focusInWorld } from "./bus";
@@ -37,6 +38,7 @@ export default function Inspector({ picked, data, onClose, open, openDash }: {
   openDash?: (id: string) => void;
 }) {
   const { t, language, setLanguage } = useI18n();
+  const queen = useQueenName();
   const [busy, setBusy] = useState("");
   const [text, setText] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -66,10 +68,10 @@ export default function Inspector({ picked, data, onClose, open, openDash }: {
   switch (picked.kind) {
     case "hall": {
       const tt = data.meter.total;
-      kind = "Queen";
+      kind = queenNamed(queen) ? queen.name : "Queen";
       rows.push(["State", data.busy || tt.live ? "Working" : "Idle"], ["Hive tokens", fmt(tt.tokens)], ["Tool calls", String(tt.calls)],
         ["Orders out", String(data.hive.tasks.filter((x) => x.state === "running").length)]);
-      body = <Talk who={{ kind: "queen" }} placeholder="Talk to the queen…" />;
+      body = <Talk who={{ kind: "queen" }} placeholder={t("Talk to {name}…", { name: queenRef(queen) })} />;
       break;
     }
     case "worker": {

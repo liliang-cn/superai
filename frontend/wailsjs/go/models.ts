@@ -2086,6 +2086,8 @@ export namespace backend {
 	    remote_agents: RemoteAgents;
 	    action_mcp_servers?: string[];
 	    apns: APNsSettings;
+	    queen_name?: string;
+	    queen_aliases?: string[];
 	
 	    static createFrom(source: any = {}) {
 	        return new Settings(source);
@@ -2139,6 +2141,8 @@ export namespace backend {
 	        this.remote_agents = this.convertValues(source["remote_agents"], RemoteAgents);
 	        this.action_mcp_servers = source["action_mcp_servers"];
 	        this.apns = this.convertValues(source["apns"], APNsSettings);
+	        this.queen_name = source["queen_name"];
+	        this.queen_aliases = source["queen_aliases"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

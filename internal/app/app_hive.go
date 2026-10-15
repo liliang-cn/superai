@@ -164,6 +164,8 @@ func (a *App) HiveStatus() map[string]any {
 		"protocol": backend.HiveProtocol, "role": "", "name": "",
 		"members": []backend.HiveMember{}, "tasks": a.tasks().Recent(), "messages": a.mailbox().Take(true, 20),
 	}
+	// What the person calls the queen, for every client to show.
+	out["queen_name"], out["queen_aliases"] = s.QueenDisplayName(), s.QueenAliasList()
 	if s == nil {
 		return out
 	}

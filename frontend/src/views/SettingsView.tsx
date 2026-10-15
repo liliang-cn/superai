@@ -24,6 +24,7 @@ import {
 import { BrowserOpenURL, EventsOff, EventsOn } from "../../wailsjs/runtime/runtime";
 import { app, backend } from "../../wailsjs/go/models";
 import { toast } from "../lib/toasts";
+import { DEFAULT_QUEEN, setQueenName } from "../lib/queenName";
 
 type ProxyStatus = {
   running: boolean;
@@ -140,6 +141,40 @@ function TextField({
       <label>{translate(label)}</label>
       <input className="input" aria-label={translate(label)} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} autoComplete="off" />
       {hint && <span className="hint">{hint}</span>}
+    </div>
+  );
+}
+
+/**
+ * The queen's name and aliases. Display and address only: the role and the
+ * agent stay "queen". Aliases are typed as one comma-separated line, so the
+ * text is kept as typed and split on the way into the settings.
+ */
+function QueenNameCard({ name, aliases, onChange, hidden }: {
+  hidden: boolean;
+  name: string;
+  aliases: string[];
+  onChange: (name: string, aliases: string[]) => void;
+}) {
+  const [text, setText] = useState(aliases.join(", "));
+  useEffect(() => {
+    const parsed = text.split(/[,，\s]+/).filter(Boolean);
+    if (parsed.join() !== aliases.join()) setText(aliases.join(", "));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aliases.join()]);
+  return (
+    <div className="card" hidden={hidden}>
+      <div className="card-title">{translate("Queen's name")}</div>
+      <div className="card-desc">
+        {translate("What the hive's main agent is called here, on the phone and in its own replies. @ with the name or an alias reaches it, never a worker.")}
+      </div>
+      <TextField label="Name" value={name} placeholder={DEFAULT_QUEEN} onChange={(v) => onChange(v, aliases)} />
+      <div className="field">
+        <label>{translate("Also answers to")}</label>
+        <input className="input" aria-label={translate("Also answers to")} value={text} autoComplete="off"
+          placeholder={translate("Comma-separated, e.g. bee, 小蜂")}
+          onChange={(e) => { setText(e.target.value); onChange(name, e.target.value.split(/[,，\s]+/).filter(Boolean)); }} />
+      </div>
     </div>
   );
 }
@@ -735,6 +770,7 @@ export default function SettingsView({
     setSaving(true);
     try {
       await SaveSettings(s);
+      setQueenName(s.queen_name, s.queen_aliases);
       toast.success("Saved. Backend rebuilt.");
       refreshProxy();
       // The gate is rebuilt with the service, so what it reports is only true
@@ -786,6 +822,12 @@ export default function SettingsView({
       </div>
       <div className="settings-scroll">
         <div className="settings-grid">
+          <QueenNameCard
+              hidden={section !== "model"}
+              name={s.queen_name === DEFAULT_QUEEN ? "" : s.queen_name ?? ""}
+              aliases={s.queen_aliases ?? []}
+              onChange={(name, aliases) => setS((prev) => (prev ? Object.assign(new backend.Settings(prev), { queen_name: name, queen_aliases: aliases }) : prev))}
+            />
           <div className="card" hidden={section !== "model"}>
             <div className="card-title">{translate("Accounts")}</div>
             <div className="card-desc">

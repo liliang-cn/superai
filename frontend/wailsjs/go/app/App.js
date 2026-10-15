@@ -186,6 +186,14 @@ export function HiveSpawn(arg1) {
   return window['go']['app']['App']['HiveSpawn'](arg1);
 }
 
+export function QueenIdentity() {
+  return window['go']['app']['App']['QueenIdentity']();
+}
+
+export function SetQueenIdentity(arg1, arg2) {
+  return window['go']['app']['App']['SetQueenIdentity'](arg1, arg2);
+}
+
 export function HiveStatus() {
   return window['go']['app']['App']['HiveStatus']();
 }

@@ -8,6 +8,7 @@ import { focusInWorld } from "./bus";
 import { EventsOn } from "../../wailsjs/runtime";
 import { QUEEN_SESSION } from "../canvas/data";
 import { useI18n } from "../lib/i18n";
+import { queenRef, queenTitle, useQueenName } from "../lib/queenName";
 import { toast } from "../lib/toasts";
 import { useImeGuard } from "../lib/ime";
 import type { ViewKey } from "../lib/types";
@@ -39,6 +40,7 @@ export default function Command({ view, onConversation, onTyping }: {
   onTyping?: (kind: string, id: string) => void;
 }) {
   const { t } = useI18n();
+  const queen = useQueenName();
   const ime = useImeGuard();
   const [text, setText] = useState("");
   const [req, setReq] = useState("");
@@ -121,7 +123,7 @@ export default function Command({ view, onConversation, onTyping }: {
       {open && (lines.length > 0 || req) && (
         <div className="wc-thread">
           <header>
-            <span className="wc-q">Q</span><b>{t("The queen")}</b>
+            <span className="wc-q">Q</span><b>{queenTitle(queen)}</b>
             <button title={t("Open the whole conversation")} onClick={onConversation}><MessageSquareIcon size={14} /></button>
             <button title={t("Fold")} onClick={() => setOpen(false)}><ChevronDownIcon size={15} /></button>
           </header>
@@ -152,7 +154,7 @@ export default function Command({ view, onConversation, onTyping }: {
         <form className="wc-say" onSubmit={(e) => { e.preventDefault(); void send(); }}>
           <span className="wc-prompt">›</span>
           <input ref={box} value={text} onChange={(e) => setText(e.target.value)} 
-            placeholder={t(lines.length ? "Reply to the queen… @ for a worker or an agent" : "Tell the queen, from anywhere. @ for a worker or an agent")}
+            placeholder={t(lines.length ? "Reply to {name}… @ for a worker or an agent" : "Tell {name}, from anywhere. @ for a worker or an agent", { name: queenRef(queen) })}
             onCompositionStart={ime.handlers.onCompositionStart} onCompositionEnd={ime.handlers.onCompositionEnd}
             onKeyDown={(e) => { if (e.key === "Enter" && ime.composing(e)) e.preventDefault(); }} />
           <button type="submit" disabled={!text.trim() || !!req} title={t("Send")}><ArrowUpIcon size={16} /></button>
