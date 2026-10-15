@@ -79,6 +79,11 @@ type Notice struct {
 	Deeplink string `json:"deeplink,omitempty"`
 	// Actions are buttons on it; each says something to the agent when tapped.
 	Actions []NoticeAction `json:"actions,omitempty"`
+	// Reply, when set, is where an answer typed on the notice goes: a coding
+	// session on a linked agent (a Claude Code turn that finished in a
+	// terminal). It is an address, not a route — ReplyToCCSession delivers to
+	// exactly that session and nowhere else.
+	Reply *NoticeReply `json:"reply,omitempty"`
 	// External marks a notice that came from outside (PostNotification). The
 	// sender already has its own channels — openclaw posts to the same
 	// Telegram chat the webhook relays to — so the webhook skips it, or every
@@ -91,6 +96,13 @@ type Notice struct {
 type NoticeAction struct {
 	Label string `json:"label"`
 	Say   string `json:"say"`
+}
+
+// NoticeReply addresses one coding session: the agent (linked machine) it
+// runs on, empty for this one, and the session's own id.
+type NoticeReply struct {
+	Agent   string `json:"agent"`
+	Session string `json:"session"`
 }
 
 // Notice kinds, as integrations post them.
@@ -242,6 +254,9 @@ func uiSink(emit func(name string, payload map[string]any)) Subscriber {
 		}
 		if len(n.Actions) > 0 {
 			payload["actions"] = n.Actions
+		}
+		if n.Reply != nil {
+			payload["reply"] = n.Reply
 		}
 		emit(NoticeEvent, payload)
 	}

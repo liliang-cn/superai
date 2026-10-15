@@ -47,6 +47,9 @@ var agentCallable = map[string]bool{
 	"CLIRuns": true, "CLIRunDetail": true,
 	"ExternalAgentsStatus": true, "RemoteAgentNames": true, "AskRemoteAgent": true,
 	"PendingToolApprovals": true, "ResolveToolApproval": true, "ToolApprovalInfo": true,
+	// An answer from the phone for one of this machine's terminal Claude Code
+	// sessions (cchook_local.go).
+	"ReplyToSession": true,
 }
 
 // agentQuiet are events too frequent to be worth the line.

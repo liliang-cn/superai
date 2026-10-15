@@ -242,3 +242,31 @@ func TestUnreadIncludingCountsTheNewNoticeOnce(t *testing.T) {
 		t.Errorf("after it is filed: %d, want 2", got)
 	}
 }
+
+// A coding session's notices collapse on its key and keep the address an
+// answer typed on them goes to.
+func TestASessionsNoticeCollapsesAndKeepsItsReplyTarget(t *testing.T) {
+	b := testInbox(t)
+	target := &NoticeReply{Agent: "mac", Session: "s-1"}
+	raise(b, Notice{Key: "cc:s-1", Title: "claude · mac · superai", Message: "first turn", Reply: target, At: "2026-10-15T10:00:00+08:00"})
+	raise(b, Notice{Key: "cc:s-1", Title: "claude · mac · superai", Message: "second turn", Reply: target, At: "2026-10-15T10:05:00+08:00"})
+	raise(b, Notice{Key: "cc:s-2", Title: "claude · mac · anywhere", Message: "other", Reply: &NoticeReply{Agent: "mac", Session: "s-2"}})
+	got := b.List(0)
+	if len(got) != 2 {
+		t.Fatalf("want one entry per session, got %+v", got)
+	}
+	byID := map[string]Notification{}
+	for _, n := range got {
+		byID[n.ID] = n
+	}
+	n := byID["cc:s-1"]
+	if n.Message != "second turn" || n.Reply == nil || *n.Reply != *target {
+		t.Errorf("collapsed entry %+v", n)
+	}
+	raise(b, Notice{Message: "plain"})
+	for _, n := range b.List(0) {
+		if n.Message == "plain" && n.Reply != nil {
+			t.Errorf("plain notice grew a reply target %+v", n)
+		}
+	}
+}

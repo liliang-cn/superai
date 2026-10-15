@@ -87,6 +87,7 @@ func AgentMain(argv []string) {
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
+	go app.serveCCHookSocket(ctx)
 	app.RunAgentLink(ctx, o)
 	fmt.Fprintln(os.Stderr, "superai-agent: stopped")
 }
