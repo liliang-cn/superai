@@ -290,7 +290,7 @@ func NewService(s *Settings) (*Service, error) {
 	_, notedMissing, _, notedConfigured := findMCPServer(MCPConfigSources(), NotedServer, os.LookupEnv)
 	notedConfigured = notedConfigured && len(notedMissing) == 0
 	b := agent.New("SuperAI").
-		WithPrompt(buildPersona(time.Now(), !s.DisableSelfInstall, s.ExternalAgents.Enabled) + hiveSection(s.Hive) + queenNameSection(s) + notedSection(notedConfigured) + uiRulesSection()).
+		WithPrompt(buildPersona(time.Now(), !s.DisableSelfInstall, s.ExternalAgents.Enabled) + hiveSection(s.Hive) + queenNameSection(s) + homeLayoutSection(s.Hive) + notedSection(notedConfigured) + uiRulesSection()).
 		WithConfig(cfg).
 		WithLLM(brain).
 		WithSandbox(sb).
