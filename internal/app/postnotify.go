@@ -309,7 +309,10 @@ type noticePush struct {
 }
 
 // apnsNoticeSink is the subscriber that puts pushed notices on the phones.
-func (a *App) apnsNoticeSink() backend.Subscriber {
+func (a *App) apnsNoticeSink() backend.Subscriber { return a.phonePush().sink() }
+
+// phonePush is the parts that put an alert on the paired phones.
+func (a *App) phonePush() noticePush {
 	return noticePush{
 		pusher: func() noticePusher {
 			// The same client the alarm pushes use; nil (with its one log
@@ -319,7 +322,7 @@ func (a *App) apnsNoticeSink() backend.Subscriber {
 		},
 		devices: func() (*deviceStore, error) { return openDevices(devicesPath()) },
 		unread:  func(id string) int { return a.inbox().UnreadIncluding(id) },
-	}.sink()
+	}
 }
 
 func (np noticePush) sink() backend.Subscriber {
@@ -338,6 +341,16 @@ func (np noticePush) send(ctx context.Context, n backend.Notice) {
 	if np.done != nil {
 		defer np.done()
 	}
+	alert, ok := alertFor(n)
+	if !ok {
+		return
+	}
+	np.deliver(ctx, alert, true)
+}
+
+// deliver sends one alert to every phone with a push token, with the unread
+// badge when badge is set.
+func (np noticePush) deliver(ctx context.Context, alert apns.Alert, badge bool) {
 	store, err := np.devices()
 	if err != nil {
 		log.Printf("notifications: no devices to push to: %v", err)
@@ -352,16 +365,12 @@ func (np noticePush) send(ctx context.Context, n backend.Notice) {
 	if p == nil {
 		return
 	}
-	alert, ok := alertFor(n)
-	if !ok {
-		return
-	}
 	// The icon's number, so it is right while the app is closed. Counted
 	// with this notice in, whether or not the centre has filed it yet.
-	if np.unread != nil {
+	if badge && np.unread != nil {
 		id, _ := alert.Data.(map[string]any)["id"].(string)
-		badge := np.unread(id)
-		alert.Badge = &badge
+		n := np.unread(id)
+		alert.Badge = &n
 	}
 	pushToDevices(ctx, store, "notifications", func(ctx context.Context, t pushTarget) error {
 		return p.Alert(ctx, t.Token, t.Env, alert)
@@ -400,6 +409,12 @@ func alertFor(n backend.Notice) (apns.Alert, bool) {
 	if n.Deeplink != "" {
 		data["deeplink"] = n.Deeplink
 	}
+	category := ""
+	if n.Reply != nil && strings.TrimSpace(n.Reply.Session) != "" {
+		// A terminal turn: answered from the lock screen, to that session.
+		category = ccReplyCategory
+		data["reply"] = map[string]any{"agent": n.Reply.Agent, "session": n.Reply.Session}
+	}
 	a := apns.Alert{
 		Title:             title,
 		Body:              body,
@@ -408,6 +423,7 @@ func alertFor(n backend.Notice) (apns.Alert, bool) {
 		Priority:          10,
 		CollapseID:        n.Key,
 		Data:              data,
+		Category:          category,
 	}
 	switch kind {
 	case backend.KindReminder, backend.KindAlert:

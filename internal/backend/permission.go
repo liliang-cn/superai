@@ -87,6 +87,15 @@ type ApprovalRequest struct {
 	// MustAsk: a session rule insists on asking; neither YOLO nor a
 	// remembered rule may answer it.
 	MustAsk bool `json:"-"`
+	// Origin is "terminal" for a Claude Code permission prompt in a
+	// terminal session on a linked machine; empty for everything else.
+	Origin string `json:"origin,omitempty"`
+	// Project and Summary are a terminal prompt's working directory's name
+	// and what the call does in one line; CCSession is that Claude Code
+	// session's id.
+	Project   string `json:"project,omitempty"`
+	Summary   string `json:"summary,omitempty"`
+	CCSession string `json:"ccSession,omitempty"`
 }
 
 // ApprovalDecision is an answer to an ApprovalRequest.

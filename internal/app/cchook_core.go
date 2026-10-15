@@ -48,6 +48,8 @@ type ccCore struct {
 	mu       sync.Mutex
 	sessions map[string]*CCSession // agent + "\x00" + session
 	raised   map[string]string     // same key -> the event last raised as a notice
+	perms    map[string]*ccPerm    // agent + "\x00" + request -> a card up for it
+	asked    map[string]time.Time  // agent + "\x00" + session -> when a card was last up for it
 }
 
 var (
@@ -57,7 +59,8 @@ var (
 
 func ccCoreState() *ccCore {
 	ccCoreOnce.Do(func() {
-		ccCoreV = &ccCore{sessions: map[string]*CCSession{}, raised: map[string]string{}}
+		ccCoreV = &ccCore{sessions: map[string]*CCSession{}, raised: map[string]string{},
+			perms: map[string]*ccPerm{}, asked: map[string]time.Time{}}
 	})
 	return ccCoreV
 }
@@ -88,6 +91,7 @@ func (c *ccCore) note(agent string, r ccReport, now time.Time) (prevText, lastRa
 	if r.Event == "SessionEnd" {
 		delete(c.sessions, k)
 		delete(c.raised, k)
+		delete(c.asked, k)
 		return prevText, lastRaised
 	}
 	s.At = now
@@ -115,6 +119,8 @@ func (c *ccCore) note(agent string, r ccReport, now time.Time) (prevText, lastRa
 		if r.Kind == "permission_prompt" {
 			s.State = ccPermission
 		}
+	case "PermissionRequest":
+		s.State = ccPermission
 	}
 	return prevText, lastRaised
 }
@@ -167,16 +173,9 @@ func ccNotice(agent string, r ccReport, prevText string, now time.Time) backend.
 	if machine == "" {
 		machine = r.Host
 	}
-	parts := []string{"claude"}
-	if machine != "" {
-		parts = append(parts, machine)
-	}
-	if p := projectName(r.Cwd); p != "" {
-		parts = append(parts, p)
-	}
 	n := backend.Notice{
 		Level:    backend.LevelInfo,
-		Title:    strings.Join(parts, " · "),
+		Title:    ccTitle(machine, r.Cwd),
 		Source:   "claude-code",
 		Key:      "cc:" + r.Session,
 		Kind:     backend.KindInfo, // not a brief: the home card for the day's brief is not where a terminal turn goes
@@ -217,7 +216,19 @@ func (a *App) noteCCSession(agent, payloadJSON string) {
 	}
 	now := time.Now()
 	cc := ccCoreState()
+	switch r.Event {
+	case "PermissionClosed":
+		cc.withdrawPerm(agent, r.Request)
+		return
+	case "PermissionRequest":
+		cc.note(agent, r, now)
+		go a.askCCPermissionCore(agent, r) // it waits for a person; the link must not
+		return
+	}
 	prev, last := cc.note(agent, r, now)
+	if r.Event == "Notification" && r.Kind == "permission_prompt" && cc.permAsking(agent, r.Session, now) {
+		return // the approval card for this prompt is already on the phone
+	}
 	if !ccShouldNotify(r, a.Presence().Away, last) {
 		return
 	}

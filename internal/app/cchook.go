@@ -11,6 +11,11 @@ package app
 // hands the reply back as the next instruction). Anything else would either
 // stall the person at the keyboard or put words in the agent's mouth.
 //
+// PermissionRequest is the one exception to the budget (cchook_perm.go): when
+// nobody is at the Mac it waits, up to its own bound, for an allow or deny
+// from the phone, and prints that decision. It prints nothing — leaving the
+// terminal's own dialog — on a timeout, an error, or a person at the desk.
+//
 // The hook itself only parses and forwards. Everything with state — which
 // sessions exist, where their terminals are, whether anyone is at the Mac,
 // what is parked for whom — lives in the running `superai serve` / `superai
@@ -45,15 +50,22 @@ const ccHookSocketName = "cc-hook.sock"
 // ccHookEvent is one Claude Code hook event, distilled: what the hook sends
 // to the local SuperAI.
 type ccHookEvent struct {
-	Event   string `json:"event"`             // Stop | StopFailure | Notification | SessionStart | SessionEnd
+	Event   string `json:"event"`             // Stop | StopFailure | Notification | SessionStart | SessionEnd | PermissionRequest | PermissionClosed
 	Session string `json:"session"`           // Claude Code's session id
 	Cwd     string `json:"cwd,omitempty"`     // where it runs
 	Kind    string `json:"kind,omitempty"`    // Notification: permission_prompt | idle_prompt; StopFailure: the error
-	Text    string `json:"text,omitempty"`    // Stop: the turn's text; Notification: its message; StopFailure: what was said
+	Text    string `json:"text,omitempty"`    // Stop: the turn's text; Notification: its message; StopFailure: what was said; PermissionRequest: what the call does, in one line
 	Source  string `json:"source,omitempty"`  // SessionStart: startup | resume | clear | compact; SessionEnd: the reason
 	TTY     string `json:"tty,omitempty"`     // the agent's controlling terminal, /dev/ttys003
 	Pane    string `json:"pane,omitempty"`    // $TMUX_PANE when it runs in tmux
 	Resumed bool   `json:"resumed,omitempty"` // set by the receiver: a parked reply was handed back, the turn goes on
+
+	// PermissionRequest only.
+	Tool    string `json:"tool,omitempty"`    // the tool Claude wants to use
+	Input   string `json:"input,omitempty"`   // its arguments, as JSON text
+	Wait    int    `json:"wait,omitempty"`    // seconds the hook will wait for an answer
+	Request string `json:"request,omitempty"` // set by the receiver: names this one request on its way to core and back
+	Expires string `json:"expires,omitempty"` // set by the receiver: RFC 3339, when the hook stops waiting
 }
 
 // ccNotificationKinds are the Notification hooks worth forwarding: Claude is
@@ -107,11 +119,53 @@ func ccEventFromHook(name string, hev hooks.HookEvent, readTurn func(path string
 		}
 	case "SessionEnd":
 		ev.Source = str("reason")
+	case "PermissionRequest":
+		ev.Tool = strings.TrimSpace(hev.ToolName)
+		if ev.Tool == "" {
+			return ccHookEvent{}, false
+		}
+		if len(hev.ToolInput) > 0 {
+			if raw, err := json.Marshal(hev.ToolInput); err == nil && len(raw) <= maxCCInput {
+				ev.Input = string(raw)
+			}
+		}
+		ev.Text = ccToolSummary(ev.Tool, hev.ToolInput)
 	default:
 		return ccHookEvent{}, false
 	}
 	ev.Text = clipFront(ev.Text, maxCCText)
 	return ev, true
+}
+
+// maxCCInput bounds a permission request's arguments. A bigger one (a Write
+// of a whole file) goes without them: the summary still says what it is.
+const maxCCInput = 32 << 10
+
+// ccToolSummary says in one line what a tool call does: the command, the
+// file, the URL, else its arguments.
+func ccToolSummary(tool string, input map[string]any) string {
+	pick := func(keys ...string) string {
+		for _, k := range keys {
+			if s, ok := input[k].(string); ok && strings.TrimSpace(s) != "" {
+				return strings.TrimSpace(s)
+			}
+		}
+		return ""
+	}
+	s := pick("command", "file_path", "notebook_path", "url", "pattern", "query", "path", "prompt", "description")
+	if s == "" && len(input) > 0 {
+		if raw, err := json.Marshal(input); err == nil {
+			s = string(raw)
+		}
+	}
+	if s == "" {
+		return tool
+	}
+	r := []rune(s)
+	if len(r) > 300 {
+		s = string(r[:299]) + "…"
+	}
+	return s
 }
 
 // clipFront keeps the last max runes of s, marking the cut.
@@ -135,13 +189,17 @@ func HookMain(argv []string) {
 	if len(argv) > 0 {
 		name = argv[0]
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), hookBudget)
-	defer cancel()
-
 	hev, err := hooks.ParsePayload(io.LimitReader(os.Stdin, 8<<20))
 	if err != nil {
 		return
 	}
+	if name == "PermissionRequest" || (name == "" && hev.EventName == "PermissionRequest") {
+		permissionHook(argv, hev)
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), hookBudget)
+	defer cancel()
+
 	ev, ok := ccEventFromHook(name, hev, transcriptTurn(ctx))
 	if !ok {
 		return
@@ -222,35 +280,44 @@ func ccHookSockets() []string {
 // sendCCHook hands the event to the first socket that answers and returns
 // the reply parked for this session, if any.
 func sendCCHook(ctx context.Context, sockets []string, ev ccHookEvent) string {
+	var out struct {
+		Reply string `json:"reply"`
+	}
+	postCCHook(ctx, sockets, ccHookPath, ev, &out)
+	return out.Reply
+}
+
+// postCCHook posts the event to path on the first socket that answers and
+// decodes its answer into out. False when none did.
+func postCCHook(ctx context.Context, sockets []string, path string, ev ccHookEvent, out any) bool {
 	body, err := json.Marshal(ev)
 	if err != nil {
-		return ""
+		return false
 	}
 	for _, sock := range sockets {
 		if _, err := os.Stat(sock); err != nil {
 			continue
 		}
 		client := ccHookClient(sock)
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://superai"+ccHookPath, bytes.NewReader(body))
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://superai"+path, bytes.NewReader(body))
 		if err != nil {
-			return ""
+			return false
 		}
 		req.Header.Set("Content-Type", "application/json")
 		resp, err := client.Do(req)
 		if err != nil {
 			if ctx.Err() != nil {
-				return ""
+				return false
 			}
 			continue // a stale socket from a process that is gone
 		}
-		var out struct {
-			Reply string `json:"reply"`
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return false
 		}
-		_ = json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&out)
-		resp.Body.Close()
-		return out.Reply
+		return json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(out) == nil
 	}
-	return ""
+	return false
 }
 
 func ccHookClient(sock string) *http.Client {

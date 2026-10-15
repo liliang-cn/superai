@@ -353,3 +353,25 @@ func TestAZeroBadgeIsSent(t *testing.T) {
 		t.Errorf("payload %s", body)
 	}
 }
+
+func TestACategoryGetsTheAppsButtons(t *testing.T) {
+	var body []byte
+	c, _ := testClient(t, func(w http.ResponseWriter, r *http.Request) { body, _ = io.ReadAll(r.Body) })
+	if err := c.Alert(context.Background(), "abcd", "", Alert{Title: "t", Body: "b", Category: "superai.cc.reply"}); err != nil {
+		t.Fatal(err)
+	}
+	var p struct {
+		APS map[string]any `json:"aps"`
+	}
+	if err := json.Unmarshal(body, &p); err != nil || p.APS["category"] != "superai.cc.reply" {
+		t.Fatalf("aps %v (%v)", p.APS, err)
+	}
+	if err := c.Alert(context.Background(), "abcd", "", Alert{Title: "t", Body: "b"}); err != nil {
+		t.Fatal(err)
+	}
+	p.APS = nil
+	_ = json.Unmarshal(body, &p)
+	if _, ok := p.APS["category"]; ok {
+		t.Errorf("a plain alert has a category: %v", p.APS)
+	}
+}

@@ -50,6 +50,9 @@ var agentCallable = map[string]bool{
 	// An answer from the phone for one of this machine's terminal Claude Code
 	// sessions (cchook_local.go).
 	"ReplyToSession": true,
+	// Core's word on a terminal permission prompt this machine is holding
+	// (cchook_perm.go): pass, asking, allow or deny.
+	"AnswerCCPermission": true,
 }
 
 // agentQuiet are events too frequent to be worth the line.

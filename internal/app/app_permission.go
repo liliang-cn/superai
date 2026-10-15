@@ -105,6 +105,18 @@ func approvalPayload(req backend.ApprovalRequest) map[string]any {
 	if req.Machine != "" {
 		out["machine"] = req.Machine
 	}
+	if req.Workdir != "" {
+		out["workdir"] = req.Workdir
+	}
+	if req.Origin != "" {
+		// A terminal session's prompt: where, and what, at a glance. It is
+		// asked about every time, so no rule is offered for it.
+		out["origin"] = req.Origin
+		out["project"] = req.Project
+		out["summary"] = req.Summary
+		out["ccSession"] = req.CCSession
+		return out
+	}
 	// What "以后同类不用问我" could mean for this call, narrowest first; the
 	// answer names one by its scope (ResolveToolApprovalRemember).
 	if sug := backend.SuggestApprovalRules(req); len(sug) > 0 {
@@ -229,7 +241,12 @@ func (a *App) StartYoloMode() map[string]any {
 	// for a click that YOLO has made meaningless.
 	a.approvalMu.Lock()
 	pending := make([]string, 0, len(a.approvals))
-	for id := range a.approvals {
+	for id, p := range a.approvals {
+		// A call that must be asked about (a terminal's permission prompt)
+		// is not answered by switching YOLO on; its card stays.
+		if p.req.MustAsk {
+			continue
+		}
 		pending = append(pending, id)
 	}
 	a.approvalMu.Unlock()

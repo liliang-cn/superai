@@ -202,6 +202,10 @@ type Alert struct {
 	Badge *int
 	// Data goes under the "superai" key, for the app to act on when tapped.
 	Data any
+	// Category names the notification category the app registered for this
+	// kind of notification: the buttons and the text field it gets on the
+	// lock screen.
+	Category string
 }
 
 // Alert sends one device a visible notification. env is as for Wake.
@@ -222,6 +226,9 @@ func (c *Client) Alert(ctx context.Context, deviceToken, env string, a Alert) er
 	}
 	if a.InterruptionLevel != "" {
 		aps["interruption-level"] = a.InterruptionLevel
+	}
+	if a.Category != "" {
+		aps["category"] = a.Category
 	}
 	body := map[string]any{"aps": aps}
 	if a.Data != nil {

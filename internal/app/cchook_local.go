@@ -85,11 +85,16 @@ type ccLocal struct {
 	typeITerm func(ctx context.Context, tty, text string) error
 	ottyPane  func(ctx context.Context, sessionID string) string
 	typeOtty  func(ctx context.Context, pane, text string) error
+
+	// perms are the permission requests held for core's word, by request id
+	// (cchook_perm.go).
+	perms map[string]chan ccPermVerdict
 }
 
 func newCCLocal() *ccLocal {
 	return &ccLocal{
 		sessions:  map[string]*ccLocalSession{},
+		perms:     map[string]chan ccPermVerdict{},
 		queue:     replies.New(),
 		liveTTYs:  reach.AgentTTYs,
 		paneAlive: func(p string) bool { _, err := tmux.SessionForPane(p); return err == nil },
@@ -162,6 +167,8 @@ func (l *ccLocal) observe(ev *ccHookEvent, now time.Time) string {
 		} else {
 			s.State = ccWaiting
 		}
+	case "PermissionRequest":
+		s.State = ccPermission
 	}
 	// Ended sessions are kept a while so a late answer gets a clear "it
 	// ended" rather than "never heard of it", then forgotten.
@@ -365,6 +372,7 @@ func (a *App) serveCCHookSocket(ctx context.Context) {
 	_ = os.Chmod(path, 0o600)
 	mux := http.NewServeMux()
 	mux.HandleFunc(ccHookPath, a.handleCCHook)
+	mux.HandleFunc(ccPermissionPath, a.handleCCPermission)
 	srv := &http.Server{Handler: mux, ReadHeaderTimeout: 5 * time.Second}
 	go func() {
 		<-ctx.Done()
