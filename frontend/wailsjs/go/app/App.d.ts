@@ -98,6 +98,10 @@ export function HiveRetire(arg1:number,arg2:boolean):Promise<Record<string, any>
 
 export function HiveSpawn(arg1:number):Promise<Record<string, any>>;
 
+export function QueenIdentity():Promise<Record<string, any>>;
+
+export function SetQueenIdentity(arg1:string,arg2:Array<string>):Promise<Record<string, any>>;
+
 export function HiveStatus():Promise<Record<string, any>>;
 
 export function HiveTaskDetail(arg1:string):Promise<Record<string, any>>;

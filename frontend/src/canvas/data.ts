@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { EventsOn } from "../../wailsjs/runtime";
 import { CLIRuns, HiveStatus, LinkedAgents, StandingAgents, Upcoming } from "../../wailsjs/go/app/App";
 import type { CodingRun, UpcomingItem } from "./tiles";
+import { setQueenName } from "../lib/queenName";
 
 export interface HiveMember {
   name: string;
@@ -43,6 +44,7 @@ export function useHive(): Hive {
       try {
         const s = (await HiveStatus()) as any;
         if (!alive) return;
+        setQueenName(s.queen_name, s.queen_aliases);
         setHive((cur) => ({
           loaded: true,
           role: s.role ?? "",

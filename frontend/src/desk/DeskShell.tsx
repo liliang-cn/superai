@@ -12,6 +12,7 @@ import { PATHS } from "../lib/routes";
 import { AppStatus, ViewKey } from "../lib/types";
 import { SetWindowTheme } from "../../wailsjs/go/app/App";
 import { useI18n } from "../lib/i18n";
+import { queenTitle, useQueenName } from "../lib/queenName";
 import NotificationCenter from "../components/NotificationCenter";
 import BackendSwitcher from "./BackendSwitcher";
 import ThemePanel from "../canvas/ThemePanel";
@@ -64,6 +65,7 @@ export const TITLES: Record<ViewKey, string> = {
  */
 export default function DeskShell({ view, badges, children, onOpenConversation, status, loading }: { view: ViewKey; badges?: Partial<Record<ViewKey, number>>; children: React.ReactNode; onOpenConversation?: (session: string) => void; status:AppStatus|null; loading:boolean }) {
   const { t } = useI18n();
+  const queen = useQueenName();
   const navigate = useNavigate();
   const [theme, setThemeState] = useState<CanvasTheme>(loadTheme);
   const setTheme = (t: CanvasTheme) => { setThemeState(t); saveTheme(t); };
@@ -136,7 +138,7 @@ export default function DeskShell({ view, badges, children, onOpenConversation, 
         </div>
         <nav className="dk-rail" style={drag}>
           {RAIL.map(({ key, label, Icon, cls }) => (
-            <button key={key} title={t(label)} style={noDrag} className={`dk-app ${cls} ${view === key || (key === "skills" && view === "mcp") || (key === "home" && view === "chat") ? "on" : ""}`}
+            <button key={key} title={key === "home" ? queenTitle(queen) : t(label)} style={noDrag} className={`dk-app ${cls} ${view === key || (key === "skills" && view === "mcp") || (key === "home" && view === "chat") ? "on" : ""}`}
               onClick={() => navigate(PATHS[key])}>
               <Icon size={21} strokeWidth={2} />
               {count(key) > 0 && <span className="dk-badge">{count(key)}</span>}
