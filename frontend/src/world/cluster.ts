@@ -9,6 +9,8 @@ import type { Bee, Hive, LinkedAgent } from "../canvas/data";
 import type { CodingRun } from "../canvas/tiles";
 import type { AttentionItem } from "../canvas/attention";
 import type { Member } from "../components/HiveMeter";
+import { translate } from "../lib/i18n";
+import { boardLine, touchesNoted, type AgendaEntry } from "./agenda";
 
 // The cluster, as it is: the core in the middle with the queen at its console
 // and the shared brain beside it; the nodes around it with their workers
@@ -22,6 +24,8 @@ export interface WorldData {
   bees: Bee[];
   linked: LinkedAgent[];
   attention: AttentionItem[];
+  /** noted's day, still to come (NotedToday). */
+  agenda: AgendaEntry[];
   dashboards: { id: string; name: string; refreshed_at?: string }[];
   skills: string[];
   mcp: { name: string; ok: boolean; tools: number }[];
@@ -456,7 +460,8 @@ export const cluster: District<WorldData> = {
       wallScreens.push({ node, sc, id: "" });
     }
 
-    // ── The calendar: a board with what is coming ───────────────────────
+    // ── noted: a board with what today still holds, on its own route from
+    //    the core; a noted tool call runs along it ──────────────────────
     const board = new THREE.Group();
     const boardPost = box(0.25, 2.2, 0.25, mat(INK), true);
     const boardBezel = rbox(5.4, 3.4, 0.2, mat(0xffffff, { rough: 0.5 }), 0.1);
@@ -466,8 +471,16 @@ export const cluster: District<WorldData> = {
     board.add(boardPost, boardBezel, boardScreen.mesh);
     board.position.set(-3.5, 0, -19);
     g.add(board);
-    ctx.pickable(board, { kind: "records", id: "records", title: "Calendar" });
-    ctx.label(board, "Calendar", "", 6);
+    ctx.pickable(board, { kind: "records", id: "records", title: "Today" });
+    const boardLab = ctx.label(board, translate("Today"), "", 6);
+    const boardCable = cable(coreAt0(), new THREE.Vector3(-3.5, 0, -18), 0.55);
+    g.add(boardCable.tube);
+    let notedBusy = false, notedAcc = 0;
+    ctx.tick((dt) => {
+      if (!notedBusy) { notedAcc = 0; return; }
+      notedAcc += dt;
+      if (notedAcc >= 0.7) { notedAcc = 0; coins.burst(boardCable.curve, 1); }
+    });
 
     // ── What needs you: a mark over the one it is about ─────────────────
     const beacons = new Map<string, { obj: THREE.Group; anchor: THREE.Object3D; lift: number }>();
@@ -960,10 +973,14 @@ export const cluster: District<WorldData> = {
           }
         }
 
-        // The calendar board: the next few things.
-        const soon = d.attention.filter((a) => a.level === "soon" && a.at).sort((a, b) => +new Date(a.at!) - +new Date(b.at!)).slice(0, 3);
-        show(boardScreen, "Coming up", soon.length ? `${soon.length} on the calendar` : "nothing scheduled",
-          soon.map((a) => `${new Date(a.at!).toLocaleString([], { weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false })} ${a.title}`), false);
+        // noted's board: what today still holds; lit while a noted tool runs.
+        notedBusy = d.meter.members.some((m) => m.live && touchesNoted(m.doing))
+          || d.hive.tasks.some((x) => x.state === "running" && touchesNoted(x.tool));
+        const left = d.agenda.filter((e) => e.kind !== "timer").length;
+        show(boardScreen, translate("Today"), left ? translate("{count} left today", { count: left }) : translate("Nothing else today"),
+          d.agenda.slice(0, 5).map(boardLine), notedBusy);
+        boardLab.set(translate("Today"), left ? String(left) : "", notedBusy ? "work" : "idle");
+        boardCable.setActive(notedBusy);
       },
     };
   },

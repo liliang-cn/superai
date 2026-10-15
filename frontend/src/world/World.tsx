@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ChevronDownIcon, HomeIcon, LocateFixedIcon, MinusIcon, PlusIcon, RotateCcwIcon, RotateCwIcon } from "lucide-react";
-import { Dashboards, MCP, Skills } from "../../wailsjs/go/app/App";
+import { Dashboards, MCP, NotedToday, Skills } from "../../wailsjs/go/app/App";
 import { EventsOn } from "../../wailsjs/runtime";
 import { useBees, useCodingRuns, useHive, useLinkedAgents } from "../canvas/data";
 import { useAttentionState } from "../canvas/attention";
@@ -13,6 +13,7 @@ import { cluster, lensOf, type WorldData } from "./cluster";
 import { worldBus } from "./bus";
 import Inspector from "./Inspector";
 import Command from "./Command";
+import { agendaOf, touchesNoted, type AgendaEntry } from "./agenda";
 import { dashboards as dashApi, type Dashboard } from "../lib/dashboards";
 import { Response } from "@/components/ai-elements/response";
 import { RefreshCwIcon, XIcon } from "lucide-react";
@@ -24,6 +25,16 @@ function useSlow() {
   const [dashboards, setDashboards] = useState<WorldData["dashboards"]>([]);
   const [skills, setSkills] = useState<string[]>([]);
   const [mcp, setMcp] = useState<WorldData["mcp"]>([]);
+  const [agenda, setAgenda] = useState<AgendaEntry[]>([]);
+  const [agendaTick, setAgendaTick] = useState(0);
+  // noted's day: a minute old at most, and read again after a noted call.
+  useEffect(() => {
+    let alive = true;
+    const load = () => { NotedToday().then((r: unknown) => { if (alive) setAgenda(agendaOf(r)); }).catch(() => { if (alive) setAgenda([]); }); };
+    load();
+    const t = window.setInterval(load, 60000);
+    return () => { alive = false; window.clearInterval(t); };
+  }, [agendaTick]);
   useEffect(() => {
     let alive = true;
     const load = () => {
@@ -36,7 +47,7 @@ function useSlow() {
     const offs = ["dashboard:changed", "skills:changed", "mcp:changed"].map((e) => EventsOn(e, load));
     return () => { alive = false; window.clearInterval(t); offs.forEach((o) => typeof o === "function" && o()); };
   }, []);
-  return { dashboards, skills, mcp };
+  return { dashboards, skills, mcp, agenda, reloadAgenda: () => setAgendaTick((n) => n + 1) };
 }
 
 /** Whether a conversation turn is going, anywhere in the app. */
@@ -77,6 +88,13 @@ export default function World({ view }: { view: ViewKey }) {
   const meter = useHiveMeter();
   const slow = useSlow();
   const busy = useBusy();
+  // A noted tool call that just ended may have changed today.
+  const notedBusy = meter.members.some((m) => m.live && touchesNoted(m.doing));
+  const wasNoted = useRef(false);
+  useEffect(() => {
+    if (wasNoted.current && !notedBusy) slow.reloadAgenda();
+    wasNoted.current = notedBusy;
+  }, [notedBusy]);
 
   useEffect(() => {
     if (!host.current) return;
@@ -95,7 +113,7 @@ export default function World({ view }: { view: ViewKey }) {
   }, []);
 
   const data: WorldData = useMemo(() => ({
-    hive, runs, bees, linked, attention,
+    hive, runs, bees, linked, attention, agenda: slow.agenda,
     dashboards: slow.dashboards, skills: slow.skills, mcp: slow.mcp,
     knowledge: 0, meter: { total: meter.total, members: meter.members }, busy,
   }), [hive, runs, bees, linked, attention, slow, meter, busy]);

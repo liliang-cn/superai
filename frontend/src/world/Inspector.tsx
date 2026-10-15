@@ -15,6 +15,9 @@ import { openSwitcher } from "../lib/hivelink";
 import Talk from "./Talk";
 import type { Picked } from "./engine";
 import type { WorldData } from "./cluster";
+import { agendaWhen, type AgendaEntry } from "./agenda";
+
+const KIND: Record<AgendaEntry["kind"], string> = { event: "Event", reminder: "Reminder", todo: "To-do", timer: "Timing" };
 
 const fmt = (n: number) => (n >= 1e6 ? (n / 1e6).toFixed(2) + "M" : n >= 1e3 ? (n / 1e3).toFixed(1) + "k" : String(Math.round(n)));
 const when = (s?: string) => {
@@ -284,24 +287,23 @@ export default function Inspector({ picked, data, onClose, open, openDash }: {
       break;
     }
     case "records": {
-      kind = "Calendar";
-      const soon = data.attention.filter((a) => a.level === "soon" && a.at).sort((a, b) => +new Date(a.at!) - +new Date(b.at!));
+      kind = "Today";
+      const left = data.agenda.filter((e) => e.kind !== "timer").length;
+      if (left) rows.push(["Still to come", String(left)]);
       body = (
         <>
           <ul className="wi-list wi-shop">
-            {soon.map((a) => (
-              <li key={a.kind + (a.ref ?? a.title)}>
-                <span className="wi-shop-n"><b>{a.title}</b><small>{when(a.at)}{a.place ? " · " + a.place : ""}</small></span>
-                {a.kind === "event" && a.ref && (
-                  <button className="wi-x" title={t("Delete")} onClick={twice("del" + a.ref, () => act("del", () => ForgetLife("schedule", a.ref!), "Deleted"))}>
-                    {confirm === "del" + a.ref ? "?" : <Trash2Icon size={11} />}
-                  </button>
-                )}
+            {data.agenda.map((e) => (
+              <li key={e.id}>
+                <span className="wi-shop-n"><b>{e.title}</b><small>{[agendaWhen(e), t(KIND[e.kind])].filter(Boolean).join(" · ")}</small></span>
               </li>
             ))}
-            {soon.length === 0 && <li className="wi-none">{t("Nothing on the calendar this week.")}</li>}
+            {data.agenda.length === 0 && <li className="wi-none">{t("Nothing else planned today.")}</li>}
           </ul>
-          <Talk who={{ kind: "queen" }} placeholder="Put something on the calendar…" />
+          <div className="wi-acts">
+            <button onClick={() => open(PATHS.records, true)}>{t("Open Records")}</button>
+          </div>
+          <Talk who={{ kind: "queen" }} placeholder="Tell noted something…" />
         </>
       );
       break;
