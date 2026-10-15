@@ -202,6 +202,18 @@ export function SetQueenIdentity(arg1, arg2) {
   return window['go']['app']['App']['SetQueenIdentity'](arg1, arg2);
 }
 
+export function HomeLayout() {
+  return window['go']['app']['App']['HomeLayout']();
+}
+
+export function SetHomeLayout(arg1, arg2) {
+  return window['go']['app']['App']['SetHomeLayout'](arg1, arg2);
+}
+
+export function Quotes(arg1) {
+  return window['go']['app']['App']['Quotes'](arg1);
+}
+
 export function HiveStatus() {
   return window['go']['app']['App']['HiveStatus']();
 }

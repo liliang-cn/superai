@@ -46,6 +46,12 @@ type App struct {
 	// app_actions.go.
 	actionsOnce sync.Once
 	actionsV    *backend.MCPActions
+	// The home screen's layout and the market data its widgets show. See
+	// app_home_layout.go.
+	homeOnce   sync.Once
+	homeStore  *backend.HomeLayoutStore
+	quotesOnce sync.Once
+	quotesV    *backend.QuoteService
 	// The alarm watcher and the APNs client it pushes with. See
 	// app_alarms.go.
 	alarmsOnce sync.Once
@@ -362,6 +368,7 @@ func (a *App) rebuild() {
 	a.registerCodingAgentTools(svc, cfg)
 	a.registerScheduleTools(svc)
 	a.registerSelfTools(svc)
+	a.registerHomeLayoutTool(svc, cfg)
 	a.registerHiveTools(svc, cfg)
 	// A queen in max delegation keeps her work tools out of her own runs
 	// while a worker is live (app_hive_delegate.go). Asked per run, so a

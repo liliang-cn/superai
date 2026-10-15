@@ -97,6 +97,8 @@ var queenKeeps = map[string]bool{
 	"list_deliverables": true, "status": true, "doctor": true, "attention": true,
 	"devices": true, "linked_agents": true, "coding_runs": true, "standing_agents": true,
 	"skills": true,
+	// the person's phone home screen, which lives on her
+	"home_layout": true,
 	// self-extension: installed on the queen, synced to every worker
 	"add_mcp_server": true, "remove_mcp_server": true, "mcp_servers": true,
 	"install_skill": true, "install_skill_from_url": true, "install_mcp_from_url": true,

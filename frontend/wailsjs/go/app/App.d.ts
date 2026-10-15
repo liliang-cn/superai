@@ -106,6 +106,12 @@ export function QueenIdentity():Promise<Record<string, any>>;
 
 export function SetQueenIdentity(arg1:string,arg2:Array<string>):Promise<Record<string, any>>;
 
+export function HomeLayout():Promise<Record<string, any>>;
+
+export function SetHomeLayout(arg1:any,arg2:number):Promise<Record<string, any>>;
+
+export function Quotes(arg1:Array<string>):Promise<Record<string, any>>;
+
 export function HiveStatus():Promise<Record<string, any>>;
 
 export function HiveTaskDetail(arg1:string):Promise<Record<string, any>>;
