@@ -77,13 +77,19 @@ func (a *App) syncLocalHive() {
 		a.stopLocalHive()
 		return
 	}
+	// The workers' model is the one the queen's turns actually use: when her
+	// embedded proxy is running, that is the proxy on loopback, not the empty
+	// address in her settings.
+	a.mu.Lock()
+	eff := a.effective()
+	a.mu.Unlock()
 	sp := s.Hive.Spawner
 	min := backend.DefaultLocalMinWorkers
 	if sp.MinWorkers != nil {
 		min = *sp.MinWorkers
 	}
 	idle := time.Duration(sp.IdleMinutes) * time.Minute
-	template := backend.LocalWorkerSettings(*s, "", queenURL, creds.Token, "")
+	template := backend.LocalWorkerSettings(*eff, "", queenURL, creds.Token, "")
 	key, _ := json.Marshal(map[string]any{"min": min, "max": sp.MaxWorkers, "idle": idle, "worker": template})
 
 	a.mu.Lock()
@@ -98,7 +104,7 @@ func (a *App) syncLocalHive() {
 		Min: min, Max: sp.MaxWorkers, Idle: idle,
 		Settings: func(name, advertise string) ([]byte, error) {
 			a.mu.Lock()
-			cur := a.settings
+			cur := a.effective()
 			a.mu.Unlock()
 			if cur == nil {
 				return nil, errors.New("settings are not loaded")

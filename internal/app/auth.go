@@ -137,6 +137,12 @@ func loadOrCreateCredentials() (*credentials, error) {
 
 	// Printed once, on the run that created them. After this the password is
 	// only a bcrypt hash on disk, and this log line is the only copy.
+	// A local worker's credentials are its queen's business only: she reads
+	// the token from its hello, nobody logs in to it, and its log is a file.
+	if os.Getenv(backend.ExitWithStdinEnv) == "1" {
+		log.Printf("generated credentials in %s", p)
+		return c, nil
+	}
 	log.Printf("no credentials found — generated a set and wrote %s", p)
 	log.Printf("  browser:  password %s", password)
 	log.Printf("  programs: Authorization: Bearer %s", c.Token)
