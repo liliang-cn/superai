@@ -14,6 +14,7 @@ import { PATHS, attentionPath, taskPath } from "../lib/routes";
 import { focusInWorld } from "./bus";
 import { openSwitcher } from "../lib/hivelink";
 import Talk from "./Talk";
+import MachineHost from "./MachineHost";
 import type { Picked } from "./engine";
 import type { WorldData } from "./cluster";
 import { agendaWhen, type AgendaEntry } from "./agenda";
@@ -132,7 +133,8 @@ export default function Inspector({ picked, data, onClose, open, openDash }: {
     }
     case "machine": {
       const a = data.linked.find((x) => x.name === picked.id);
-      const clis = a?.clis?.length ? a.clis : ["claude", "codex"];
+      // Core's own CLIs are not in the linked list; a linked machine says.
+      const clis = a ? a.clis ?? [] : ["claude", "codex"];
       const host = picked.id;
       const mine = data.runs.filter((r) => (r.remote || "core") === host);
       const live = mine.filter((r) => r.state === "running");
@@ -141,11 +143,12 @@ export default function Inspector({ picked, data, onClose, open, openDash }: {
       rows.push(["Running", String(live.length)], ["Sessions", String(mine.length)]);
       body = (
         <>
-          <NewRun clis={clis} host={host} onStart={(agent, prompt) => act("run", () => StartCLIRun(agent, prompt, "", "", true), "Run started")} busy={busy === "run"} />
+          <MachineHost name={host} />
+          {clis.length > 0 && <NewRun clis={clis} host={host} onStart={(agent, prompt) => act("run", () => StartCLIRun(agent, prompt, "", "", true), "Run started")} busy={busy === "run"} />}
           <ul className="wi-list">
             {mine.slice(0, 5).map((r) => <RunLine key={r.id} run={r} onStop={() => act("stop" + r.id, () => CancelCLIRun(r.id), "Stopped")} />)}
           </ul>
-          <button className="wl-go ghost" onClick={() => open(PATHS.coding, true)}>{t("All coding runs")}<ArrowRightIcon size={14} /></button>
+          {(clis.length > 0 || mine.length > 0) && <button className="wl-go ghost" onClick={() => open(PATHS.coding, true)}>{t("All coding runs")}<ArrowRightIcon size={14} /></button>}
         </>
       );
       break;

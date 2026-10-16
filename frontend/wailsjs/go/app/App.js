@@ -218,6 +218,26 @@ export function HomeLayout() {
   return window['go']['app']['App']['HomeLayout']();
 }
 
+export function HostExec(arg1, arg2) {
+  return window['go']['app']['App']['HostExec'](arg1, arg2);
+}
+
+export function HostLogs(arg1, arg2) {
+  return window['go']['app']['App']['HostLogs'](arg1, arg2);
+}
+
+export function HostService(arg1, arg2) {
+  return window['go']['app']['App']['HostService'](arg1, arg2);
+}
+
+export function HostServices() {
+  return window['go']['app']['App']['HostServices']();
+}
+
+export function HostStatus() {
+  return window['go']['app']['App']['HostStatus']();
+}
+
 export function ImportCSV(arg1, arg2) {
   return window['go']['app']['App']['ImportCSV'](arg1, arg2);
 }
@@ -284,6 +304,26 @@ export function LongRunStop(arg1) {
 
 export function MCP() {
   return window['go']['app']['App']['MCP']();
+}
+
+export function MachineExec(arg1, arg2, arg3) {
+  return window['go']['app']['App']['MachineExec'](arg1, arg2, arg3);
+}
+
+export function MachineLogs(arg1, arg2, arg3) {
+  return window['go']['app']['App']['MachineLogs'](arg1, arg2, arg3);
+}
+
+export function MachineService(arg1, arg2, arg3) {
+  return window['go']['app']['App']['MachineService'](arg1, arg2, arg3);
+}
+
+export function MachineServices(arg1) {
+  return window['go']['app']['App']['MachineServices'](arg1);
+}
+
+export function MachineStatus(arg1) {
+  return window['go']['app']['App']['MachineStatus'](arg1);
 }
 
 export function MarkNotificationsRead(arg1) {

@@ -288,3 +288,20 @@
 .wl-cam button { transition: background-color 0.18s var(--wl-ease), color 0.18s var(--wl-ease), transform 0.18s var(--wl-ease); }
 .wl-cam button:active { transform: scale(0.92); }
 @media (prefers-reduced-motion: reduce) { .wl-callout .wl-detail { animation: none; } .wl-pill { transition: none; } }
+
+/* A machine to look after (MachineHost.tsx). */
+.wm { display: flex; flex-direction: column; gap: 8px; }
+.wm-gauges { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.wm-g { position: relative; overflow: hidden; background: #f6f8fa; border-radius: 8px; padding: 7px 8px 9px; display: flex; flex-direction: column; min-width: 0; }
+.wm-g span { font-size: 11px; color: #5f6d77; }
+.wm-g b { margin-top: 2px; font: 600 15px "Geist", system-ui, sans-serif; color: #16202b; }
+.wm-g small { font-size: 10.5px; color: #5f6d77; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wm-g i { position: absolute; left: 0; bottom: 0; height: 3px; background: #2f5bea; }
+.wm-g.warm i { background: #f2b416; } .wm-g.hot i { background: #e2553f; }
+.wm-svcs { max-height: 220px; overflow: auto; }
+.wm-svcs li { gap: 5px; flex: none; }
+.wm-n { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wm-svcs .wi-x { margin-left: 0; }
+.wm-svcs .wi-x.wm-sure { background: #e2553f; color: #fff; }
+.wm-out em { display: block; font: 11px "Geist Mono", monospace; color: #5f6d77; font-style: normal; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wm-out .wi-text { max-height: 220px; font: 11px/1.45 "Geist Mono", monospace; }

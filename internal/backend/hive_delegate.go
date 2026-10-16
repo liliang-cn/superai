@@ -107,10 +107,10 @@ var queenKeeps = map[string]bool{
 
 // queenKeepsPrefix are kept by prefix: the hive's own tools, agents outside
 // the hive (delegation too), her plan, skills' know-how, dashboards,
-// schedules, settings, the pet, long tasks.
+// schedules, settings, the pet, long tasks, the machines.
 var queenKeepsPrefix = []string{
 	"hive_", "coding_agent_", "remote_agent_", "scratchpad_", "skill_", "dashboard_",
-	"schedule_", "settings_", "pet_", "standing_agent_", "long_task_",
+	"schedule_", "settings_", "pet_", "standing_agent_", "long_task_", "machine_",
 }
 
 // QueenKeepsTool says whether a queen in max mode keeps a tool in her own run.

@@ -114,6 +114,16 @@ export function HiveTaskDetail(arg1:string):Promise<Record<string, any>>;
 
 export function HomeLayout():Promise<Record<string, any>>;
 
+export function HostExec(arg1:string,arg2:number):Promise<app.HostExecResult>;
+
+export function HostLogs(arg1:string,arg2:number):Promise<string>;
+
+export function HostService(arg1:string,arg2:string):Promise<string>;
+
+export function HostServices():Promise<Array<app.HostService>>;
+
+export function HostStatus():Promise<app.HostInfo>;
+
 export function ImportCSV(arg1:string,arg2:string):Promise<string>;
 
 export function ImportFiles(arg1:Array<string>):Promise<Array<string>>;
@@ -147,6 +157,16 @@ export function LongRunState(arg1:string):Promise<backend.TaskState>;
 export function LongRunStop(arg1:string):Promise<boolean>;
 
 export function MCP():Promise<Array<mcp.ServerStatus>>;
+
+export function MachineExec(arg1:string,arg2:string,arg3:number):Promise<app.HostExecResult>;
+
+export function MachineLogs(arg1:string,arg2:string,arg3:number):Promise<string>;
+
+export function MachineService(arg1:string,arg2:string,arg3:string):Promise<string>;
+
+export function MachineServices(arg1:string):Promise<Array<app.HostService>>;
+
+export function MachineStatus(arg1:string):Promise<app.HostInfo>;
 
 export function MarkNotificationsRead(arg1:Array<string>):Promise<Record<string, any>>;
 
