@@ -4,6 +4,7 @@ import LanguageSettings from "../components/LanguageSettings";
 import AvatarSection from "./AvatarSection";
 import PairPhoneCard from "../components/PairPhoneCard";
 import LinkSuperAICard from "../components/LinkSuperAICard";
+import LocalHiveCard from "../components/LocalHiveCard";
 import { AppStatus } from "../lib/types";
 import {
   CLIProxyAccounts,
@@ -1329,6 +1330,11 @@ export default function SettingsView({
 
           {!served && section === "runtime" && <OpenInBrowserCard />}
           {served && section === "runtime" && <PairPhoneCard />}
+          {section === "runtime" && (
+            <LocalHiveCard
+              onChanged={(fresh) => setS((cur) => (cur ? backend.Settings.createFrom({ ...cur, hive: fresh.hive }) : fresh))}
+            />
+          )}
           {section === "runtime" && (
             <LinkSuperAICard
               onChanged={(fresh) => setS((cur) => (cur ? backend.Settings.createFrom({ ...cur, remote_agents: fresh.remote_agents }) : fresh))}

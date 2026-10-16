@@ -151,6 +151,19 @@ type App struct {
 	steerFn  func(session, content string) bool
 	hiveStop context.CancelFunc
 	hiveDone chan struct{}
+	// localHive runs this queen's workers as processes on this machine, when
+	// its spawner is "local" (app_localhive.go); localHiveKey is what they
+	// were started with, so a save that changes nothing leaves them be.
+	localHive    *backend.LocalSpawner
+	localHiveKey []byte
+	// serveURL is this instance's own loopback address in serve mode; empty
+	// in the desktop app.
+	serveURL string
+	// workerInFlight and workerLastUse are, per worker, delegated work in
+	// progress and the last time any started or ended: the idle check.
+	workerUseMu    sync.Mutex
+	workerInFlight map[string]int
+	workerLastUse  map[string]time.Time
 	// scheduleLock is held while this process owns firing schedules; nil means
 	// another process (the daemon) owns them and this one only manages.
 	scheduleLock *backend.ScheduleLock
@@ -290,6 +303,7 @@ func (a *App) Shutdown(ctx context.Context) {
 	// the same reason — it may be in the middle of a turn.
 	a.stopTelegram()
 	a.stopHive()
+	a.stopLocalHive()
 	a.stopAlarmWatch()
 	a.stopScheduler()
 	// Also before the lock, and both for the same reason as the scheduler: each

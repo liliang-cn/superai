@@ -31,7 +31,8 @@ import (
 // which is the default: creating pods is a power, and a queen that was never
 // given it is one that cannot be talked into using it.
 type SpawnerSettings struct {
-	// Kind is "kubectl", the only one so far.
+	// Kind is "kubectl" (pods in a cluster) or "local" (processes on this
+	// machine, hive_local.go).
 	Kind        string `json:"kind"`
 	Namespace   string `json:"namespace,omitempty"`
 	StatefulSet string `json:"statefulset,omitempty"`
@@ -41,6 +42,17 @@ type SpawnerSettings struct {
 	MaxWorkers int `json:"max_workers,omitempty"`
 	// Kubectl is the binary; empty finds it on PATH.
 	Kubectl string `json:"kubectl,omitempty"`
+	// MinWorkers is how many local workers are kept running even when idle.
+	// Nil takes DefaultLocalMinWorkers. Local only.
+	MinWorkers *int `json:"min_workers,omitempty"`
+	// IdleMinutes is how long a local worker above the minimum may sit idle
+	// before it is let go. Zero takes DefaultLocalIdleMinutes. Local only.
+	IdleMinutes int `json:"idle_minutes,omitempty"`
+}
+
+// IsLocal says the workers are processes on this machine.
+func (s *SpawnerSettings) IsLocal() bool {
+	return s != nil && strings.TrimSpace(s.Kind) == SpawnerLocal
 }
 
 // DefaultMaxWorkers is the cap when the settings do not set one.
@@ -62,8 +74,13 @@ func NewSpawner(s *SpawnerSettings) (Spawner, error) {
 	if s == nil || strings.TrimSpace(s.Kind) == "" {
 		return nil, nil
 	}
+	if s.IsLocal() {
+		// A local hive's processes belong to the app that runs them; one built
+		// here would be a second, empty supervisor.
+		return nil, errors.New("a local spawner is run by the app, not built from settings")
+	}
 	if s.Kind != "kubectl" {
-		return nil, fmt.Errorf("spawner kind %q is not supported; only \"kubectl\"", s.Kind)
+		return nil, fmt.Errorf("spawner kind %q is not supported; \"kubectl\" or \"local\"", s.Kind)
 	}
 	if strings.TrimSpace(s.StatefulSet) == "" {
 		return nil, errors.New("spawner needs the name of the statefulset the workers run in")

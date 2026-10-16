@@ -10,12 +10,20 @@ export function AddSchedule(arg1, arg2, arg3, arg4) {
   return window['go']['app']['App']['AddSchedule'](arg1, arg2, arg3, arg4);
 }
 
+export function AnswerCCPermission(arg1, arg2, arg3) {
+  return window['go']['app']['App']['AnswerCCPermission'](arg1, arg2, arg3);
+}
+
 export function AskRemoteAgent(arg1, arg2) {
   return window['go']['app']['App']['AskRemoteAgent'](arg1, arg2);
 }
 
 export function Attention() {
   return window['go']['app']['App']['Attention']();
+}
+
+export function CCAwayHint(arg1) {
+  return window['go']['app']['App']['CCAwayHint'](arg1);
 }
 
 export function CCSessions() {
@@ -158,6 +166,10 @@ export function ForgetLife(arg1, arg2) {
   return window['go']['app']['App']['ForgetLife'](arg1, arg2);
 }
 
+export function GetLocalHive() {
+  return window['go']['app']['App']['GetLocalHive']();
+}
+
 export function GetSettings() {
   return window['go']['app']['App']['GetSettings']();
 }
@@ -194,32 +206,16 @@ export function HiveSpawn(arg1) {
   return window['go']['app']['App']['HiveSpawn'](arg1);
 }
 
-export function QueenIdentity() {
-  return window['go']['app']['App']['QueenIdentity']();
-}
-
-export function SetQueenIdentity(arg1, arg2) {
-  return window['go']['app']['App']['SetQueenIdentity'](arg1, arg2);
-}
-
-export function HomeLayout() {
-  return window['go']['app']['App']['HomeLayout']();
-}
-
-export function SetHomeLayout(arg1, arg2) {
-  return window['go']['app']['App']['SetHomeLayout'](arg1, arg2);
-}
-
-export function Quotes(arg1) {
-  return window['go']['app']['App']['Quotes'](arg1);
-}
-
 export function HiveStatus() {
   return window['go']['app']['App']['HiveStatus']();
 }
 
 export function HiveTaskDetail(arg1) {
   return window['go']['app']['App']['HiveTaskDetail'](arg1);
+}
+
+export function HomeLayout() {
+  return window['go']['app']['App']['HomeLayout']();
 }
 
 export function ImportCSV(arg1, arg2) {
@@ -382,6 +378,14 @@ export function Pulse() {
   return window['go']['app']['App']['Pulse']();
 }
 
+export function QueenIdentity() {
+  return window['go']['app']['App']['QueenIdentity']();
+}
+
+export function Quotes(arg1) {
+  return window['go']['app']['App']['Quotes'](arg1);
+}
+
 export function ReadWorkspaceFile(arg1) {
   return window['go']['app']['App']['ReadWorkspaceFile'](arg1);
 }
@@ -488,6 +492,18 @@ export function SetAway(arg1) {
 
 export function SetDashboardCron(arg1, arg2) {
   return window['go']['app']['App']['SetDashboardCron'](arg1, arg2);
+}
+
+export function SetHomeLayout(arg1, arg2) {
+  return window['go']['app']['App']['SetHomeLayout'](arg1, arg2);
+}
+
+export function SetLocalHive(arg1, arg2, arg3) {
+  return window['go']['app']['App']['SetLocalHive'](arg1, arg2, arg3);
+}
+
+export function SetQueenIdentity(arg1, arg2) {
+  return window['go']['app']['App']['SetQueenIdentity'](arg1, arg2);
 }
 
 export function SetScheduledPromptEnabled(arg1, arg2) {

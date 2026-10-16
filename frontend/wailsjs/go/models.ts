@@ -921,6 +921,30 @@ export namespace app {
 	        this.reachable = source["reachable"];
 	    }
 	}
+	export class LocalHive {
+	    available: boolean;
+	    enabled: boolean;
+	    min_workers: number;
+	    max_workers: number;
+	    running: number;
+	    live: number;
+	    note?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new LocalHive(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.available = source["available"];
+	        this.enabled = source["enabled"];
+	        this.min_workers = source["min_workers"];
+	        this.max_workers = source["max_workers"];
+	        this.running = source["running"];
+	        this.live = source["live"];
+	        this.note = source["note"];
+	    }
+	}
 	
 	export class NewIntegrationToken {
 	    id: string;
@@ -1602,6 +1626,8 @@ export namespace backend {
 	    statefulset?: string;
 	    max_workers?: number;
 	    kubectl?: string;
+	    min_workers?: number;
+	    idle_minutes?: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new SpawnerSettings(source);
@@ -1614,6 +1640,8 @@ export namespace backend {
 	        this.statefulset = source["statefulset"];
 	        this.max_workers = source["max_workers"];
 	        this.kubectl = source["kubectl"];
+	        this.min_workers = source["min_workers"];
+	        this.idle_minutes = source["idle_minutes"];
 	    }
 	}
 	export class HiveSettings {

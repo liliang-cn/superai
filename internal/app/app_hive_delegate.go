@@ -239,6 +239,8 @@ func (a *App) hiveDelegate(ctx context.Context, args map[string]any) (any, error
 	env := backend.DelegateEnv{
 		Candidates: a.delegateCandidates,
 		Run: func(ctx context.Context, worker, prompt string) (backend.RemoteResult, error) {
+			a.markWorker(worker, +1)
+			defer a.markWorker(worker, -1)
 			return a.remoteRunner().Run(ctx, worker, prompt)
 		},
 		Self:     a.queenSelf,

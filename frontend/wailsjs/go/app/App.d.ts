@@ -10,9 +10,13 @@ export function AddRecord(arg1:string,arg2:string,arg3:string,arg4:Array<string>
 
 export function AddSchedule(arg1:string,arg2:string,arg3:string,arg4:Array<string>):Promise<Record<string, any>>;
 
+export function AnswerCCPermission(arg1:string,arg2:string,arg3:string):Promise<void>;
+
 export function AskRemoteAgent(arg1:string,arg2:string):Promise<backend.RemoteResult>;
 
 export function Attention():Promise<Array<app.AttentionItem>>;
+
+export function CCAwayHint(arg1:boolean):Promise<Record<string, any>>;
 
 export function CCSessions():Promise<Array<app.CCSession>>;
 
@@ -84,6 +88,8 @@ export function ForgetHive(arg1:string):Promise<void>;
 
 export function ForgetLife(arg1:string,arg2:string):Promise<void>;
 
+export function GetLocalHive():Promise<app.LocalHive>;
+
 export function GetSettings():Promise<backend.Settings>;
 
 export function GetStatus():Promise<Record<string, any>>;
@@ -102,19 +108,11 @@ export function HiveRetire(arg1:number,arg2:boolean):Promise<Record<string, any>
 
 export function HiveSpawn(arg1:number):Promise<Record<string, any>>;
 
-export function QueenIdentity():Promise<Record<string, any>>;
-
-export function SetQueenIdentity(arg1:string,arg2:Array<string>):Promise<Record<string, any>>;
-
-export function HomeLayout():Promise<Record<string, any>>;
-
-export function SetHomeLayout(arg1:any,arg2:number):Promise<Record<string, any>>;
-
-export function Quotes(arg1:Array<string>):Promise<Record<string, any>>;
-
 export function HiveStatus():Promise<Record<string, any>>;
 
 export function HiveTaskDetail(arg1:string):Promise<Record<string, any>>;
+
+export function HomeLayout():Promise<Record<string, any>>;
 
 export function ImportCSV(arg1:string,arg2:string):Promise<string>;
 
@@ -196,6 +194,10 @@ export function PreviewPrompt(arg1:string,arg2:string):Promise<backend.PromptPre
 
 export function Pulse():Promise<backend.PulseSnapshot>;
 
+export function QueenIdentity():Promise<Record<string, any>>;
+
+export function Quotes(arg1:Array<string>):Promise<Record<string, any>>;
+
 export function ReadWorkspaceFile(arg1:string):Promise<string>;
 
 export function ReadWorkspaceFileDataURL(arg1:string):Promise<string>;
@@ -249,6 +251,12 @@ export function SendChat(arg1:string,arg2:string,arg3:Array<string>):Promise<str
 export function SetAway(arg1:boolean):Promise<app.CCPresence>;
 
 export function SetDashboardCron(arg1:string,arg2:string):Promise<Record<string, any>>;
+
+export function SetHomeLayout(arg1:any,arg2:number):Promise<Record<string, any>>;
+
+export function SetLocalHive(arg1:boolean,arg2:number,arg3:number):Promise<backend.Settings>;
+
+export function SetQueenIdentity(arg1:string,arg2:Array<string>):Promise<Record<string, any>>;
 
 export function SetScheduledPromptEnabled(arg1:string,arg2:boolean):Promise<string>;
 
