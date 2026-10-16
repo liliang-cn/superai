@@ -817,6 +817,127 @@ export namespace app {
 		    return a;
 		}
 	}
+	export class HostDisk {
+	    mount: string;
+	    total: number;
+	    used: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new HostDisk(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.mount = source["mount"];
+	        this.total = source["total"];
+	        this.used = source["used"];
+	    }
+	}
+	export class HostExecResult {
+	    exit: number;
+	    output: string;
+	    truncated?: boolean;
+	    ms: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new HostExecResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.exit = source["exit"];
+	        this.output = source["output"];
+	        this.truncated = source["truncated"];
+	        this.ms = source["ms"];
+	    }
+	}
+	export class HostMemory {
+	    total: number;
+	    used: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new HostMemory(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.total = source["total"];
+	        this.used = source["used"];
+	    }
+	}
+	export class HostInfo {
+	    name: string;
+	    host: string;
+	    os: string;
+	    arch: string;
+	    kernel?: string;
+	    uptimeSeconds: number;
+	    cpus: number;
+	    load: number[];
+	    memory: HostMemory;
+	    disks: HostDisk[];
+	    version?: string;
+	    control: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new HostInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.host = source["host"];
+	        this.os = source["os"];
+	        this.arch = source["arch"];
+	        this.kernel = source["kernel"];
+	        this.uptimeSeconds = source["uptimeSeconds"];
+	        this.cpus = source["cpus"];
+	        this.load = source["load"];
+	        this.memory = this.convertValues(source["memory"], HostMemory);
+	        this.disks = this.convertValues(source["disks"], HostDisk);
+	        this.version = source["version"];
+	        this.control = source["control"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class HostService {
+	    name: string;
+	    state: string;
+	    about?: string;
+	    pid?: number;
+	    lastExit?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new HostService(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.state = source["state"];
+	        this.about = source["about"];
+	        this.pid = source["pid"];
+	        this.lastExit = source["lastExit"];
+	    }
+	}
 	export class IntegrationToken {
 	    id: string;
 	    name: string;

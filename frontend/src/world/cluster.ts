@@ -775,8 +775,9 @@ export const cluster: District<WorldData> = {
             doing.length ? doing : on.map((m) => `${short(m.name)} · ${m.state === "lost" ? "lost" : "ready"}`), doing.length > 0);
         }
 
-        // Linked machines and the coding agents on them.
-        const linked = d.linked.filter((a) => a.clis?.length || a.agents?.length);
+        // Linked machines and the coding agents on them. A machine with
+        // nothing to run is still one to look after, so every one is here.
+        const linked = d.linked;
         for (const [h, x] of machines) if (!linked.some((a) => a.name === h)) {
           x.label.remove(); x.clis.forEach((c) => c.label.remove()); g.remove(x.dev); cables.remove(x.cable.tube); x.cable.tube.userData.dispose?.(); machines.delete(h);
         }

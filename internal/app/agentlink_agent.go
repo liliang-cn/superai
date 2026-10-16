@@ -56,6 +56,9 @@ var agentCallable = map[string]bool{
 	// Core's away switch, pushed when it changes and on connect, so a
 	// permission prompt is passed on the spot when somebody is at this machine.
 	"CCAwayHint": true,
+	// The machine itself (host.go): how it is, its services and logs, and —
+	// unless its owner turned it off — service actions and commands.
+	"HostStatus": true, "HostServices": true, "HostLogs": true, "HostService": true, "HostExec": true,
 }
 
 // agentQuiet are events too frequent to be worth the line.

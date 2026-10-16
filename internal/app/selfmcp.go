@@ -57,7 +57,7 @@ func (t selfTool) schema() map[string]any {
 // selfTools is the table. A function rather than a variable: settings_set
 // reaches SaveSettings, which rebuilds the agent, which registers this table.
 func selfTools() []selfTool {
-	return []selfTool{
+	return append([]selfTool{
 		{
 			Name: "status", Title: "SuperAI status", ReadOnly: true,
 			Description: "How this SuperAI is doing: whether it is ready (and the error if not), the model and provider it thinks with, " +
@@ -151,7 +151,7 @@ func selfTools() []selfTool {
 				return a.selfSetSetting(strings.TrimSpace(str(args["key"])), args["value"])
 			},
 		},
-	}
+	}, machineTools()...)
 }
 
 // registerSelfTools gives the agent the table. Runs inside the build, which

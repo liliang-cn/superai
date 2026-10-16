@@ -207,10 +207,13 @@ journalctl -u superai-agent -n 5   # 看到 "connected to … as build-box, clis
 | `SUPERAI_CORE_TOKEN_FILE` | 从文件读取 token（推荐）。也可以用 `SUPERAI_CORE_TOKEN` / `-core-token` 直接传 |
 | `SUPERAI_AGENT_NAME` / `-name` | core 看到的机器名，不填就用主机名 |
 | `SUPERAI_CORE_TLS=1` / `-core-tls` | 用 TLS 连接 core |
+| `SUPERAI_HOST_CONTROL=off` | 不让 core 在这台机器上重启服务、执行命令。状态、服务列表和日志照样能看 |
 
 CLI 本身（`claude`、`codex`、`gemini` 等）要在这台机器上装好，并且已经登录。core 是以 `SUPERAI_HOME` 所属的用户身份去调用它们的。
 
 一台已经在跑 `superai serve` 的机器，也可以加上同样的 `-core` 等参数，同时作为另一个 core 的 agent。
+
+连上的每台机器都会出现在 3D 视图里，没装 CLI 的也一样。点开机器能看到负载、内存、磁盘和服务列表（失败的排在前面），可以查看日志、重启服务，或者执行一条命令。queen 用 `machine_inspect` 和 `machine_act` 两个工具做同样的事；`machine_act` 会改动机器，所以要先经过审批。MCP 客户端里对应的是 `superai_machine_inspect` 和 `superai_machine_act`。core 自己的机器名叫 `core`。
 
 ### 另一种接法：`superai node`（配对码）
 
