@@ -358,6 +358,9 @@ func ServeMain(argv []string) {
 	hub := newEventHub()
 	app := NewApp()
 	app.emitFn = hub.broadcast // before startup: no window may ever see an event
+	// Loopback whatever the bind: it is the address this instance's own local
+	// workers join (app_localhive.go), and they are on this machine.
+	app.serveURL = fmt.Sprintf("http://127.0.0.1:%d", *port)
 	app.startupHeadless()
 	defer app.Shutdown(context.Background())
 
@@ -376,6 +379,11 @@ func ServeMain(argv []string) {
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
+	// A local worker goes when its queen does: she holds the other end of
+	// its stdin, and the operating system closes it when she exits.
+	if os.Getenv(backend.ExitWithStdinEnv) == "1" {
+		backend.WatchStdin(stop)
+	}
 
 	// Core: agents dial in here.
 	if *agentPort > 0 {

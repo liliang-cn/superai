@@ -175,8 +175,8 @@ func (a *App) HiveStatus() map[string]any {
 		out["abilities"] = a.abilities
 		a.mu.Unlock()
 	}
-	if sp, _ := backend.NewSpawner(s.Hive.Spawner); sp != nil && s.Hive.Role == backend.HiveRoleQueen {
-		out["spawner"] = map[string]any{"enabled": true, "max": sp.Max()}
+	if sp, _ := a.spawnerFor(s); sp != nil && s.Hive.Role == backend.HiveRoleQueen {
+		out["spawner"] = map[string]any{"enabled": true, "max": sp.Max(), "local": s.Hive.Spawner.IsLocal()}
 	}
 	name := strings.TrimSpace(s.Hive.Name)
 	if name == "" {
@@ -333,6 +333,7 @@ func (a *App) handleHiveTask(w http.ResponseWriter, r *http.Request) {
 // changing the role or the join address is a settings change.
 func (a *App) startHive() {
 	a.stopHive()
+	a.syncLocalHive()
 
 	a.mu.Lock()
 	s := a.settings
@@ -768,7 +769,7 @@ func (a *App) queenSpawner() (*backend.Hive, backend.Spawner, error) {
 	if s == nil {
 		return nil, nil, fmt.Errorf("settings are not loaded yet")
 	}
-	sp, err := backend.NewSpawner(s.Hive.Spawner)
+	sp, err := a.spawnerFor(s)
 	if err != nil {
 		return nil, nil, err
 	}
