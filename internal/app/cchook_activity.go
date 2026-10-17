@@ -111,6 +111,7 @@ type ccActSession struct {
 	CCActivitySession
 	tty    string
 	inTool bool // a PreToolUse has not had its PostToolUse yet
+	pid    int  // the CLI's process, when its plugin said (cli_activity.go)
 }
 
 // ccActivity is this machine's sessions and the throttle on telling core.
@@ -178,6 +179,9 @@ func (t *ccActivity) observe(ev ccHookEvent, now time.Time) bool {
 	s.Last = now
 	if p := projectName(ev.Cwd); p != "" {
 		s.Project = clipField(p)
+	}
+	if ev.PID > 0 {
+		s.pid = ev.PID
 	}
 	if ev.TTY != "" {
 		s.tty = ev.TTY

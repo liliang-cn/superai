@@ -138,6 +138,12 @@ func (t *cliTracker) observe(ev ccHookEvent, now time.Time) (string, bool) {
 // setProcs takes a process look: every CLI's sessions, by name. It returns
 // the CLIs whose sessions changed.
 func (t *cliTracker) setProcs(procs map[string][]CCActivitySession) []string {
+	return t.setProcsAlive(procs, nil)
+}
+
+// setProcsAlive is setProcs with every process the look saw, by pid: a
+// plugin session whose process is not among them is over.
+func (t *cliTracker) setProcsAlive(procs map[string][]CCActivitySession, alive map[int]bool) []string {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	var changed []string
@@ -157,6 +163,16 @@ func (t *cliTracker) setProcs(procs map[string][]CCActivitySession) []string {
 	// without saying goodbye.
 	for cli, h := range t.hooked {
 		if len(procs[cli]) > 0 || !knownProcCLI(cli) {
+			if alive != nil {
+				h.mu.Lock()
+				for id, s := range h.sessions {
+					if s.pid > 0 && !alive[s.pid] {
+						delete(h.sessions, id)
+						changed = append(changed, cli)
+					}
+				}
+				h.mu.Unlock()
+			}
 			continue
 		}
 		h.mu.Lock()

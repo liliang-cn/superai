@@ -78,6 +78,14 @@ func TestAPluginSpeaksForItsCLIAndProcessesForTheRest(t *testing.T) {
 	if _, ok := tr.observe(ccHookEvent{CLI: "claude", Event: "Stop", Session: "c"}, now); ok {
 		t.Fatal("claude event taken")
 	}
+	// One opencode of two exits: the sessions its plugin named go with it.
+	tr.observe(ccHookEvent{CLI: "opencode", Event: "SessionStart", Session: "ses_run", PID: 4242}, now)
+	if a := tr.current("opencode", now); len(a.Sessions) != 3 {
+		t.Fatalf("with the run %+v", a)
+	}
+	if ch := tr.setProcsAlive(procs, map[int]bool{500: true}); strings.Join(ch, ",") != "opencode" || len(tr.current("opencode", now).Sessions) != 2 {
+		t.Fatalf("run gone: %v %+v", ch, tr.current("opencode", now))
+	}
 	// opencode exits without a word: its plugin sessions go with it.
 	delete(procs, "opencode")
 	ch := tr.setProcs(procs)

@@ -454,7 +454,12 @@ func (a *App) pollCLIProcs(ctx context.Context, t *cliTracker) {
 		if err != nil {
 			continue
 		}
-		t.setProcs(p.look(parsePS(out), time.Now()))
+		rows := parsePS(out)
+		alive := make(map[int]bool, len(rows))
+		for _, r := range rows {
+			alive[r.PID] = true
+		}
+		t.setProcsAlive(p.look(rows, time.Now()), alive)
 		for _, c := range t.clis() {
 			t.kick(c) // a snapshot that says nothing new is not sent
 		}

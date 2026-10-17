@@ -52,7 +52,10 @@ const ccHookSocketName = "cc-hook.sock"
 type ccHookEvent struct {
 	// CLI is the coding CLI the event is from when it is not Claude Code:
 	// opencode's plugin, pi's extension, codex's hooks (cli_activity.go).
-	CLI     string `json:"cli,omitempty"`
+	CLI string `json:"cli,omitempty"`
+	// PID is that CLI's process, from its plugin: a session whose process
+	// is gone is over.
+	PID     int    `json:"pid,omitempty"`
 	Event   string `json:"event"`             // Stop | StopFailure | Notification | SessionStart | SessionEnd | PermissionRequest | PermissionClosed | UserPromptSubmit | PreToolUse | PostToolUse
 	Session string `json:"session"`           // Claude Code's session id
 	Cwd     string `json:"cwd,omitempty"`     // where it runs
