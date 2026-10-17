@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronDownIcon, HomeIcon, LocateFixedIcon, MinusIcon, PlusIcon, RotateCcwIcon, RotateCwIcon } from "lucide-react";
+import { ChevronDownIcon, GaugeIcon, HomeIcon, LocateFixedIcon, MinusIcon, PlusIcon, RotateCcwIcon, RotateCwIcon } from "lucide-react";
 import { Dashboards, MCP, NotedToday, Skills } from "../../wailsjs/go/app/App";
 import { EventsOn } from "../../wailsjs/runtime";
 import { useBees, useCodingRuns, useHive, useLinkedAgents } from "../canvas/data";
@@ -13,12 +13,14 @@ import { cluster, lensOf, type WorldData } from "./cluster";
 import { worldBus } from "./bus";
 import Inspector from "./Inspector";
 import Command from "./Command";
-import StatsBlock from "../components/StatsBlock";
+import StatsHud, { HoloTokens } from "./StatsHud";
 import { agendaOf, touchesNoted, type AgendaEntry } from "./agenda";
 import { dashboards as dashApi, type Dashboard } from "../lib/dashboards";
 import { Response } from "@/components/ai-elements/response";
 import { RefreshCwIcon, XIcon } from "lucide-react";
 import "./world.css";
+
+const HOLO_KEY = "superai-world-holo";
 
 /** The app's slower lists, refreshed now and then and on the events that
  *  change them. */
@@ -80,6 +82,22 @@ export default function World({ view }: { view: ViewKey }) {
   const [inset, setInsetState] = useState(0);
   const [dash, setDash] = useState("");
   const home = view === "home" || view === "chat";
+  const { t } = useI18n();
+  // The figures in the corners: on unless turned off, and remembered.
+  const [holo, setHolo] = useState(() => { try { return localStorage.getItem(HOLO_KEY) !== "0"; } catch { return true; } });
+  const flipHolo = () => setHolo((v) => { try { localStorage.setItem(HOLO_KEY, v ? "0" : "1"); } catch { /* this visit only */ } return !v; });
+  // S, when nothing is being typed into.
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() !== "s" || e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
+      if (e.isComposing || e.keyCode === 229) return;
+      if ((e.target as HTMLElement)?.closest?.("input,textarea,select,[contenteditable=''],[contenteditable=true]")) return;
+      e.preventDefault();
+      flipHolo();
+    };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, []);
 
   const hive = useHive();
   const runs = useCodingRuns();
@@ -170,11 +188,14 @@ export default function World({ view }: { view: ViewKey }) {
           worldBus.publish(null);
           engine.current?.look(l.x, l.z, l.zoom, "cluster");
         }}><LocateFixedIcon size={15} /></button>
+        <span className="wl-cam-sep" />
+        <button className={holo ? "on" : ""} aria-pressed={holo} aria-label={t("Stats")} title={`${t("Stats")} (S)`} onClick={flipHolo}><GaugeIcon size={15} /></button>
       </div>
       <div className="wl-corner">
         <Hud view={view} data={data} />
-        {home && <div className="wl-figs"><StatsBlock compact hive={hive} runs={runs} /></div>}
+        <HoloTokens on={holo} />
       </div>
+      <StatsHud hive={hive} runs={runs} on={holo} />
       <div ref={card} className="wl-callout" style={{ display: picked ? "" : "none" }}>
         {picked && <Inspector key={picked.kind + ":" + picked.id} picked={picked} data={data} onClose={close} openDash={setDash} open={(to, full) => { if (full) window.dispatchEvent(new CustomEvent("superai:window", { detail: to })); else navigate(to); }} />}
       </div>

@@ -124,7 +124,7 @@ const zh: Record<string,string> = {
   "Load":"负载", "{n} CPUs":"{n} 核", "RAM":"内存", "Disk":"磁盘", "free":"可用", "Up {time}":"已运行 {time}", "Services":"服务", "Command":"命令", "Reading the machine…":"正在读取机器状态…", "Reading services…":"正在读取服务…", "No services.":"没有服务。", "Log":"日志", "Restart":"重启", "Restart it?":"确定重启？", "A shell command on {name}":"在 {name} 上执行的命令", "Running…":"正在执行…", "exit {code}":"退出码 {code}", "The log is empty.":"日志为空。", "This machine's owner turned off commands and service actions.":"这台机器的主人关闭了命令和服务操作。",
   "Talk to {name}":"和{name}对话", "Choose figures":"选择指标", "Working now":"运行中", "Move up":"上移", "Move down":"下移",
   "tokens today":"今日 tokens", "tokens all time":"累计 tokens", "tokens this process":"本进程 tokens", "cached":"缓存", "turns":"轮次", "tool calls":"工具调用", "reads":"读取", "writes":"写入", "shells":"命令", "mcp calls":"MCP 调用", "memory calls":"记忆调用", "failed":"失败", "cpu":"CPU", "heap":"堆内存", "goroutines":"协程", "orders in flight":"进行中的指令", "coding runs going":"进行中的编程",
-  "today":"今日", "all time":"累计", "tokens":"tokens", "calls":"调用", "mcp":"MCP", "memory":"记忆", "orders":"指令", "coding":"编程",
+  "today":"今日", "all time":"累计", "tokens":"tokens", "calls":"调用", "mcp":"MCP", "memory":"记忆", "orders":"指令", "coding":"编程", "workers busy":"忙碌的工作节点", "failed today":"今日失败",
 };
 export function translate(key:string, values:Record<string,string|number> = {}) {
   let value = language === "zh-CN" ? zh[key] ?? key : key;
