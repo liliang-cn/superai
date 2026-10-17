@@ -47,12 +47,13 @@ type App struct {
 	gateForMCP *backend.ToolGate
 	// delegations are superai_hive_delegate's runs (mcp_hive.go).
 	delegations delegationStore
-	// ownTurnFn and appendFn, when set, stand in for a turn with this app's
-	// model and for writing an exchange into its conversation; a test sets
-	// them. queenToken is the queen engine's /mcp token, minted on first use
-	// (app_queen_engine.go).
+	// ownTurnFn, appendFn and turnsFn, when set, stand in for a turn with
+	// this app's model, for writing an exchange into its conversation and for
+	// reading one; a test sets them. queenToken is the queen engine's /mcp
+	// token, minted on first use (app_queen_engine.go).
 	ownTurnFn  func(requestID, sessionID, message, standIn string)
 	appendFn   func(sessionID, question, answer string) error
+	turnsFn    func(sessionID string) []backend.ChatTurn
 	queenToken queenTokenCache
 	// Direct MCP calls from chat-block buttons and home tiles. See
 	// app_actions.go.

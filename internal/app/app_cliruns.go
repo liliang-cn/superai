@@ -325,6 +325,7 @@ func (a *App) startCLIRun(o cliStart) (CLIRun, error) {
 		req.ExtraArgs = []string{"--mcp-config", string(cfg), "--strict-mcp-config"}
 		if q := o.Queen; q != nil {
 			req.SystemPrompt = q.SystemPrompt
+			req.ExtraArgs = append(req.ExtraArgs, q.Args...)
 			// --allowedTools takes every word after it, so a flag follows it
 			// and the prompt is not read as a tool.
 			if len(q.Allowed) > 0 {

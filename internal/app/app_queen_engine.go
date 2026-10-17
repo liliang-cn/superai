@@ -27,6 +27,7 @@ package app
 // fallback is switched off; then the turn fails with the reason.
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -61,9 +62,23 @@ type QueenKit struct {
 	// The hive server is one: the cluster-changing calls on it pass this
 	// app's own approval gate, so asking first as well would ask twice.
 	Allowed []string `json:"allowed,omitempty"`
-	// Env is set for the CLI alone: the tokens its servers' entries name.
+	// Env is set for the CLI alone: the tokens its servers' entries name,
+	// and what keeps the run lean.
 	Env map[string]string `json:"env,omitempty"`
+	// Args go on the command line as they are: queenLeanArgs.
+	Args []string `json:"args,omitempty"`
 }
+
+// queenLeanArgs keep the person's own Claude Code out of a queen run: no
+// user, project or local settings (so none of their hooks, plugins, model or
+// permission rules), no CLAUDE.md from them, no skills or slash commands. The
+// login is not a setting and still works. With --strict-mcp-config and
+// queenLeanEnv the run is the queen's prompt and the servers it is handed.
+var queenLeanArgs = []string{"--setting-sources", "", "--disable-slash-commands"}
+
+// queenLeanEnv turns off Claude's auto-memory for the run, which would read
+// and write notes under ~/.claude/projects for the workspace.
+var queenLeanEnv = map[string]string{"CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1"}
 
 // QueenRunRequest is a queen run asked of another machine over the agent link
 // or its API: StartCLIRun's arguments, the session to resume and the kit.
@@ -88,6 +103,23 @@ func (a *App) StartQueenCLIRun(r QueenRunRequest) (CLIRun, error) {
 		}
 		if name == "superai" {
 			return CLIRun{}, errors.New("the superai server name is this machine's approval channel")
+		}
+	}
+	// Only the lean flags and the variables the servers name, or the lean
+	// one: anything else on the command line or in the environment is that
+	// machine running more than a Claude for its queen.
+	if !slices.Equal(r.Kit.Args, queenLeanArgs) && len(r.Kit.Args) > 0 {
+		return CLIRun{}, fmt.Errorf("arguments %q are not the queen's", r.Kit.Args)
+	}
+	named := map[string]bool{}
+	if body, err := json.Marshal(r.Kit.Servers); err == nil {
+		for _, name := range backend.MCPEnvRefs(string(body)) {
+			named[name] = true
+		}
+	}
+	for k := range r.Kit.Env {
+		if _, lean := queenLeanEnv[k]; !lean && !named[k] {
+			return CLIRun{}, fmt.Errorf("%s is not a variable the queen's servers use", k)
 		}
 	}
 	kit := r.Kit
@@ -194,6 +226,12 @@ func (a *App) routeToEngine(requestID, sessionID, engine, message string) {
 	o := cliStart{Agent: engine, Prompt: message, Ask: !s.ExternalAgents.Unattended, Chat: sessionID, Queen: kit}
 	if prev := a.lastChatRun(sessionID, engine, true); prev != nil {
 		o.Thread, o.Session, o.Cwd, o.Model, o.Prev = prev.Thread, prev.Session, prev.Cwd, prev.Model, prev
+	}
+	// What was said here that the engine's session did not hear goes in
+	// front of the question: the whole conversation for a session new to
+	// it, the turns since its last answer for one it continues.
+	if earlier := handoffText(a.unseenTurns(sessionID, engine, o.Prev != nil)); earlier != "" {
+		o.Prompt = earlier + message
 	}
 
 	// The answer as it is written. Claude sends a message's text twice, as
@@ -322,6 +360,10 @@ func (a *App) queenKitFor(engine string, s *backend.Settings) (*QueenKit, error)
 		}},
 		Allowed: []string{"mcp__" + queenHiveServer},
 		Env:     map[string]string{queenTokenEnv: tok},
+		Args:    append([]string(nil), queenLeanArgs...),
+	}
+	for k, v := range queenLeanEnv {
+		kit.Env[k] = v
 	}
 	for _, name := range backend.QueenEngineServers {
 		if entry, env, ok := backend.EngineMCPServer(name, remote); ok {
@@ -527,4 +569,82 @@ func (a *App) validQueenEngine(next *backend.Settings, prev string) error {
 		}
 	}
 	return errors.New("Claude Code is not installed on this machine")
+}
+
+// How much of the earlier conversation an engine is handed: the last few
+// turns, each and all of them cut to a size that is context and not a
+// transcript.
+const (
+	handoffTurns    = 6
+	handoffTurnMax  = 1200
+	handoffTotalMax = 6000
+)
+
+// sessionTurns is a conversation as ChatHistory shows it, with who answered.
+func (a *App) sessionTurns(sessionID string) []backend.ChatTurn {
+	if a.turnsFn != nil {
+		return withTurnTimes(sessionID, a.turnsFn(sessionID))
+	}
+	a.mu.Lock()
+	svc := a.svc
+	a.mu.Unlock()
+	if svc == nil {
+		return nil
+	}
+	return withTurnTimes(sessionID, svc.SessionTurns(sessionID))
+}
+
+// unseenTurns are the turns of a conversation the engine's session has not
+// heard: all of them for a new session, those after its last answer for one
+// it resumes. A resumed session whose last answer is not found (the history
+// was compacted) is handed nothing rather than a guess.
+func (a *App) unseenTurns(sessionID, engine string, resumed bool) []backend.ChatTurn {
+	turns := a.sessionTurns(sessionID)
+	from := 0
+	if resumed {
+		from = -1
+		for i := len(turns) - 1; i >= 0; i-- {
+			if turns[i].Role == "assistant" && turns[i].Engine == engine {
+				from = i + 1
+				break
+			}
+		}
+		if from < 0 {
+			return nil
+		}
+	}
+	var out []backend.ChatTurn
+	for _, t := range turns[from:] {
+		if t.Kind == "" && (t.Role == "user" || t.Role == "assistant") && strings.TrimSpace(t.Content) != "" {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+// handoffText is the earlier conversation as it goes in front of a question,
+// oldest first and marked as what it is.
+func handoffText(turns []backend.ChatTurn) string {
+	if len(turns) > handoffTurns {
+		turns = turns[len(turns)-handoffTurns:]
+	}
+	var lines []string
+	size := 0
+	for i := len(turns) - 1; i >= 0; i-- {
+		who := "Person"
+		if turns[i].Role == "assistant" {
+			who = "Queen"
+		}
+		line := who + ": " + cliClip(strings.TrimSpace(turns[i].Content), handoffTurnMax)
+		if size+len(line) > handoffTotalMax {
+			break
+		}
+		size += len(line)
+		lines = append([]string{line}, lines...)
+	}
+	if len(lines) == 0 {
+		return ""
+	}
+	return "[Earlier in this conversation, oldest first. You did not see these turns; they are context, not requests.]\n" +
+		strings.Join(lines, "\n\n") + "\n[End of the earlier conversation. The person now says:]\n\n"
 }

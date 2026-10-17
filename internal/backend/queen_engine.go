@@ -89,3 +89,12 @@ func loopbackURL(raw string) bool {
 	h := strings.ToLower(u.Hostname())
 	return h == "localhost" || h == "::1" || strings.HasPrefix(h, "127.")
 }
+
+// MCPEnvRefs are the variables a piece of MCP config names as ${NAME}.
+func MCPEnvRefs(s string) []string {
+	var out []string
+	for _, m := range mcpEnvRef.FindAllStringSubmatch(s, -1) {
+		out = append(out, m[1])
+	}
+	return out
+}

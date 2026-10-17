@@ -104,6 +104,11 @@ func (a *App) lastChatRun(chat, agent string, queen bool) *CLIRun {
 	defer s.mu.Unlock()
 	var best *CLIRun
 	for _, r := range s.runs {
+		// The queen continues an answer, not a run that failed or was
+		// stopped: what she did not finish is not in the conversation.
+		if queen && r.State != "done" {
+			continue
+		}
 		if r.Chat == chat && r.Agent == agent && r.Queen == queen && (r.Session != "" || r.RemoteRun != "") && r.State != "running" {
 			if best == nil || r.Started.After(best.Started) {
 				c := *r
