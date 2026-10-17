@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "build:world-embed": "tsc && vite build --config vite.world-embed.config.ts",
     "preview": "vite preview",
     "test:desktop": "node --test scripts/desktop-regression.test.cjs"
   },

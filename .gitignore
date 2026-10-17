@@ -1,12 +1,14 @@
 build/bin
 node_modules
 frontend/dist
+frontend/dist-world-embed
 
 # build output
 /build/bin/
 # frontend
 /frontend/node_modules/
 /frontend/dist/
+/frontend/dist-world-embed/
 .DS_Store
 
 # scratch from driving the app under Playwright

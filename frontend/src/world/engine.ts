@@ -55,6 +55,19 @@ const AZIM = THREE.MathUtils.degToRad(45);
 const BASE = 104;
 const FOV = 30;
 
+/** How hard a host lets the world work. Every field left out keeps the
+ *  desktop's own choice. */
+export interface EngineOptions {
+  /** The highest device pixel ratio drawn at. */
+  maxPixelRatio?: number;
+  /** Soft shadows from the key light; a weaker GPU goes without. */
+  shadows?: boolean;
+  antialias?: boolean;
+  /** Frames a second while nothing is moving and nobody is touching the
+   *  world; 0 draws every frame. */
+  idleFps?: number;
+}
+
 export class WorldEngine<D> {
   readonly scene = new THREE.Scene();
   private renderer: THREE.WebGLRenderer;
@@ -85,10 +98,10 @@ export class WorldEngine<D> {
   private ro: ResizeObserver;
   readonly reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  constructor(private host: HTMLElement) {
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this.light ? 1.5 : 2));
-    this.renderer.shadowMap.enabled = true;
+  constructor(private host: HTMLElement, private opts: EngineOptions = {}) {
+    this.renderer = new THREE.WebGLRenderer({ antialias: opts.antialias ?? true, powerPreference: "high-performance" });
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, opts.maxPixelRatio ?? (this.light ? 1.5 : 2)));
+    this.renderer.shadowMap.enabled = opts.shadows ?? true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     // Khronos' neutral curve: whites stay white and the one blue stays that
@@ -121,6 +134,11 @@ export class WorldEngine<D> {
     this.controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
     // A hand on the world takes over from any flight under way.
     this.controls.addEventListener("start", () => { this.flight = null; this.glide = null; this.turn = null; });
+    // A hand on the world, or the camera still settling: full rate.
+    const touch = () => { this.touched = performance.now(); };
+    this.controls.addEventListener("change", touch);
+    this.renderer.domElement.addEventListener("pointerdown", touch);
+    this.renderer.domElement.addEventListener("wheel", touch, { passive: true });
 
     this.lights();
     this.ground();
@@ -149,7 +167,7 @@ export class WorldEngine<D> {
     // One key light, high and to the left, for form and a soft shadow.
     const sun = new THREE.DirectionalLight(0xfffcf7, 3.2);
     sun.position.set(-30, 70, 42);
-    sun.castShadow = true;
+    sun.castShadow = this.opts.shadows ?? true;
     const size = this.light ? 2048 : 4096;
     sun.shadow.mapSize.set(size, size);
     const s = sun.shadow.camera as THREE.OrthographicCamera;
@@ -606,11 +624,31 @@ export class WorldEngine<D> {
     this.camera.updateProjectionMatrix();
   }
 
+  private paused = false;
+  private touched = 0;
+  private drawn = 0;
+  /** Stops drawing altogether (a host that put the world out of sight), or
+   *  starts again without jumping the clock. */
+  setPaused(on: boolean) {
+    if (on === this.paused) return;
+    this.paused = on;
+    cancelAnimationFrame(this.raf);
+    this.raf = 0;
+    if (!on) { this.last = performance.now(); this.raf = requestAnimationFrame(this.loop); }
+  }
+
   private loop(now: number) {
+    if (this.paused) return;
     this.raf = requestAnimationFrame(this.loop);
     // Nothing is drawn while the tab is hidden, and coming back does not
     // jump the clock.
     if (document.hidden) { this.last = now; return; }
+    // Idle, a lighter host draws fewer frames; the clock still runs, so
+    // everything moves at the same speed, only less often.
+    const idle = this.opts.idleFps ?? 0;
+    if (idle > 0 && !this.flight && !this.glide && !this.turn && !this.spin && now - this.touched > 1500
+      && now - this.drawn < 1000 / idle - 4) return;
+    this.drawn = now;
     const dt = Math.min(1 / 20, Math.max(0, (now - this.last) / 1000));
     this.last = now;
     const t = (now - this.start) / 1000;

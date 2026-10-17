@@ -118,3 +118,10 @@ test('calendar aliases and timezone-equivalent meeting times do not duplicate ap
  const result=calendarEvents(meetings);assert.equal(result.length,3);assert.equal(result[0].id,'a');assert.equal(result[1].id,'c');assert.equal(meetings.length,4);
  assert.equal(calendarEvents([{title:'A',start_at:'2026-10-06T09:00:00Z'},{title:'B',start_at:'2026-10-06T09:00:00Z'}]).length,2);
 });
+test('world embed takes partial host data and rejects what is not a message',()=>{
+ const {normalize,parse}=load('src/world-embed/protocol.ts');
+ assert.equal(parse('not json'),null);assert.equal(parse({no:'type'}),null);assert.equal(parse('{"type":"camera","op":"zoomIn"}').op,'zoomIn');
+ const empty=normalize(undefined);assert.equal(empty.hive.members.length,0);assert.equal(empty.meter.total.tokens,0);assert.equal(empty.busy,false);
+ const d=normalize({hive:{members:[{name:'w1',state:'live'}],tasks:[{id:'t',worker:'w1',prompt:'p',state:'running'}]},linked:[{name:'mac',os:'darwin'}],meter:{members:[{name:'queen',tokens:5,live:true},{name:'w1',tokens:7}]}});
+ assert.equal(d.hive.tasks[0].tools,0);assert.equal(d.linked[0].clis.length,0);assert.equal(d.meter.total.tokens,12);assert.equal(d.meter.total.live,true);
+});
