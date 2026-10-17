@@ -7,6 +7,7 @@ import { useBees, useCodingRuns, useHive, useLinkedAgents } from "../canvas/data
 import { useAttentionState } from "../canvas/attention";
 import { useHiveMeter } from "../components/HiveMeter";
 import { useI18n } from "../lib/i18n";
+import { useDaylight } from "../lib/useDaylight";
 import type { ViewKey } from "../lib/types";
 import { WorldEngine, type Picked } from "./engine";
 import { cluster, lensOf, type WorldData } from "./cluster";
@@ -137,6 +138,8 @@ export default function World({ view }: { view: ViewKey }) {
     knowledge: 0, meter: { total: meter.total, members: meter.members }, busy,
   }), [hive, runs, bees, linked, attention, slow, meter, busy]);
   useEffect(() => { engine.current?.update(data); }, [data]);
+  const day = useDaylight();
+  useEffect(() => { engine.current?.setNight(!day); }, [day]);
 
   // A new page: a new lens, and nothing selected.
   useEffect(() => {
