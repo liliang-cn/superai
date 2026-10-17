@@ -26,5 +26,9 @@ html, body {
 }
 #world { position: fixed; inset: 0; isolation: isolate; --wl-ease: cubic-bezier(0.2, 0.8, 0.2, 1); }
 #world canvas { display: block; outline: none; }
+/* Spacing in a pill by margins, not flex gap: Chrome 74's WebView has no gap in flex rows. */
+.wl-pill { gap: 0; }
+.wl-pill > i { margin-right: 6px; }
+.wl-pill > span { margin-left: 6px; }
 /* Chinese labels: the system's own Han face after Geist's Latin. */
 .wl-pill, .wl-plot, .wl-burn, .wl-say { font-family: Geist, "Noto Sans CJK SC", "PingFang SC", system-ui, sans-serif; }

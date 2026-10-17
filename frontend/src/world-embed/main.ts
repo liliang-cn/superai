@@ -1,3 +1,4 @@
+import "./polyfills";
 import "../world/world.css";
 import "./embed.css";
 import { WorldEngine, type EngineOptions, type Picked } from "../world/engine";
@@ -107,8 +108,15 @@ function start() {
     return;
   }
   const e = engine;
-  e.add(cluster);
-  e.update(normalize(undefined));
+  try {
+    e.add(cluster);
+    e.update(normalize(undefined));
+  } catch (err) {
+    // A scene that cannot build says so rather than leaving the host waiting.
+    e.setPaused(true);
+    send({ type: "ready", version: PROTOCOL, webgl: false, error: String((err as Error)?.message ?? err) });
+    return;
+  }
   e.pickHandler((p: Picked | null) => {
     if (quiet) return;
     send(p ? { type: "pick", kind: p.kind, id: p.id, title: p.title } : { type: "pick", id: null });
