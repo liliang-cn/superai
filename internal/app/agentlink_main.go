@@ -89,6 +89,7 @@ func AgentMain(argv []string) {
 	defer stop()
 	go app.serveCCHookSocket(ctx)
 	go autoUpgradeCCHooks()
+	go autoInstallCLIHooks()
 	app.RunAgentLink(ctx, o)
 	fmt.Fprintln(os.Stderr, "superai-agent: stopped")
 }

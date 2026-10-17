@@ -34,6 +34,26 @@ export interface Hive {
   tasks: HiveTask[];
   /** Who thinks for the queen in a person's chat ("claude", "claude.mac"); empty is SuperAI's own agent. */
   engine?: string;
+  /** The relay agents (agent_link.relay_only): not machines, but the named
+   *  agents they serve are drawn as their own group. */
+  relays?: RelayAgent[];
+}
+
+/** A relay agent: what it serves (openclaw, hermes, pi …) and what is
+ *  running on it, by CLI. */
+export interface RelayAgent {
+  name: string;
+  host: string;
+  agents: { name: string; about: string }[];
+  cliActivity?: Record<string, CLIActivity>;
+}
+
+/** Patches one CLI's snapshot into a by-CLI map; null removes it. */
+export function withCLI(m: Record<string, CLIActivity> | undefined, cli: string, act: CLIActivity | null | undefined): Record<string, CLIActivity> {
+  const next = { ...(m ?? {}) };
+  if (act && act.sessions?.length) next[cli] = act;
+  else delete next[cli];
+  return next;
 }
 
 /** The hive as this SuperAI sees it: polled for the roster, kept current by
@@ -52,6 +72,7 @@ export function useHive(): Hive {
           role: s.role ?? "",
           name: s.name ?? "",
           engine: s.queen_engine ?? "",
+          relays: Array.isArray(s.relays) ? s.relays : [],
           members: [...(s.members ?? [])].sort((a: HiveMember, b: HiveMember) => a.name.localeCompare(b.name, undefined, { numeric: true })),
           // The first load seeds the orders; after that the stream is the source.
           tasks: cur.loaded ? cur.tasks : [...(s.tasks ?? [])].slice(-80).reverse(),
@@ -70,10 +91,17 @@ export function useHive(): Hive {
         return { ...cur, tasks };
       });
     });
+    // What runs on a relay moved: patched in place.
+    const offCli = EventsOn("cli:activity", (p: { agent?: string; cli?: string; activity?: CLIActivity | null }) => {
+      if (!p?.agent || !p.cli) return;
+      setHive((cur) => (cur.relays?.some((r) => r.name === p.agent)
+        ? { ...cur, relays: cur.relays.map((r) => (r.name === p.agent ? { ...r, cliActivity: withCLI(r.cliActivity, p.cli!, p.activity) } : r)) }
+        : cur));
+    });
     return () => {
       alive = false;
       window.clearInterval(t);
-      if (typeof off === "function") off();
+      [off, offCli].forEach((o) => typeof o === "function" && o());
     };
   }, []);
   return hive;
@@ -193,6 +221,10 @@ export interface LinkedAgent {
   /** What the interactive Claude Code sessions in its terminals are doing —
    *  not SuperAI's own runs. Absent when it has none. */
   activity?: CCActivity | null;
+  /** What every coding CLI running on it is doing, by CLI (claude too):
+   *  from the CLI's plugin or hooks, or from its processes. A CLI not
+   *  running is not in it. */
+  cliActivity?: Record<string, CLIActivity>;
 }
 
 /** One terminal Claude Code session, as its machine reports it: no prompt,
@@ -220,6 +252,13 @@ export interface CCActivity {
   at: string;
 }
 
+/** One CLI's sessions on a machine: "plugin" when its own plugin or hooks
+ *  said so, "process" when only its processes did (working while they use
+ *  the CPU, else idle). */
+export interface CLIActivity extends CCActivity {
+  source: "plugin" | "process";
+}
+
 /** The machines connected to core over the agent link — the ones it can run
  *  things on and look after. Core leaves out the hive's own workers, listed
  *  as such, and the relays kept only for their named agents; the filter here
@@ -238,8 +277,13 @@ export function useLinkedAgents(): LinkedAgent[] {
       if (!alive || !p?.agent) return;
       setList((cur) => cur.map((a) => (a.name === p.agent ? { ...a, activity: p.activity ?? null } : a)));
     });
+    // Any coding CLI's: the same, by CLI.
+    const offCli = EventsOn("cli:activity", (p: { agent?: string; cli?: string; activity?: CLIActivity | null }) => {
+      if (!alive || !p?.agent || !p.cli) return;
+      setList((cur) => cur.map((a) => (a.name === p.agent ? { ...a, cliActivity: withCLI(a.cliActivity, p.cli!, p.activity) } : a)));
+    });
     const t = window.setInterval(load, 30000);
-    return () => { alive = false; window.clearInterval(t); [off, offAct].forEach((o) => typeof o === "function" && o()); };
+    return () => { alive = false; window.clearInterval(t); [off, offAct, offCli].forEach((o) => typeof o === "function" && o()); };
   }, []);
   return list;
 }

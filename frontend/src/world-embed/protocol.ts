@@ -75,6 +75,10 @@ export function normalize(d: Partial<WorldData> | undefined): WorldData {
       members: arr<WorldData["hive"]["members"][number]>(h.members).filter((m) => m && typeof m.name === "string"),
       tasks: arr<WorldData["hive"]["tasks"][number]>(h.tasks).filter((t) => t && typeof t.id === "string")
         .map((t) => ({ ...t, worker: str(t.worker), prompt: str(t.prompt), tools: num(t.tools), started_at: str(t.started_at) })),
+      // HiveStatus.relays: the named agents each relay serves, and what runs there.
+      relays: arr<NonNullable<WorldData["hive"]["relays"]>[number]>(h.relays).filter((r) => r && typeof r.name === "string")
+        .map((r) => ({ ...r, host: str(r.host), agents: arr<{ name: string; about: string }>(r.agents).filter((a) => a && typeof a.name === "string"),
+          cliActivity: r.cliActivity && typeof r.cliActivity === "object" ? r.cliActivity : {} })),
     },
     runs: arr<WorldData["runs"][number]>(x.runs).map((r) => ({ ...r, agent: str(r.agent), prompt: str(r.prompt), state: str(r.state), started: str(r.started) })),
     bees: arr<WorldData["bees"][number]>(x.bees).filter((b) => b && typeof b.id === "string").map((b) => ({ ...b, name: str(b.name), goal: str(b.goal), paused: !!b.paused })),

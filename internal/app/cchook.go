@@ -50,6 +50,12 @@ const ccHookSocketName = "cc-hook.sock"
 // ccHookEvent is one Claude Code hook event, distilled: what the hook sends
 // to the local SuperAI.
 type ccHookEvent struct {
+	// CLI is the coding CLI the event is from when it is not Claude Code:
+	// opencode's plugin, pi's extension, codex's hooks (cli_activity.go).
+	CLI string `json:"cli,omitempty"`
+	// PID is that CLI's process, from its plugin: a session whose process
+	// is gone is over.
+	PID     int    `json:"pid,omitempty"`
 	Event   string `json:"event"`             // Stop | StopFailure | Notification | SessionStart | SessionEnd | PermissionRequest | PermissionClosed | UserPromptSubmit | PreToolUse | PostToolUse
 	Session string `json:"session"`           // Claude Code's session id
 	Cwd     string `json:"cwd,omitempty"`     // where it runs
@@ -209,6 +215,12 @@ func HookMain(argv []string) {
 	if os.Getenv("SUPERAI_CLI_RUN") != "" {
 		return
 	}
+	// `superai hook --cli codex <Event>`: another CLI's hooks, in Claude
+	// Code's shape; they only move that CLI's activity record.
+	if len(argv) >= 2 && argv[0] == "--cli" {
+		cliHook(argv[1], argv[2:])
+		return
+	}
 	name := ""
 	if len(argv) > 0 {
 		name = argv[0]
@@ -242,6 +254,42 @@ func HookMain(argv []string) {
 	if reply = strings.TrimSpace(reply); reply != "" && ev.Event == "Stop" {
 		_ = json.NewEncoder(os.Stdout).Encode(map[string]string{"decision": "block", "reason": reply})
 	}
+}
+
+// cliHookEvents are the events another CLI's hooks send (--cli), and the
+// name each travels as: an interrupted turn is over, as a stopped one is.
+var cliHookEvents = map[string]string{
+	"SessionStart": "SessionStart", "SessionEnd": "SessionEnd", "UserPromptSubmit": "UserPromptSubmit",
+	"PreToolUse": "PreToolUse", "PostToolUse": "PostToolUse", "PermissionRequest": "PermissionRequest",
+	"Stop": "Stop", "Interrupt": "Stop",
+}
+
+// cliHook hands one event of another CLI's hooks to the local SuperAI: the
+// session, the project, the tool's name. Nothing printed.
+func cliHook(cli string, argv []string) {
+	cli = cliName(cli)
+	if cli == "" || cli == "claude" {
+		return
+	}
+	hev, err := hooks.ParsePayload(io.LimitReader(os.Stdin, 8<<20))
+	if err != nil {
+		return
+	}
+	name := hev.EventName
+	if len(argv) > 0 {
+		name = argv[0]
+	}
+	ev := ccHookEvent{CLI: cli, Event: cliHookEvents[name], Session: strings.TrimSpace(hev.SessionID), Cwd: projectName(hev.Cwd)}
+	if ev.Event == "" || ev.Session == "" {
+		return
+	}
+	if name == "PreToolUse" || name == "PostToolUse" || name == "PermissionRequest" {
+		ev.Tool = strings.TrimSpace(hev.ToolName)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), ccActivityBudget)
+	defer cancel()
+	var out struct{}
+	postCCHook(ctx, ccHookSockets(), ccHookPath, ev, &out)
 }
 
 // activityHook is a prompt or a tool call: hand the local SuperAI the

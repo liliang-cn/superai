@@ -156,6 +156,9 @@
 .wi-dot.waiting { background: #2f6bff; }
 .wi-cc { display: flex; flex-direction: column; gap: 4px; }
 .wi-cc li { cursor: default; }
+.wi-cc-cli { display: flex; flex-direction: column; gap: 2px; }
+.wi-cc-name { margin: 2px 0 0; font: 600 12px Geist, system-ui, sans-serif; color: #1d2a33; display: flex; gap: 6px; align-items: baseline; }
+.wi-cc-name em { font: 400 10.5px "Geist Mono", monospace; font-style: normal; color: #7a8791; }
 .wi-cap { margin: 0; font: 600 10.5px "Geist Mono", monospace; letter-spacing: 0.04em; text-transform: uppercase; color: #5f6d77; }
 .wi-x { margin-left: auto; border: 0; background: #f1f4f8; border-radius: 6px; width: 22px; height: 22px; display: grid; place-items: center; cursor: pointer; }
 .wi-latest { background: #f6f8fa; border-radius: 8px; padding: 8px 9px; font-size: 12.5px; }

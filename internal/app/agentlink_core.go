@@ -47,6 +47,10 @@ type agentConn struct {
 	// activity is what the machine's interactive Claude Code sessions are
 	// doing, as it last said (cc:activity); nil when it has none.
 	activity atomic.Pointer[CCActivity]
+	// clis is what the machine's other coding CLIs are doing, by CLI, as it
+	// last said (cli:activity, cli_activity.go); cliMu orders the writes.
+	cliMu sync.Mutex
+	clis  atomic.Pointer[cliMap]
 }
 
 func (c *agentConn) name() string { return c.hello.GetName() }
@@ -353,6 +357,11 @@ type LinkedAgent struct {
 	// doing — the ones people run in its terminals, not SuperAI's own runs;
 	// absent when it has none.
 	Activity *CCActivity `json:"activity,omitempty"`
+	// CLIActivity is what every coding CLI running on it is doing, by CLI
+	// (claude too, the same as Activity): from the CLI's own plugin or hooks
+	// where it has them, else from its processes. A CLI not running is not
+	// in it; absent when none is.
+	CLIActivity cliMap `json:"cliActivity,omitempty"`
 }
 
 // LinkedAgents lists the machines connected to this core over the agent link:
@@ -382,6 +391,9 @@ func (a *App) LinkedAgentsAll() []LinkedAgent {
 			la.Agents = append(la.Agents, map[string]string{"name": n.GetName(), "about": n.GetAbout()})
 		}
 		la.Activity = c.activity.Load()
+		if m := c.cliActivity(); len(m) > 0 {
+			la.CLIActivity = m
+		}
 		la.Role = role(la.Name, c.hello.GetRole())
 		la.Machine = la.Role == agentRoleMachine
 		out = append(out, la)
@@ -585,6 +597,10 @@ func (s *agentLinkServer) receive(stream agentlinkpb.AgentLink_ConnectServer, c 
 			}
 			if k.Event.GetName() == ccActivityEvent {
 				s.app.noteCCActivity(c, k.Event.GetPayloadJson())
+				break
+			}
+			if k.Event.GetName() == cliActivityEvent {
+				s.app.noteCLIActivity(c, k.Event.GetPayloadJson())
 				break
 			}
 			c.mu.Lock()

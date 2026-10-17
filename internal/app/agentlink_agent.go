@@ -230,6 +230,7 @@ func (a *App) agentLinkOnce(ctx context.Context, o AgentLinkOptions) error {
 	// What the terminal Claude Code sessions here are doing, again: a core
 	// that just took this link has not heard it.
 	ccActivityState().resend()
+	cliTrackerState().resend()
 
 	// A changed set of CLIs or agents is said again, so core's menus follow.
 	go func() {

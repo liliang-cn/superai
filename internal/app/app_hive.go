@@ -167,6 +167,11 @@ func (a *App) HiveStatus() map[string]any {
 	// What the interactive Claude Code sessions on each machine are doing,
 	// by machine name ("core" is this one); only machines that have some.
 	out["cc_activity"] = a.CCActivityAll()
+	// Every coding CLI's, by machine (relays too) and then by CLI.
+	out["cli_activity"] = a.CLIActivityAll()
+	// The relay agents: not machines, but the named agents they serve are
+	// drawn as their own group (agent_link.relay_only).
+	out["relays"] = a.Relays()
 	// What the person calls the queen, for every client to show.
 	out["queen_name"], out["queen_aliases"] = s.QueenDisplayName(), s.QueenAliasList()
 	if s == nil {

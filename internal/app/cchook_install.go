@@ -498,7 +498,20 @@ func HookInstallMain(argv []string) {
 	}
 	if len(added) == 0 {
 		fmt.Printf("%s already has every SuperAI hook\n", *settings)
-		return
+	} else {
+		fmt.Printf("set %s in %s; Claude Code sessions started from now on use them\n", strings.Join(added, ", "), *settings)
 	}
-	fmt.Printf("set %s in %s; Claude Code sessions started from now on use them\n", strings.Join(added, ", "), *settings)
+	// The other CLIs that have a way in: opencode, pi, codex.
+	t := defaultCLIHookTargets(*bin)
+	t.Slim = *slim
+	done, errs := installCLIHooks(t)
+	for _, err := range errs {
+		fmt.Fprintln(os.Stderr, "superai hook install:", err)
+	}
+	for _, d := range done {
+		fmt.Printf("set %s\n", d)
+	}
+	if len(errs) > 0 {
+		os.Exit(1)
+	}
 }

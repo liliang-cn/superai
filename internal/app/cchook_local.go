@@ -325,6 +325,13 @@ func (a *App) handleCCHook(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad event", http.StatusBadRequest)
 		return
 	}
+	// Another CLI's plugin or hooks (cli_activity.go): only its activity
+	// record moves; the phone's notices and replies are Claude Code's.
+	if c := cliName(ev.CLI); c != "" && c != "claude" {
+		writeJSON(w, map[string]string{"reply": ""})
+		observeCLIActivity(ev)
+		return
+	}
 	reply := ccLocalState().observe(&ev, time.Now())
 	writeJSON(w, map[string]string{"reply": reply})
 	observeCCActivity(ev)
@@ -388,6 +395,7 @@ func (a *App) serveCCHookSocket(ctx context.Context) {
 		_ = os.Remove(path)
 	}()
 	a.startCCActivity(ctx)
+	a.startCLIActivity(ctx)
 	log.Printf("cc relay: hooks on %s", path)
 	if err := srv.Serve(lis); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Printf("cc relay: %v", err)
