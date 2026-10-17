@@ -27,7 +27,7 @@ func (a *App) routeToCLI(requestID, sessionID, name, prompt string) {
 	a.mu.Unlock()
 
 	o := cliStart{Agent: name, Prompt: prompt, Ask: !unattended, Chat: sessionID}
-	if prev := a.lastChatRun(sessionID, name); prev != nil {
+	if prev := a.lastChatRun(sessionID, name, false); prev != nil {
 		o.Thread, o.Session, o.Cwd, o.Model, o.Ask, o.Prev = prev.Thread, prev.Session, prev.Cwd, prev.Model, prev.Ask, prev
 	}
 
@@ -92,8 +92,10 @@ func (a *App) routeToCLI(requestID, sessionID, name, prompt string) {
 }
 
 // lastChatRun is the newest finished run of an agent started from a
-// conversation, the one whose session the next @mention continues.
-func (a *App) lastChatRun(chat, agent string) *CLIRun {
+// conversation, the one whose session the next @mention continues — or, with
+// queen, the next turn the agent thinks for the queen there. The two are kept
+// apart: "@claude fix the test" is not the queen's conversation.
+func (a *App) lastChatRun(chat, agent string, queen bool) *CLIRun {
 	if chat == "" {
 		return nil
 	}
@@ -102,7 +104,12 @@ func (a *App) lastChatRun(chat, agent string) *CLIRun {
 	defer s.mu.Unlock()
 	var best *CLIRun
 	for _, r := range s.runs {
-		if r.Chat == chat && r.Agent == agent && (r.Session != "" || r.RemoteRun != "") && r.State != "running" {
+		// The queen continues an answer, not a run that failed or was
+		// stopped: what she did not finish is not in the conversation.
+		if queen && r.State != "done" {
+			continue
+		}
+		if r.Chat == chat && r.Agent == agent && r.Queen == queen && (r.Session != "" || r.RemoteRun != "") && r.State != "running" {
 			if best == nil || r.Started.After(best.Started) {
 				c := *r
 				c.Events = nil

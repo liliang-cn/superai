@@ -323,6 +323,13 @@ func RunDelegated(ctx context.Context, env DelegateEnv, tasks []DelegateTask) []
 				out, err := env.Run(actx, w, delegatePreamble+t.Task)
 				timedOut := actx.Err() == context.DeadlineExceeded
 				cancel()
+				if out.Cancelled {
+					// Stopped on request: that is the answer for this piece,
+					// not a failure for someone else to retry.
+					res.Worker, res.Text, res.TaskID = w, out.Text, out.TaskID
+					res.Failed, res.Reason = true, out.Reason
+					return
+				}
 				if err == nil && !out.Failed {
 					res.Worker, res.Text, res.TaskID = w, out.Text, out.TaskID
 					return

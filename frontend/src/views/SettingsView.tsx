@@ -5,6 +5,7 @@ import AvatarSection from "./AvatarSection";
 import PairPhoneCard from "../components/PairPhoneCard";
 import LinkSuperAICard from "../components/LinkSuperAICard";
 import LocalHiveCard from "../components/LocalHiveCard";
+import QueenEngineCard from "../components/QueenEngineCard";
 import { AppStatus } from "../lib/types";
 import {
   CLIProxyAccounts,
@@ -829,6 +830,23 @@ export default function SettingsView({
               aliases={s.queen_aliases ?? []}
               onChange={(name, aliases) => setS((prev) => (prev ? Object.assign(new backend.Settings(prev), { queen_name: name, queen_aliases: aliases }) : prev))}
             />
+          {s.hive?.role !== "worker" && (
+            <QueenEngineCard
+              hidden={section !== "model"}
+              engine={s.hive?.queen_engine ?? ""}
+              fallback={s.hive?.queen_fallback !== false}
+              publicURL={s.hive?.public_url ?? ""}
+              onChange={(engine, fallback, publicURL) =>
+                setS((prev) =>
+                  prev
+                    ? Object.assign(new backend.Settings(prev), {
+                        hive: new backend.HiveSettings({ ...prev.hive, queen_engine: engine, queen_fallback: fallback, public_url: publicURL }),
+                      })
+                    : prev,
+                )
+              }
+            />
+          )}
           <div className="card" hidden={section !== "model"}>
             <div className="card-title">{translate("Accounts")}</div>
             <div className="card-desc">

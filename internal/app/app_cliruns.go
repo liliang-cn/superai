@@ -39,7 +39,9 @@ type CLIRunEvent struct {
 	Seq int       `json:"seq"`
 	At  time.Time `json:"at"`
 	// Kind is text (the agent talking), tool (a call), result (what came
-	// back), note (the CLI or this app saying something) or error.
+	// back), note (the CLI or this app saying something) or error. A queen
+	// run also has delta, a piece of text as it is written, which goes to the
+	// turn watching it and is not kept.
 	Kind   string `json:"kind"`
 	Text   string `json:"text,omitempty"`
 	Tool   string `json:"tool,omitempty"`
@@ -64,6 +66,10 @@ type CLIRun struct {
 	// Chat is the conversation an @mention started this run from, if any;
 	// the next @mention of the same agent there continues this session.
 	Chat string `json:"chat,omitempty"`
+	// Queen marks a run thinking for the queen (app_queen_engine.go). Its
+	// session is the conversation's queen session, apart from any @mention
+	// of the same agent there.
+	Queen bool `json:"queen,omitempty"`
 	// Remote is the SuperAI this run is happening on, by its name in Remote
 	// agents; RemoteRun is the run's id there. Empty for a run on this machine.
 	Remote    string        `json:"remote,omitempty"`
@@ -102,7 +108,9 @@ type cliStart struct {
 	Ask                       bool
 	Thread, Session, Chat     string
 	// Prev is the run this one continues, if any.
-	Prev  *CLIRun
+	Prev *CLIRun
+	// Queen, when set, makes the run one thinking for the queen.
+	Queen *QueenKit
 	Watch func(CLIRunEvent)
 	Done  func(CLIRun)
 }
@@ -286,7 +294,7 @@ func (a *App) startCLIRun(o cliStart) (CLIRun, error) {
 		thread = id
 	}
 	run := &CLIRun{ID: id, Thread: thread, Agent: agent, Prompt: prompt, Cwd: dir, Model: model,
-		Session: session, Ask: ask, Chat: o.Chat, State: "running", Started: time.Now()}
+		Session: session, Ask: ask, Chat: o.Chat, Queen: o.Queen != nil, State: "running", Started: time.Now()}
 
 	req := agentexec.Request{
 		RunID: id, Prompt: prompt, WorkspacePath: dir, Model: model,
@@ -301,6 +309,11 @@ func (a *App) startCLIRun(o cliStart) (CLIRun, error) {
 	// Strict, so the user's own servers stay out of a delegated run.
 	if agent == "claude" {
 		servers := map[string]any{}
+		if o.Queen != nil {
+			for name, entry := range o.Queen.Servers {
+				servers[name] = entry
+			}
+		}
 		if ask {
 			url, err := a.cliApproveURL(id)
 			if err != nil {
@@ -310,6 +323,21 @@ func (a *App) startCLIRun(o cliStart) (CLIRun, error) {
 		}
 		cfg, _ := json.Marshal(map[string]any{"mcpServers": servers})
 		req.ExtraArgs = []string{"--mcp-config", string(cfg), "--strict-mcp-config"}
+		if q := o.Queen; q != nil {
+			req.SystemPrompt = q.SystemPrompt
+			req.ExtraArgs = append(req.ExtraArgs, q.Args...)
+			// --allowedTools takes every word after it, so a flag follows it
+			// and the prompt is not read as a tool.
+			if len(q.Allowed) > 0 {
+				req.ExtraArgs = append(req.ExtraArgs, "--allowedTools", strings.Join(q.Allowed, ","))
+			}
+			// The answer goes into the chat as it is written, not a message
+			// at a time.
+			req.ExtraArgs = append(req.ExtraArgs, "--include-partial-messages")
+			for k, v := range q.Env {
+				req.Env[k] = v
+			}
+		}
 	}
 	if ask {
 		switch agent {
@@ -357,8 +385,11 @@ func (a *App) startCLIRun(o cliStart) (CLIRun, error) {
 	s.mu.Unlock()
 	a.emit("cli:run", runPayload(run))
 
+	// Read before the run is under way: from then on it changes under the
+	// store's lock, which this does not hold.
+	out := summaryOf(run)
 	go a.driveCLIRun(ctx, cancel, run, sess, spec)
-	return summaryOf(run), nil
+	return out, nil
 }
 
 func (a *App) driveCLIRun(ctx context.Context, cancel context.CancelFunc, run *CLIRun, sess agentexec.Session, spec agentexec.CommandSpec) {
@@ -438,6 +469,20 @@ func (a *App) finishCLIRun(run *CLIRun, set func(*CLIRun)) {
 
 func (a *App) addCLIEvent(run *CLIRun, e CLIRunEvent) {
 	s := a.cliStore()
+	if e.Kind == "delta" {
+		// Only the turn wants these. They are sent on from where the CLI
+		// runs, for a core mirroring it, and kept nowhere.
+		s.mu.Lock()
+		watch := s.watch[run.ID]
+		s.mu.Unlock()
+		if watch != nil {
+			watch(e)
+		}
+		if run.Remote == "" {
+			a.emit("cli:event", map[string]any{"run": run.ID, "thread": run.Thread, "event": e})
+		}
+		return
+	}
 	s.mu.Lock()
 	e.Seq = len(run.Events) + 1
 	if n := len(run.Events); n > 0 {
@@ -567,6 +612,16 @@ func normaliseCLIEvent(e agentexec.Event, calls map[string]string) []CLIRunEvent
 		case "error":
 			if t, _ := p["text"].(string); t != "" {
 				return []CLIRunEvent{{Kind: "error", Text: cliClip(t, cliRunTextMax)}}
+			}
+		case "stream_event":
+			// --include-partial-messages: a message's text as it is written.
+			raw, _ := p["raw"].(map[string]any)
+			ev, _ := raw["event"].(map[string]any)
+			delta, _ := ev["delta"].(map[string]any)
+			if pickStr(ev, "type") == "content_block_delta" && pickStr(delta, "type") == "text_delta" {
+				if t, _ := delta["text"].(string); t != "" {
+					return []CLIRunEvent{{Kind: "delta", Text: t}}
+				}
 			}
 		}
 	case agentexec.EventToolCall:

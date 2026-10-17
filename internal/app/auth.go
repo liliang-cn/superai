@@ -363,13 +363,26 @@ func requireAuth(c *credentials, next http.Handler) http.Handler {
 			}
 			// An integration's token opens one door. Known, so not a 401
 			// that would send it looking for a login form; just not here.
-			if c.integrations != nil && c.integrations.authenticate(bearer) {
-				if r.URL.Path == postNotificationPath {
-					next.ServeHTTP(w, r)
+			if c.integrations != nil {
+				if scope, ok := c.integrations.authenticate(bearer); ok {
+					switch scope {
+					case scopeQueen:
+						// /mcp, marked so the endpoint serves the queen's
+						// tools only (mcp_scope.go).
+						if r.URL.Path == mcpPath || strings.HasPrefix(r.URL.Path, mcpPath+"/") {
+							next.ServeHTTP(w, r.WithContext(withMCPScope(r.Context(), mcpScopeQueen)))
+							return
+						}
+						writeJSONStatus(w, http.StatusForbidden, map[string]any{"error": "a queen token may only reach /mcp"})
+					default:
+						if r.URL.Path == postNotificationPath {
+							next.ServeHTTP(w, r)
+							return
+						}
+						writeJSONStatus(w, http.StatusForbidden, map[string]any{"error": "an integration token may only call PostNotification"})
+					}
 					return
 				}
-				writeJSONStatus(w, http.StatusForbidden, map[string]any{"error": "an integration token may only call PostNotification"})
-				return
 			}
 		}
 		if hasSession(c, r) {

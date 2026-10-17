@@ -487,25 +487,35 @@ func (a *App) routeToRemote(requestID, sessionID, name, prompt string) {
 // and nothing more — the answer is already on screen, and failing the turn
 // over its bookkeeping would take away the thing that did work.
 func (a *App) recordRoutedExchange(sessionID, name, prompt, reply string) {
+	if err := a.appendExchange(sessionID, "@"+name+" "+prompt, reply); err != nil {
+		log.Printf("superai: could not record the @%s exchange in %s: %v", name, sessionID, err)
+	}
+}
+
+// appendExchange adds one question and its answer to a conversation that this
+// app's model did not answer itself. A conversation it cannot reach (no
+// session id, no backend) is skipped without an error.
+func (a *App) appendExchange(sessionID, question, answer string) error {
 	if strings.TrimSpace(sessionID) == "" {
-		return
+		return nil
+	}
+	if a.appendFn != nil {
+		return a.appendFn(sessionID, question, answer)
 	}
 	a.mu.Lock()
 	svc := a.svc
 	a.mu.Unlock()
 	if svc == nil {
-		return
+		return nil
 	}
 	inner := svc.Agent()
 	if inner == nil {
-		return
+		return nil
 	}
-	if err := inner.AppendSessionMessages(sessionID,
-		domain.Message{Role: "user", Content: "@" + name + " " + prompt},
-		domain.Message{Role: "assistant", Content: reply},
-	); err != nil {
-		log.Printf("superai: could not record the @%s exchange in %s: %v", name, sessionID, err)
-	}
+	return inner.AppendSessionMessages(sessionID,
+		domain.Message{Role: "user", Content: question},
+		domain.Message{Role: "assistant", Content: answer},
+	)
 }
 
 // routedTimeout is how long an addressed message may take, which depends on

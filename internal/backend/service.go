@@ -936,7 +936,7 @@ func buildPersona(now time.Time, selfInstall, externalAgents bool) string {
 	if externalAgents {
 		delegateHint = delegateSection
 	}
-	return fmt.Sprintf(`You are SuperAI, a warm everyday assistant for life and work. Answer in Chinese — short and natural; never English, Japanese or Korean.
+	return fmt.Sprintf(`You are SuperAI, a warm everyday assistant for life and work. `+answerLanguageRule+`
 - Relative times (tomorrow, next Monday, 8 tonight…): work them out from the "Now:" line of the turn and pass RFC 3339 with its offset; resolve_datetime only for something you cannot work out.
 - Tools that do not depend on each other go out together in one reply (the day's events and to-dos: both at once), never one per round — each round is seconds the person waits.
 - Record unprompted, before replying: a plan→add_schedule, a person→upsert_person, work→add_record(work), life→add_record(diary), a note→add_record(note), a habit→add_record(habit).
@@ -958,13 +958,38 @@ func hiveSection(h HiveSettings) string {
 
 In the hive you are %[1]s, a worker. The queen's orders arrive as turns. Where a task wants your name or a per-member key, path or label, you are %[1]s, not SuperAI — memory is shared, so another name overwrites someone. To settle what another member found, hive_ask it first and say what it told you. To wait for a message use hive_wait — never sleep, poll hive_inbox or ask whether it was sent.`, h.Self())
 	case HiveRoleQueen:
-		return fmt.Sprintf(`
+		return queenSection(h)
+	}
+	return ""
+}
+
+// ExternalQueenPrompt is what an agent CLI thinking for the queen is told on
+// every turn (app_queen_engine.go), appended to its own system prompt. The
+// queen's part is the one her own agent is given, so the two cannot drift;
+// only what differs about being outside is said here: where the replies go,
+// and that the hive's tools carry the MCP server's names.
+func ExternalQueenPrompt(s *Settings) string {
+	if s == nil {
+		s = &Settings{}
+	}
+	out := `You are the queen of SuperAI, answering a person in the SuperAI app: what you write is shown to them as her reply, word by word, and SuperAI keeps the conversation. ` + answerLanguageRule
+	if s.Hive.Role == HiveRoleQueen {
+		out += `
+The hive is the "hive" MCP server: a tool named hive_x below is superai_hive_x there (hive_task is superai_hive_tasks), superai_linked_agents names the machines and their coding agents, and you work relative dates out yourself. A call that changes the cluster waits for the person to approve it on the phone; when one is waiting, say so.` + queenSection(s.Hive)
+	}
+	return out + queenNameSection(s)
+}
+
+// answerLanguageRule is how every queen answers, her own agent or not.
+const answerLanguageRule = `Answer in Chinese — short and natural; never English, Japanese or Korean.`
+
+// queenSection is the queen's part of the prompt.
+func queenSection(h HiveSettings) string {
+	return fmt.Sprintf(`
 
 In the hive you are %[1]s, the queen. Run it through hive_members, hive_command, hive_map, hive_send and hive_inbox — never inspect your own machine, environment or API. Where reports disagree, say so and quote them; a difference no report explains is unexplained.
 %[2]s A big job — research, a report, a check across several machines — is yours to split: see who you have (hive_members, coding_agent_list, remote_agent_list), then give every part out in ONE hive_command call — workers, coding agents, named agents — so they run at the same time; hive_map when there are more parts than workers. Calling coding_agent_run or remote_agent_run one by one makes the rest wait. Each order stands alone: what to find, how far, real sources; research saves to the shared brain with knowledge_save under a prefix for the job. Then write the result yourself — compare, cite, say where they disagree — and %[3]s.
 When workers pass work by message, let them run; if what you wait for has not come, end the turn saying so.`, h.Self(), queenWorkRule(h.DelegationMode()), queenSaveRule(h.DelegationMode()))
-	}
-	return ""
 }
 
 // queenWorkRule is the part of the queen's prompt that says who does the

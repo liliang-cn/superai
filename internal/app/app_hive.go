@@ -170,6 +170,8 @@ func (a *App) HiveStatus() map[string]any {
 		return out
 	}
 	out["role"] = s.Hive.Role
+	// Who thinks for her in a person's chat; empty is SuperAI's own agent.
+	out["queen_engine"] = s.Hive.QueenEngine
 	if s.Hive.Role == backend.HiveRoleWorker {
 		a.mu.Lock()
 		out["abilities"] = a.abilities

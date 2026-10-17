@@ -3,6 +3,7 @@ package backend
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os/exec"
 	"regexp"
@@ -350,6 +351,9 @@ type RemoteResult struct {
 	TaskID string `json:"task_id,omitempty"`
 	// The tokens the worker said its turn used; nil when it said nothing.
 	Usage *domain.TokenUsage `json:"usage,omitempty"`
+	// Cancelled is an order stopped on request (TaskBoard.Stop), not one that
+	// failed: nobody should be handed it again.
+	Cancelled bool `json:"cancelled,omitempty"`
 }
 
 // Bracket announces one remote run to whoever watches the caller's own run,
@@ -413,17 +417,24 @@ func (r *RemoteRunner) Run(ctx context.Context, name, prompt string) (res Remote
 		id := NewTaskID()
 		r.board.StartAs(id, name, from, dir, prompt)
 		r.board.InSession(id, ChatSessionFrom(ctx))
+		// Its own context, so this one order can be stopped by its id.
+		runCtx, stop := context.WithCancelCause(ctx)
+		defer stop(nil)
+		r.board.OnStop(id, func() { stop(ErrTaskStopped) })
 		target := workerTarget{name: name, url: agent.URL, token: agent.Token, timeout: limit, taskID: id,
 			pulse: func(kind, tool string, n int) { r.board.Pulse(id, kind, tool, n) },
 			tools: WorkerTraceFrom(ctx)}
 		if r.approve != nil {
 			target.approve = func(ctx context.Context, req map[string]any) bool { return r.approve(ctx, name, req) }
 		}
-		out := askWorker(ctx, target, prompt, func(phase, tool string) { r.board.Progress(id, phase, tool) })
+		out := askWorker(runCtx, target, prompt, func(phase, tool string) { r.board.Progress(id, phase, tool) })
 		out.MS = time.Since(started).Milliseconds()
 		out.TaskID = id
+		if errors.Is(context.Cause(runCtx), ErrTaskStopped) {
+			out.Cancelled, out.Failed, out.Reason = true, true, ErrTaskStopped.Error()
+		}
 		switch {
-		case ctx.Err() != nil:
+		case runCtx.Err() != nil:
 			r.board.Finish(id, TaskCancelled, out.Text, out.Reason)
 		case out.Failed:
 			r.board.Finish(id, TaskFailed, out.Text, out.Reason)

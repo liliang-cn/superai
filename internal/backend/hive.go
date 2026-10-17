@@ -102,6 +102,33 @@ type HiveSettings struct {
 	// before it is given to another (or done by the queen). Zero takes
 	// DefaultDelegateTimeout.
 	DelegateTimeoutSeconds int `json:"delegate_timeout_seconds,omitempty"`
+	// QueenEngine is who thinks for the queen when a person talks to her: ""
+	// is SuperAI's own agent, a driven agent CLI's name ("claude", or
+	// "claude.mac" on a linked machine) hands those turns to it. Schedules,
+	// calls, dashboards and the hive's own traffic stay with SuperAI's agent
+	// whatever this says. See app_queen_engine.go.
+	QueenEngine string `json:"queen_engine,omitempty"`
+	// QueenFallback is whether SuperAI's own agent answers a turn the engine
+	// cannot take (not installed, machine offline, failed before saying
+	// anything), with a note saying so. Nil is on.
+	QueenFallback *bool `json:"queen_fallback,omitempty"`
+	// PublicURL is where machines other than this one reach its API, e.g.
+	// https://ai.superleo.cn. An engine on a linked machine calls /mcp there;
+	// empty takes $SUPERAI_PUBLIC_URL.
+	PublicURL string `json:"public_url,omitempty"`
+}
+
+// QueenFallsBack reports whether SuperAI's own agent stands in for an engine
+// that cannot take a turn.
+func (h HiveSettings) QueenFallsBack() bool { return h.QueenFallback == nil || *h.QueenFallback }
+
+// Public is PublicURL or $SUPERAI_PUBLIC_URL, without a trailing slash.
+func (h HiveSettings) Public() string {
+	u := strings.TrimSpace(h.PublicURL)
+	if u == "" {
+		u = strings.TrimSpace(os.Getenv("SUPERAI_PUBLIC_URL"))
+	}
+	return strings.TrimRight(u, "/")
 }
 
 // DefaultMaxConcurrentOrders is the worker's concurrency when the settings

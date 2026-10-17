@@ -91,12 +91,16 @@ func TestTheNextMentionContinuesTheNewestFinishedSessionOfThatAgentInThatChat(t 
 		"3": {ID: "3", Agent: "codex", Chat: "c1", Session: "cx", State: "done", Started: now},
 		"4": {ID: "4", Agent: "claude", Chat: "c2", Session: "other", State: "done", Started: now},
 		"5": {ID: "5", Agent: "claude", Chat: "c1", Session: "busy", State: "running", Started: now},
+		"6": {ID: "6", Agent: "claude", Chat: "c1", Session: "queen", Queen: true, State: "done", Started: now},
 	}
-	if r := a.lastChatRun("c1", "claude"); r == nil || r.Session != "new" {
+	if r := a.lastChatRun("c1", "claude", false); r == nil || r.Session != "new" {
 		t.Fatalf("got %+v", r)
 	}
-	if r := a.lastChatRun("c3", "claude"); r != nil {
+	if r := a.lastChatRun("c3", "claude", false); r != nil {
 		t.Fatalf("a fresh chat continued %+v", r)
+	}
+	if r := a.lastChatRun("c1", "claude", true); r == nil || r.Session != "queen" {
+		t.Fatalf("the queen's session %+v", r)
 	}
 }
 

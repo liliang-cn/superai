@@ -8,6 +8,12 @@
 // opens exactly one door, PostNotification (postnotify.go), and is answered
 // 403 everywhere else.
 //
+// A queen token is the same kind with a different door: an agent that runs
+// the queen's thinking from outside (Claude Code, say) commands the cluster
+// through /mcp and nothing else, and on /mcp only through the cluster-command
+// tools (queenMCPTools in mcp_scope.go). It cannot ask SuperAI, change its
+// settings, or reach the RPC surface.
+//
 // Kept like the devices are: only the sha256 is on disk, the secret is shown
 // once when minted, and each can be revoked on its own. The file is re-read
 // when it changes, because the ops path is `superai integration-token create`
@@ -38,14 +44,22 @@ const (
 	// integrationTokenPrefix tells an integration token apart in a config
 	// file or a log at a glance; nothing checks it.
 	integrationTokenPrefix = "sai_int_"
+	queenTokenPrefix       = "sai_queen_"
 	maxIntegrationName     = 60
+
+	// What a token opens. Empty is the original kind, which posts
+	// notifications; a file written before scopes existed reads as that.
+	scopeNotify = ""
+	scopeQueen  = "queen"
 )
 
 // integrationToken is one integration's credential, as kept on disk.
 type integrationToken struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	TokenHash string    `json:"token_hash"`
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	TokenHash string `json:"token_hash"`
+	// Scope is scopeNotify or scopeQueen.
+	Scope     string    `json:"scope,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
 	LastUsed  time.Time `json:"last_used,omitzero"`
 }
@@ -138,9 +152,14 @@ func (s *integrationStore) saveLocked() error {
 	return nil
 }
 
-// create mints a token for name and returns it with its secret, which exists
-// nowhere else afterwards.
+// create mints a notification token for name and returns it with its secret,
+// which exists nowhere else afterwards.
 func (s *integrationStore) create(name string) (integrationToken, string, error) {
+	return s.createScoped(name, scopeNotify)
+}
+
+// createScoped is create for a token of the given scope.
+func (s *integrationStore) createScoped(name, scope string) (integrationToken, string, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return integrationToken{}, "", errors.New("an integration token needs a name, e.g. openclaw")
@@ -153,8 +172,16 @@ func (s *integrationStore) create(name string) (integrationToken, string, error)
 	if err := s.reloadLocked(); err != nil {
 		return integrationToken{}, "", err
 	}
-	secret := integrationTokenPrefix + randomSecret(32)
-	t := integrationToken{ID: randomSecret(6), Name: name, TokenHash: hashToken(secret), CreatedAt: s.now().UTC()}
+	prefix := integrationTokenPrefix
+	switch scope {
+	case scopeNotify:
+	case scopeQueen:
+		prefix = queenTokenPrefix
+	default:
+		return integrationToken{}, "", fmt.Errorf("no token scope called %q", scope)
+	}
+	secret := prefix + randomSecret(32)
+	t := integrationToken{ID: randomSecret(6), Name: name, TokenHash: hashToken(secret), Scope: scope, CreatedAt: s.now().UTC()}
 	s.tokens = append(s.tokens, t)
 	if err := s.saveLocked(); err != nil {
 		s.tokens = s.tokens[:len(s.tokens)-1]
@@ -163,11 +190,11 @@ func (s *integrationStore) create(name string) (integrationToken, string, error)
 	return t, secret, nil
 }
 
-// authenticate says whether tok is a live integration token, noting when it
-// was last used.
-func (s *integrationStore) authenticate(tok string) bool {
+// authenticate says whether tok is a live integration token, and which door
+// it opens, noting when it was last used.
+func (s *integrationStore) authenticate(tok string) (scope string, ok bool) {
 	if tok == "" {
-		return false
+		return "", false
 	}
 	h := hashToken(tok)
 	s.mu.Lock()
@@ -176,7 +203,7 @@ func (s *integrationStore) authenticate(tok string) bool {
 		// A file that cannot be read authenticates nobody, and keeps nobody
 		// it already had: a revocation must not be undone by a bad write.
 		s.tokens = nil
-		return false
+		return "", false
 	}
 	for i := range s.tokens {
 		if subtle.ConstantTimeCompare([]byte(s.tokens[i].TokenHash), []byte(h)) == 1 {
@@ -185,7 +212,27 @@ func (s *integrationStore) authenticate(tok string) bool {
 				s.tokens[i].LastUsed = now
 				_ = s.saveLocked() // a missed last-used is not worth refusing a post over
 			}
-			return true
+			return s.tokens[i].Scope, true
+		}
+	}
+	return "", false
+}
+
+// holds reports whether tok is a live token of scope, without counting this
+// as a use of it.
+func (s *integrationStore) holds(tok, scope string) bool {
+	if tok == "" {
+		return false
+	}
+	h := hashToken(tok)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.reloadLocked() != nil {
+		return false
+	}
+	for _, t := range s.tokens {
+		if subtle.ConstantTimeCompare([]byte(t.TokenHash), []byte(h)) == 1 {
+			return t.Scope == scope
 		}
 	}
 	return false
@@ -219,8 +266,11 @@ func (s *integrationStore) revoke(id string) (bool, error) {
 
 // IntegrationToken is an integration token as listed: never the secret.
 type IntegrationToken struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	// Scope is "notify" (PostNotification only) or "queen" (/mcp's
+	// cluster-command tools only).
+	Scope     string    `json:"scope"`
 	CreatedAt time.Time `json:"created_at"`
 	LastUsed  time.Time `json:"last_used,omitzero"`
 }
@@ -232,7 +282,11 @@ type NewIntegrationToken struct {
 }
 
 func integrationTokenView(t integrationToken) IntegrationToken {
-	return IntegrationToken{ID: t.ID, Name: t.Name, CreatedAt: t.CreatedAt, LastUsed: t.LastUsed}
+	scope := t.Scope
+	if scope == scopeNotify {
+		scope = "notify"
+	}
+	return IntegrationToken{ID: t.ID, Name: t.Name, Scope: scope, CreatedAt: t.CreatedAt, LastUsed: t.LastUsed}
 }
 
 // CreateIntegrationToken mints a token that may only call PostNotification:
@@ -242,11 +296,28 @@ func integrationTokenView(t integrationToken) IntegrationToken {
 //
 // The token is in this answer and nowhere else.
 func (a *App) CreateIntegrationToken(name string) (NewIntegrationToken, error) {
+	return createScopedToken(name, scopeNotify)
+}
+
+// CreateQueenToken mints a token for an agent that runs the queen from
+// outside: it reaches /mcp and nothing else, and there only the
+// cluster-command tools (no superai_ask, no settings):
+//
+//	POST /api/rpc/CreateQueenToken  ["claude-queen"]
+//	→ {"id":"…","name":"claude-queen","scope":"queen","created_at":"…","token":"sai_queen_…"}
+//
+// Listed and revoked with the integration tokens. The token is in this answer
+// and nowhere else.
+func (a *App) CreateQueenToken(name string) (NewIntegrationToken, error) {
+	return createScopedToken(name, scopeQueen)
+}
+
+func createScopedToken(name, scope string) (NewIntegrationToken, error) {
 	s, err := openIntegrations(integrationsPath())
 	if err != nil {
 		return NewIntegrationToken{}, err
 	}
-	t, secret, err := s.create(name)
+	t, secret, err := s.createScoped(name, scope)
 	if err != nil {
 		return NewIntegrationToken{}, &callError{http.StatusBadRequest, err.Error()}
 	}
@@ -291,7 +362,8 @@ func (a *App) RevokeIntegrationToken(id string) error {
 // IntegrationTokenMain is `superai integration-token`, for whoever operates
 // the server and has its data directory (SUPERAI_HOME) at hand:
 //
-//	superai integration-token create <name>   prints the token, once
+//	superai integration-token create <name>           prints the token, once
+//	superai integration-token create --queen <name>   a queen token, likewise
 //	superai integration-token list
 //	superai integration-token revoke <id>
 //
@@ -299,7 +371,8 @@ func (a *App) RevokeIntegrationToken(id string) error {
 // up on the next request.
 func IntegrationTokenMain(argv []string) {
 	usage := func() {
-		fmt.Fprintln(os.Stderr, "usage: superai integration-token create <name> | list | revoke <id>")
+		fmt.Fprintln(os.Stderr, "usage: superai integration-token create [--queen] <name> | list | revoke <id>")
+		fmt.Fprintln(os.Stderr, "  --queen mints a token that reaches only /mcp's cluster-command tools")
 		fmt.Fprintln(os.Stderr, "  tokens are kept in", integrationsPath(), "(set SUPERAI_HOME to change)")
 		os.Exit(2)
 	}
@@ -313,15 +386,23 @@ func IntegrationTokenMain(argv []string) {
 	a := &App{}
 	switch args[0] {
 	case "create":
-		if len(args) != 2 {
+		cf := flag.NewFlagSet("integration-token create", flag.ExitOnError)
+		cf.Usage = usage
+		queen := cf.Bool("queen", false, "mint a queen token: /mcp's cluster-command tools only")
+		_ = cf.Parse(args[1:])
+		if cf.NArg() != 1 {
 			usage()
 		}
-		t, err := a.CreateIntegrationToken(args[1])
+		mint, what := a.CreateIntegrationToken, "it can only call PostNotification"
+		if *queen {
+			mint, what = a.CreateQueenToken, "it can only reach /mcp, and there only the cluster-command tools"
+		}
+		t, err := mint(cf.Arg(0))
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "superai:", err)
 			os.Exit(1)
 		}
-		fmt.Fprintf(os.Stderr, "created integration token %s (%s); it can only call PostNotification.\n", t.ID, t.Name)
+		fmt.Fprintf(os.Stderr, "created %s token %s (%s); %s.\n", t.Scope, t.ID, t.Name, what)
 		fmt.Fprintln(os.Stderr, "This is the only time it is shown:")
 		// The secret alone on stdout, so it can be piped straight into a
 		// secret store without anything else around it.
@@ -333,13 +414,13 @@ func IntegrationTokenMain(argv []string) {
 			os.Exit(1)
 		}
 		w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
-		fmt.Fprintln(w, "ID\tNAME\tCREATED\tLAST USED")
+		fmt.Fprintln(w, "ID\tNAME\tSCOPE\tCREATED\tLAST USED")
 		for _, t := range tokens {
 			last := "never"
 			if !t.LastUsed.IsZero() {
 				last = t.LastUsed.Local().Format(time.DateTime)
 			}
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", t.ID, t.Name, t.CreatedAt.Local().Format(time.DateTime), last)
+			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", t.ID, t.Name, t.Scope, t.CreatedAt.Local().Format(time.DateTime), last)
 		}
 		_ = w.Flush()
 	case "revoke":

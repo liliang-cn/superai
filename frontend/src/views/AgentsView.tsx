@@ -123,6 +123,8 @@ export default function AgentsView() {
       });
     });
     const offEv = EventsOn("cli:event", (p: { run: string; event: Ev }) => {
+      // A queen run's text as it is written; the run keeps it whole.
+      if ((p?.event as { kind?: string } | undefined)?.kind === "delta") return;
       setEvents((prev) => {
         const list = prev[p.run];
         if (!list) return prev; // not opened yet; the detail load brings it

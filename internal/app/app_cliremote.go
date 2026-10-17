@@ -195,9 +195,15 @@ func (a *App) startRemoteCLIRun(o cliStart, host string) (CLIRun, error) {
 
 	var there CLIRun
 	callCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	if o.Prev != nil && o.Prev.RemoteRun != "" {
+	switch {
+	case o.Queen != nil:
+		// The queen's prompt and servers go every turn, a resumed one too,
+		// so it is a start of its own with the session to resume.
+		err = r.rpc(callCtx, "StartQueenCLIRun", []any{QueenRunRequest{Agent: o.Agent, Prompt: o.Prompt,
+			Cwd: o.Cwd, Model: o.Model, Ask: o.Ask, Session: o.Session, Kit: *o.Queen}}, &there)
+	case o.Prev != nil && o.Prev.RemoteRun != "":
 		err = r.rpc(callCtx, "FollowUpCLIRun", []any{o.Prev.RemoteRun, o.Prompt}, &there)
-	} else {
+	default:
 		err = r.rpc(callCtx, "StartCLIRun", []any{o.Agent, o.Prompt, o.Cwd, o.Model, o.Ask}, &there)
 	}
 	cancel()
@@ -213,7 +219,7 @@ func (a *App) startRemoteCLIRun(o cliStart, host string) (CLIRun, error) {
 		thread = id
 	}
 	run := &CLIRun{ID: id, Thread: thread, Agent: o.Agent + "." + host, Prompt: o.Prompt, Cwd: there.Cwd,
-		Model: there.Model, Session: there.Session, Ask: there.Ask, Chat: o.Chat, State: "running",
+		Model: there.Model, Session: there.Session, Ask: there.Ask, Chat: o.Chat, Queen: o.Queen != nil, State: "running",
 		Started: time.Now(), Remote: host, RemoteRun: there.ID}
 	s := a.cliStore()
 	s.mu.Lock()
@@ -232,12 +238,13 @@ func (a *App) startRemoteCLIRun(o cliStart, host string) (CLIRun, error) {
 	s.mu.Unlock()
 	a.emit("cli:run", runPayload(run))
 
+	out := summaryOf(run) // before the mirror starts changing it
 	go func() {
 		defer stop()
 		defer resp.Body.Close()
 		a.mirrorRemoteRun(ctx, r, run, there, resp.Body)
 	}()
-	return summaryOf(run), nil
+	return out, nil
 }
 
 // events opens the remote's event stream: SSE over HTTP, or the agent link's

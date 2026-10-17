@@ -313,3 +313,39 @@ func TestConcurrentDecisionsAllLandInTheLog(t *testing.T) {
 		t.Fatalf("audit has %d entries, want 8 — concurrent writes are losing decisions", len(entries))
 	}
 }
+
+// The calls that change the cluster are asked about by name and arguments,
+// whoever makes them: the queen's own run and an agent over /mcp share this
+// policy.
+func TestClusterCallsAreAlwaysAsked(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		args map[string]any
+		want bool
+	}{
+		{"machine_act", map[string]any{"machine": "orange1", "action": "exec", "command": "uptime"}, true},
+		{"machine_act", map[string]any{"machine": "orange1", "action": "restart", "service": "nginx"}, true},
+		{"hive_task_cancel", map[string]any{"id": "x"}, true},
+		{"hive_retire", map[string]any{"count": 1, "force": true}, true},
+		{"hive_retire", map[string]any{"count": 1}, false},
+		{"hive_retire", map[string]any{"count": 1, "force": false}, false},
+		{"schedule_remove", map[string]any{"id": "x"}, true},
+		{"machine_inspect", map[string]any{"machine": "orange1"}, false},
+	} {
+		if got := toolNeedsApproval(agent.PermissionRequest{ToolName: c.name, ToolArgs: c.args}); got != c.want {
+			t.Errorf("%s %v: asked=%v, want %v", c.name, c.args, got, c.want)
+		}
+	}
+	// The card says what and where.
+	for args, want := range map[string]string{
+		`{"machine":"orange1","action":"exec","command":"df -h"}`:     "df -h   on orange1",
+		`{"machine":"","action":"restart","service":"superai"}`:       "restart superai   on core",
+		`{"machine":"sds-b","action":"stop","service":"openclaw-gw"}`: "stop openclaw-gw   on sds-b",
+	} {
+		var m map[string]any
+		_ = json.Unmarshal([]byte(args), &m)
+		if got := approvalCommand("machine_act", m); got != want {
+			t.Errorf("card for %s = %q, want %q", args, got, want)
+		}
+	}
+}

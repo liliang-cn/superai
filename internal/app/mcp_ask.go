@@ -225,7 +225,9 @@ func (a *App) ask(ctx context.Context, in askIn, progress func(string)) (askOut,
 
 	send := a.askFn
 	if send == nil {
-		send = func(session, message string) string { return a.SendChat(session, message, nil) }
+		// SuperAI's own agent, not the queen engine: whoever asks over MCP is
+		// as likely as not that engine's CLI, and would be answering itself.
+		send = func(session, message string) string { return a.sendChat(session, message, nil, true) }
 	}
 	requestID := send(conv, msg)
 	st := newAskState(conv, requestID)

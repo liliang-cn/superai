@@ -143,3 +143,11 @@ export function withoutCallNotes(text: string): string {
   const i = text.indexOf("\n\n(This is a voice call:");
   return (i >= 0 ? text.slice(0, i) : text).split("[end call]").join("").trim();
 }
+
+/** How a person reads a queen engine's name: "claude.mac" is "Claude Code · mac". */
+export function engineLabel(engine: string): string {
+  const dot = engine.indexOf(".");
+  const agent = dot > 0 ? engine.slice(0, dot) : engine;
+  const name = agent === "claude" ? "Claude Code" : agent;
+  return dot > 0 && dot < engine.length - 1 ? `${name} · ${engine.slice(dot + 1)}` : name;
+}

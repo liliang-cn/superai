@@ -58,6 +58,8 @@ export function ClearNotifications():Promise<Record<string, any>>;
 
 export function CreateIntegrationToken(arg1:string):Promise<app.NewIntegrationToken>;
 
+export function CreateQueenToken(arg1:string):Promise<app.NewIntegrationToken>;
+
 export function Dashboard():Promise<Record<string, any>>;
 
 export function Dashboards():Promise<Array<backend.Dashboard>>;
@@ -214,6 +216,8 @@ export function PreviewPrompt(arg1:string,arg2:string):Promise<backend.PromptPre
 
 export function Pulse():Promise<backend.PulseSnapshot>;
 
+export function QueenEngines():Promise<Record<string, any>>;
+
 export function QueenIdentity():Promise<Record<string, any>>;
 
 export function Quotes(arg1:Array<string>):Promise<Record<string, any>>;
@@ -266,6 +270,8 @@ export function SearchMCPServers(arg1:string):Promise<Record<string, any>>;
 
 export function SearchSkills(arg1:string):Promise<Array<backend.SkillCandidate>>;
 
+export function SendCallChat(arg1:string,arg2:string,arg3:Array<string>):Promise<string>;
+
 export function SendChat(arg1:string,arg2:string,arg3:Array<string>):Promise<string>;
 
 export function SetAway(arg1:boolean):Promise<app.CCPresence>;
@@ -275,6 +281,8 @@ export function SetDashboardCron(arg1:string,arg2:string):Promise<Record<string,
 export function SetHomeLayout(arg1:any,arg2:number):Promise<Record<string, any>>;
 
 export function SetLocalHive(arg1:boolean,arg2:number,arg3:number):Promise<backend.Settings>;
+
+export function SetQueenEngine(arg1:string,arg2:boolean):Promise<Record<string, any>>;
 
 export function SetQueenIdentity(arg1:string,arg2:Array<string>):Promise<Record<string, any>>;
 
@@ -293,6 +301,8 @@ export function StandingReports(arg1:string):Promise<Array<app.AgentReportEntry>
 export function StandingWakes(arg1:number):Promise<Array<app.WakeMark>>;
 
 export function StartCLIRun(arg1:string,arg2:string,arg3:string,arg4:string,arg5:boolean):Promise<app.CLIRun>;
+
+export function StartQueenCLIRun(arg1:app.QueenRunRequest):Promise<app.CLIRun>;
 
 export function StartYoloMode():Promise<Record<string, any>>;
 

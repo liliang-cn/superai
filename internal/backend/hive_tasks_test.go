@@ -408,3 +408,109 @@ func TestAnOrderRemembersItsConversation(t *testing.T) {
 		t.Fatal("a context without a conversation named one")
 	}
 }
+
+func TestOnlyARunningTaskWithAStopCanBeStopped(t *testing.T) {
+	b := NewTaskBoard(nil)
+	running := b.Start("w1", TaskOut, "long job")
+	foreign := b.Start("w2", TaskPeer, "someone else's")
+	finished := b.Start("w3", TaskOut, "short job")
+	stopped := 0
+	b.OnStop(running, func() { stopped++ })
+	b.OnStop(finished, func() { t.Error("a finished task was stopped") })
+	b.Finish(finished, TaskDone, "ok", "")
+	// A stop set after the end is not kept.
+	b.OnStop(finished, func() { t.Error("a finished task was stopped") })
+
+	for _, c := range []struct {
+		id, wantErr string
+		stoppable   bool
+	}{
+		{"nope", "no such task", false},
+		{finished, "already ended: done", false},
+		{foreign, "cannot stop it", false},
+		{running, "", true},
+	} {
+		if got := b.Stoppable(c.id); got != c.stoppable {
+			t.Errorf("%s stoppable=%v, want %v", c.id, got, c.stoppable)
+		}
+		err := b.Stop(c.id)
+		switch {
+		case c.wantErr == "" && err != nil:
+			t.Errorf("%s: %v", c.id, err)
+		case c.wantErr != "" && (err == nil || !strings.Contains(err.Error(), c.wantErr)):
+			t.Errorf("%s: err %v, want %q", c.id, err, c.wantErr)
+		}
+	}
+	if stopped != 1 {
+		t.Fatalf("stopped %d times", stopped)
+	}
+	// Settling drops the stop.
+	b.Finish(running, TaskCancelled, "", "")
+	if b.Stoppable(running) {
+		t.Error("a settled task is still stoppable")
+	}
+}
+
+// RemoteRunner gives each order to a worker its own stop, and an order
+// stopped that way comes back Cancelled, settles as cancelled, and is
+// stopped on the worker too.
+func TestARunningOrderStopsByItsID(t *testing.T) {
+	cancelled := make(chan struct{}, 1)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/events", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		fmt.Fprint(w, ": connected\n\n")
+		w.(http.Flusher).Flush()
+		<-r.Context().Done()
+	})
+	mux.HandleFunc("/api/rpc/SendChat", func(w http.ResponseWriter, r *http.Request) { _ = json.NewEncoder(w).Encode("req-1") })
+	mux.HandleFunc("/api/rpc/CancelChat", func(w http.ResponseWriter, r *http.Request) {
+		select {
+		case cancelled <- struct{}{}:
+		default:
+		}
+		_ = json.NewEncoder(w).Encode("ok")
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	board := NewTaskBoard(nil)
+	r := NewRemoteRunner(RemoteAgents{Enabled: true, Agents: map[string]RemoteAgent{"w1": {URL: srv.URL}}})
+	r.SetBoard(board)
+	done := make(chan RemoteResult, 1)
+	go func() {
+		res, _ := r.Run(context.Background(), "w1", "do a long thing")
+		done <- res
+	}()
+	var id string
+	for deadline := time.Now().Add(5 * time.Second); id == "" && time.Now().Before(deadline); time.Sleep(5 * time.Millisecond) {
+		for _, tk := range board.Recent() {
+			if tk.State == TaskRunning && board.Stoppable(tk.ID) {
+				id = tk.ID
+			}
+		}
+	}
+	if id == "" {
+		t.Fatal("the order never became stoppable")
+	}
+	if err := board.Stop(id); err != nil {
+		t.Fatal(err)
+	}
+	var res RemoteResult
+	select {
+	case res = <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the stopped order did not return")
+	}
+	if !res.Cancelled || !res.Failed || res.TaskID != id {
+		t.Fatalf("result %+v", res)
+	}
+	if tk, _ := board.Get(id); tk.State != TaskCancelled {
+		t.Fatalf("board says %s", tk.State)
+	}
+	select {
+	case <-cancelled:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the worker was not told to stop")
+	}
+}

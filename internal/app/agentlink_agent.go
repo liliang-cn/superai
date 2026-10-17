@@ -45,6 +45,8 @@ type AgentLinkOptions struct {
 var agentCallable = map[string]bool{
 	"StartCLIRun": true, "FollowUpCLIRun": true, "CancelCLIRun": true,
 	"CLIRuns": true, "CLIRunDetail": true,
+	// A coding agent here thinking for core's queen (app_queen_engine.go).
+	"StartQueenCLIRun":     true,
 	"ExternalAgentsStatus": true, "RemoteAgentNames": true, "AskRemoteAgent": true,
 	"PendingToolApprovals": true, "ResolveToolApproval": true, "ToolApprovalInfo": true,
 	// An answer from the phone for one of this machine's terminal Claude Code

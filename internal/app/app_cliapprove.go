@@ -108,6 +108,11 @@ func (a *App) cliApprove1(ctx context.Context, runID string, in cliApproveIn) *m
 	if run == nil || run.State != "running" {
 		return answer(map[string]any{"behavior": "deny", "message": "this run is no longer active"})
 	}
+	// Thinking for the queen, an MCP tool is asked about when the queen's
+	// own call of it would be (a delete, say), not every time.
+	if run.Queen && a.queenMayCall(in.ToolName, in.Input) {
+		return answer(map[string]any{"behavior": "allow", "updatedInput": in.Input})
+	}
 	_, detail, _ := toolCallParts(map[string]any{"name": in.ToolName, "input": in.Input})
 	a.addCLIEvent(run, CLIRunEvent{Kind: "note", Tool: in.ToolName, Detail: detail, Text: "waiting for approval"})
 

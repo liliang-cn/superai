@@ -32,6 +32,8 @@ export interface Hive {
   name: string;
   members: HiveMember[];
   tasks: HiveTask[];
+  /** Who thinks for the queen in a person's chat ("claude", "claude.mac"); empty is SuperAI's own agent. */
+  engine?: string;
 }
 
 /** The hive as this SuperAI sees it: polled for the roster, kept current by
@@ -49,6 +51,7 @@ export function useHive(): Hive {
           loaded: true,
           role: s.role ?? "",
           name: s.name ?? "",
+          engine: s.queen_engine ?? "",
           members: [...(s.members ?? [])].sort((a: HiveMember, b: HiveMember) => a.name.localeCompare(b.name, undefined, { numeric: true })),
           // The first load seeds the orders; after that the stream is the source.
           tasks: cur.loaded ? cur.tasks : [...(s.tasks ?? [])].slice(-80).reverse(),
