@@ -84,6 +84,9 @@ type alarmWatcher struct {
 	// pusher is nil when pushes are not configured.
 	pusher  func() alarmPusher
 	devices func() (*deviceStore, error)
+	// vendors picks the sender for an Android phone's provider
+	// (vendorSenderFor when nil). See push_vendor.go.
+	vendors func(provider string) vendorSender
 	// statePath keeps the last version across restarts.
 	statePath string
 
@@ -164,11 +167,7 @@ func (w *alarmWatcher) observe(ctx context.Context, v string) {
 // pushAll sends each registered phone the silent push, and forgets the
 // tokens Apple says are dead.
 func (w *alarmWatcher) pushAll(ctx context.Context, version string) {
-	if w.pusher == nil || w.devices == nil {
-		return
-	}
-	p := w.pusher()
-	if p == nil {
+	if w.devices == nil {
 		return
 	}
 	store, err := w.devices()
@@ -177,6 +176,14 @@ func (w *alarmWatcher) pushAll(ctx context.Context, version string) {
 		return
 	}
 	data := map[string]any{"kind": "alarms", "version": version}
+	pushToVendors(ctx, store, "alarms", w.vendors, vendorPush{Silent: true, Data: data})
+	if w.pusher == nil {
+		return
+	}
+	p := w.pusher()
+	if p == nil {
+		return
+	}
 	pushToDevices(ctx, store, "alarms", func(ctx context.Context, t pushTarget) error {
 		return p.Wake(ctx, t.Token, t.Env, data)
 	})

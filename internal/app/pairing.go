@@ -277,9 +277,9 @@ type pushTarget struct {
 	Provider string
 }
 
-// pushTargets is every device with an APNs token: the one channel this server
-// sends through. A phone registered with a vendor channel is left out until
-// that channel has a sender.
+// pushTargets is every device with an APNs token, the ones the APNs client
+// sends to. A phone registered with any other provider is reached through
+// pushToVendors (push_vendor.go).
 func (s *deviceStore) pushTargets() []pushTarget {
 	var out []pushTarget
 	for _, t := range s.allPushTargets() {
@@ -387,7 +387,7 @@ const registerPushPath = "/api/rpc/RegisterPushToken"
 // registerPushRoute records a paired phone's push token.
 //
 //	POST /api/rpc/RegisterPushToken  ["<hex device token>","sandbox"|"production"|""]
-//	POST /api/rpc/RegisterPushToken  ["<token>","","mipush"|"hms"|"honor"|"oppo"|"vivo"|"apns"]
+//	POST /api/rpc/RegisterPushToken  ["<token>","","mipush"|"hms"|"honor"|"oppo"|"vivo"|"sse"|"apns"]
 //	→ {"ok":true,"device_id":"…"}
 //
 // Two arguments are an iPhone's APNs token, as the iOS app has always sent
@@ -424,7 +424,7 @@ func registerPushRoute(mux *http.ServeMux, c *credentials) {
 			}
 		}
 		if !pushProviders[provider] {
-			http.Error(w, "provider must be one of apns, mipush, hms, honor, oppo, vivo", http.StatusBadRequest)
+			http.Error(w, "provider must be one of apns, mipush, hms, honor, oppo, vivo, sse", http.StatusBadRequest)
 			return
 		}
 		token, env := strings.TrimSpace(args[0]), strings.ToLower(strings.TrimSpace(args[1]))
@@ -457,10 +457,12 @@ func registerPushRoute(mux *http.ServeMux, c *credentials) {
 // without one.
 const pushAPNs = "apns"
 
-// pushProviders is who RegisterPushToken takes tokens for. Only APNs has a
-// sender so far; the vendor channels are recorded for when one is added.
+// pushProviders is who RegisterPushToken takes tokens for. APNs has its
+// client; the vendor channels and sse have their senders in push_vendor.go
+// ("sse" is a phone with no vendor channel holding the event stream open, its
+// token any id of its own).
 var pushProviders = map[string]bool{
-	pushAPNs: true, "mipush": true, "hms": true, "honor": true, "oppo": true, "vivo": true,
+	pushAPNs: true, "mipush": true, "hms": true, "honor": true, "oppo": true, "vivo": true, pushSSE: true,
 }
 
 // validPushToken is hex of a plausible length: 32 bytes today, and Apple says
