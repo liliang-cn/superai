@@ -70,6 +70,9 @@ func TestTheQueenEngineSurvivesTheEntrypointRewritingSettings(t *testing.T) {
 
 	// Back to SuperAI with the fallback on: the file goes, and the Secret's
 	// word is the only one again.
+	// The Secret leaves the proxy at its default (on); off here, or saving
+	// starts the real CLIProxyAPI and its own data race fails -race.
+	cleared.CLIProxyEnabled = false
 	a.mu.Lock()
 	a.settings = &cleared
 	a.mu.Unlock()
