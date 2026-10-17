@@ -364,3 +364,71 @@
 .wm-svcs .wi-x.wm-sure { background: #e2553f; color: #fff; }
 .wm-out em { display: block; font: 11px "Geist Mono", monospace; color: #5f6d77; font-style: normal; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wm-out .wi-text { max-height: 220px; font: 11px/1.45 "Geist Mono", monospace; }
+
+/* ── Night: the same instrument after hours. Ink panels on an ink floor,
+   light type, the one blue lifted so it still reads. Day stays the default. ── */
+:root[data-theme="dark"] .wl-root { background: #0f151c; }
+:root[data-theme="dark"] .wl-pill { background: rgba(26, 35, 45, 0.94); color: #e8edf2;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 14px rgba(0, 0, 0, 0.28), 0 0 0 0.5px rgba(232, 237, 242, 0.14); }
+:root[data-theme="dark"] .wl-pill span { color: #9aa8b4; }
+:root[data-theme="dark"] .wl-pill i { background: #5d6b78; }
+:root[data-theme="dark"] .wl-pill[data-state="work"], :root[data-theme="dark"] .wl-pill.sel { background: #3d6bff; color: #fff; }
+:root[data-theme="dark"] .wl-pill[data-state="work"] span, :root[data-theme="dark"] .wl-pill.sel span { color: rgba(255, 255, 255, 0.84); }
+:root[data-theme="dark"] .wl-plot { color: rgba(150, 178, 255, 0.55); }
+:root[data-theme="dark"] .wl-cam { background: rgba(26, 35, 45, 0.94); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(232, 237, 242, 0.08); }
+:root[data-theme="dark"] .wl-cam button { color: #b7c2cc; }
+:root[data-theme="dark"] .wl-cam button:hover { background: #26313d; color: #f2f5f8; }
+:root[data-theme="dark"] .wl-cam button.on { color: #8fb0ff; background: rgba(61, 107, 255, 0.18); }
+:root[data-theme="dark"] .wl-cam-sep { background: rgba(232, 237, 242, 0.12); }
+:root[data-theme="dark"] .wl-lead line { stroke: #c9d3dc; }
+
+/* Cards, the command line, the thread, the dashboard sheet. */
+:root[data-theme="dark"] .wl-detail, :root[data-theme="dark"] .wl-callout .wl-detail,
+:root[data-theme="dark"] .wc-thread, :root[data-theme="dark"] .wl-screen-in, :root[data-theme="dark"] .wl-stats {
+  background: #18212b; color: #e8edf2; border-color: rgba(232, 237, 242, 0.12); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4); }
+:root[data-theme="dark"] .wl-cell, :root[data-theme="dark"] .wc-bar, :root[data-theme="dark"] .wc-answer, :root[data-theme="dark"] .wl-chip,
+:root[data-theme="dark"] .dk-world .cv-glass { background: rgba(24, 33, 43, 0.97); color: #e8edf2; border-color: rgba(232, 237, 242, 0.12); }
+:root[data-theme="dark"] .wc-bar { box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4); }
+:root[data-theme="dark"] .wl-detail header em, :root[data-theme="dark"] .wl-go.ghost:hover { color: #8fb0ff; }
+:root[data-theme="dark"] .wl-callout .wl-detail header em,
+:root[data-theme="dark"] .wl-detail dt, :root[data-theme="dark"] .wl-chip span, :root[data-theme="dark"] .wl-cell span,
+:root[data-theme="dark"] .wi-list em, :root[data-theme="dark"] .wi-cap, :root[data-theme="dark"] .wi-latest em, :root[data-theme="dark"] .wi-note,
+:root[data-theme="dark"] .wi-seg span, :root[data-theme="dark"] .wi-shop-n small, :root[data-theme="dark"] .wi-none, :root[data-theme="dark"] .wi-cc-name em,
+:root[data-theme="dark"] .wc-busy, :root[data-theme="dark"] .wt-busy, :root[data-theme="dark"] .wl-say small,
+:root[data-theme="dark"] .wl-stats-top em, :root[data-theme="dark"] .wl-stats-grid span, :root[data-theme="dark"] .wl-stats-cap, :root[data-theme="dark"] .wl-stats-chev,
+:root[data-theme="dark"] .wm-g span, :root[data-theme="dark"] .wm-g small, :root[data-theme="dark"] .wm-out em { color: #9aa8b4 !important; }
+:root[data-theme="dark"] .wl-chip b, :root[data-theme="dark"] .wl-cell b, :root[data-theme="dark"] .wl-stats-top b, :root[data-theme="dark"] .wm-g b,
+:root[data-theme="dark"] .wi-cc-name, :root[data-theme="dark"] .wc-lines, :root[data-theme="dark"] .wc-answer { color: #e8edf2; }
+:root[data-theme="dark"] .wl-detail dl > div, :root[data-theme="dark"] .wl-screen-in header, :root[data-theme="dark"] .wc-thread header,
+:root[data-theme="dark"] .wl-stats-body { border-color: rgba(232, 237, 242, 0.1); }
+/* The quiet buttons and wells inside them. */
+:root[data-theme="dark"] .wl-detail header button, :root[data-theme="dark"] .wl-go.ghost, :root[data-theme="dark"] .wi-x,
+:root[data-theme="dark"] .wc-answer button, :root[data-theme="dark"] .wc-thread header button, :root[data-theme="dark"] .wl-screen-in header button {
+  background: #26313d; color: #d5dde4; }
+:root[data-theme="dark"] .wl-go.ghost:hover { background: #2f3b48; }
+:root[data-theme="dark"] .wl-go { background: #3d6bff; }
+:root[data-theme="dark"] .wl-go:hover { background: #5a82ff; }
+:root[data-theme="dark"] .wl-done { color: #4cc995; }
+:root[data-theme="dark"] .wi-latest, :root[data-theme="dark"] .wi-text, :root[data-theme="dark"] .wc-say, :root[data-theme="dark"] .wm-g,
+:root[data-theme="dark"] .wl-spark, :root[data-theme="dark"] .wc-queen, :root[data-theme="dark"] .wt-it { background: #1f2a35; color: #e8edf2; }
+:root[data-theme="dark"] .wi-list li:hover, :root[data-theme="dark"] .wi-acts button:hover, :root[data-theme="dark"] .wc-act:hover,
+:root[data-theme="dark"] .wl-stats-top:hover { background: #222d38; }
+:root[data-theme="dark"] .wi-say input, :root[data-theme="dark"] .wi-run textarea, :root[data-theme="dark"] .wi-acts button,
+:root[data-theme="dark"] .wi-clis button, :root[data-theme="dark"] .wi-seg button {
+  background: #1f2a35; color: #e8edf2; border-color: rgba(232, 237, 242, 0.16); }
+:root[data-theme="dark"] .wi-acts button.danger { color: #ff8a93; }
+/* Dark-on-light pieces flip to light-on-dark. */
+:root[data-theme="dark"] .wi-say button, :root[data-theme="dark"] .wc-say button, :root[data-theme="dark"] .wc-act.on, :root[data-theme="dark"] .wc-q,
+:root[data-theme="dark"] .wi-get, :root[data-theme="dark"] .wi-clis button.on, :root[data-theme="dark"] .wi-seg button.on,
+:root[data-theme="dark"] .wc-you, :root[data-theme="dark"] .wt-you { background: #e8edf2; color: #16202b; border-color: #e8edf2; }
+:root[data-theme="dark"] .wi-get:disabled { background: #26313d; color: #9aa8b4; }
+:root[data-theme="dark"] .wc-act { color: #c5cfd8; }
+:root[data-theme="dark"] .wc-sep { background: rgba(232, 237, 242, 0.12); }
+:root[data-theme="dark"] .wc-say input { color: #e8edf2; }
+:root[data-theme="dark"] .wc-prompt { color: #f2b416; }
+:root[data-theme="dark"] .wt-it.bad { background: rgba(226, 85, 63, 0.18); color: #ff9a8c; }
+:root[data-theme="dark"] .wl-stats-who .bar { background: #26313d; }
+:root[data-theme="dark"] .wl-stats-who i { background: #4a5764; }
+:root[data-theme="dark"] .wl-screen { background: rgba(8, 12, 17, 0.6); }
+/* Speech bubbles stay white with an ink line: a comic panel reads the same at night. */
+:root[data-theme="dark"] .wl-burn { text-shadow: 0 0 6px rgba(255, 154, 46, 0.8); }

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   ListTodoIcon, LayoutDashboardIcon, ChartColumnIcon, PanelRightOpenIcon, PanelRightCloseIcon, BookOpenIcon, BotIcon, HexagonIcon, MessageSquareIcon, PaletteIcon,
   NotebookTabsIcon, PuzzleIcon, SlidersHorizontalIcon, TerminalIcon, XIcon,
+  MoonIcon, SunIcon,
 } from "lucide-react";
 import DeskStatusBar from "./DeskStatusBar";
 import World from "../world/World";
@@ -197,7 +198,7 @@ export default function DeskShell({ view, badges, children, onOpenConversation, 
         <div className="dk-bar" style={drag} />
         {/* One toolbar, top right, the same in every mode and on every page:
             the pane's toggle at the inner end (absent in 3D, where there is no
-            pane), then Dashboards, Stats, and the bell at the edge. */}
+            pane), then Dashboards, Stats, light or dark, and the bell at the edge. */}
         <div className="dk-toolbar" style={noDrag} role="toolbar">
           {mode === "menu" && (
             <button type="button" className={`dk-tool dk-tool-pane${paneShown ? " on" : ""}`} aria-pressed={paneShown}
@@ -215,6 +216,11 @@ export default function DeskShell({ view, badges, children, onOpenConversation, 
               </button>
             );
           })}
+          <button type="button" className="dk-tool dk-tool-mode" aria-pressed={theme.mode === "dark"}
+            title={theme.mode === "dark" ? t("Light") : t("Dark")} aria-label={theme.mode === "dark" ? t("Light") : t("Dark")}
+            onClick={() => setTheme({ ...theme, mode: theme.mode === "dark" ? "light" : "dark" })}>
+            {theme.mode === "dark" ? <SunIcon size={18} /> : <MoonIcon size={18} />}
+          </button>
           <NotificationCenter variant="desk" onOpenConversation={onOpenConversation} />
         </div>
         <nav className="dk-rail" style={drag}>

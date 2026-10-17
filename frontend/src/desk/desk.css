@@ -664,3 +664,6 @@ html[data-desk] body { background: transparent; }
 /* In a browser there is no window to drag, but the top row stays: it is the
    toolbar's, the same as in the app. */
 .dk-shell.served > .dk-bar { display: none; }
+/* Menu mode draws no world, so at night the shell needs a ground of its own:
+   the 3D scene's night floor, not the page's white. */
+.dk-shell.dk-dark.dk-flat { background: #0f151c; }

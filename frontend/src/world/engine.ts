@@ -96,6 +96,8 @@ export class WorldEngine<D> {
   private inset = 0;
   private size = { w: 1, h: 1 };
   private ro: ResizeObserver;
+  /** What the light and dark looks swap: the sky, the floor, the grid, the lights. */
+  private look_!: { hemi: THREE.HemisphereLight; sun: THREE.DirectionalLight; floor: THREE.MeshStandardMaterial; grid: THREE.GridHelper; night: boolean };
   readonly reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   constructor(private host: HTMLElement, private opts: EngineOptions = {}) {
@@ -163,7 +165,8 @@ export class WorldEngine<D> {
     this.scene.environmentIntensity = 0.3;
     room.dispose();
     pmrem.dispose();
-    this.scene.add(new THREE.HemisphereLight(0xffffff, 0xd9e0e8, 0.3));
+    const hemi = new THREE.HemisphereLight(0xffffff, 0xd9e0e8, 0.3);
+    this.scene.add(hemi);
     // One key light, high and to the left, for form and a soft shadow.
     const sun = new THREE.DirectionalLight(0xfffcf7, 3.2);
     sun.position.set(-30, 70, 42);
@@ -178,6 +181,7 @@ export class WorldEngine<D> {
     sun.shadow.radius = 6;
     sun.shadow.intensity = 0.9;
     this.scene.add(sun);
+    this.look_ = { hemi, sun } as typeof this.look_;
   }
 
   private ground() {
@@ -185,17 +189,51 @@ export class WorldEngine<D> {
     const haze = 0xf3f5f8;
     this.scene.background = new THREE.Color(haze);
     this.scene.fog = new THREE.Fog(haze, 110, 290);
-    const g = new THREE.Mesh(new THREE.PlaneGeometry(1200, 1200), mat(0xe2e7ed, { rough: 0.95 }));
+    // Its own material: mat() shares one per colour, and night recolours this one.
+    const floor = mat(0xe2e7ed, { rough: 0.95 }).clone();
+    const g = new THREE.Mesh(new THREE.PlaneGeometry(1200, 1200), floor);
     g.rotation.x = -Math.PI / 2;
     g.receiveShadow = true;
     this.scene.add(g);
-    // A fine survey grid, an instrument's, fading out with distance.
-    const grid = new THREE.GridHelper(600, 300, 0xd6dce4, 0xdde2e9);
+    const grid = this.makeGrid(false);
+    this.scene.add(grid);
+    Object.assign(this.look_, { floor, grid, night: false });
+  }
+
+  /** A fine survey grid, an instrument's, fading out with distance. */
+  private makeGrid(night: boolean) {
+    const grid = night ? new THREE.GridHelper(600, 300, 0x3a4858, 0x2c3846) : new THREE.GridHelper(600, 300, 0xd6dce4, 0xdde2e9);
     grid.position.y = 0.02;
     (grid.material as THREE.Material).transparent = true;
-    (grid.material as THREE.Material).opacity = 0.7;
+    (grid.material as THREE.Material).opacity = night ? 0.9 : 0.7;
     (grid.material as THREE.Material).depthWrite = false;
-    this.scene.add(grid);
+    return grid;
+  }
+
+  /**
+   * Day is the default; night is the same instrument after hours: an ink
+   * sky and floor, a cool key light, the grid a shade above the ground.
+   */
+  setNight(on: boolean) {
+    const l = this.look_;
+    if (l.night === on) return;
+    l.night = on;
+    const haze = on ? 0x0f151c : 0xf3f5f8;
+    (this.scene.background as THREE.Color).setHex(haze);
+    (this.scene.fog as THREE.Fog).color.setHex(haze);
+    l.floor.color.setHex(on ? 0x151d26 : 0xe2e7ed);
+    this.scene.remove(l.grid);
+    l.grid.dispose();
+    l.grid = this.makeGrid(on);
+    this.scene.add(l.grid);
+    l.hemi.color.setHex(on ? 0x9fb4cc : 0xffffff);
+    l.hemi.groundColor.setHex(on ? 0x0f151c : 0xd9e0e8);
+    l.hemi.intensity = on ? 0.45 : 0.3;
+    l.sun.color.setHex(on ? 0xc9d8ff : 0xfffcf7);
+    l.sun.intensity = on ? 1.6 : 3.2;
+    this.scene.environmentIntensity = on ? 0.16 : 0.3;
+    this.renderer.toneMappingExposure = on ? 0.9 : 0.84;
+    this.touched = performance.now();
   }
   private swayers: THREE.Object3D[] = [];
   private frame = 0;
