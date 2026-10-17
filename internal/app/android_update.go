@@ -7,7 +7,8 @@ package app
 //	{"versionCode":2,"versionName":"0.2.0","url":"superai-0.2.0.apk",
 //	 "sha256":"<hex>","notes":"…"}
 //
-// The app asks for latest.json at most once a day, downloads the APK when
+// `superai android publish` (android_publish.go) writes both. The app asks
+// for latest.json at most once a day, downloads the APK when
 // versionCode is newer than its own, checks sha256 and hands it to the
 // system installer. A relative url is read against /api/android/. Both
 // routes sit under /api, so a paired device's token is what opens them, like

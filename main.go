@@ -52,6 +52,12 @@ func main() {
 		app.NodeMain(os.Args[2:])
 		return
 	}
+	// Publishing the release the sideloaded Android app updates from
+	// (internal/app/android_publish.go).
+	if len(os.Args) > 1 && os.Args[1] == "android" {
+		app.AndroidMain(os.Args[2:])
+		return
+	}
 
 	// Create an instance of the app structure
 	a := app.NewApp()
