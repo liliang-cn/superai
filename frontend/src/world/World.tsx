@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronDownIcon, HomeIcon, LocateFixedIcon, MinusIcon, PlusIcon, RotateCcwIcon, RotateCwIcon } from "lucide-react";
+import { ChevronDownIcon, GaugeIcon, HomeIcon, LocateFixedIcon, MinusIcon, PlusIcon, RotateCcwIcon, RotateCwIcon } from "lucide-react";
 import { Dashboards, MCP, NotedToday, Skills } from "../../wailsjs/go/app/App";
 import { EventsOn } from "../../wailsjs/runtime";
 import { useBees, useCodingRuns, useHive, useLinkedAgents } from "../canvas/data";
@@ -13,11 +13,14 @@ import { cluster, lensOf, type WorldData } from "./cluster";
 import { worldBus } from "./bus";
 import Inspector from "./Inspector";
 import Command from "./Command";
+import StatsHud, { HoloTokens } from "./StatsHud";
 import { agendaOf, touchesNoted, type AgendaEntry } from "./agenda";
 import { dashboards as dashApi, type Dashboard } from "../lib/dashboards";
 import { Response } from "@/components/ai-elements/response";
 import { RefreshCwIcon, XIcon } from "lucide-react";
 import "./world.css";
+
+const HOLO_KEY = "superai-world-holo";
 
 /** The app's slower lists, refreshed now and then and on the events that
  *  change them. */
@@ -79,6 +82,22 @@ export default function World({ view }: { view: ViewKey }) {
   const [inset, setInsetState] = useState(0);
   const [dash, setDash] = useState("");
   const home = view === "home" || view === "chat";
+  const { t } = useI18n();
+  // The figures in the corners: on unless turned off, and remembered.
+  const [holo, setHolo] = useState(() => { try { return localStorage.getItem(HOLO_KEY) !== "0"; } catch { return true; } });
+  const flipHolo = () => setHolo((v) => { try { localStorage.setItem(HOLO_KEY, v ? "0" : "1"); } catch { /* this visit only */ } return !v; });
+  // S, when nothing is being typed into.
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() !== "s" || e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
+      if (e.isComposing || e.keyCode === 229) return;
+      if ((e.target as HTMLElement)?.closest?.("input,textarea,select,[contenteditable=''],[contenteditable=true]")) return;
+      e.preventDefault();
+      flipHolo();
+    };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, []);
 
   const hive = useHive();
   const runs = useCodingRuns();
@@ -169,8 +188,14 @@ export default function World({ view }: { view: ViewKey }) {
           worldBus.publish(null);
           engine.current?.look(l.x, l.z, l.zoom, "cluster");
         }}><LocateFixedIcon size={15} /></button>
+        <span className="wl-cam-sep" />
+        <button className={holo ? "on" : ""} aria-pressed={holo} aria-label={t("Stats")} title={`${t("Stats")} (S)`} onClick={flipHolo}><GaugeIcon size={15} /></button>
       </div>
-      <Hud view={view} data={data} left={24} />
+      <div className="wl-corner">
+        <Hud view={view} data={data} />
+        <HoloTokens on={holo} />
+      </div>
+      <StatsHud hive={hive} runs={runs} on={holo} />
       <div ref={card} className="wl-callout" style={{ display: picked ? "" : "none" }}>
         {picked && <Inspector key={picked.kind + ":" + picked.id} picked={picked} data={data} onClose={close} openDash={setDash} open={(to, full) => { if (full) window.dispatchEvent(new CustomEvent("superai:window", { detail: to })); else navigate(to); }} />}
       </div>
@@ -183,7 +208,7 @@ export default function World({ view }: { view: ViewKey }) {
 /** The hive's figures, on one flat screen that stays on the page: the
  *  totals, how fast tokens are going lately, and each member's share. Folds
  *  to its top line. */
-function Hud({ data, left }: { view: ViewKey; data: WorldData; left: number }) {
+function Hud({ data }: { view: ViewKey; data: WorldData }) {
   const { t } = useI18n();
   // Folded to one pill unless opened; it remembers.
   const [open, setOpen] = useState(() => { try { return localStorage.getItem("superai-world-stats") === "1"; } catch { return false; } });
@@ -209,7 +234,7 @@ function Hud({ data, left }: { view: ViewKey; data: WorldData; left: number }) {
   const topTokens = Math.max(1, ...members.map((m) => m.tokens));
   const short = (n: string) => n.replace(/^superai-worker-/, "w").replace(/^superai-/, "");
   return (
-    <div className={`wl-stats${open ? "" : " folded"}`} style={{ left }}>
+    <div className={`wl-stats${open ? "" : " folded"}`}>
       <button className="wl-stats-top" onClick={toggle} title={t(open ? "Fold" : "Show the figures")}>
         <span className={`wl-stats-dot${tt.tokPerSec > 0.5 ? " on" : ""}`} />
         <b>{fmt(tt.tokens)}</b><em>{t("tokens")}</em>

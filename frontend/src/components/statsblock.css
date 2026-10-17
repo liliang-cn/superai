@@ -1,0 +1,66 @@
+/* The home's figures as standing pillars: ink on the day ground, fine lines
+   for the scale, the signal blue only on a pillar whose figure just rose. */
+.sb { --sb-signal: #2f5bea; --sb-ink: var(--ink, #16202b); --sb-ink-2: var(--ink-2, #5f6d77); --sb-line: var(--line, rgba(22, 32, 43, 0.08));
+  position: relative; display: flex; flex-direction: column; gap: 10px; min-height: 0; color: var(--sb-ink); font-family: Geist, system-ui, sans-serif; }
+:root[data-theme="dark"] .sb { --sb-signal: #7c9bff; }
+
+.sb-head { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 550; color: var(--sb-ink-2); }
+.sb-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ink-3, #b8c2cf); flex: none; }
+.sb-dot.on { background: var(--sb-signal); box-shadow: 0 0 0 3px color-mix(in srgb, var(--sb-signal) 20%, transparent); }
+.sb-pick { margin-left: auto; width: 28px; height: 28px; display: grid; place-items: center; border: 0; border-radius: 8px; background: transparent; color: var(--sb-ink-2); cursor: pointer; }
+.sb-pick:hover { background: color-mix(in srgb, var(--sb-ink) 7%, transparent); color: var(--sb-ink); }
+.sb-pick.on { background: var(--sb-ink); color: var(--glass-bg, #fff); }
+:root[data-theme="dark"] .sb-pick.on { color: #16202b; }
+.sb button:focus-visible, .sb input:focus-visible { outline: 2px solid var(--sb-signal); outline-offset: 2px; }
+
+.sb-row { flex: 1; min-height: 150px; display: flex; align-items: stretch; gap: 6px; }
+.sb-col { --tip: 22px; flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+/* The scale: a baseline and faint quarter lines behind every pillar; the
+   pillar stands from the baseline and carries its number at the tip. */
+.sb-track { flex: 1; width: 100%; min-height: 60px; position: relative;
+  border-bottom: 1px solid color-mix(in srgb, var(--sb-ink) 40%, transparent);
+  background: repeating-linear-gradient(to top, transparent 0 calc(25% - 1px), var(--sb-line) calc(25% - 1px) 25%); }
+.sb-pillar { position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); width: clamp(4px, 18%, 10px); height: calc((100% - var(--tip)) * var(--r, 0));
+  border-radius: 3px 3px 0 0; background: var(--sb-ink); transition: height 0.7s cubic-bezier(0.2, 0.7, 0.2, 1); }
+.sb-track > b { position: absolute; left: 50%; bottom: calc((100% - var(--tip)) * var(--r, 0) + 5px); transform: translateX(-50%);
+  font: 600 15px/1 "Geist Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; white-space: nowrap;
+  transition: bottom 0.7s cubic-bezier(0.2, 0.7, 0.2, 1); }
+.sb-pillar.lit { animation: sb-lit 1.4s ease-out; }
+@keyframes sb-lit {
+  0%, 30% { background: var(--sb-signal); box-shadow: 0 0 0 2px color-mix(in srgb, var(--sb-signal) 22%, transparent), 0 0 14px color-mix(in srgb, var(--sb-signal) 55%, transparent); }
+}
+.sb-col.bad .sb-track > b { color: #d0313f; }
+.sb-col.bad .sb-pillar { background: #d0313f; }
+.sb-col > span { max-width: 100%; min-height: 2.4em; font-size: 11.5px; line-height: 1.2; color: var(--sb-ink-2); text-align: center; overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+.sb.compact { gap: 8px; }
+.sb.compact .sb-row { min-height: 128px; gap: 3px; }
+.sb.compact .sb-col { --tip: 17px; gap: 5px; }
+.sb.compact .sb-track > b { font-size: 11px; }
+.sb.compact .sb-pillar { width: 4px; }
+.sb.compact .sb-col > span, .sb-row.brief .sb-col > span { min-height: 0; font-size: 10.5px; display: block; white-space: nowrap; text-overflow: ellipsis; }
+
+.sb-none { flex: 1; min-height: 80px; border: 1px dashed color-mix(in srgb, var(--sb-ink) 25%, transparent); border-radius: 10px; background: transparent; color: var(--sb-ink-2); font: 550 12.5px Geist, system-ui, sans-serif; cursor: pointer; }
+
+.sb-chooser { position: absolute; z-index: 30; top: 34px; right: 0; width: 248px; max-height: min(380px, 70vh); display: flex; flex-direction: column;
+  background: #fff; color: #16202b; border: 1px solid rgba(22, 32, 43, 0.12); border-radius: 12px; box-shadow: 0 14px 36px rgba(22, 32, 43, 0.16); }
+:root[data-theme="dark"] .sb-chooser { background: #1f2226; color: #f2f1ee; border-color: rgba(255, 255, 255, 0.12); }
+.sb-chooser ul { list-style: none; margin: 0; padding: 6px; overflow-y: auto; }
+.sb-chooser li { display: flex; align-items: center; gap: 2px; padding: 0 4px; border-radius: 8px; }
+.sb-chooser li:hover { background: rgba(22, 32, 43, 0.04); }
+.sb-chooser li.split { margin-top: 5px; padding-top: 5px; border-top: 1px solid rgba(22, 32, 43, 0.08); border-radius: 0 0 8px 8px; }
+.sb-chooser label { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 6px 2px; font-size: 13px; cursor: pointer; }
+.sb-chooser li.off label { color: #5f6d77; }
+.sb-chooser input { accent-color: var(--sb-signal); width: 14px; height: 14px; margin: 0; }
+.sb-chooser li button { width: 24px; height: 24px; display: grid; place-items: center; border: 0; border-radius: 6px; background: transparent; color: inherit; cursor: pointer; }
+.sb-chooser li button:hover:not(:disabled) { background: rgba(22, 32, 43, 0.08); }
+.sb-chooser li button:disabled { opacity: 0.25; cursor: default; }
+.sb-chooser footer { display: flex; justify-content: space-between; gap: 8px; padding: 8px; border-top: 1px solid rgba(22, 32, 43, 0.08); }
+.sb-chooser footer button { height: 30px; padding: 0 12px; border-radius: 8px; border: 1px solid rgba(22, 32, 43, 0.14); background: transparent; color: inherit; font: 600 12.5px Geist, system-ui, sans-serif; cursor: pointer; }
+.sb-chooser footer button.pri { background: #16202b; border-color: #16202b; color: #fff; }
+
+@media (prefers-reduced-motion: reduce) {
+  .sb-pillar, .sb-track > b { transition: none; }
+  .sb-pillar.lit { animation: none; }
+}

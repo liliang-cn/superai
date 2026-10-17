@@ -21,15 +21,9 @@
   grid-template-rows: minmax(0, 1fr);
   padding-bottom: 2px;
 }
-.dk.folded { grid-template-columns: var(--dk-side-width, 252px) minmax(360px, 1fr) 58px; }
-.dk-live-strip { grid-column: 3; grid-row: 1; margin: 0 14px 12px 0; display: flex; flex-direction: column; align-items: center; gap: 8px; }
-.dk-unfold { position: relative; width: 44px; height: 44px; border-radius: calc(14px * var(--rs)); display: grid; place-items: center; color: var(--ink-2); }
-.dk-unfold:hover { color: var(--ink); }
-.dk-unfold.on { color: var(--honey-deep); box-shadow: inset 0 0 0 1.5px rgba(var(--honey-rgb), .55); }
-/* On Dashboards and Stats the home's right column stays, so the same button closes them. */
-.dk-page.with-side { margin-right: 72px; }
-.dk-shell > .dk-side-strip { grid-column: 2; grid-row: 2; justify-self: end; width: 58px; justify-content: flex-start; }
-.dk-unfold .dk-livedot { position: absolute; top: 7px; right: 7px; }
+/* Folded, the pane is gone and the conversation takes its room; its toggle
+   stays in the toolbar. */
+.dk.folded { grid-template-columns: var(--dk-side-width, 252px) minmax(360px, 1fr) 0; }
 
 /* Any other page: one pane of glass. */
 .dk-page { grid-column: 2; grid-row: 2; margin: 0 14px 14px 0; min-height: 0; min-width: 0; overflow: hidden; display: flex; border-radius: calc(22px * var(--rs)); }
@@ -39,15 +33,21 @@
 
 /* The top bar: the window moves by it. */
 .dk-bar { grid-column: 1 / -1; grid-row: 1; display: flex; align-items: center; padding-left: 90px; }
-/* The notification bell: top right, over the column the live pane folds into. */
-.dk-shell > .dk-corner { grid-column: 1 / -1; grid-row: 1; justify-self: end; align-self: center; margin-right: 26px; z-index: 5; }
-.dk-shell .dk-bell { position: relative; width: 34px; height: 34px; border-radius: 50%; }
-.dk-shell .dk-bell.on { background: rgba(var(--glass-rgb), .7); color: var(--ink); }
+/* The toolbar: top right of the window, in the title bar's row, in the same
+   place in both modes, on every page, the pane open or folded. The bell ends
+   it, over the lane the round buttons keep down the right. */
+.dk-shell { --dk-tb-right: 27px; --dk-tb-w: 148px; }
+.dk-shell > .dk-toolbar { position: fixed; z-index: 9; top: 6px; right: var(--dk-tb-right); height: 34px; display: flex; align-items: center; gap: 4px; }
+.dk-shell .dk-tool, .dk-shell .dk-bell { position: relative; flex: none; width: 34px; height: 34px; display: grid; place-items: center; border-radius: 10px; color: var(--ink-2); }
+.dk-shell .dk-tool:hover, .dk-shell .dk-bell:hover { background: rgba(var(--glass-rgb), .75); color: var(--ink); }
+.dk-shell .dk-tool.on, .dk-shell .dk-bell.on { background: rgba(var(--glass-rgb), .92); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line), 0 1px 3px rgba(0, 0, 0, .06); }
+.dk-shell .dk-tool:focus-visible, .dk-shell .dk-bell:focus-visible { outline: 2px solid var(--honey); outline-offset: 1px; }
+.dk-tool .dk-livedot { position: absolute; top: 6px; right: 6px; }
 .dk-bar-title { font-size: 15px; font-weight: 650; letter-spacing: -.01em; }
 .dk-tabs { height: 42px; flex: none; display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; }
-.dk-tabs .dk-fold { margin-left: auto; }
-/* The live pane's tab row shares the top line with the bell; leave it room. */
-.dk-live .dk-tabs { padding-right: 50px; }
+/* The live pane's tab row shares the top line with the toolbar; it stops
+   short of it. The pane ends 72px from the window's right edge. */
+.dk-live .dk-tabs { padding-right: calc(var(--dk-tb-right) + var(--dk-tb-w) + 12px - 72px); }
 .dk-tab { height: 34px; display: inline-flex; align-items: center; gap: 8px; padding: 0 12px; border-radius: calc(11px * var(--rs)); color: var(--ink-2); font-weight: 500; font-size: 13.5px; white-space: nowrap; min-width: 0; }
 .dk-tab span { overflow: hidden; text-overflow: ellipsis; max-width: 160px; }
 .dk-tab.on { color: var(--ink); background: rgba(var(--glass-rgb), calc(var(--ga) + 0.35)); box-shadow: inset 0 1px 0 rgba(255,255,255,var(--hl)), 0 1px 3px rgba(0,0,0,.06); }
@@ -395,14 +395,15 @@ html[data-desk] body { background: transparent; }
 .dk-st em { font-style: normal; font-family: var(--font-mono); font-size: 12px; color: var(--ink-3); }
 
 /* Stats: the figures. */
-.dk-stats { position: absolute; inset: 0; padding: 16px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
-.dk-stats-head { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-2); font-weight: 550; }
-.dk-stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-.dk-fig { padding: 14px 16px; border-radius: calc(14px * var(--rs)); background: rgba(var(--glass-rgb), .5); box-shadow: inset 0 0 0 1px var(--line); }
-.dk-fig b { display: block; font-size: 24px; font-weight: 650; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
-.dk-fig span { font-size: 12.5px; color: var(--ink-2); }
-.dk-fig.big { grid-column: 1 / -1; }
-.dk-fig.big b { font-size: 40px; color: var(--honey-deep); }
+.dk-stats { position: absolute; inset: 0; padding: 14px 16px 16px; display: flex; flex-direction: column; }
+.dk-stats > .sb { flex: 1; }
+/* The shell's glass is white in either theme (see .dk-world .cv-glass), so
+   the pillars keep the day's ink on it. */
+.dk-world .sb { --sb-ink: #16202b; --sb-ink-2: #5f6d77; --sb-line: rgba(22, 32, 43, 0.07); --sb-signal: #2f5bea; }
+:root[data-theme="dark"] .dk-world .sb-pick.on { color: #fff; }
+:root[data-theme="dark"] .dk-world .sb-chooser { background: #fff; color: #16202b; border-color: rgba(22, 32, 43, 0.12); }
+/* Floating over the conversation, the pane's own close button holds the
+   top right corner. */
 .dk-st-h { font-size: 12px; font-weight: 650; color: var(--ink-3); padding: 10px 10px 2px; }
 .dk-foryou { margin: 6px 0 4px; }
 .dk-foryou .att-row { padding: 7px 6px; grid-template-columns: 24px minmax(0, 1fr); row-gap: 0; }
@@ -525,10 +526,6 @@ html[data-desk] body { background: transparent; }
 .dk-side { overflow-y: auto; overscroll-behavior: contain; }
 .dk-recents { flex: 1 0 auto; overflow: visible; min-height: auto; }
 .dk-side > .dk-foot { position: sticky; bottom: -10px; z-index: 1; margin: 6px -10px -10px; padding: 8px 10px 10px; background: rgba(var(--glass-rgb), .97); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
-@media (max-width: 1240px) {
-  .dk:not(.folded) > .dk-live { bottom: 96px; }
-  .dk:not(.folded) > .dk-live .dk-hud { right: 52px; }
-}
 
 /* Skills and MCP share one desktop destination. */
 .extensions-view { flex:1; min-width:0; min-height:0; display:flex; flex-direction:column; overflow:hidden; }
@@ -543,14 +540,10 @@ html[data-desk] body { background: transparent; }
 .extensions-panel > .view { flex:1; min-width:0; }
 @media(max-width:640px) { .extensions-header { padding:16px 16px 0; } }
 
-.dk-float-x { display: none; }
 @media (max-width: 1240px) {
-  .dk:not(.folded) > .dk-live .dk-screen { position: relative; }
-  .dk:not(.folded) > .dk-live .dk-float-x { display: grid; position: absolute; z-index: 3; top: 10px; right: 10px; width: 30px; height: 30px; border-radius: 50%; background: rgba(var(--glass-rgb), .9); box-shadow: inset 0 0 0 1px var(--line); }
   /* The pane's footer belongs to the pane: no spilling over the conversation. */
   .dk:not(.folded) > .dk-live .dk-ctl { margin-top: 8px; padding: 8px 12px; border-radius: calc(16px * var(--rs)); background: rgba(var(--glass-rgb), .94); box-shadow: 0 8px 24px rgba(40, 30, 10, .12); }
   .dk:not(.folded) > .dk-live { bottom: 96px; }
-  .dk:not(.folded) > .dk-live .dk-hud { right: 52px; }
 }
 
 .dk-shell > .dk-statusbar { grid-column:1/-1; grid-row:3; display:flex; align-items:center; gap:16px; padding:0 18px; border-top:1px solid var(--line); background:rgba(var(--glass-rgb),.72); color:var(--ink-2); font-size:11px; min-width:0; --wails-draggable:no-drag; }
@@ -579,7 +572,7 @@ html[data-desk] body { background: transparent; }
 .dk-world .dk { pointer-events: none; }
 .dk-world .dk > * { pointer-events: auto; }
 .dk-world .dk-live { pointer-events: none; }
-.dk-world .dk-live > .dk-tabs, .dk-world .dk-live > .dk-ctl, .dk-world .dk-live .dk-float-x { pointer-events: auto; }
+.dk-world .dk-live > .dk-tabs, .dk-world .dk-live > .dk-ctl { pointer-events: auto; }
 .dk-world .dk-screen.see-world { background: transparent; border: 0; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; pointer-events: none; }
 .dk-world .dk-screen:not(.see-world) { pointer-events: auto; }
 @media (max-width: 1240px) { .dk-world .dk-page { width: auto; justify-self: stretch; } }
@@ -625,17 +618,15 @@ html[data-desk] body { background: transparent; }
    conversation stays mounted (it holds the chat). */
 .dk-world:not(.panel-on) .dk-page { display: none; }
 .dk-world:not(.panel-on) > .dk { display: none; }
-.dk-world:not(.panel-on) > .dk-rail,
-.dk-world:not(.panel-on) > .dk-side-strip { display: none; }
+.dk-world:not(.panel-on) > .dk-rail { display: none; }
 .dk-world:not(.panel-on) .wl-cam { right: 20px; }
 /* Menu mode: no world behind, so a page takes the width it used to leave
-   for it. */
-.dk-shell.dk-world.dk-flat > .dk-page { width: auto; justify-self: stretch; margin: 6px 0 14px 4px; }
-.dk-shell.dk-world.dk-flat > .dk-page.with-side { margin-right: 72px; }
+   for it, short of the round buttons' lane down the right. */
+.dk-shell.dk-world.dk-flat > .dk-page { width: auto; justify-self: stretch; margin: 6px 72px 14px 4px; }
 
 /* A page opened full size over the world: the screen of the thing it
    belongs to, in a window with a way back. */
-.dk-world.window-on > .dk-rail, .dk-world.window-on > .dk-side-strip { display: none; }
+.dk-world.window-on > .dk-rail { display: none; }
 .dk-world.window-on > .dk-page {
   display: flex; position: fixed; z-index: 8; inset: 52px 72px 44px 72px; width: auto; margin: 0;
   border-radius: 18px; background: #fff; box-shadow: 0 30px 80px rgba(22, 32, 43, 0.28), 0 0 0 1px rgba(22, 32, 43, 0.08);
@@ -647,7 +638,7 @@ html[data-desk] body { background: transparent; }
   background: #f3f5f8; border-radius: 18px; padding: 10px; box-shadow: 0 30px 80px rgba(22, 32, 43, 0.28);
   animation: dk-win-in 0.22s ease-out;
 }
-.dk-world.window-on > .dk > .dk-live, .dk-world.window-on > .dk > .dk-live-strip { display: none; }
+.dk-world.window-on > .dk > .dk-live { display: none; }
 .dk-world.window-on .wc { display: none; }
 @keyframes dk-win-in { from { opacity: 0; transform: scale(0.97); } }
 .dk-win-x { position: fixed; z-index: 9; top: 40px; right: 58px; width: 34px; height: 34px; border-radius: 50%; border: 0; background: #16202b; color: #fff; display: grid; place-items: center; cursor: pointer; box-shadow: 0 6px 16px rgba(22, 32, 43, 0.3); }
@@ -658,35 +649,18 @@ html[data-desk] body { background: transparent; }
 .dk-world.window-on > .dk-win-x:hover { background: #16202b; color: #fff; }
 .dk-world.window-on > .dk-page > .content { padding-right: 40px; }
 
-/* ── 3D or Menu: one floating button, bottom right, in both modes ────── */
-.dk-mode-fab { position: fixed; z-index: 7; right: 22px; bottom: 44px; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center;
-  background: #16202b; box-shadow: 0 8px 22px rgba(22, 32, 43, 0.28), 0 0 0 1px rgba(255, 255, 255, 0.06); cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; }
-.dk-shell .dk-mode-fab { color: #fff; }
-.dk-mode-fab > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
-.dk-mode-fab:hover { transform: translateY(-1px); box-shadow: 0 12px 26px rgba(22, 32, 43, 0.32); }
-.dk-mode-fab:focus-visible { outline: 2px solid #2f5bea; outline-offset: 2px; }
-.dk-world.window-on > .dk-mode-fab { display: none; }
+/* ── The round buttons, bottom right (components/fabs.css) ───────────── */
+/* They keep a lane of their own down the right, with the bell at its top:
+   the home in Menu mode stops short of it, pane open or folded, as every
+   other page does. */
+.dk-shell.dk-flat.on-home > .dk { margin-right: 58px; }
+.dk-shell > .fab-stack { position: fixed; z-index: 9; }
 /* Menu mode in a narrow window: the live pane floats over the conversation,
    so it is solid, controls included. */
 @media (max-width: 1240px) {
   .dk-world.dk-flat .dk-live .dk-screen, .dk-world.dk-flat .dk-live > .dk-ctl { background: #fff; }
 }
 
-/* Menu mode in a browser: no window to drag and no traffic lights, so no
-   title bar. Everything starts at the top; the bell and the live pane's tabs
-   keep to the right. */
-.dk-shell.dk-flat.served { grid-template-rows: 10px minmax(0, 1fr) 30px; }
-.dk-shell.dk-flat.served > .dk-bar { display: none; }
-.dk-shell.dk-flat.served > .dk-corner { position: absolute; top: 10px; right: 26px; margin: 0; height: 42px; display: flex; align-items: center; }
-.dk-shell.dk-flat.served .dk-live { margin-top: 0; }
-.dk-shell.dk-flat.served > .dk-side-strip { padding-top: 52px; }
-@media (max-width: 1240px) {
-  .dk-shell.dk-flat.served .dk:not(.folded) > .dk-live { top: 0; }
-  .dk-shell.dk-flat.served .dk.folded > .dk-live-strip { padding-top: 52px; }
-}
-/* Off the home, the bell heads the strip of buttons down the right, in their
-   shape; on the home it sits at the end of the live pane's tab row. */
-.dk-shell.dk-flat.served:not(.on-home) > .dk-corner { top: 14px; right: 21px; height: 44px; }
-.dk-shell.dk-flat.served:not(.on-home) > .dk-corner .dk-bell { width: 44px; height: 44px; border-radius: calc(14px * var(--rs)); background: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 1px 2px rgba(22, 32, 43, 0.06), 0 6px 18px rgba(22, 32, 43, 0.08), inset 0 0 0 1px rgba(22, 32, 43, 0.05); }
-.dk-shell.dk-flat.served:not(.on-home) > .dk-side-strip { padding-top: 66px; }
+/* In a browser there is no window to drag, but the top row stays: it is the
+   toolbar's, the same as in the app. */
+.dk-shell.served > .dk-bar { display: none; }

@@ -16,17 +16,18 @@ import { COLORS, CanvasTheme, loadTheme, saveTheme, themeVars } from "./theme";
 import ThemePanel from "./ThemePanel";
 import EventSheet from "../components/EventSheet";
 import "./canvas.css";
+import StatsBlock from "../components/StatsBlock";
 import { Response } from "@/components/ai-elements/response";
 import { withoutCallNotes } from "../lib/format";
 import type { ChatMessage } from "../lib/types";
 import { queenRef, queenTitle, useQueenName } from "../lib/queenName";
 import { translate } from "../lib/i18n";
 
-type Kind = "inFlight" | "machines" | "today" | "bees" | "later" | "coding" | "queen" | "generated";
+type Kind = "inFlight" | "machines" | "today" | "stats" | "bees" | "later" | "coding" | "queen" | "generated";
 interface Tile { id: string; kind: Kind; span: 2 | 3 | 4 | 6 }
 
 const TITLES: Record<Kind, string> = {
-  inFlight: "In flight", machines: "Machines", today: "Today", bees: "Bees", later: "Later", coding: "Coding runs", queen: "The queen", generated: "Made for you",
+  inFlight: "In flight", machines: "Machines", today: "Today", stats: "Stats", bees: "Bees", later: "Later", coding: "Coding runs", queen: "The queen", generated: "Made for you",
 };
 
 const LAYOUT_KEY = "superai-canvas-layout";
@@ -34,6 +35,7 @@ const DEFAULT: Tile[] = [
   { id: "t-inflight", kind: "inFlight", span: 4 },
   { id: "t-today", kind: "today", span: 2 },
   { id: "t-machines", kind: "machines", span: 2 },
+  { id: "t-stats", kind: "stats", span: 6 },
   { id: "t-later", kind: "later", span: 3 },
   { id: "t-coding", kind: "coding", span: 3 },
   { id: "t-queen", kind: "queen", span: 6 },
@@ -55,6 +57,14 @@ function loadLayout(): Tile[] {
     if (!localStorage.getItem("superai-canvas-v3")) {
       localStorage.setItem("superai-canvas-v3", "1");
       return t.filter((x) => x.kind !== "bees");
+    }
+    // Stats came later still: offered once, the same way.
+    if (!localStorage.getItem("superai-canvas-v4")) {
+      localStorage.setItem("superai-canvas-v4", "1");
+      if (t.some((x) => x.kind === "stats")) return t;
+      const q = t.findIndex((x) => x.kind === "queen");
+      const add = DEFAULT.filter((d) => d.kind === "stats");
+      return q < 0 ? [...t, ...add] : [...t.slice(0, q), ...add, ...t.slice(q)];
     }
     return t;
   } catch {
@@ -201,6 +211,7 @@ export default function CanvasView({ approvals }: { approvals: { pending: ToolAp
       case "later": return <Later items={upcoming} open={() => navigate(PATHS.agents)} />;
       case "coding": return <Coding runs={codingRuns} open={() => navigate(PATHS.coding)} />;
       case "queen": return <div ref={queenRef}><Queen messages={chat.messages} /></div>;
+      case "stats": return <StatsBlock compact hive={hive} runs={codingRuns} />;
       case "generated": return <Generated spec={specs[t.id]} busy={making.has(t.id)} onRefresh={() => refresh(t.id)} />;
     }
   };
@@ -328,7 +339,7 @@ export default function CanvasView({ approvals }: { approvals: { pending: ToolAp
       {adding && (
         <AddTile
           present={new Set(tiles.map((t) => t.kind))}
-          onPick={(kind) => { setTiles((ts) => [...ts, { id: `t-${kind}-${Date.now()}`, kind, span: kind === "queen" ? 6 : kind === "today" || kind === "machines" ? 2 : kind === "later" || kind === "coding" ? 3 : 4 }]); setAdding(false); }}
+          onPick={(kind) => { setTiles((ts) => [...ts, { id: `t-${kind}-${Date.now()}`, kind, span: kind === "queen" || kind === "stats" ? 6 : kind === "today" || kind === "machines" ? 2 : kind === "later" || kind === "coding" ? 3 : 4 }]); setAdding(false); }}
           onDescribe={(prompt) => {
             const id = `g-${Date.now().toString(36)}`;
             setSpecs((s) => ({ ...s, [id]: { prompt } }));

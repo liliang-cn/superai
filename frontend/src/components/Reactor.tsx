@@ -67,6 +67,22 @@ const clamp = (v: number, lo: number, hi: number) => (v < lo ? lo : v > hi ? hi 
  *  text overrides the formatted value when a unit belongs on the tip. */
 export interface Pillar { key: string; label: string; value: number; color: string; text?: string }
 
+/** How much of its reach a pillar takes: log scale, against the largest of
+ *  them. A ring of figures spanning five orders of magnitude has to be read
+ *  as magnitudes or the small ones vanish. The number at the tip is the
+ *  reading; the length is the shape. */
+export function pillarShare(value: number, top: number): number {
+  const span = Math.log10(1 + Math.max(1, top));
+  return span > 0 ? Math.log10(1 + Math.max(0, value)) / span : 0;
+}
+
+/** Each pillar's height as a fraction, for pillars drawn standing in a row:
+ *  the wheel's scale, with a floor so a figure at zero still stands. */
+export function pillarReach(values: number[], floor = 0.1): number[] {
+  const top = values.reduce((m, v) => Math.max(m, v), 1);
+  return values.map((v) => floor + (1 - floor) * pillarShare(v, top));
+}
+
 const EMPTY: Snap = {
   now: "", since: "", live: false, runs: [], bins: [], tools: [], events: [],
   tokens: 0, cached: 0, rounds: 0, calls: 0, reads: 0, writes: 0, shells: 0, fails: 0, mcp: 0, memory: 0,
@@ -393,11 +409,6 @@ class Wheel {
   setPillars(list: Pillar[]) {
     const n = Math.min(MAX_PILLARS, list.length);
     const top = list.reduce((m, p) => Math.max(m, p.value), 1);
-    // Log scale, against the largest of them: a wheel of figures spanning
-    // five orders of magnitude has to be read as magnitudes or the small
-    // ones vanish. The number at the tip is the reading; the length is the
-    // shape.
-    const span = Math.log10(1 + top);
     // The longest pillar, label included, stays inside the panel: a figure
     // whose tip is off the screen is a figure nobody can read.
     const room = Math.max(60, Math.min(this.w, this.h) / 2 - this.R - 74);
@@ -405,7 +416,7 @@ class Wheel {
     list.slice(0, n).forEach((p, i) => {
       kept.add(p.key);
       const theta = this.th0 - ((i + 0.5) / n) * 2 * Math.PI;
-      const target = 24 + (room - 24) * (span > 0 ? Math.log10(1 + Math.max(0, p.value)) / span : 0);
+      const target = 24 + (room - 24) * pillarShare(p.value, top);
       const value = p.text ?? fmtK(p.value);
       const text = value + " " + p.label + " " + p.color;
       let post = this.postList.find((x) => x.pillar.key === p.key);

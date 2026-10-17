@@ -264,8 +264,10 @@ export function plot(w: number, d: number) {
 
 /** A canvas-backed screen: a plane whose picture a district redraws. Its
  *  cursor is a quad of its own over the picture, so blinking it costs
- *  nothing: the canvas is repainted only when what it says changes. */
-export function screen(w: number, h: number, px = 256) {
+ *  nothing: the canvas is repainted only when what it says changes. As a
+ *  hologram it is light, not a surface: unlit, seen through and from both
+ *  sides, drawn after the solid world and hiding nothing behind it. */
+export function screen(w: number, h: number, px = 256, holo = false) {
   const canvas = document.createElement("canvas");
   canvas.width = px;
   canvas.height = Math.round((px * h) / w);
@@ -274,13 +276,16 @@ export function screen(w: number, h: number, px = 256) {
   tex.anisotropy = 8;
   tex.generateMipmaps = true;
   tex.minFilter = THREE.LinearMipmapLinearFilter;
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: tex, toneMapped: false }));
+  const see = holo ? { transparent: true, side: THREE.DoubleSide, depthWrite: false } : {};
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: tex, toneMapped: false, ...see }));
   m.userData.isScreen = true;
+  m.userData.holo = holo;
   m.userData.w = w;
-  const caret = new THREE.Mesh(geo("caret", () => new THREE.PlaneGeometry(1, 1)), new THREE.MeshBasicMaterial({ color: 0x5b8dff, toneMapped: false }));
+  const caret = new THREE.Mesh(geo("caret", () => new THREE.PlaneGeometry(1, 1)), new THREE.MeshBasicMaterial({ color: holo ? 0x2f6bff : 0x5b8dff, toneMapped: false, ...see }));
   caret.visible = false;
   caret.raycast = () => {};
   m.add(caret);
+  if (holo) { m.renderOrder = 10; caret.renderOrder = 11; }
   const draw = (paint: (ctx: CanvasRenderingContext2D, w: number, h: number) => void) => {
     const ctx = canvas.getContext("2d")!;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -298,6 +303,47 @@ export function screen(w: number, h: number, px = 256) {
     if (r.color) (caret.material as THREE.MeshBasicMaterial).color.set(r.color);
   };
   return { mesh: m, draw, cursor, caret };
+}
+
+let slitMat: THREE.MeshBasicMaterial | null = null;
+/** A hologram's projector: a slim aluminium bar lying on whatever holds it,
+ *  a thin slit of blue light along its top. */
+export function projector(w: number, d = 0.34) {
+  const g = new THREE.Group();
+  const bar = rbox(w, 0.07, d, FIN.alu(), 0.03);
+  const slit = box(w - 0.2, 0.012, 0.07, slitMat ??= new THREE.MeshBasicMaterial({ color: 0x5b8dff, toneMapped: false }));
+  slit.position.y = 0.064;
+  slit.receiveShadow = false;
+  g.add(bar, slit);
+  return g;
+}
+
+let beamTex: THREE.CanvasTexture | null = null;
+/** The light from a projector up to its hologram: a pale blue fan from `y0`
+ *  to `y1`, `bottom` wide at the slit and `top` (the screen's width) where
+ *  it meets the screen, brightest at the slit. */
+export function beam(y0: number, y1: number, bottom: number, top: number) {
+  if (!beamTex) {
+    const c = document.createElement("canvas");
+    c.width = 4; c.height = 64;
+    const x = c.getContext("2d")!;
+    const g = x.createLinearGradient(0, 0, 0, 64);
+    g.addColorStop(0, "rgba(91,141,255,0.04)");
+    g.addColorStop(1, "rgba(91,141,255,0.2)");
+    x.fillStyle = g; x.fillRect(0, 0, 4, 64);
+    beamTex = new THREE.CanvasTexture(c);
+    beamTex.colorSpace = THREE.SRGBColorSpace;
+  }
+  const h = y1 - y0, b = bottom / 2, t = top / 2;
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute([-b, 0, 0, b, 0, 0, t, h, 0, -t, h, 0], 3));
+  g.setAttribute("uv", new THREE.Float32BufferAttribute([0, 0, 1, 0, 1, 1, 0, 1], 2));
+  g.setIndex([0, 1, 2, 0, 2, 3]);
+  const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: beamTex, transparent: true, side: THREE.DoubleSide, depthWrite: false, toneMapped: false }));
+  m.position.y = y0;
+  m.renderOrder = 9;
+  m.raycast = () => {};
+  return m;
 }
 
 /** A ring thrown off something that just did a thing; grows and fades. */

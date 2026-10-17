@@ -36,6 +36,56 @@
 }
 .wl-cam button { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 8px; color: #33434d; background: none; border: 0; cursor: pointer; }
 .wl-cam button:hover { background: #eef2f8; color: #16202b; }
+.wl-cam button.on { color: #2f5bea; background: #eaf0ff; }
+.wl-cam button:focus-visible { outline: 2px solid #2f5bea; outline-offset: 1px; }
+
+/* The core's figures in the corners: panes of light over the scene, no
+   frame, fine scan lines, the signal blue glowing. Nothing here takes the
+   pointer, so the scene still turns under them. */
+.wl-holo {
+  --holo-ink: #1f4fe0; --holo-dim: rgba(31, 79, 224, 0.62); --holo-glow: rgba(47, 91, 234, 0.38);
+  --holo-a: rgba(210, 225, 255, 0.62); --holo-b: rgba(226, 236, 255, 0.12); --holo-scan: rgba(47, 91, 234, 0.06); --holo-bad: #d0313f;
+  position: absolute; z-index: 2; pointer-events: none; padding: 10px 14px 11px; min-width: 168px;
+  background: repeating-linear-gradient(to bottom, var(--holo-scan) 0 1px, transparent 1px 3px), linear-gradient(155deg, var(--holo-a), var(--holo-b));
+  border-radius: 6px; color: var(--holo-ink); font-family: "Geist Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 1px var(--holo-glow), 0 0 8px var(--holo-glow);
+  transition: opacity 0.18s ease, visibility 0.18s; }
+:root[data-theme="dark"] .wl-holo {
+  --holo-ink: #a9c0ff; --holo-dim: rgba(185, 205, 255, 0.84); --holo-glow: rgba(110, 150, 255, 0.55);
+  --holo-a: rgba(16, 30, 64, 0.72); --holo-b: rgba(16, 30, 64, 0.28); --holo-scan: rgba(140, 170, 255, 0.08); --holo-bad: #ff7a85; }
+.wl-holo.off { opacity: 0; visibility: hidden; }
+.wl-holo.tr { top: 56px; right: 24px; text-align: right; }
+.wl-holo.bl { left: 24px; bottom: 44px; }
+.wl-holo.br { right: 86px; bottom: 44px; text-align: right; }
+/* Where the bar to the queen reaches the corners, the bottom panes stand above it. */
+@media (max-width: 1380px) { .wl-holo.bl, .wl-holo.br { bottom: 108px; } }
+.wl-holo.tl { position: relative; }
+.wh-row { display: flex; gap: 18px; }
+.wl-holo.tr .wh-row, .wl-holo.br .wh-row { justify-content: flex-end; }
+.wh-fig { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.wh-fig b { font-size: 20px; font-weight: 600; line-height: 1; letter-spacing: -0.02em; white-space: nowrap; display: inline-flex; align-items: center; gap: 7px; }
+.wl-holo.tr .wh-fig b, .wl-holo.br .wh-fig b { justify-content: flex-end; }
+.wh-fig.big b { font-size: 34px; }
+.wh-fig span { font: 600 9.5px/1.2 Geist, system-ui, sans-serif; letter-spacing: 0.12em; text-transform: uppercase; color: var(--holo-dim); white-space: nowrap; }
+.wh-fig.bad b { color: var(--holo-bad); }
+.wh-fig.big + .wh-row { margin-top: 10px; }
+.wh-row + .wh-row, .wh-row + .wh-line { margin-top: 10px; }
+.wh-line { display: flex; gap: 12px; justify-content: flex-end; font: 600 10px/1.2 Geist, system-ui, sans-serif; letter-spacing: 0.08em; text-transform: uppercase; color: var(--holo-dim); }
+.wh-line b { font: 600 11.5px "Geist Mono", ui-monospace, monospace; color: var(--holo-ink); letter-spacing: 0; margin-left: 2px; }
+.wh-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--holo-dim); opacity: 0.45; flex: none; }
+.wh-dot.on { opacity: 1; background: var(--holo-ink); box-shadow: 0 0 8px var(--holo-glow); }
+/* Narrow: one figure to a corner. */
+@media (max-width: 600px) {
+  .wl-holo { min-width: 0; padding: 7px 10px 8px; }
+  .wl-holo .wh-fig:not(.main), .wl-holo .wh-line { display: none; }
+  .wh-row + .wh-row:not(:has(.main)) { display: none; }
+  .wh-fig.big b { font-size: 24px; }
+  .wh-fig.big + .wh-row { margin-top: 0; }
+  .wl-holo.tr { top: 56px; right: 12px; }
+  .wl-holo.bl { left: 12px; bottom: 108px; }
+  .wl-holo.br { right: 74px; bottom: 108px; }
+}
+@media (prefers-reduced-motion: reduce) { .wl-holo { transition: none; } }
 
 /* What is selected. */
 .wl-detail {
@@ -231,7 +281,9 @@
 
 /* The figures, on one flat screen at the top left. */
 .wl-hud { display: none; }
-.wl-stats { position: absolute; top: 20px; z-index: 3; width: 300px; background: #fff; border: 1px solid rgba(22, 32, 43, 0.12); border-radius: 14px;
+/* The top left: the hive's figures, and under them the core's own. */
+.wl-corner { position: absolute; left: 24px; z-index: 3; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; max-height: calc(100% - 140px); }
+.wl-stats { position: relative; width: 300px; background: #fff; border: 1px solid rgba(22, 32, 43, 0.12); border-radius: 14px;
   box-shadow: 0 10px 28px rgba(22, 32, 43, 0.1); font-family: Geist, system-ui, sans-serif; color: #16202b; overflow: hidden; }
 .wl-stats.folded { width: auto; }
 .wl-stats-top { display: flex; align-items: baseline; gap: 5px; width: 100%; padding: 10px 12px; border: 0; background: transparent; cursor: pointer; text-align: left; white-space: nowrap; }
@@ -263,7 +315,7 @@
 .wl-stats-who .bar.live span { background: #f2b416; }
 /* Clear of the window's title bar and its traffic lights; a pill that opens
    into the full panel. */
-.wl-stats { top: 56px; }
+.wl-corner { top: 56px; }
 .wl-stats.folded { border-radius: 999px; box-shadow: 0 6px 18px rgba(22, 32, 43, 0.1); }
 .wl-stats.folded .wl-stats-top { padding: 8px 12px 8px 14px; }
 .wl-stats-top:hover { background: #f7f9fb; }

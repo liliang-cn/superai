@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import type { District, DistrictCtx, Label } from "./engine";
-import { FIN, box, contact, cyl, hash01, mat, ownMat, rbox, screen, smooth } from "./kit";
+import { FIN, beam, box, contact, cyl, hash01, mat, ownMat, projector, rbox, screen, smooth } from "./kit";
 import { INK, pose, robot, setState, type RobotState } from "./robots";
 import { forgetActor, registerActor } from "./bubbles";
 import { Packets, type Link } from "./packets";
@@ -150,31 +150,50 @@ function paint(s: Screen, title: string, status: string, lines: string[], busy: 
   // Dark glass with white type and one blue, as the phone draws it: the
   // name and a blue prompt, what it is doing, a hairline, the last lines of
   // the work with a blue chevron each. The cursor is the screen's own quad,
-  // so blinking it never repaints this.
-  let caret: { x: number; y: number; w: number; h: number } | null = null;
+  // so blinking it never repaints this. On a hologram everything is blue
+  // light: deep enough to read against the white world, with a soft halo
+  // round each letter.
+  const holo = !!s.mesh.userData.holo;
+  let caret: { x: number; y: number; w: number; h: number; color: string } | null = null;
   s.draw((c, w, h) => {
     const k = w / 768; // laid out on the phone's 768-wide screen
-    const blue = "#5b8dff";
+    const blue = holo ? "#2f6bff" : "#5b8dff";
+    const ink = holo ? "#1d4ed8" : "rgba(255,255,255,0.95)";
+    const text = holo ? "rgba(31,63,153,0.92)" : "rgba(255,255,255,0.86)";
+    const dim = holo ? "rgba(47,107,255,0.62)" : "rgba(255,255,255,0.5)";
+    const rule = holo ? "rgba(47,107,255,0.28)" : "rgba(255,255,255,0.09)";
+    const idle = holo ? "rgba(47,107,255,0.25)" : "rgba(255,255,255,0.22)";
     const pad = 36 * k, lineH = 46 * k, top = 150 * k;
     const bg = c.createLinearGradient(0, 0, 0, h);
-    bg.addColorStop(0, "#17212c"); bg.addColorStop(1, "#0c131b");
-    c.fillStyle = bg; c.fillRect(0, 0, w, h);
+    if (holo) {
+      // The pane: brightest where the beam comes in at the bottom, thinning
+      // upward, with fine scan lines.
+      bg.addColorStop(0, "rgba(91,141,255,0.05)"); bg.addColorStop(1, "rgba(91,141,255,0.17)");
+      c.fillStyle = bg; c.fillRect(0, 0, w, h);
+      c.fillStyle = "rgba(47,107,255,0.05)";
+      for (let y = 0; y < h; y += 6 * k) c.fillRect(0, y, w, 2 * k);
+      c.shadowColor = "rgba(91,141,255,0.75)";
+      c.shadowBlur = 14 * k;
+    } else {
+      bg.addColorStop(0, "#17212c"); bg.addColorStop(1, "#0c131b");
+      c.fillStyle = bg; c.fillRect(0, 0, w, h);
+    }
     c.textBaseline = "top";
     const mono = (px: number, weight: number) => `${weight} ${px * k}px 'Geist Mono', 'SF Mono', Menlo, 'PingFang SC', monospace`;
     c.font = mono(38, 600);
-    c.fillStyle = "rgba(255,255,255,0.95)";
+    c.fillStyle = ink;
     c.fillText(title, pad, 30 * k);
     c.fillStyle = blue;
     c.fillText(" ~$", pad + c.measureText(title).width, 30 * k);
     c.font = mono(26, 400);
-    c.fillStyle = "rgba(255,255,255,0.5)";
+    c.fillStyle = dim;
     c.fillText(status, pad, 84 * k);
     // What it is on: a dot, blue while busy.
-    c.fillStyle = busy ? blue : "rgba(255,255,255,0.22)";
+    c.fillStyle = busy ? blue : idle;
     c.beginPath(); c.arc(w - pad - 9 * k, 53 * k, 9 * k, 0, Math.PI * 2); c.fill();
-    c.fillStyle = "rgba(255,255,255,0.09)";
+    c.fillStyle = rule;
     c.fillRect(pad, 130 * k, w - pad * 2, 2 * k);
-    c.font = mono(29, 400);
+    c.font = mono(29, holo ? 500 : 400);
     const maxW = w - pad * 2 - 34 * k;
     const rows: [string, boolean][] = [];
     for (const l of lines) {
@@ -187,13 +206,14 @@ function paint(s: Screen, title: string, status: string, lines: string[], busy: 
       if (row) rows.push([row, first]);
     }
     const shown = rows.slice(0, 5);
-    shown.forEach(([text, first], i) => {
+    shown.forEach(([line, first], i) => {
       const y = top + i * lineH;
       if (first) { c.fillStyle = blue; c.fillText("›", pad, y); }
-      c.fillStyle = "rgba(255,255,255,0.86)";
-      c.fillText(text, pad + 34 * k, y);
+      c.fillStyle = text;
+      c.fillText(line, pad + 34 * k, y);
     });
-    if (busy) caret = { x: pad + 34 * k, y: top + shown.length * lineH + 6 * k, w: 16 * k, h: 30 * k };
+    if (busy) caret = { x: pad + 34 * k, y: top + shown.length * lineH + 6 * k, w: 16 * k, h: 30 * k, color: blue };
+    if (holo) return;
     // A sheen across the glass from the top left; no raster, no glow.
     const sheen = c.createLinearGradient(0, 0, w * 0.6, h);
     sheen.addColorStop(0, "rgba(255,255,255,0.06)"); sheen.addColorStop(0.45, "rgba(255,255,255,0.012)"); sheen.addColorStop(0.46, "rgba(255,255,255,0)");
@@ -202,9 +222,16 @@ function paint(s: Screen, title: string, status: string, lines: string[], busy: 
   s.cursor(caret);
 }
 
+/** What a desk's light along its front edge says its computer is doing. */
+type DeskLight = "idle" | "busy" | "lost";
+const LIGHT: Record<DeskLight, number> = { idle: 0xd8dee6, busy: 0xf2b416, lost: 0xe2553f };
+function setLight(station: THREE.Object3D, s: DeskLight) {
+  ((station.userData.strip as THREE.Mesh).material as THREE.MeshBasicMaterial).color.set(LIGHT[s]);
+}
+
 /** A computer at a desk, monitor (or laptop) facing the room. Its screens and
- *  the light on its case are in userData; `spots` are where its robots
- *  stand, beside the desk, turned to the screen. */
+ *  the light along its front edge are in userData; `spots` are where its
+ *  robots stand, beside the desk, turned to the screen. */
 function workstation(kind: "desktop" | "laptop" | "console") {
   const g = new THREE.Group();
   const wide = kind === "console" ? 10 : 6.2;
@@ -221,17 +248,14 @@ function workstation(kind: "desktop" | "laptop" | "console") {
     g.add(leg);
   }
   const screens: Screen[] = [];
+  // A monitor is a hologram: a slim projector on the desk, a faint beam, and
+  // the screen hanging in the air above it with no glass and no frame.
   const monitor = (x: number, tilt = 0) => {
     const m = new THREE.Group();
-    const foot = rbox(1, 0.06, 0.7, FIN.alu(), 0.03, false);
-    const neck = rbox(0.5, 0.85, 0.06, FIN.alu(), 0.025);
-    neck.position.set(0, 0.04, -0.15);
-    neck.rotation.x = -0.12;
-    const bezel = rbox(3.3, 2.05, 0.12, FIN.glass(), 0.05);
-    bezel.position.set(0, 0.75, -0.2);
-    const sc = screen(3.05, 1.8, 640);
-    sc.mesh.position.set(0, 0.75 + 1.025, -0.12);
-    m.add(foot, neck, bezel, sc.mesh);
+    const sw = 3.05, sh = 1.8, mid = 0.75 + 1.025;
+    const sc = screen(sw, sh, 640, true);
+    sc.mesh.position.set(0, mid, 0);
+    m.add(projector(1.3), beam(0.08, mid - sh / 2, 1.1, sw), sc.mesh);
     m.position.set(x, surface, -0.6);
     m.rotation.y = tilt;
     screens.push(sc);
@@ -260,17 +284,14 @@ function workstation(kind: "desktop" | "laptop" | "console") {
     keys.position.set(0, surface, 0.65);
     g.add(keys);
   }
-  // The case on the floor beside the desk, with its light.
-  const tower = rbox(1.2, 2.5, 2.3, FIN.shell(), 0.12);
-  tower.position.set(wide / 2 + 0.9, 0, -0.2);
-  const strip = box(0.08, 1.6, 0.06, ownMat(0xd8dee6, { emissive: accentColor, glow: 0 }));
-  strip.position.set(wide / 2 + 0.9, 0.5, 0.96);
-  if (kind !== "laptop") g.add(tower, strip);
-  // The soft dark where the desk and its case meet the floor.
-  const under = contact(wide + 1.6, 4.2, 0.13);
-  under.position.x = kind === "laptop" ? 0 : 0.5;
-  g.add(under);
-  g.userData.tower = tower;
+  // No computer case: what it is doing shows in a line of light along the
+  // desk's front edge, just under the top.
+  const strip = box(wide - 0.8, 0.035, 0.03, new THREE.MeshBasicMaterial({ color: LIGHT.idle, toneMapped: false }));
+  strip.position.set(0, surface - 0.1375, 1.5);
+  strip.receiveShadow = false;
+  g.add(strip);
+  // The soft dark where the desk meets the floor.
+  g.add(contact(wide + 1.6, 4.2, 0.13));
   g.userData.screens = screens;
   g.userData.strip = strip;
   // Against the desk's front edge, close enough for the hands to reach the
@@ -370,8 +391,8 @@ export const cluster: District<WorldData> = {
     core.rotation.y = 0;
     g.add(core);
     ctx.pickable(core, { kind: "hall", id: "queen", title: queenTitle() });
-    // The core's own case: where this core is set up.
-    ctx.pickable(core.userData.tower, { kind: "settings", id: "core", title: "This core" });
+    // The dais is the core itself: where this core is set up.
+    ctx.pickable(dais, { kind: "settings", id: "core", title: "This core" });
     const queen = robot("queen");
     registerActor("queen", queen);
     // She faces you: she is the one you talk to.
@@ -508,13 +529,20 @@ export const cluster: District<WorldData> = {
 
     // ── noted: a board with what today still holds, on its own route from
     //    the core; a noted tool call runs along it ──────────────────────
+    // No sign: a projector bar across two posts' tops, and the board a
+    // hologram standing on its light.
     const board = new THREE.Group();
-    const boardPost = cyl(0.11, 0.11, 2.2, 16, FIN.alu(), true);
-    const boardBezel = rbox(5.4, 3.4, 0.18, FIN.shell(), 0.1);
-    boardBezel.position.y = 2;
-    const boardScreen = screen(5, 3, 640);
-    boardScreen.mesh.position.set(0, 3.7, 0.11);
-    board.add(boardPost, boardBezel, boardScreen.mesh, contact(3, 2, 0.12));
+    for (const x of [-2.2, 2.2]) {
+      const post = cyl(0.07, 0.07, 2.2, 16, FIN.alu(), true);
+      const foot = rbox(0.5, 0.06, 0.5, FIN.alu(), 0.03);
+      post.position.x = foot.position.x = x;
+      board.add(post, foot);
+    }
+    const boardBar = projector(4.6, 0.3);
+    boardBar.position.y = 2.2;
+    const boardScreen = screen(5, 3, 640, true);
+    boardScreen.mesh.position.set(0, 2.45 + 1.5, 0);
+    board.add(boardBar, beam(2.28, 2.45, 4.2, 5), boardScreen.mesh, contact(6.5, 2, 0.14));
     board.position.set(-3.5, 0, -19);
     g.add(board);
     ctx.pickable(board, { kind: "records", id: "records", title: "Today" });
@@ -763,8 +791,6 @@ export const cluster: District<WorldData> = {
           setState(w.r, st);
           if (st === "think" && mine.length) (w.r.userData.carry as THREE.Object3D).visible = true;
           nx.cable.setActive(run.some((x) => workers.get(x.worker)?.node === node));
-          const strip = nx.box.userData.strip as THREE.Mesh;
-          (strip.material as THREE.MeshStandardMaterial).emissiveIntensity = run.some((x) => workers.get(x.worker)?.node === node) ? 0.9 : 0;
           w.label.set(short(m.name), st === "lost" ? "not answering" : mine.length ? clip(mine[0].tool ? `${mine[0].tool} · ${mine[0].prompt}` : mine[0].prompt, 28) : st === "fail" ? "failed" : "idle",
             st === "lost" || st === "fail" ? "bad" : st === "work" || st === "think" ? "work" : "idle");
         });
@@ -774,6 +800,7 @@ export const cluster: District<WorldData> = {
           const on = members.filter((m) => nodeOf(m) === n);
           const doing = on.flatMap((m) => run.filter((t) => t.worker === m.name).map((t) => `${short(m.name)}: ${t.tool ? t.tool + " · " : ""}${t.prompt}`));
           const lost = on.some((m) => m.state === "lost");
+          setLight(x.box, lost ? "lost" : doing.length ? "busy" : "idle");
           show((x.box.userData.screens as Screen[])[0], n, lost ? "a worker is not answering" : doing.length ? `${doing.length} order${doing.length > 1 ? "s" : ""} running` : "idle",
             doing.length ? doing : on.map((m) => `${short(m.name)} · ${m.state === "lost" ? "lost" : "ready"}`), doing.length > 0);
         }
@@ -838,6 +865,7 @@ export const cluster: District<WorldData> = {
           const runsHere = d.runs.filter((r) => (r.remote || "core") === a.name);
           const liveHere = runsHere.filter((r) => r.state === "running");
           x.cable.setActive(liveHere.length > 0 || run.some((t) => route(t.worker)?.curve === x!.cable.curve));
+          setLight(x.dev, liveHere.length ? "busy" : "idle");
           show((x.dev.userData.screens as Screen[])[0], a.name, liveHere.length ? `${liveHere.length} running` : `${who.length} agents ready`,
             (liveHere.length ? liveHere : runsHere.slice(0, 4)).map((r) => `${r.agent}: ${r.prompt}`), liveHere.length > 0);
         });
@@ -888,8 +916,7 @@ export const cluster: District<WorldData> = {
         calls = d.meter.total.calls;
         const doing = d.meter.members.find((m) => m.live && m.doing)?.doing;
         queenLab.set(queenLabel(d.hive.engine), live ? clip(doing || "thinking", 26) : "idle", live ? "work" : queenState === "wait" ? "wait" : "idle");
-        const coreStrip = (core.userData.strip as THREE.Mesh).material as THREE.MeshStandardMaterial;
-        coreStrip.emissiveIntensity = live ? 1 : 0.15;
+        setLight(core, live ? "busy" : "idle");
         const [s1, s2, s3] = core.userData.screens as Screen[];
         const fmt = (n: number) => (n >= 1e6 ? (n / 1e6).toFixed(2) + "M" : n >= 1e3 ? (n / 1e3).toFixed(1) + "k" : String(Math.round(n)));
         show(s1, "hive tokens", `${fmt(d.meter.total.tokens)}`, [`${Math.round(d.meter.total.tokPerSec)} tok/s`, `${d.meter.total.calls} tool calls`], d.meter.total.tokPerSec > 0.5);
