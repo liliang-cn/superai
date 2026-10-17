@@ -351,6 +351,15 @@ bearer_token_env_var = "SUPERAI_TOKEN"
 | `superai_chat_history` | 一个会话最近的消息：角色、文字、时间 |
 | `superai_schedule_*` | 定时任务的增删改查和立即运行 |
 | `superai_hive_*` | hive 的成员、扩缩容、派活和消息（只在 queen 上有意义） |
+| `superai_hive_delegate` | 像 queen 自己的 `hive_delegate` 一样把具体的活交给最合适的 worker，失败换人，没人能做就 queen 自己做。异步：最多等 `wait_seconds`（默认 25，最多 55）就返回 delegation id 和状态，没做完就用 `superai_hive_tasks` 带这个 id 接着看；做完的每一份带着谁做的、调了哪些工具（含参数）和 worker 的报告 |
+| `superai_hive_tasks` | 最近的 delegation 和任务板上的每一单：状态、worker、阶段、耗时、结果开头、能否停止；带 `id` 返回完整记录 |
+| `superai_hive_task_cancel` | 停掉一个 delegation 或一单任务（要审批） |
+| `superai_approvals_pending` | 等人批的工具调用：是什么、谁要的、什么时候过期。只读，批只能在手机上 |
+| `superai_machine_*` | 看机器、动机器（`superai_machine_act` 要审批） |
+
+`superai_machine_act`、带 `force` 的 `superai_hive_retire`、`superai_hive_task_cancel` 和 `superai_schedule_delete` 和 queen 自己调用时一样过审批：手机上弹卡，调用一直等到有人点（没人点就拒绝）；设置里关了审批或开着 YOLO 时照那个设置走。
+
+外部 agent 当 queen 时用 **queen token**（见下面的 integration token，`create --queen`）：它只能访问 `/mcp`，而且在 `/mcp` 上只看得到、只能调用指挥集群的工具（hive、机器、定时任务、任务板、待审批列表、会话记录、状态），没有 `superai_ask`、设置和其他工具；访问别的接口一律 403。
 
 ### 给 SuperAI 接 MCP 服务器
 
@@ -418,6 +427,7 @@ Authorization: Bearer <integration token 或 core 的 token>
 
 ```sh
 superai integration-token create openclaw   # token 打印到 stdout，只有这一次
+superai integration-token create --queen claude-queen   # queen token：只能用 /mcp 上指挥集群的工具
 superai integration-token list
 superai integration-token revoke <id>
 ```
@@ -431,8 +441,9 @@ ssh node1 'sudo k3s kubectl -n superai exec superai-queen-0 -- superai integrati
 命令直接写 `integrations.json`，正在运行的服务马上生效，不用重启。也可以用 RPC 管理（需要 core 的 token、配对设备或已登录的网页）：
 
 ```
-POST /api/rpc/CreateIntegrationToken  ["openclaw"]  → {"id":"…","name":"openclaw","created_at":"…","token":"sai_int_…"}
-POST /api/rpc/ListIntegrationTokens   []            → [{"id":"…","name":"openclaw","created_at":"…","last_used":"…"}]
+POST /api/rpc/CreateIntegrationToken  ["openclaw"]  → {"id":"…","name":"openclaw","scope":"notify","created_at":"…","token":"sai_int_…"}
+POST /api/rpc/CreateQueenToken        ["claude-queen"] → {"id":"…","name":"claude-queen","scope":"queen","created_at":"…","token":"sai_queen_…"}
+POST /api/rpc/ListIntegrationTokens   []            → [{"id":"…","name":"openclaw","scope":"notify","created_at":"…","last_used":"…"}]
 POST /api/rpc/RevokeIntegrationToken  ["<id>"]      → null（id 不存在是 404）
 ```
 

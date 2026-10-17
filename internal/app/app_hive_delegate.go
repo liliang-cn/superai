@@ -211,12 +211,32 @@ func delegateTasks(args map[string]any) []backend.DelegateTask {
 
 // hiveDelegate is the hive_delegate tool.
 func (a *App) hiveDelegate(ctx context.Context, args map[string]any) (any, error) {
-	tasks := delegateTasks(args)
+	results, err := a.delegate(ctx, delegateTasks(args), nil)
+	if err != nil {
+		return nil, err
+	}
+	return backend.FormatDelegated(results), nil
+}
+
+// checkDelegateTasks is what one delegation takes.
+func checkDelegateTasks(tasks []backend.DelegateTask) error {
 	if len(tasks) == 0 {
-		return nil, fmt.Errorf("give tasks: one self-contained instruction per piece of work")
+		return fmt.Errorf("give tasks: one self-contained instruction per piece of work")
 	}
 	if len(tasks) > backend.MaxDelegateTasks {
-		return nil, fmt.Errorf("%d tasks is more than one call takes (%d); for many uniform jobs use hive_map", len(tasks), backend.MaxDelegateTasks)
+		return fmt.Errorf("%d tasks is more than one call takes (%d); for many uniform jobs use hive_map", len(tasks), backend.MaxDelegateTasks)
+	}
+	return nil
+}
+
+// delegate runs one delegation: each piece to the best worker, another on a
+// failure, the queen herself when nobody can. hive_delegate in her own run and
+// superai_hive_delegate on /mcp both come here. Every tool event goes on the
+// turn's stream (when there is a turn) and to any trace already on ctx;
+// onAssign, when set, is told who takes each piece.
+func (a *App) delegate(ctx context.Context, tasks []backend.DelegateTask, onAssign func(i int, worker string, fallback bool)) ([]backend.DelegateResult, error) {
+	if err := checkDelegateTasks(tasks); err != nil {
+		return nil, err
 	}
 	a.mu.Lock()
 	svc, s := a.svc, a.settings
@@ -234,7 +254,13 @@ func (a *App) hiveDelegate(ctx context.Context, args map[string]any) (any, error
 	}
 
 	requestID := chatRequestFrom(ctx)
-	ctx = backend.WithWorkerTrace(ctx, func(ev backend.WorkerToolEvent) { a.emitWorkerTool(requestID, ev) })
+	outer := backend.WorkerTraceFrom(ctx)
+	ctx = backend.WithWorkerTrace(ctx, func(ev backend.WorkerToolEvent) {
+		a.emitWorkerTool(requestID, ev)
+		if outer != nil {
+			outer(ev)
+		}
+	})
 	queen := a.hiveName()
 	env := backend.DelegateEnv{
 		Candidates: a.delegateCandidates,
@@ -247,6 +273,9 @@ func (a *App) hiveDelegate(ctx context.Context, args map[string]any) (any, error
 		SelfName: queen,
 		Timeout:  timeout,
 		OnAssign: func(i int, worker string, fallback bool) {
+			if onAssign != nil {
+				onAssign(i, worker, fallback)
+			}
 			line := fmt.Sprintf("%s takes piece %d", worker, i+1)
 			if fallback {
 				line = fmt.Sprintf("no worker could take piece %d; the queen does it herself", i+1)
@@ -263,7 +292,7 @@ func (a *App) hiveDelegate(ctx context.Context, args map[string]any) (any, error
 			log.Printf("hive: piece %d done by the queen herself: %s", r.Index+1, r.Why)
 		}
 	}
-	return backend.FormatDelegated(results), nil
+	return results, nil
 }
 
 // emitWorkerTool puts one tool event of delegated work on the queen's turn,

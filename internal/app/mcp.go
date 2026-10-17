@@ -13,7 +13,8 @@
 // Transport is streamable HTTP at /mcp, behind the same credential gate as the
 // RPC surface (requireAuth in auth.go): a request needs the Bearer token from
 // auth.json, a paired device's token, or a signed-in browser session. The
-// gate is this process's own, whatever sits in front of it.
+// gate is this process's own, whatever sits in front of it. A queen token
+// reaches a narrower server on the same path (mcp_scope.go).
 
 package app
 
@@ -34,7 +35,7 @@ const mcpPath = "/mcp"
 // mcpServerVersion is what a client sees in the initialize handshake. The app
 // itself carries no version string, so this tracks the tool surface: bump it
 // when a tool is added, removed, or changes shape.
-const mcpServerVersion = "0.6.0"
+const mcpServerVersion = "0.7.0"
 
 // nextRunsShown is how many upcoming times a create/validate answer names.
 //
@@ -96,17 +97,50 @@ type scheduleEnableIn struct {
 	Enabled bool   `json:"enabled" jsonschema:"true resumes the schedule, false pauses it without deleting it"`
 }
 
-// newMCPHandler builds the MCP endpoint over app.
+// Who an approval card says is asking, by the server the call came in on.
+const (
+	mcpCallerFull  = "an MCP client"
+	mcpCallerQueen = "the queen, over MCP"
+)
+
+// newMCPHandler builds the MCP endpoint over app: every tool for the full
+// credential, the cluster-command tools for a queen token.
 func newMCPHandler(app *App, version string) http.Handler {
 	if strings.TrimSpace(version) == "" {
 		version = "dev"
 	}
+	queen := newMCPServer(app, version, mcpCallerQueen, queenMCPInstructions)
+	queen.AddReceivingMiddleware(onlyTools(queenMCPTools))
+	return scopedMCPHandler{
+		full:  streamableMCP(newMCPServer(app, version, mcpCallerFull, mcpInstructions)),
+		queen: streamableMCP(queen),
+	}
+}
+
+func streamableMCP(s *mcp.Server) http.Handler {
+	return mcp.NewStreamableHTTPHandler(
+		func(*http.Request) *mcp.Server { return s },
+		// The SDK refuses a non-loopback Host header when the listener is on
+		// loopback — DNS-rebinding protection for a local server a browser
+		// could be tricked into calling. That threat needs a browser that
+		// reaches the listener directly, and nothing does: serve binds
+		// 127.0.0.1 and the only way in is a reverse proxy that authenticates
+		// first. Leaving it on would mean rejecting every request that arrives
+		// with the real hostname, which is all of them.
+		&mcp.StreamableHTTPOptions{DisableLocalhostProtection: true},
+	)
+}
+
+// newMCPServer is one MCP server with every tool; caller is who its approval
+// cards say is asking.
+func newMCPServer(app *App, version, caller, instructions string) *mcp.Server {
 	s := mcp.NewServer(
 		&mcp.Implementation{Name: "superai", Title: "SuperAI", Version: version},
-		&mcp.ServerOptions{Instructions: mcpInstructions},
+		&mcp.ServerOptions{Instructions: instructions},
 	)
-	addSelfMCPTools(s, app)
+	addSelfMCPTools(s, app, caller)
 	addAskMCPTools(s, app)
+	addHiveMCPTools(s, app, caller)
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:  "superai_schedule_create",
@@ -153,10 +187,16 @@ func newMCPHandler(app *App, version string) http.Handler {
 	})
 
 	mcp.AddTool(s, &mcp.Tool{
-		Name:        "superai_schedule_delete",
-		Title:       "Delete a schedule",
-		Description: "Removes it for good. To stop it temporarily use superai_schedule_enable with enabled=false.",
+		Name:  "superai_schedule_delete",
+		Title: "Delete a schedule",
+		Description: "Removes it for good. To stop it temporarily use superai_schedule_enable with enabled=false. " +
+			"Passes SuperAI's approval gate: the person is asked on the phone and the call waits for the answer " +
+			"(denied if nobody answers in time).",
+		Annotations: &mcp.ToolAnnotations{DestructiveHint: ptr(true)},
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in scheduleIDIn) (*mcp.CallToolResult, any, error) {
+		if refused := app.mcpGate(ctx, caller, "superai_schedule_delete", map[string]any{"id": in.ID}); refused != nil {
+			return refused, nil, nil
+		}
 		if msg := app.DeleteScheduledPrompt(in.ID); msg != "ok" {
 			return toolErr(msg)
 		}
@@ -208,8 +248,12 @@ func newMCPHandler(app *App, version string) http.Handler {
 		Name:  "superai_hive_retire",
 		Title: "Retire workers",
 		Description: "Let the highest-numbered workers go. Refuses while one is in the middle of an order, " +
-			"unless force is set.",
+			"unless force is set. With force the call passes SuperAI's approval gate: the person is asked on the " +
+			"phone and the call waits for the answer (denied if nobody answers in time).",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in hiveRetireIn) (*mcp.CallToolResult, any, error) {
+		if refused := app.mcpGate(ctx, caller, "superai_hive_retire", map[string]any{"count": in.Count, "force": in.Force}); refused != nil {
+			return refused, nil, nil
+		}
 		r := app.HiveRetire(in.Count, in.Force)
 		if ok, _ := r["ok"].(bool); !ok {
 			return toolErr(fmt.Sprint(r["error"]))
@@ -276,18 +320,10 @@ func newMCPHandler(app *App, version string) http.Handler {
 		return toolOK(map[string]any{"messages": app.mailbox().Take(in.All, limit)})
 	})
 
-	return mcp.NewStreamableHTTPHandler(
-		func(*http.Request) *mcp.Server { return s },
-		// The SDK refuses a non-loopback Host header when the listener is on
-		// loopback — DNS-rebinding protection for a local server a browser
-		// could be tricked into calling. That threat needs a browser that
-		// reaches the listener directly, and nothing does: serve binds
-		// 127.0.0.1 and the only way in is a reverse proxy that authenticates
-		// first. Leaving it on would mean rejecting every request that arrives
-		// with the real hostname, which is all of them.
-		&mcp.StreamableHTTPOptions{DisableLocalhostProtection: true},
-	)
+	return s
 }
+
+func ptr[T any](v T) *T { return &v }
 
 const mcpInstructions = `SuperAI is a personal assistant with its own tools, memory and data (to-dos,
 calendar, notes, holdings through noted). superai_ask talks to it as the person
@@ -303,6 +339,20 @@ the cron rather than explaining it.
 
 A schedule's prompt is an instruction to SuperAI, written the way it would be
 typed into chat. It is not a description of a schedule.`
+
+const queenMCPInstructions = `You are the queen of a SuperAI hive, and these tools are how you command it.
+SuperAI carries out every action; dangerous ones (machine_act, forced retire,
+task cancel, schedule delete) wait for the person to approve them on the phone.
+
+Hand concrete work to workers with superai_hive_delegate (it returns a
+delegation id; poll superai_hive_tasks with it until the state is not
+running). superai_hive_command and superai_hive_map send orders to many
+workers at once. superai_hive_tasks shows what every worker is doing;
+superai_hive_task_cancel stops one order or delegation.
+
+superai_machine_inspect and superai_machine_act look after the machines
+(superai_linked_agents names them). superai_approvals_pending lists what is
+waiting for the person; you cannot answer it, only tell them.`
 
 // nextRuns validates a cron expression and returns its next n occurrences.
 func nextRuns(expr string, n int) ([]string, error) {

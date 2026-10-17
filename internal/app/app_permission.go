@@ -33,6 +33,9 @@ type pendingApproval struct {
 // builds. It blocks until the user answers or the gate stops waiting.
 func (a *App) askToolApproval(ctx context.Context, req backend.ApprovalRequest) (backend.ApprovalDecision, error) {
 	if req.By == "" {
+		req.By = approvalByFrom(ctx)
+	}
+	if req.By == "" {
 		req.By = a.standingNameForSession(req.SessionID)
 	}
 	// YOLO, then a remembered "以后同类不用问我" rule, before any card.

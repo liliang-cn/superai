@@ -179,19 +179,23 @@ func (a *App) registerSelfTools(svc *backend.Service) {
 	}
 }
 
-// addSelfMCPTools serves the table on the MCP server.
-func addSelfMCPTools(s *mcp.Server, app *App) {
+// addSelfMCPTools serves the table on the MCP server. caller is who the
+// approval card says is asking, for a tool that has to ask.
+func addSelfMCPTools(s *mcp.Server, app *App, caller string) {
 	for _, t := range selfTools() {
 		tool := &mcp.Tool{Name: "superai_" + t.Name, Title: t.Title, Description: t.Description, InputSchema: t.schema()}
 		if t.ReadOnly {
 			tool.Annotations = &mcp.ToolAnnotations{ReadOnlyHint: true}
 		}
-		s.AddTool(tool, func(_ context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		s.AddTool(tool, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			args := map[string]any{}
 			if raw := req.Params.Arguments; len(raw) > 0 {
 				if err := json.Unmarshal(raw, &args); err != nil {
 					return selfErr("arguments are not a JSON object: " + err.Error()), nil
 				}
+			}
+			if refused := app.mcpGate(ctx, caller, tool.Name, args); refused != nil {
+				return refused, nil
 			}
 			out, err := t.Run(app, args)
 			if err != nil {

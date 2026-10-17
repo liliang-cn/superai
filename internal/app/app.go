@@ -42,6 +42,11 @@ type App struct {
 	// test sets it to a stub queen.
 	taps  sync.Map
 	askFn func(sessionID, message string) string
+	// gateForMCP, when set, is the approval gate /mcp's destructive tools
+	// pass instead of the service's (mcp_scope.go); a test sets it.
+	gateForMCP *backend.ToolGate
+	// delegations are superai_hive_delegate's runs (mcp_hive.go).
+	delegations delegationStore
 	// Direct MCP calls from chat-block buttons and home tiles. See
 	// app_actions.go.
 	actionsOnce sync.Once
@@ -908,6 +913,7 @@ func (a *App) SendChat(sessionID, message string, imagePaths []string) string {
 		// record and this one are the same UUID.
 		id, _ := backend.TaskIDFromSession(sessionID)
 		taskID = board.StartAs(id, a.hiveName(), "", backend.TaskIn, message)
+		board.OnStop(taskID, func() { a.CancelChat(requestID) })
 		// Mail waiting is mentioned with the order, not put into it: the order
 		// stands alone, and whether the notes bear on it is the worker's call.
 		if n := a.mailbox().Unread(); n > 0 {
