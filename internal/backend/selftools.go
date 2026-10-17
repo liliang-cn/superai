@@ -59,15 +59,16 @@ const selfMaxRoundsCeiling = 2000
 // What is left is preference: how hard it tries, where it works, whether the
 // avatar bridge is on, and where a notice is sent.
 var settingsWritable = map[string]string{
-	"llm_model":     "The chat model, as the provider names it.",
-	"embed_model":   "The embedding model.",
-	"max_rounds":    "Tool-call rounds per task (1-200).",
-	"headless":      "Run the browser without a visible window.",
-	"avatar_port":   "Local SSE port for the avatar bridge; 0 turns it off.",
-	"webhook_url":   "Where a notice is POSTed. Blank turns the webhook off.",
-	"workspace_dir": "Where the agent reads and writes deliverable files.",
-	"pii_redaction": "Strip personal data before sending to the model.",
-	"disable_ptc":   "Turn off programmatic tool calling.",
+	"llm_model":             "The chat model, as the provider names it.",
+	"embed_model":           "The embedding model.",
+	"max_rounds":            "Tool-call rounds per task (1-200).",
+	"headless":              "Run the browser without a visible window.",
+	"avatar_port":           "Local SSE port for the avatar bridge; 0 turns it off.",
+	"webhook_url":           "Where a notice is POSTed. Blank turns the webhook off.",
+	"workspace_dir":         "Where the agent reads and writes deliverable files.",
+	"pii_redaction":         "Strip personal data before sending to the model.",
+	"disable_ptc":           "Turn off programmatic tool calling.",
+	"agent_link.relay_only": "Linked agents that are relays, not machines: their named agents stay reachable, but they are not shown or looked after as machines. A list of names; empty for none.",
 }
 
 // registerSelfTools gives the agent the app's own controls.
@@ -263,6 +264,7 @@ func SettingsSnapshot(cfg *Settings) map[string]interface{} {
 		"external_agents_enabled": cfg.ExternalAgents.Enabled,
 		"remote_agents_enabled":   cfg.RemoteAgents.Enabled,
 		"self_install_enabled":    !cfg.DisableSelfInstall,
+		"agent_link":              map[string]interface{}{"relay_only": append([]string{}, cfg.AgentLink.RelayOnly...)},
 		"writable_from_this_tool": writable,
 	}
 }
@@ -328,6 +330,16 @@ func SetWritableSetting(cfg *Settings, key string, raw interface{}) (interface{}
 		cfg.PIIRedaction = toBool(raw)
 	case "disable_ptc":
 		cfg.DisablePTC = toBool(raw)
+	case "agent_link.relay_only":
+		names, err := toNames(raw)
+		if err != nil {
+			return nil, fmt.Errorf("agent_link.relay_only: %v", err)
+		}
+		cfg.AgentLink.RelayOnly = names
+		if names == nil {
+			names = []string{}
+		}
+		return names, nil
 	default:
 		return nil, errNotWritable(key)
 	}

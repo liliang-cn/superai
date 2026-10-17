@@ -481,6 +481,8 @@ func (a *App) SaveSettings(s backend.Settings) error {
 	a.restartScheduler()
 	a.startTelegram()
 	a.startHive()
+	// agent_link.relay_only may have moved an agent in or out of the machines.
+	a.agentsChanged()
 	return nil
 }
 

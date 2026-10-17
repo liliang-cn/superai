@@ -186,16 +186,22 @@ export interface LinkedAgent {
   agents?: { name: string; about: string }[];
   connected: string;
   lastSeen: string;
+  /** Shown and looked after as a machine. */
+  machine?: boolean;
+  /** machine, worker (a hive worker's pod) or relay (kept for its named agents). */
+  role?: string;
 }
 
-/** The agents connected to core over the agent link — the machines it can
- *  run things on — without the hive's own workers, which are listed as such. */
+/** The machines connected to core over the agent link — the ones it can run
+ *  things on and look after. Core leaves out the hive's own workers, listed
+ *  as such, and the relays kept only for their named agents; the filter here
+ *  is for a core from before it did. */
 export function useLinkedAgents(): LinkedAgent[] {
   const [list, setList] = useState<LinkedAgent[]>([]);
   useEffect(() => {
     let alive = true;
     const load = () => LinkedAgents().then((l) => {
-      if (alive) setList(((l ?? []) as unknown as LinkedAgent[]).filter((a) => !a.name.startsWith("superai-worker-")));
+      if (alive) setList(((l ?? []) as unknown as LinkedAgent[]).filter((a) => a.machine ?? !a.name.startsWith("superai-worker-")));
     }).catch(() => {});
     load();
     const off = EventsOn("agents:changed", load);

@@ -351,8 +351,10 @@ workers at once. superai_hive_tasks shows what every worker is doing;
 superai_hive_task_cancel stops one order or delegation.
 
 superai_machine_inspect and superai_machine_act look after the machines
-(superai_linked_agents names them). superai_approvals_pending lists what is
-waiting for the person; you cannot answer it, only tell them.`
+(superai_linked_agents names them: the entries with machine true; hive
+workers and relays are listed there too, and are not machines).
+superai_approvals_pending lists what is waiting for the person; you cannot
+answer it, only tell them.`
 
 // nextRuns validates a cron expression and returns its next n occurrences.
 func nextRuns(expr string, n int) ([]string, error) {

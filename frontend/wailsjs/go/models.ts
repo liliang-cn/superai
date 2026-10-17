@@ -992,6 +992,8 @@ export namespace app {
 	    connected: any;
 	    // Go type: time
 	    lastSeen: any;
+	    machine: boolean;
+	    role: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new LinkedAgent(source);
@@ -1008,6 +1010,8 @@ export namespace app {
 	        this.agents = source["agents"];
 	        this.connected = this.convertValues(source["connected"], null);
 	        this.lastSeen = this.convertValues(source["lastSeen"], null);
+	        this.machine = source["machine"];
+	        this.role = source["role"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -1249,6 +1253,7 @@ export namespace app {
 	    servers: Record<string, any>;
 	    allowed?: string[];
 	    env?: Record<string, string>;
+	    args?: string[];
 	
 	    static createFrom(source: any = {}) {
 	        return new QueenKit(source);
@@ -1260,6 +1265,7 @@ export namespace app {
 	        this.servers = source["servers"];
 	        this.allowed = source["allowed"];
 	        this.env = source["env"];
+	        this.args = source["args"];
 	    }
 	}
 	export class QueenRunRequest {
@@ -1451,6 +1457,18 @@ export namespace backend {
 	        this.team_id = source["team_id"];
 	        this.topic = source["topic"];
 	        this.env = source["env"];
+	    }
+	}
+	export class AgentLinkSettings {
+	    relay_only?: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new AgentLinkSettings(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.relay_only = source["relay_only"];
 	    }
 	}
 	export class RuleScope {
@@ -2510,6 +2528,7 @@ export namespace backend {
 	    apns: APNsSettings;
 	    queen_name?: string;
 	    queen_aliases?: string[];
+	    agent_link: AgentLinkSettings;
 	
 	    static createFrom(source: any = {}) {
 	        return new Settings(source);
@@ -2565,6 +2584,7 @@ export namespace backend {
 	        this.apns = this.convertValues(source["apns"], APNsSettings);
 	        this.queen_name = source["queen_name"];
 	        this.queen_aliases = source["queen_aliases"];
+	        this.agent_link = this.convertValues(source["agent_link"], AgentLinkSettings);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

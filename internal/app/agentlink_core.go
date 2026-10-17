@@ -23,6 +23,7 @@ import (
 
 	"github.com/google/uuid"
 	agentlinkpb "github.com/liliang-cn/superai/internal/agentlink/pb"
+	"github.com/liliang-cn/superai/internal/backend"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/keepalive"
@@ -167,13 +168,16 @@ type agentHub struct {
 	mu     sync.Mutex
 	agents map[string]*agentConn
 	lost   map[string]time.Time
+	// lostRole is the role a lost agent declared in its last Hello, so a hive
+	// worker that dropped is not also reported as a machine gone missing.
+	lostRole map[string]string
 
 	pingEvery, silence time.Duration // agentPingEvery and agentSilence, shorter in tests
 }
 
 func (a *App) agents() *agentHub {
 	a.agentHubOnce.Do(func() {
-		a.agentHubV = &agentHub{agents: map[string]*agentConn{}, lost: map[string]time.Time{},
+		a.agentHubV = &agentHub{agents: map[string]*agentConn{}, lost: map[string]time.Time{}, lostRole: map[string]string{},
 			pingEvery: agentPingEvery, silence: agentSilence}
 	})
 	return a.agentHubV
@@ -188,11 +192,19 @@ func (h *agentHub) lostAgents(now time.Time) map[string]time.Time {
 	for name, seen := range h.lost {
 		if now.Sub(seen) > agentForget {
 			delete(h.lost, name)
+			delete(h.lostRole, name)
 			continue
 		}
 		out[name] = seen
 	}
 	return out
+}
+
+// declaredRole is the role a lost agent declared before it dropped.
+func (h *agentHub) declaredRole(name string) string {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.lostRole[name]
 }
 
 func (h *agentHub) get(name string) *agentConn {
@@ -267,6 +279,56 @@ func (h *agentHub) servingAs(name string) (*agentConn, string) {
 	return nil, name
 }
 
+// What a linked agent is to this core. Every agent on the link can be asked
+// to run things; only a machine is shown and looked after as one.
+const (
+	// agentRoleMachine is a computer someone owns: the Mac, the orange boxes.
+	agentRoleMachine = "machine"
+	// agentRoleWorker is a hive worker's pod, which also dials the link. It is
+	// on the roster and drawn as a worker; as a machine it would be twice.
+	agentRoleWorker = "worker"
+	// agentRoleRelay is an agent kept for the named agents it serves
+	// (openclaw, hermes, ...): agent_link.relay_only in the settings.
+	agentRoleRelay = "relay"
+)
+
+// agentRoles is a classifier for the agents connected right now, built once
+// from the hive roster and the settings so a list does not take a.mu per row.
+//
+// A worker is known by what it says (Hello.role, sent by a build that knows
+// it is one) or, for a worker from before that, by being on the roster under
+// the name it links with: a worker pod links as $(POD_NAME), the name it
+// joins the hive by.
+func (a *App) agentRoles() func(name, declared string) string {
+	a.mu.Lock()
+	h := a.hive
+	var link backend.AgentLinkSettings
+	if a.settings != nil {
+		link = a.settings.AgentLink
+	}
+	a.mu.Unlock()
+	roster := map[string]bool{}
+	if h != nil {
+		for _, m := range h.Members() {
+			roster[m.Name] = true
+		}
+	}
+	return func(name, declared string) string {
+		switch {
+		case declared == agentRoleWorker || roster[name]:
+			return agentRoleWorker
+		case link.IsRelay(name):
+			return agentRoleRelay
+		}
+		return agentRoleMachine
+	}
+}
+
+// agentRole is what the connected agent c is to this core.
+func (a *App) agentRole(c *agentConn) string {
+	return a.agentRoles()(c.name(), c.hello.GetRole())
+}
+
 // LinkedAgent is a connected agent as the screens show it.
 type LinkedAgent struct {
 	Name      string              `json:"name"`
@@ -278,11 +340,32 @@ type LinkedAgent struct {
 	Agents    []map[string]string `json:"agents"`
 	Connected time.Time           `json:"connected"`
 	LastSeen  time.Time           `json:"lastSeen"`
+	// Machine is whether it is shown and looked after as a machine; Role
+	// says what it is: machine, worker (a hive worker's pod) or relay (kept
+	// for its named agents, agent_link.relay_only).
+	Machine bool   `json:"machine"`
+	Role    string `json:"role"`
 }
 
-// LinkedAgents lists the agents connected to this core over the agent link.
+// LinkedAgents lists the machines connected to this core over the agent link:
+// what the machine lists and the 3D view draw. Hive workers and relays are
+// left out here, so a client that takes every row for a machine — the iOS
+// app does — shows the right ones; LinkedAgentsAll has them too.
 func (a *App) LinkedAgents() []LinkedAgent {
 	out := []LinkedAgent{}
+	for _, la := range a.LinkedAgentsAll() {
+		if la.Machine {
+			out = append(out, la)
+		}
+	}
+	return out
+}
+
+// LinkedAgentsAll lists every agent connected over the agent link, each with
+// what it is (Machine, Role).
+func (a *App) LinkedAgentsAll() []LinkedAgent {
+	out := []LinkedAgent{}
+	role := a.agentRoles()
 	for _, c := range a.agents().list() {
 		la := LinkedAgent{Name: c.name(), Host: c.hello.GetHost(), OS: c.hello.GetOs(), Arch: c.hello.GetArch(),
 			Version: c.hello.GetVersion(), CLIs: append([]string{}, c.hello.GetClis()...),
@@ -290,6 +373,8 @@ func (a *App) LinkedAgents() []LinkedAgent {
 		for _, n := range c.hello.GetAgents() {
 			la.Agents = append(la.Agents, map[string]string{"name": n.GetName(), "about": n.GetAbout()})
 		}
+		la.Role = role(la.Name, c.hello.GetRole())
+		la.Machine = la.Role == agentRoleMachine
 		out = append(out, la)
 	}
 	return out
@@ -380,9 +465,10 @@ func (s *agentLinkServer) Connect(stream agentlinkpb.AgentLink_ConnectServer) er
 	}
 	hub.agents[hello.GetName()] = c
 	delete(hub.lost, hello.GetName())
+	delete(hub.lostRole, hello.GetName())
 	hub.mu.Unlock()
 	s.app.agentsChanged()
-	log.Printf("agent %s connected from %s (%s/%s), clis %v", hello.GetName(), hello.GetHost(), hello.GetOs(), hello.GetArch(), hello.GetClis())
+	log.Printf("agent %s connected from %s (%s/%s), clis %v, role %s", hello.GetName(), hello.GetHost(), hello.GetOs(), hello.GetArch(), hello.GetClis(), s.app.agentRole(c))
 	go hintCCAwayTo(c, s.app.Presence().Away)
 
 	// An agent that closes its side said goodbye: it is stopping, not lost.
@@ -393,6 +479,9 @@ func (s *agentLinkServer) Connect(stream agentlinkpb.AgentLink_ConnectServer) er
 			delete(hub.agents, hello.GetName())
 			if !bye {
 				hub.lost[hello.GetName()] = time.UnixMilli(c.lastSeen.Load())
+				c.mu.Lock()
+				hub.lostRole[hello.GetName()] = c.hello.GetRole()
+				c.mu.Unlock()
 			}
 		}
 		hub.mu.Unlock()
