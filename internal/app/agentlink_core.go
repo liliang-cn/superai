@@ -43,6 +43,10 @@ type agentConn struct {
 	pending map[string]chan *agentlinkpb.Reply
 	subs    map[int]chan *agentlinkpb.Event
 	nextSub int
+
+	// activity is what the machine's interactive Claude Code sessions are
+	// doing, as it last said (cc:activity); nil when it has none.
+	activity atomic.Pointer[CCActivity]
 }
 
 func (c *agentConn) name() string { return c.hello.GetName() }
@@ -345,6 +349,10 @@ type LinkedAgent struct {
 	// for its named agents, agent_link.relay_only).
 	Machine bool   `json:"machine"`
 	Role    string `json:"role"`
+	// Activity is what the machine's interactive Claude Code sessions are
+	// doing — the ones people run in its terminals, not SuperAI's own runs;
+	// absent when it has none.
+	Activity *CCActivity `json:"activity,omitempty"`
 }
 
 // LinkedAgents lists the machines connected to this core over the agent link:
@@ -373,6 +381,7 @@ func (a *App) LinkedAgentsAll() []LinkedAgent {
 		for _, n := range c.hello.GetAgents() {
 			la.Agents = append(la.Agents, map[string]string{"name": n.GetName(), "about": n.GetAbout()})
 		}
+		la.Activity = c.activity.Load()
 		la.Role = role(la.Name, c.hello.GetRole())
 		la.Machine = la.Role == agentRoleMachine
 		out = append(out, la)
@@ -572,6 +581,10 @@ func (s *agentLinkServer) receive(stream agentlinkpb.AgentLink_ConnectServer, c 
 			}
 			if k.Event.GetName() == ccSessionEvent {
 				s.app.noteCCSession(c.name(), k.Event.GetPayloadJson())
+				break
+			}
+			if k.Event.GetName() == ccActivityEvent {
+				s.app.noteCCActivity(c, k.Event.GetPayloadJson())
 				break
 			}
 			c.mu.Lock()

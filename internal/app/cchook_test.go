@@ -51,7 +51,13 @@ func TestTheHookForwardsOnlyWhatAPhoneShouldHear(t *testing.T) {
 		{"compaction keeps the session", "SessionStart", `{"session_id":"s1","source":"compact"}`, nil},
 		{"session end", "SessionEnd", `{"session_id":"s1","reason":"prompt_input_exit"}`,
 			&ccHookEvent{Event: "SessionEnd", Session: "s1", Source: "prompt_input_exit"}},
-		{"tool calls are not forwarded", "PreToolUse", `{"session_id":"s1","tool_name":"Bash"}`, nil},
+		{"a tool call says only which tool", "PreToolUse", `{"session_id":"s1","cwd":"/w/x","tool_name":"Bash","tool_input":{"command":"cat secrets.env"}}`,
+			&ccHookEvent{Event: "PreToolUse", Session: "s1", Cwd: "/w/x", Tool: "Bash"}},
+		{"a finished tool call too", "PostToolUse", `{"session_id":"s1","tool_name":"Edit","tool_input":{"file_path":"/w/x/a.go"},"tool_response":{"ok":true}}`,
+			&ccHookEvent{Event: "PostToolUse", Session: "s1", Tool: "Edit"}},
+		{"a prompt says only that a turn began", "UserPromptSubmit", `{"session_id":"s1","cwd":"/w/x","prompt":"the launch codes are 0000"}`,
+			&ccHookEvent{Event: "UserPromptSubmit", Session: "s1", Cwd: "/w/x"}},
+		{"subagent stops are not hooked", "SubagentStop", `{"session_id":"s1"}`, nil},
 		{"no session, nothing to address", "Stop", `{"last_assistant_message":"x"}`, nil},
 	}
 	for _, c := range cases {
@@ -302,6 +308,8 @@ func resetCC(t *testing.T) {
 	ccCoreOnce.Do(func() {})
 	ccLocalV = newCCLocal()
 	ccLocalOnce.Do(func() {})
+	ccActV = newCCActivity()
+	ccActOnce.Do(func() {})
 }
 
 func TestNoticesCollapsePerSessionAndHonourTheAwaySwitch(t *testing.T) {

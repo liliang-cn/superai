@@ -58,10 +58,12 @@ func (a *App) MachineStatus(name string) (HostInfo, error) {
 	if isCoreMachine(name) {
 		h, err := a.HostStatus()
 		h.Name = "core"
+		h.Claude = a.machineActivity("core")
 		return h, err
 	}
 	var h HostInfo
 	err := a.onMachine(name, 30*time.Second, "HostStatus", []any{}, &h)
+	h.Claude = a.machineActivity(name)
 	return h, err
 }
 

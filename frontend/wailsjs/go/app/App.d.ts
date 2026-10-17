@@ -16,6 +16,8 @@ export function AskRemoteAgent(arg1:string,arg2:string):Promise<backend.RemoteRe
 
 export function Attention():Promise<Array<app.AttentionItem>>;
 
+export function CCActivityAll():Promise<Record<string, app.CCActivity>>;
+
 export function CCAwayHint(arg1:boolean):Promise<Record<string, any>>;
 
 export function CCSessions():Promise<Array<app.CCSession>>;

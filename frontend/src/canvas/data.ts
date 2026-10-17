@@ -190,6 +190,34 @@ export interface LinkedAgent {
   machine?: boolean;
   /** machine, worker (a hive worker's pod) or relay (kept for its named agents). */
   role?: string;
+  /** What the interactive Claude Code sessions in its terminals are doing —
+   *  not SuperAI's own runs. Absent when it has none. */
+  activity?: CCActivity | null;
+}
+
+/** One terminal Claude Code session, as its machine reports it: no prompt,
+ *  no tool arguments, only where it is, how it is and what tool it is on. */
+export interface CCActivitySession {
+  id: string;
+  /** The working directory's last element. */
+  project?: string;
+  state: "working" | "waiting" | "idle";
+  /** Why a waiting one waits. */
+  wait?: "permission" | "input";
+  tool?: string;
+  /** Tool calls this turn. */
+  tools: number;
+  since: string;
+  started: string;
+  last: string;
+}
+
+export interface CCActivity {
+  working: number;
+  waiting: number;
+  idle: number;
+  sessions: CCActivitySession[];
+  at: string;
 }
 
 /** The machines connected to core over the agent link — the ones it can run
@@ -205,8 +233,13 @@ export function useLinkedAgents(): LinkedAgent[] {
     }).catch(() => {});
     load();
     const off = EventsOn("agents:changed", load);
+    // A machine's terminal sessions moved: patched in place, no reload.
+    const offAct = EventsOn("cc:activity", (p: { agent?: string; activity?: CCActivity | null }) => {
+      if (!alive || !p?.agent) return;
+      setList((cur) => cur.map((a) => (a.name === p.agent ? { ...a, activity: p.activity ?? null } : a)));
+    });
     const t = window.setInterval(load, 30000);
-    return () => { alive = false; window.clearInterval(t); if (typeof off === "function") off(); };
+    return () => { alive = false; window.clearInterval(t); [off, offAct].forEach((o) => typeof o === "function" && o()); };
   }, []);
   return list;
 }

@@ -169,6 +169,8 @@ func (l *ccLocal) observe(ev *ccHookEvent, now time.Time) string {
 		}
 	case "PermissionRequest":
 		s.State = ccPermission
+	case "UserPromptSubmit", "PreToolUse", "PostToolUse":
+		s.State = ccWorking
 	}
 	// Ended sessions are kept a while so a late answer gets a clear "it
 	// ended" rather than "never heard of it", then forgotten.
@@ -323,6 +325,10 @@ func (a *App) handleCCHook(w http.ResponseWriter, r *http.Request) {
 	}
 	reply := ccLocalState().observe(&ev, time.Now())
 	writeJSON(w, map[string]string{"reply": reply})
+	observeCCActivity(ev)
+	if ccActivityOnly[ev.Event] {
+		return // it travels only in the activity snapshot, throttled
+	}
 	go a.forwardCCEvent(ev)
 }
 
@@ -379,6 +385,7 @@ func (a *App) serveCCHookSocket(ctx context.Context) {
 		_ = srv.Close()
 		_ = os.Remove(path)
 	}()
+	a.startCCActivity(ctx)
 	log.Printf("cc relay: hooks on %s", path)
 	if err := srv.Serve(lis); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Printf("cc relay: %v", err)

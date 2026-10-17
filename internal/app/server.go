@@ -396,6 +396,7 @@ func ServeMain(argv []string) {
 	}
 	// Claude Code's hooks on this machine (cchook.go) report here.
 	go app.serveCCHookSocket(ctx)
+	go autoUpgradeCCHooks()
 	// Agent: this instance also dials a core (a node that keeps its own web
 	// surface, like the Mac's).
 	if o, ok := lf.options(); ok {

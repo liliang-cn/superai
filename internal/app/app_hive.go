@@ -164,6 +164,9 @@ func (a *App) HiveStatus() map[string]any {
 		"protocol": backend.HiveProtocol, "role": "", "name": "",
 		"members": []backend.HiveMember{}, "tasks": a.tasks().Recent(), "messages": a.mailbox().Take(true, 20),
 	}
+	// What the interactive Claude Code sessions on each machine are doing,
+	// by machine name ("core" is this one); only machines that have some.
+	out["cc_activity"] = a.CCActivityAll()
 	// What the person calls the queen, for every client to show.
 	out["queen_name"], out["queen_aliases"] = s.QueenDisplayName(), s.QueenAliasList()
 	if s == nil {

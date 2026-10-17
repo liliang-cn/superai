@@ -50,7 +50,7 @@ const ccHookSocketName = "cc-hook.sock"
 // ccHookEvent is one Claude Code hook event, distilled: what the hook sends
 // to the local SuperAI.
 type ccHookEvent struct {
-	Event   string `json:"event"`             // Stop | StopFailure | Notification | SessionStart | SessionEnd | PermissionRequest | PermissionClosed
+	Event   string `json:"event"`             // Stop | StopFailure | Notification | SessionStart | SessionEnd | PermissionRequest | PermissionClosed | UserPromptSubmit | PreToolUse | PostToolUse
 	Session string `json:"session"`           // Claude Code's session id
 	Cwd     string `json:"cwd,omitempty"`     // where it runs
 	Kind    string `json:"kind,omitempty"`    // Notification: permission_prompt | idle_prompt; StopFailure: the error
@@ -60,13 +60,26 @@ type ccHookEvent struct {
 	Pane    string `json:"pane,omitempty"`    // $TMUX_PANE when it runs in tmux
 	Resumed bool   `json:"resumed,omitempty"` // set by the receiver: a parked reply was handed back, the turn goes on
 
+	// PermissionRequest, PreToolUse and PostToolUse.
+	Tool string `json:"tool,omitempty"` // the tool Claude wants to use, by name
+
 	// PermissionRequest only.
-	Tool    string `json:"tool,omitempty"`    // the tool Claude wants to use
 	Input   string `json:"input,omitempty"`   // its arguments, as JSON text
 	Wait    int    `json:"wait,omitempty"`    // seconds the hook will wait for an answer
 	Request string `json:"request,omitempty"` // set by the receiver: names this one request on its way to core and back
 	Expires string `json:"expires,omitempty"` // set by the receiver: RFC 3339, when the hook stops waiting
 }
+
+// ccActivityOnly are the events that only move this machine's activity
+// record (cchook_activity.go): they never go to core one by one and never
+// become a notice. They fire on every prompt and every tool call, so their
+// hook is held to a far shorter budget than the rest.
+var ccActivityOnly = map[string]bool{"UserPromptSubmit": true, "PreToolUse": true, "PostToolUse": true}
+
+// ccActivityBudget is all an activity-only hook may spend. A tool waits for
+// its PreToolUse hook; a local socket answers in well under a millisecond,
+// and one that does not is skipped.
+const ccActivityBudget = 300 * time.Millisecond
 
 // ccNotificationKinds are the Notification hooks worth forwarding: Claude is
 // stopped on a question only a person can answer. The rest (auth_success,
@@ -119,6 +132,11 @@ func ccEventFromHook(name string, hev hooks.HookEvent, readTurn func(path string
 		}
 	case "SessionEnd":
 		ev.Source = str("reason")
+	case "UserPromptSubmit":
+		// Only that a turn began: the prompt stays in the terminal.
+	case "PreToolUse", "PostToolUse":
+		// Only which tool, by name: never its arguments or its result.
+		ev.Tool = strings.TrimSpace(hev.ToolName)
 	case "PermissionRequest":
 		ev.Tool = strings.TrimSpace(hev.ToolName)
 		if ev.Tool == "" {
@@ -181,6 +199,12 @@ func clipFront(s string, max int) string {
 // long: an error only means the phone does not hear about this event.
 func HookMain(argv []string) {
 	defer func() { _ = recover() }() // a hook must not crash the agent's turn
+	// `superai hook install`: the person setting the hooks up, not Claude
+	// Code running one (cchook_install.go).
+	if len(argv) > 0 && argv[0] == "install" {
+		HookInstallMain(argv[1:])
+		return
+	}
 	// A run SuperAI started itself already reports through cli:run.
 	if os.Getenv("SUPERAI_CLI_RUN") != "" {
 		return
@@ -197,6 +221,13 @@ func HookMain(argv []string) {
 		permissionHook(argv, hev)
 		return
 	}
+	if name == "" {
+		name = hev.EventName
+	}
+	if ccActivityOnly[name] {
+		activityHook(name, hev)
+		return
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), hookBudget)
 	defer cancel()
 
@@ -211,6 +242,26 @@ func HookMain(argv []string) {
 	if reply = strings.TrimSpace(reply); reply != "" && ev.Event == "Stop" {
 		_ = json.NewEncoder(os.Stdout).Encode(map[string]string{"decision": "block", "reason": reply})
 	}
+}
+
+// activityHook is a prompt or a tool call: hand the local SuperAI the
+// session, the project and the tool's name, and get out of the way. No
+// transcript, no reply, nothing printed. A prompt also says which terminal
+// it came from (one ps), which a reply from the phone needs; a tool call
+// does not spend even that.
+func activityHook(name string, hev hooks.HookEvent) {
+	ev, ok := ccEventFromHook(name, hev, nil)
+	if !ok {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), ccActivityBudget)
+	defer cancel()
+	if name == "UserPromptSubmit" {
+		ev.TTY = controllingTTY(ctx)
+		ev.Pane = os.Getenv("TMUX_PANE")
+	}
+	var out struct{}
+	postCCHook(ctx, ccHookSockets(), ccHookPath, ev, &out)
 }
 
 // transcriptTurn reads the turn's text, but not past the hook's budget: a

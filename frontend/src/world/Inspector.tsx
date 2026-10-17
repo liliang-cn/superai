@@ -6,7 +6,7 @@ import {
   RefreshDashboard, RemoveMCPServer, RemoveSkill, ResolveToolApproval, ResumeStandingAgent, SendChat, StandingReports,
   StartCLIRun, WakeStandingAgent,
 } from "../../wailsjs/go/app/App";
-import { QUEEN_SESSION } from "../canvas/data";
+import { QUEEN_SESSION, type CCActivity } from "../canvas/data";
 import { useI18n } from "../lib/i18n";
 import { queenNamed, queenRef, useQueenName } from "../lib/queenName";
 import { toast } from "../lib/toasts";
@@ -16,7 +16,7 @@ import { openSwitcher } from "../lib/hivelink";
 import Talk from "./Talk";
 import MachineHost from "./MachineHost";
 import type { Picked } from "./engine";
-import type { WorldData } from "./cluster";
+import { sessionLine, type WorldData } from "./cluster";
 import { agendaWhen, type AgendaEntry } from "./agenda";
 
 const KIND: Record<AgendaEntry["kind"], string> = { event: "Event", reminder: "Reminder", todo: "To-do", timer: "Timing" };
@@ -141,8 +141,10 @@ export default function Inspector({ picked, data, onClose, open, openDash }: {
       kind = "Machine";
       if (a) rows.push(["System", `${a.os} ${a.arch}`]);
       rows.push(["Running", String(live.length)], ["Sessions", String(mine.length)]);
+      if (a?.activity) rows.push(["Terminal sessions", `${a.activity.working} ${t("working")} · ${a.activity.waiting} ${t("waiting")}`]);
       body = (
         <>
+          <TermSessions act={a?.activity} />
           <MachineHost name={host} />
           {clis.length > 0 && <NewRun clis={clis} host={host} onStart={(agent, prompt) => act("run", () => StartCLIRun(agent, prompt, "", "", true), "Run started")} busy={busy === "run"} />}
           <ul className="wi-list">
@@ -161,8 +163,10 @@ export default function Inspector({ picked, data, onClose, open, openDash }: {
       const live = mine.filter((r) => r.state === "running");
       kind = picked.kind === "cli" ? "Coding agent" : "Agent";
       rows.push(["On", host], ["Running", String(live.length)]);
+      const term = name === "claude" ? data.linked.find((x) => x.name === host)?.activity : null;
       body = (
         <>
+          <TermSessions act={term} />
           <Talk who={picked.kind === "cli" ? { kind: "cli", agent: picked.id } : { kind: "agent", name }} placeholder={picked.kind === "cli" ? `What should ${name} do?` : `Talk to ${name}…`} />
           {live.length > 0 && (
             <ul className="wi-list">
@@ -506,6 +510,32 @@ function McpShop({ servers }: { servers: WorldData["mcp"] }) {
         </ul>
       )}
     </>
+  );
+}
+
+/** The Claude Code sessions people run in a machine's terminals: each by
+ *  its project, what it is on, and since when. Only what the machine sent —
+ *  never a prompt. */
+function TermSessions({ act }: { act?: CCActivity | null }) {
+  const { t } = useI18n();
+  if (!act?.sessions?.length) return null;
+  const since = (s: string) => {
+    const d = new Date(s);
+    return isNaN(+d) ? "" : d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+  };
+  return (
+    <div className="wi-cc">
+      <p className="wi-cap">{t("Terminal sessions")}</p>
+      <ul className="wi-list">
+        {act.sessions.slice(0, 8).map((s) => (
+          <li key={s.id} title={s.tools ? t("{count} tool calls", { count: s.tools }) : undefined}>
+            <i className={`wi-dot ${s.state === "working" ? "running" : s.state === "waiting" ? "waiting" : ""}`} />
+            {sessionLine(s)}
+            <em>{t("since {time}", { time: since(s.since) })}</em>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 

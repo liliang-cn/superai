@@ -22,6 +22,10 @@ export function Attention() {
   return window['go']['app']['App']['Attention']();
 }
 
+export function CCActivityAll() {
+  return window['go']['app']['App']['CCActivityAll']();
+}
+
 export function CCAwayHint(arg1) {
   return window['go']['app']['App']['CCAwayHint'](arg1);
 }
