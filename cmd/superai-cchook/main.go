@@ -17,6 +17,10 @@
 // The rest of the hook events (SessionStart, Stop, Notification,
 // PermissionRequest, ...) stay with `superai hook`: they are rare, and some of
 // them read a transcript or wait on the phone.
+//
+// `superai-cchook --cli codex <Event>` is the same for another CLI whose
+// hooks take Claude Code's shape (codex's hooks.json): every event it has
+// goes this way, since for that CLI they only move its activity record.
 package main
 
 import (
@@ -45,6 +49,14 @@ const (
 // events are the ones this binary handles; any other is ignored.
 var events = map[string]bool{"UserPromptSubmit": true, "PreToolUse": true, "PostToolUse": true}
 
+// cliEvents are the events taken for another CLI (--cli), and the name each
+// travels as: an interrupted turn is over, as a stopped one is.
+var cliEvents = map[string]string{
+	"SessionStart": "SessionStart", "SessionEnd": "SessionEnd", "UserPromptSubmit": "UserPromptSubmit",
+	"PreToolUse": "PreToolUse", "PostToolUse": "PostToolUse", "PermissionRequest": "PermissionRequest",
+	"Stop": "Stop", "Interrupt": "Stop",
+}
+
 // payload is the little of Claude Code's hook input this reads.
 type payload struct {
 	Event     string `json:"hook_event_name"`
@@ -55,6 +67,7 @@ type payload struct {
 
 // event is what goes to the node: the shape of ccHookEvent, these fields only.
 type event struct {
+	CLI     string `json:"cli,omitempty"`
 	Event   string `json:"event"`
 	Session string `json:"session"`
 	Cwd     string `json:"cwd,omitempty"`
@@ -65,6 +78,11 @@ type event struct {
 // parse turns the hook input into the event to send, or false for one not
 // to send. name is the event named on the command line, else the payload's.
 func parse(name string, in []byte) (event, bool) {
+	return parseFor("", name, in)
+}
+
+// parseFor is parse for a CLI other than Claude Code when cli is set.
+func parseFor(cli, name string, in []byte) (event, bool) {
 	var p payload
 	if json.Unmarshal(in, &p) != nil {
 		return event{}, false
@@ -72,14 +90,19 @@ func parse(name string, in []byte) (event, bool) {
 	if name == "" {
 		name = p.Event
 	}
-	ev := event{Event: name, Session: strings.TrimSpace(p.SessionID)}
-	if !events[name] || ev.Session == "" {
+	ev := event{CLI: cli, Event: name, Session: strings.TrimSpace(p.SessionID)}
+	if cli != "" {
+		ev.Event = cliEvents[name]
+		if ev.Event == "" || ev.Session == "" {
+			return event{}, false
+		}
+	} else if !events[name] || ev.Session == "" {
 		return event{}, false
 	}
 	if cwd := strings.TrimRight(strings.TrimSpace(p.Cwd), "/"); cwd != "" {
 		ev.Cwd = filepath.Base(cwd)
 	}
-	if name != "UserPromptSubmit" {
+	if name == "PreToolUse" || name == "PostToolUse" || name == "PermissionRequest" {
 		ev.Tool = strings.TrimSpace(p.ToolName)
 	}
 	return ev, true
@@ -161,6 +184,13 @@ func run(args []string, stdin io.Reader) {
 	if os.Getenv("SUPERAI_CLI_RUN") != "" {
 		return
 	}
+	cli := ""
+	if len(args) >= 2 && args[0] == "--cli" {
+		cli, args = strings.ToLower(strings.TrimSpace(args[1])), args[2:]
+		if cli == "" || cli == "claude" {
+			return
+		}
+	}
 	name := ""
 	if len(args) > 0 {
 		name = args[0]
@@ -169,7 +199,7 @@ func run(args []string, stdin io.Reader) {
 	if err != nil {
 		return
 	}
-	ev, ok := parse(name, in)
+	ev, ok := parseFor(cli, name, in)
 	if !ok {
 		return
 	}
