@@ -98,6 +98,10 @@ spec:
             - {name: POD_NAME, valueFrom: {fieldRef: {fieldPath: metadata.name}}}
             - {name: SUPERAI_NODE, valueFrom: {fieldRef: {fieldPath: spec.nodeName}}}
             - {name: SUPERAI_ADVERTISE_URL, value: "http://$(POD_NAME).superai-queen.superai.svc.cluster.local:43117"}
+            # Where machines other than the queen reach her API: a queen engine
+            # on a linked machine (claude.mac) calls /mcp here. The default for
+            # hive.public_url; one set from a client (/data/queenengine.json) wins.
+            - {name: SUPERAI_PUBLIC_URL, value: "https://ai.superleo.cn"}
             # Core: agents dial in here over gRPC (proto/agentlink/v1).
             - {name: SUPERAI_AGENT_PORT, value: "43120"}
             - {name: CORTEXDB_GRPC_TOKEN, valueFrom: {secretKeyRef: {name: superai-hive, key: cortexdb_token}}}

@@ -555,6 +555,7 @@ func LoadSettings() (*Settings, error) {
 		s.mergeLinked(LoadLinkedSuperAIs())
 		s.mergeQueenIdentity()
 		s.mergeAgentLink()
+		s.mergeQueenEngine()
 	}
 	return s, err
 }
@@ -707,6 +708,9 @@ func (s *Settings) Save() error {
 		return err
 	}
 	if err := s.saveQueenIdentity(); err != nil {
+		return err
+	}
+	if err := s.saveQueenEngine(); err != nil {
 		return err
 	}
 	return s.saveAgentLink()
