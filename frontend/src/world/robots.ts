@@ -14,6 +14,7 @@ const JOINT = 0x2a3442;
 const FACE = 0x18212b;
 const EYE_IDLE = 0xbfe3ff;
 const EYE_BAD = 0xe2553f;
+const EYE_X = 0.12;
 
 let accent = 0xf2b416;
 /** The theme's colour, for eyes and held work. */
@@ -21,23 +22,39 @@ export function setAccent(c: number) { accent = c; }
 
 let capsule: THREE.BufferGeometry | null = null;
 let collarGeo: THREE.BufferGeometry | null = null;
+let faceGeo: THREE.BufferGeometry | null = null;
+/** A rounded rectangle round the origin. */
+function rounded(w: number, d: number, r: number) {
+  const x = -w / 2, y = -d / 2, s = new THREE.Shape();
+  s.moveTo(x + r, y); s.lineTo(x + w - r, y); s.absarc(x + w - r, y + r, r, -Math.PI / 2, 0, false);
+  s.lineTo(x + w, y + d - r); s.absarc(x + w - r, y + d - r, r, 0, Math.PI / 2, false);
+  s.lineTo(x + r, y + d); s.absarc(x + r, y + d - r, r, Math.PI / 2, Math.PI, false);
+  s.lineTo(x, y + r); s.absarc(x + r, y + r, r, Math.PI, Math.PI * 1.5, false);
+  return s;
+}
+// The skull's rounding: small enough that its flat front (0.58 x 0.38) holds
+// the whole face, so no edge of the glass stands off the curve.
+const SKULL_R = 0.14;
 /** The visor band: a ring under the head with the skull's rounded corners and
  *  bevelled edges, not a flat plate. */
 const collar = () => (collarGeo ??= (() => {
-  const w = 0.82, d = 0.68, r = 0.2, x = -w / 2, y = -d / 2;
-  const s = new THREE.Shape();
-  s.moveTo(x + r, y); s.lineTo(x + w - r, y); s.quadraticCurveTo(x + w, y, x + w, y + r);
-  s.lineTo(x + w, y + d - r); s.quadraticCurveTo(x + w, y + d, x + w - r, y + d);
-  s.lineTo(x + r, y + d); s.quadraticCurveTo(x, y + d, x, y + d - r);
-  s.lineTo(x, y + r); s.quadraticCurveTo(x, y, x + r, y);
-  const g = new THREE.ExtrudeGeometry(s, { depth: 0.05, bevelEnabled: true, bevelThickness: 0.025, bevelSize: 0.025, bevelSegments: 6, curveSegments: 24 });
+  const g = new THREE.ExtrudeGeometry(rounded(0.82, 0.68, SKULL_R - 0.02), { depth: 0.05, bevelEnabled: true, bevelThickness: 0.025, bevelSize: 0.025, bevelSegments: 6, curveSegments: 24 });
   g.rotateX(-Math.PI / 2);
+  return g;
+})());
+/** The face: a pane of dark glass 0.56 x 0.36, its corners 0.09 round, its
+ *  back sunk in the skull's front and its face a hair proud of it. */
+const glassFace = () => (faceGeo ??= (() => {
+  const b = 0.008;
+  const g = new THREE.ExtrudeGeometry(rounded(0.56 - b * 2, 0.36 - b * 2, 0.09 - b), { depth: 0.03, bevelEnabled: true, bevelThickness: b, bevelSize: b, bevelSegments: 3, curveSegments: 16 });
+  g.translate(0, 0, -0.022);
   return g;
 })());
 const arm = () => (capsule ??= (() => { const c = new THREE.CapsuleGeometry(0.11, 0.42, 8, 20); c.translate(0, -0.3, 0); return c; })());
 let hg: THREE.BufferGeometry | null = null, eg: THREE.BufferGeometry | null = null, bg: THREE.BufferGeometry | null = null;
 const handGeo = () => (hg ??= new THREE.SphereGeometry(0.13, 24, 16));
-const eyeGeo = () => (eg ??= new THREE.CapsuleGeometry(0.055, 0.08, 6, 16));
+// The eyes: flat upright lights on the glass, fully rounded.
+const eyeGeo = () => (eg ??= new THREE.ShapeGeometry(rounded(0.1, 0.13, 0.05), 12));
 const bulbGeo = () => (bg ??= new THREE.SphereGeometry(0.08, 20, 14));
 
 /**
@@ -73,8 +90,12 @@ export function robot(kind: RobotKind, trim = accent) {
   const torso = rbox(0.92, 0.82, 0.62, shell, 0.18);
   torso.position.y = 0.42;
   const chest = rbox(0.42, 0.22, 0.05, ownMat(FACE, { emissive: trim, glow: 0.0 }), 0.05, false);
-  chest.position.set(0, 0.85, 0.31);
-  g.add(torso, chest);
+  chest.position.set(0, 0.74, 0.31);
+  // A neck from the torso up into the collar: the head stands clear of the
+  // torso so it can nod, and without this it floated over it.
+  const neck = cyl(0.2, 0.2, 0.16, 32, joint, false);
+  neck.position.y = 1.18;
+  g.add(torso, chest, neck);
 
   const arms: THREE.Group[] = [];
   for (const x of [-0.58, 0.58]) {
@@ -92,18 +113,19 @@ export function robot(kind: RobotKind, trim = accent) {
 
   const head = new THREE.Group();
   head.position.y = 1.32;
-  const skull = rbox(0.86, 0.66, 0.72, shell, 0.2);
-  // The visor: black glass, so the studio light runs across it.
-  const face = rbox(0.7, 0.42, 0.06, FIN.glass(), 0.08, false);
-  face.position.set(0, 0.12, 0.36);
+  const skull = rbox(0.86, 0.66, 0.72, shell, SKULL_R);
+  // The visor: black glass set into the skull's flat front, so the studio
+  // light runs across it.
+  const face = new THREE.Mesh(glassFace(), FIN.glass());
+  face.position.set(0, 0.33, 0.36);
   const band = new THREE.Mesh(collar(), mat(trim, { rough: 0.32, clear: 0.5 }));
   band.position.y = 0.02;
   const eyeMat = ownMat(EYE_IDLE, { emissive: EYE_IDLE, glow: 0.9 });
   const eyes: THREE.Mesh[] = [];
-  for (const x of [-0.15, 0.15]) {
+  // Light on the glass, not parts stuck on it.
+  for (const x of [-EYE_X, EYE_X]) {
     const e = new THREE.Mesh(eyeGeo(), eyeMat);
-    e.rotation.z = Math.PI / 2;
-    e.position.set(x, 0.33, 0.4);
+    e.position.set(x, 0.33, 0.378);
     eyes.push(e);
     head.add(e);
   }
@@ -179,7 +201,7 @@ export function pose(r: THREE.Object3D, t: number, reduced = false) {
     la = -1.28 + Math.sin(k * 19) * tap; ra = -1.28 + Math.sin(k * 19 + Math.PI) * tap; lz = 0.14; rz = -0.14;
     hx = 0.16 + (still ? 0 : Math.sin(k * 1.3) * 0.05); hy = still ? 0 : Math.sin(k * 0.8) * 0.22;
     bob = still ? 0 : Math.abs(Math.sin(k * 9.5)) * 0.035;
-    if (!still) (u.eyes as THREE.Mesh[]).forEach((e, i) => { e.position.x = (i ? 0.15 : -0.15) + Math.sin(k * 3.2) * 0.04; });
+    if (!still) (u.eyes as THREE.Mesh[]).forEach((e, i) => { e.position.x = (i ? EYE_X : -EYE_X) + Math.sin(k * 3.2) * 0.04; });
   } else if (s === "work") {
     la = ra = -1.15; lz = 0.25; rz = -0.25;
     if (!still) { bob = Math.abs(Math.sin(k * 5)) * 0.04; hy = Math.sin(k * 2.2) * 0.12; (u.cube as THREE.Object3D).rotation.y = k * 1.4; }
@@ -212,16 +234,16 @@ export function pose(r: THREE.Object3D, t: number, reduced = false) {
   for (const key in want) j[key] = damp(j[key], want[key], key === "bob" ? 18 : rate, dt);
   l.rotation.set(j.la, 0, j.lz);
   rr.rotation.set(j.ra, 0, j.rz);
-  if (s !== "work") (u.eyes as THREE.Mesh[]).forEach((e, i) => { e.position.x = i ? 0.15 : -0.15; });
+  if (s !== "work") (u.eyes as THREE.Mesh[]).forEach((e, i) => { e.position.x = i ? EYE_X : -EYE_X; });
   head.rotation.set(j.hx, j.hy, 0);
   // (A robot at a desk was turned with lookAt, whose Euler angles may carry a
   // half-turn in z; only free-standing ones sway.)
   if (!u.desk) r.rotation.z = j.tilt;
-  // Blink now and then.
+  // Blink now and then: the lights squeeze shut and open again.
   if (!still && s !== "lost") {
     const ph = k % 4.2;
     const blink = ph < 0.18 ? 1 - 0.85 * Math.sin((ph / 0.18) * Math.PI) : 1;
-    (u.eyes as THREE.Mesh[]).forEach((e) => (e.scale.x = blink));
+    (u.eyes as THREE.Mesh[]).forEach((e) => (e.scale.y = blink));
   }
   if (u.kind === "bee") {
     if (!still && u.rotor) (u.rotor as THREE.Object3D).rotation.y = k * (s === "lost" ? 0 : 18);
