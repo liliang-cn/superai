@@ -31,7 +31,8 @@ import { openSwitcher } from "../lib/hivelink";
 import LiveHive from "./LiveHive";
 import LiveRun, { useRun } from "./LiveRun";
 import LiveStatus from "./LiveStatus";
-import LiveStats from "./LiveStats";
+import StatsBlock from "../components/StatsBlock";
+import { takeCompose } from "../lib/compose";
 import { useDeskTheme, useDeskWorld } from "./DeskShell";
 
 type TabKey = string; // "hive" | "run:<id>" | "dash:<id>"
@@ -126,6 +127,9 @@ function useLink() {
 /** The tabs the right pane always has. */
 const FIXED: TabKey[] = ["hive", "status", "stats"];
 const FOLD_KEY = "superai-desk-live-folded";
+/** Which of the fixed tabs was last in front, so a home left on its figures
+ *  opens on them. */
+const TAB_KEY = "superai-desk-live-tab";
 
 const PIN_COLORS = ["dk-a-later", "dk-a-hive", "dk-a-code", "dk-a-bees", "dk-a-know", "dk-a-stats", "dk-a-rec"];
 
@@ -197,7 +201,14 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
   const [onQueen, setOnQueen] = useState(true);
   const [opened, setOpened] = useState<TabKey[]>([]);
   const [closed, setClosed] = useState<Set<TabKey>>(new Set());
-  const [active, setActive] = useState<TabKey>("hive");
+  const [active, setActiveState] = useState<TabKey>(() => {
+    try { const v = localStorage.getItem(TAB_KEY); if (v && FIXED.includes(v)) return v; } catch { /* fine */ }
+    return "hive";
+  });
+  const setActive = (k: TabKey) => {
+    setActiveState(k);
+    if (FIXED.includes(k)) try { localStorage.setItem(TAB_KEY, k); } catch { /* fine */ }
+  };
   const needsRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -301,6 +312,25 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
     setOnQueen(id === QUEEN_SESSION);
     chat.loadSession(id).catch(() => {});
   };
+
+  // The round chat button, from any page: the queen's conversation, ready to type in.
+  const onQueenRef = useRef(onQueen);
+  onQueenRef.current = onQueen;
+  const chatRef = useRef(chat);
+  chatRef.current = chat;
+  useEffect(() => {
+    const compose = () => {
+      if (!takeCompose()) return;
+      if (!onQueenRef.current) { setOnQueen(true); chatRef.current.loadSession(QUEEN_SESSION).catch(() => {}); }
+      // After the shell has shown this page (a window opening, a page
+      // changing): a hidden box takes no focus.
+      window.setTimeout(() => composerRef.current?.focus(), 80);
+    };
+    compose();
+    window.addEventListener("superai:compose", compose);
+    return () => window.removeEventListener("superai:compose", compose);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Who is working: workers with an order, and coding agents running somewhere.
   // Esc hides the pane when it floats over the conversation.
@@ -517,7 +547,7 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
           <div className="dk-in">
             {/* The hive tab is a window onto the world behind the app. */}
             {current === "status" && <LiveStatus hive={hive} now={now} agents={linked} runs={runs} />}
-            {current === "stats" && <LiveStats hive={hive} runs={runs} />}
+            {current === "stats" && <div className="dk-stats"><StatsBlock hive={hive} runs={runs} /></div>}
             {current.startsWith("run:") && <RunTab id={current.slice(4)} now={now} />}
             {current.startsWith("dash:") && (
               <div className="dk-dash">{dashOf(current) ? <Response>{dashOf(current)!.source}</Response> : "Gone."}</div>

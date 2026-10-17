@@ -1,0 +1,20 @@
+/* Bottom right, clear of the status bar and the home indicator. */
+.fab-stack { position: fixed; z-index: 9; right: calc(22px + env(safe-area-inset-right, 0px)); bottom: calc(44px + env(safe-area-inset-bottom, 0px));
+  display: flex; flex-direction: column; align-items: center; gap: 10px; pointer-events: none; }
+/* The phone's pages keep a bar along the bottom (Save, a composer): stand
+   above it. */
+.fab-stack.lifted { right: calc(16px + env(safe-area-inset-right, 0px)); bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
+.fab { pointer-events: auto; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; border: 0; cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s, background-color 0.15s; -webkit-tap-highlight-color: transparent; }
+.fab:hover { transform: translateY(-1px); }
+.fab:active { transform: scale(0.95); }
+.fab:focus-visible { outline: 2px solid #2f5bea; outline-offset: 3px; }
+/* The conversation: ink, the one used most. */
+.fab-chat { background: #16202b; color: #fff; box-shadow: 0 8px 22px rgba(22, 32, 43, 0.28), 0 0 0 1px rgba(255, 255, 255, 0.06); }
+.fab-chat:hover { box-shadow: 0 12px 26px rgba(22, 32, 43, 0.32); }
+/* The mode: white, secondary. */
+.fab-mode { width: 40px; height: 40px; background: #fff; color: #16202b; box-shadow: 0 6px 18px rgba(22, 32, 43, 0.14), 0 0 0 1px rgba(22, 32, 43, 0.08); }
+.fab-mode:hover { box-shadow: 0 10px 22px rgba(22, 32, 43, 0.18), 0 0 0 1px rgba(22, 32, 43, 0.1); }
+:root[data-theme="dark"] .fab-chat { background: #f2f1ee; color: #16202b; }
+:root[data-theme="dark"] .fab-mode { background: #24272b; color: #f2f1ee; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1); }
+@media (prefers-reduced-motion: reduce) { .fab { transition: none; } .fab:hover, .fab:active { transform: none; } }

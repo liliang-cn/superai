@@ -29,6 +29,7 @@ import { Toaster } from "./components/Toaster";
 import { useBackendToasts } from "./lib/toasts";
 import { EventsOff, EventsOn } from "../wailsjs/runtime/runtime";
 import ToolApprovals from "./components/ToolApprovals";
+import { ChatFab, FabStack } from "./components/Fabs";
 import { Accent, AppStatus, Theme, ViewKey, normalizeStatus } from "./lib/types";
 import { useScheduleRuns } from "./lib/useScheduleRuns";
 import { useToolApprovals } from "./lib/useToolApprovals";
@@ -279,6 +280,9 @@ export default function App() {
       {view !== "records" && (
         <ScheduleRunToasts log={runs} onOpenConversation={openConversation} />
       )}
+      {/* The conversation, a thumb away from every page but its own. A phone
+          has no 3D, so the mode button stays with the desktop shell. */}
+      {view !== "chat" && <FabStack lifted><ChatFab onClick={() => setView("chat")} /></FabStack>}
       {/* Everything the backend publishes, whatever raised it. */}
       <Toaster onOpenConversation={openConversation} />
       <ToolApprovals

@@ -231,7 +231,10 @@
 
 /* The figures, on one flat screen at the top left. */
 .wl-hud { display: none; }
-.wl-stats { position: absolute; top: 20px; z-index: 3; width: 300px; background: #fff; border: 1px solid rgba(22, 32, 43, 0.12); border-radius: 14px;
+/* The top left: the hive's figures, and on the home the core's own as pillars. */
+.wl-corner { position: absolute; left: 24px; z-index: 3; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; max-height: calc(100% - 140px); }
+.wl-figs { width: 330px; padding: 10px 12px 12px; background: #fff; border: 1px solid rgba(22, 32, 43, 0.12); border-radius: 14px; box-shadow: 0 10px 28px rgba(22, 32, 43, 0.1); --ink: #16202b; --ink-2: #5f6d77; --ink-3: #b8c2cf; --line: rgba(22, 32, 43, 0.07); }
+.wl-stats { position: relative; width: 300px; background: #fff; border: 1px solid rgba(22, 32, 43, 0.12); border-radius: 14px;
   box-shadow: 0 10px 28px rgba(22, 32, 43, 0.1); font-family: Geist, system-ui, sans-serif; color: #16202b; overflow: hidden; }
 .wl-stats.folded { width: auto; }
 .wl-stats-top { display: flex; align-items: baseline; gap: 5px; width: 100%; padding: 10px 12px; border: 0; background: transparent; cursor: pointer; text-align: left; white-space: nowrap; }
@@ -263,7 +266,7 @@
 .wl-stats-who .bar.live span { background: #f2b416; }
 /* Clear of the window's title bar and its traffic lights; a pill that opens
    into the full panel. */
-.wl-stats { top: 56px; }
+.wl-corner { top: 56px; }
 .wl-stats.folded { border-radius: 999px; box-shadow: 0 6px 18px rgba(22, 32, 43, 0.1); }
 .wl-stats.folded .wl-stats-top { padding: 8px 12px 8px 14px; }
 .wl-stats-top:hover { background: #f7f9fb; }

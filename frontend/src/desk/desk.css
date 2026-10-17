@@ -395,14 +395,16 @@ html[data-desk] body { background: transparent; }
 .dk-st em { font-style: normal; font-family: var(--font-mono); font-size: 12px; color: var(--ink-3); }
 
 /* Stats: the figures. */
-.dk-stats { position: absolute; inset: 0; padding: 16px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
-.dk-stats-head { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-2); font-weight: 550; }
-.dk-stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-.dk-fig { padding: 14px 16px; border-radius: calc(14px * var(--rs)); background: rgba(var(--glass-rgb), .5); box-shadow: inset 0 0 0 1px var(--line); }
-.dk-fig b { display: block; font-size: 24px; font-weight: 650; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
-.dk-fig span { font-size: 12.5px; color: var(--ink-2); }
-.dk-fig.big { grid-column: 1 / -1; }
-.dk-fig.big b { font-size: 40px; color: var(--honey-deep); }
+.dk-stats { position: absolute; inset: 0; padding: 14px 16px 16px; display: flex; flex-direction: column; }
+.dk-stats > .sb { flex: 1; }
+/* The shell's glass is white in either theme (see .dk-world .cv-glass), so
+   the pillars keep the day's ink on it. */
+.dk-world .sb { --sb-ink: #16202b; --sb-ink-2: #5f6d77; --sb-line: rgba(22, 32, 43, 0.07); --sb-signal: #2f5bea; }
+:root[data-theme="dark"] .dk-world .sb-pick.on { color: #fff; }
+:root[data-theme="dark"] .dk-world .sb-chooser { background: #fff; color: #16202b; border-color: rgba(22, 32, 43, 0.12); }
+/* Floating over the conversation, the pane's own close button holds the
+   top right corner. */
+@media (max-width: 1240px) { .dk:not(.folded) > .dk-live .dk-stats .sb-head { padding-right: 40px; } }
 .dk-st-h { font-size: 12px; font-weight: 650; color: var(--ink-3); padding: 10px 10px 2px; }
 .dk-foryou { margin: 6px 0 4px; }
 .dk-foryou .att-row { padding: 7px 6px; grid-template-columns: 24px minmax(0, 1fr); row-gap: 0; }
@@ -658,14 +660,12 @@ html[data-desk] body { background: transparent; }
 .dk-world.window-on > .dk-win-x:hover { background: #16202b; color: #fff; }
 .dk-world.window-on > .dk-page > .content { padding-right: 40px; }
 
-/* ── 3D or Menu: one floating button, bottom right, in both modes ────── */
-.dk-mode-fab { position: fixed; z-index: 7; right: 22px; bottom: 44px; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center;
-  background: #16202b; box-shadow: 0 8px 22px rgba(22, 32, 43, 0.28), 0 0 0 1px rgba(255, 255, 255, 0.06); cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; }
-.dk-shell .dk-mode-fab { color: #fff; }
-.dk-mode-fab > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
-.dk-mode-fab:hover { transform: translateY(-1px); box-shadow: 0 12px 26px rgba(22, 32, 43, 0.32); }
-.dk-mode-fab:focus-visible { outline: 2px solid #2f5bea; outline-offset: 2px; }
-.dk-world.window-on > .dk-mode-fab { display: none; }
+/* ── The round buttons, bottom right (components/fabs.css) ───────────── */
+/* They keep a lane of their own down the right: the home's live pane in
+   Menu mode stops short of it, as every other page already does; folded, it
+   is a strip of buttons along the top of that lane. */
+.dk-shell.dk-flat.on-home > .dk:not(.folded) { margin-right: 58px; }
+.dk-shell > .fab-stack { position: fixed; z-index: 9; }
 /* Menu mode in a narrow window: the live pane floats over the conversation,
    so it is solid, controls included. */
 @media (max-width: 1240px) {

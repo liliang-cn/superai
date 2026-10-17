@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  ListTodoIcon, LayoutDashboardIcon, ChartColumnIcon, PanelRightOpenIcon, BookOpenIcon, BotIcon, BoxIcon, HexagonIcon, ListIcon, MessageSquareIcon, PaletteIcon,
+  ListTodoIcon, LayoutDashboardIcon, ChartColumnIcon, PanelRightOpenIcon, BookOpenIcon, BotIcon, HexagonIcon, MessageSquareIcon, PaletteIcon,
   NotebookTabsIcon, PuzzleIcon, SlidersHorizontalIcon, TerminalIcon, XIcon,
 } from "lucide-react";
 import DeskStatusBar from "./DeskStatusBar";
@@ -16,6 +16,8 @@ import { queenTitle, useQueenName } from "../lib/queenName";
 import NotificationCenter from "../components/NotificationCenter";
 import BackendSwitcher from "./BackendSwitcher";
 import ThemePanel from "../canvas/ThemePanel";
+import { ChatFab, FabStack, ModeFab } from "../components/Fabs";
+import { askToCompose } from "../lib/compose";
 import "../canvas/canvas.css";
 import "./desk.css";
 
@@ -82,18 +84,22 @@ export default function DeskShell({ view, badges, children, onOpenConversation, 
   };
   const pendingWindow = useRef(false);
   useEffect(() => {
-    setMode((m) => (pendingWindow.current ? "window" : m === "menu" ? "menu" : "world"));
+    // Read before the reset: the updater may run later, at render.
+    const pending = pendingWindow.current;
     pendingWindow.current = false;
+    setMode((m) => (pending ? "window" : m === "menu" ? "menu" : "world"));
   }, [view]);
   useEffect(() => {
     const open = (e: Event) => {
       const path = (e as CustomEvent<string>).detail;
       // In Menu mode a page is already a page: just go there.
       if (modeRef.current === "menu") { navigate(path); return; }
+      // Same page: the view does not change, so open it here. Not on a
+      // timer: a navigation can take longer to land than any timer, and the
+      // window opened early is closed again when it does.
+      if ((window.location.hash.slice(1) || "/") === path) { setMode("window"); return; }
       pendingWindow.current = true;
       navigate(path);
-      // Same page: the view does not change, so open it here.
-      window.setTimeout(() => { if (pendingWindow.current) { pendingWindow.current = false; setMode("window"); } }, 50);
     };
     const theme = () => setTheming(true);
     // Esc closes the window, unless someone is typing in it.
@@ -106,6 +112,21 @@ export default function DeskShell({ view, badges, children, onOpenConversation, 
     return () => { window.removeEventListener("keydown", esc); window.removeEventListener("superai:window", open); window.removeEventListener("superai:theme", theme); };
   }, [navigate]);
   const world = mode !== "menu";
+  // The mode changes how the page in front of you is framed, never which page
+  // it is: a page switched to 3D stays open, as a window over its part of the
+  // world; the home becomes the world itself.
+  const toggleMode = () => {
+    if (world) { switchTo("menu"); return; }
+    switchTo("world");
+    if (view !== "home") setMode("window");
+  };
+  // The conversation with the queen: the home's middle column in Menu, a
+  // window over the world in 3D, with the cursor in its box either way.
+  const openChat = () => {
+    if (mode === "menu") navigate(PATHS.home);
+    else window.dispatchEvent(new CustomEvent("superai:window", { detail: PATHS.home }));
+    askToCompose();
+  };
   const runs = useCodingRuns();
   const liveRuns = runs.filter((r) => r.state === "running").length;
 
@@ -176,10 +197,10 @@ export default function DeskShell({ view, badges, children, onOpenConversation, 
         {mode === "window" && (
           <button className="dk-win-x" style={noDrag} title={t("Back to the world")} onClick={() => setMode("world")}><XIcon size={18} /></button>
         )}
-        <button className="dk-mode-fab" style={noDrag} onClick={() => switchTo(world ? "menu" : "world")}
-          title={world ? t("Menus and lists, the way it was") : t("The hive in 3D")}>
-          {world ? <ListIcon size={17} /> : <BoxIcon size={17} />}<span>{world ? t("Menu") : "3D"}</span>
-        </button>
+        <FabStack style={noDrag}>
+          <ModeFab world={world} onClick={toggleMode} />
+          <ChatFab onClick={openChat} />
+        </FabStack>
         <DeskStatusBar status={status} loading={loading} codingRuns={liveRuns}/>
       </div>
     </WorldCtx.Provider>

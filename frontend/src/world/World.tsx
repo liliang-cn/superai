@@ -13,6 +13,7 @@ import { cluster, lensOf, type WorldData } from "./cluster";
 import { worldBus } from "./bus";
 import Inspector from "./Inspector";
 import Command from "./Command";
+import StatsBlock from "../components/StatsBlock";
 import { agendaOf, touchesNoted, type AgendaEntry } from "./agenda";
 import { dashboards as dashApi, type Dashboard } from "../lib/dashboards";
 import { Response } from "@/components/ai-elements/response";
@@ -170,7 +171,10 @@ export default function World({ view }: { view: ViewKey }) {
           engine.current?.look(l.x, l.z, l.zoom, "cluster");
         }}><LocateFixedIcon size={15} /></button>
       </div>
-      <Hud view={view} data={data} left={24} />
+      <div className="wl-corner">
+        <Hud view={view} data={data} />
+        {home && <div className="wl-figs"><StatsBlock compact hive={hive} runs={runs} /></div>}
+      </div>
       <div ref={card} className="wl-callout" style={{ display: picked ? "" : "none" }}>
         {picked && <Inspector key={picked.kind + ":" + picked.id} picked={picked} data={data} onClose={close} openDash={setDash} open={(to, full) => { if (full) window.dispatchEvent(new CustomEvent("superai:window", { detail: to })); else navigate(to); }} />}
       </div>
@@ -183,7 +187,7 @@ export default function World({ view }: { view: ViewKey }) {
 /** The hive's figures, on one flat screen that stays on the page: the
  *  totals, how fast tokens are going lately, and each member's share. Folds
  *  to its top line. */
-function Hud({ data, left }: { view: ViewKey; data: WorldData; left: number }) {
+function Hud({ data }: { view: ViewKey; data: WorldData }) {
   const { t } = useI18n();
   // Folded to one pill unless opened; it remembers.
   const [open, setOpen] = useState(() => { try { return localStorage.getItem("superai-world-stats") === "1"; } catch { return false; } });
@@ -209,7 +213,7 @@ function Hud({ data, left }: { view: ViewKey; data: WorldData; left: number }) {
   const topTokens = Math.max(1, ...members.map((m) => m.tokens));
   const short = (n: string) => n.replace(/^superai-worker-/, "w").replace(/^superai-/, "");
   return (
-    <div className={`wl-stats${open ? "" : " folded"}`} style={{ left }}>
+    <div className={`wl-stats${open ? "" : " folded"}`}>
       <button className="wl-stats-top" onClick={toggle} title={t(open ? "Fold" : "Show the figures")}>
         <span className={`wl-stats-dot${tt.tokPerSec > 0.5 ? " on" : ""}`} />
         <b>{fmt(tt.tokens)}</b><em>{t("tokens")}</em>
