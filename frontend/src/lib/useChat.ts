@@ -8,6 +8,7 @@ import {
   ChatError,
   ChatEvent,
   ChatMessage,
+  ChatTurn,
   ProgressStep,
   TraceItem,
 } from "./types";
@@ -144,6 +145,12 @@ export function useChat(): UseChatResult {
   // deltas themselves, and stripping needs the whole text: a <code> block is cut
   // across deltas wherever the provider happens to flush.
   const streamed = useRef(new Map<string, string>());
+  // The conversation on screen, for the handlers registered once below.
+  const sessionRef = useRef("");
+  // Turns another device (or this one, before SendChat answered) started in
+  // the conversation on screen, waiting to learn whether they are ours.
+  const turnsHeld = useRef(new Map<string, ChatTurn>());
+  sessionRef.current = sessionId;
 
   const patchMessage = useCallback(
     (askId: string, patch: (m: ChatMessage) => ChatMessage) => {
@@ -459,6 +466,45 @@ function lintRetryLine(content: string | undefined): string {
   }, [route]);
 
   /**
+   * Follow a turn this window did not send — the same conversation on the
+   * phone, the iPad, another tab — in its own pair of bubbles, exactly as if
+   * it had been asked here. Whatever of it arrived before this is replayed.
+   */
+  const adoptTurn = useCallback(
+    (turn: ChatTurn) => {
+      if (bound.current.has(turn.requestId)) return;
+      const askId = makeId();
+      const userMsg: ChatMessage = { id: makeId(), role: "user", content: turn.message };
+      const assistantMsg: ChatMessage = {
+        id: askId,
+        role: "assistant",
+        content: "",
+        streaming: true,
+        progress: [],
+        startedAt: Date.now(),
+      };
+      attached.current.add(askId);
+      running.current.add(askId);
+      bound.current.set(turn.requestId, askId);
+      request.current.set(askId, turn.requestId);
+      setMessages((prev) => [...prev, userMsg, assistantMsg]);
+      const held = queue.current.get(turn.requestId);
+      queue.current.delete(turn.requestId);
+      held?.forEach((item) => dispatch(askId, item));
+    },
+    [dispatch],
+  );
+
+  /** Every held turn that is not one of ours is somebody else's. */
+  const adoptHeld = useCallback(() => {
+    const held = Array.from(turnsHeld.current.values());
+    turnsHeld.current.clear();
+    held.forEach((t) => {
+      if (t.sessionId === sessionRef.current) adoptTurn(t);
+    });
+  }, [adoptTurn]);
+
+  /**
    * Tie a request id to the ask that started it and replay whatever arrived in
    * the meantime. Must stay synchronous: an event delivered between the bind
    * and the replay would otherwise overtake the buffered ones.
@@ -466,6 +512,7 @@ function lintRetryLine(content: string | undefined): string {
   const bindAsk = useCallback(
     (askId: string, requestId: string) => {
       unbound.current -= 1;
+      turnsHeld.current.delete(requestId);
       const held = queue.current.get(requestId);
       queue.current.delete(requestId);
       if (attached.current.has(askId)) {
@@ -473,10 +520,14 @@ function lintRetryLine(content: string | undefined): string {
         request.current.set(askId, requestId);
         held?.forEach((item) => dispatch(askId, item));
       }
-      // Anything still held once every send knows its id is unclaimable.
-      if (unbound.current === 0) queue.current.clear();
+      // Once every send knows its id, a turn still held was another
+      // device's; anything else still held is unclaimable.
+      if (unbound.current === 0) {
+        adoptHeld();
+        queue.current.clear();
+      }
     },
-    [dispatch],
+    [adoptHeld, dispatch],
   );
 
   /**
@@ -563,7 +614,10 @@ function lintRetryLine(content: string | undefined): string {
         // Nothing was started. The backend also emits a tagged error, but it is
         // tagged with an id we were never given, so report it from here.
         unbound.current -= 1;
-        if (unbound.current === 0) queue.current.clear();
+        if (unbound.current === 0) {
+          adoptHeld();
+          queue.current.clear();
+        }
         if (attached.current.has(askId)) {
           finishAsk(askId, {
             error: "backend not ready — configure your LLM in Settings",
@@ -571,13 +625,16 @@ function lintRetryLine(content: string | undefined): string {
         }
       } catch (e: any) {
         unbound.current -= 1;
-        if (unbound.current === 0) queue.current.clear();
+        if (unbound.current === 0) {
+          adoptHeld();
+          queue.current.clear();
+        }
         if (attached.current.has(askId)) {
           finishAsk(askId, { error: String(e?.message || e) });
         }
       }
     },
-    [sessionId, bindAsk, finishAsk, stopRequest],
+    [sessionId, adoptHeld, bindAsk, finishAsk, stopRequest],
   );
 
   const onDone = useCallback((cb: () => void) => {
@@ -602,6 +659,7 @@ function lintRetryLine(content: string | undefined): string {
 
   const reset = useCallback(() => {
     detachAll();
+    turnsHeld.current.clear();
     setMessages([]);
     setTrace([]);
     setLastEmotion("");
@@ -642,6 +700,41 @@ function lintRetryLine(content: string | undefined): string {
     },
     [detachAll],
   );
+
+  // A turn started in this conversation somewhere else — the phone, the iPad,
+  // another tab — is followed live, as if it had been asked here.
+  useEffect(() => {
+    if (typeof window === "undefined" || !(window as any).runtime) return;
+    return EventsOn("chat:turn", (t: ChatTurn) => {
+      if (!t?.requestId || !t.sessionId || t.sessionId !== sessionRef.current) return;
+      if (bound.current.has(t.requestId)) return;
+      // A send of ours has not learned its id yet, and this may be it. Held
+      // until it does; its events are held under the same id meanwhile.
+      if (unbound.current > 0) {
+        turnsHeld.current.set(t.requestId, t);
+        return;
+      }
+      adoptTurn(t);
+    }) as unknown as () => void;
+  }, [adoptTurn]);
+
+  // Back from a dropped stream, whatever was said meanwhile — here or on
+  // another device — is read again, unless an answer is streaming in here.
+  const loadRef = useRef(loadSession);
+  loadRef.current = loadSession;
+  useEffect(() => {
+    if (typeof window === "undefined" || !(window as any).runtime) return;
+    const again = () => {
+      if (running.current.size > 0 || unbound.current > 0) return;
+      void loadRef.current(sessionRef.current).catch(() => {});
+    };
+    const offs = [
+      EventsOn("stream:reconnect", again),
+      // A linked desktop window: the queen's stream came back.
+      EventsOn("hivelink:state", (p: { live?: boolean }) => { if (p?.live) again(); }),
+    ];
+    return () => offs.forEach((off) => typeof off === "function" && off());
+  }, []);
 
   // Restore the conversation that was on screen before the reload. Only the
   // transcript comes back: a turn still running on the server keeps running and

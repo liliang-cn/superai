@@ -39,6 +39,9 @@ type App struct {
 	// openTurns are the turns still running, by request id, as the session
 	// list shows them (ChatSessions).
 	openTurns sync.Map
+	// turnSess is each running turn's conversation, for its events
+	// (queen_console.go).
+	turnSess turnSessions
 	// abilities is what the last sync of the queen's skills and MCP did.
 	abilities AbilitiesState
 	// taps are in-process listeners on every emitted event, by id. See
@@ -726,6 +729,7 @@ var windowEmit = func(ctx context.Context, name string, payload map[string]any) 
 // startup there is no window, so the Wails call is skipped rather than made
 // against a nil context (which the Wails runtime treats as fatal).
 func (a *App) emit(name string, payload map[string]any) {
+	payload = a.withTurnSession(name, payload)
 	if a.emitFn != nil {
 		a.emitFn(name, payload)
 	}
@@ -885,6 +889,7 @@ func (a *App) SendCallChat(sessionID, message string, imagePaths []string) strin
 // queen engine.
 func (a *App) sendChat(sessionID, message string, imagePaths []string, own bool) string {
 	requestID := uuid.NewString()
+	a.announceTurn(requestID, sessionID, message, len(imagePaths))
 
 	// A message addressed to another agent goes there instead, and this app's
 	// model never runs. Checked before the readiness gate below on purpose: an

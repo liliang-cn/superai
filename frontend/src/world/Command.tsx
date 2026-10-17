@@ -6,7 +6,7 @@ import { Response } from "@/components/ai-elements/response";
 import { onBubbleClick, say, sayDone } from "./bubbles";
 import { focusInWorld } from "./bus";
 import { EventsOn } from "../../wailsjs/runtime";
-import { QUEEN_SESSION } from "../canvas/data";
+import { loadQueenSession, queenSession } from "../lib/queenConsole";
 import { useI18n } from "../lib/i18n";
 import { queenRef, queenTitle, useQueenName } from "../lib/queenName";
 import { toast } from "../lib/toasts";
@@ -56,7 +56,7 @@ export default function Command({ view, onConversation, onTyping }: {
   const end = useRef<HTMLDivElement>(null);
   const district = view === "chat" ? "home" : view === "mcp" ? "skills" : view;
   useEffect(() => {
-    ChatHistory(QUEEN_SESSION).then((turns: any[]) => {
+    loadQueenSession().then((id) => ChatHistory(id)).then((turns: any[]) => {
       setLines((turns ?? []).filter((x) => (x.role === "user" || x.role === "assistant") && x.kind !== "context" && x.content)
         .slice(-8).map((x) => ({ who: x.role === "user" ? "you" : "queen", text: String(x.content) })));
     }).catch(() => {});
@@ -82,6 +82,29 @@ export default function Command({ view, onConversation, onTyping }: {
     else onTyping?.("machine", name);
   }, [text]);
 
+  // A turn another device takes in the same conversation: its words when it
+  // starts, its answer when it ends.
+  const reqRef = useRef("");
+  reqRef.current = req;
+  const mine = useRef("");
+  useEffect(() => {
+    const others = new Set<string>();
+    const offs = [
+      EventsOn("chat:turn", (p: any) => {
+        if (!p?.requestId || p.sessionId !== queenSession() || p.requestId === reqRef.current) return;
+        if (mine.current && mine.current === p.message) { mine.current = ""; return; }
+        others.add(p.requestId);
+        setLines((l) => [...l, { who: "you" as const, text: String(p.message ?? "") }].slice(-12));
+      }),
+      EventsOn("chat:done", (p: any) => {
+        if (others.delete(p?.requestId)) setLines((l) => [...l, { who: "queen" as const, text: String(p.final ?? "") }].slice(-12));
+      }),
+      EventsOn("chat:error", (p: any) => { others.delete(p?.requestId); }),
+      EventsOn("chat:cancelled", (p: any) => { others.delete(p?.requestId); }),
+    ];
+    return () => offs.forEach((f) => typeof f === "function" && f());
+  }, []);
+
   useEffect(() => {
     if (!req) return;
     const a = EventsOn("chat:event", (p: any) => {
@@ -105,7 +128,13 @@ export default function Command({ view, onConversation, onTyping }: {
     setLines((l) => [...l, { who: "you" as const, text: s }].slice(-12));
     setStep("");
     raw.current = "";
-    try { setReq(await SendChat(QUEEN_SESSION, s, [])); }
+    mine.current = s;
+    try {
+      const id = await SendChat(queenSession(), s, []);
+      reqRef.current = id;
+      mine.current = "";
+      setReq(id);
+    }
     catch (e) { toast.error(String(e instanceof Error ? e.message : e)); }
   };
   const run = async (key: string, fn: () => Promise<unknown>, ok: string) => {

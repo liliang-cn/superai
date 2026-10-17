@@ -71,7 +71,22 @@ function installWebShim() {
       });
     };
     // EventSource reconnects on its own; nothing to do on error beyond not
-    // tearing the listener map down.
+    // tearing the listener map down. What was missed while it was down is not
+    // replayed, so a reconnect is announced to the page as a local
+    // "stream:reconnect", and a conversation on screen reads itself again.
+    let opened = false;
+    source.onopen = () => {
+      if (opened) {
+        listeners.get("stream:reconnect")?.forEach((cb) => {
+          try {
+            cb();
+          } catch (err) {
+            console.error("event handler for stream:reconnect:", err);
+          }
+        });
+      }
+      opened = true;
+    };
   };
 
   const eventsOn = (name: string, cb: EventCallback): (() => void) => {

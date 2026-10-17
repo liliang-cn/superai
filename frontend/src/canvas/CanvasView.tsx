@@ -8,7 +8,8 @@ import { PATHS } from "../lib/routes";
 import Sky, { Lane } from "./Sky";
 import { Bees, Cell, Coding, CodingRun, InFlight, Later, Machines, NeedsYou, Queen, Today, UpcomingItem } from "./tiles";
 import { EventsOn } from "../../wailsjs/runtime";
-import { Hive, elapsed, isToday, oneLine, short, useBees, useCodingRuns, useHive, useUpcoming, useLinkedAgents, QUEEN_SESSION } from "./data";
+import { Hive, elapsed, isToday, oneLine, short, useBees, useCodingRuns, useHive, useUpcoming, useLinkedAgents } from "./data";
+import { loadQueenSession } from "../lib/queenConsole";
 import { GenSpec, loadSpecs, makeTile, saveSpecs } from "./generated";
 import { AttentionItem, AttentionList, useAttention } from "./attention";
 import { taskPath } from "../lib/routes";
@@ -129,7 +130,7 @@ export default function CanvasView({ approvals }: { approvals: { pending: ToolAp
 
   // The orders given from this screen go to one conversation with the queen.
   useEffect(() => {
-    chat.loadSession(QUEEN_SESSION).catch(() => {});
+    loadQueenSession().then((id) => chat.loadSession(id)).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

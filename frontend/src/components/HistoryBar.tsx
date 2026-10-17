@@ -10,6 +10,7 @@ import { ChatSessions, DeleteChatSession } from "../../wailsjs/go/app/App";
 import { backend } from "../../wailsjs/go/models";
 import { copyText } from "../lib/format";
 import { toast } from "../lib/toasts";
+import { withConsoleTitles } from "../lib/queenConsole";
 
 export interface HistoryController {
   /** Non-null while the list is open (null = transcript is showing). */
@@ -37,7 +38,9 @@ export function useHistory(): HistoryController {
   const open = useCallback(() => {
     setLoading(true);
     ChatSessions()
-      .then((s) => setSessions(s || []))
+      // The old per-device consoles go by the device they were kept on.
+      .then((s) => withConsoleTitles(s || []))
+      .then((s) => setSessions(s))
       .catch(() => setSessions([]))
       .finally(() => setLoading(false));
   }, []);
