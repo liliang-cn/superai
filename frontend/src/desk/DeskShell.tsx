@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  ListTodoIcon, LayoutDashboardIcon, ChartColumnIcon, PanelRightOpenIcon, BookOpenIcon, BotIcon, HexagonIcon, MessageSquareIcon, PaletteIcon,
+  ListTodoIcon, LayoutDashboardIcon, ChartColumnIcon, PanelRightOpenIcon, PanelRightCloseIcon, BookOpenIcon, BotIcon, HexagonIcon, MessageSquareIcon, PaletteIcon,
   NotebookTabsIcon, PuzzleIcon, SlidersHorizontalIcon, TerminalIcon, XIcon,
 } from "lucide-react";
 import DeskStatusBar from "./DeskStatusBar";
@@ -34,6 +34,19 @@ export const useDeskTheme = () => useContext(ThemeCtx);
 const WorldCtx = createContext(true);
 export const useDeskWorld = () => useContext(WorldCtx);
 
+/** The home's right pane: whether it is folded away, kept the way it was
+ *  left. The shell holds it so the toolbar's toggle works from every page;
+ *  the home reports whether anything is busy, for the toggle's dot. */
+type Pane = { folded: boolean; fold: (on: boolean) => void; setBusy: (busy: boolean) => void };
+const PaneCtx = createContext<Pane>({ folded: false, fold: () => {}, setBusy: () => {} });
+export const useDeskPane = () => useContext(PaneCtx);
+const FOLD_KEY = "superai-desk-live-folded";
+// In a narrow window, where it would float over the conversation, it starts folded.
+const loadFolded = () => {
+  try { const v = localStorage.getItem(FOLD_KEY); if (v !== null) return v === "1"; } catch { /* fine */ }
+  return window.matchMedia("(max-width: 1240px)").matches;
+};
+
 const MODE_KEY = "superai-desk-mode";
 const loadMode = (): "world" | "menu" => {
   try { return localStorage.getItem(MODE_KEY) === "menu" ? "menu" : "world"; } catch { return "world"; }
@@ -50,8 +63,7 @@ const RAIL: { key: ViewKey; label: string; Icon: typeof HexagonIcon; cls: string
   { key: "skills", label: "Extensions", Icon: PuzzleIcon, cls: "dk-a-later" },
 ];
 
-/** The pages the right column opens; it stays on every page but the home,
- *  which has its own, and the open one's button closes it. */
+/** The pages the toolbar opens; the open one's button closes it again. */
 const SIDE: ViewKey[] = ["dashboards", "stats"];
 
 export const TITLES: Record<ViewKey, string> = {
@@ -129,6 +141,34 @@ export default function DeskShell({ view, badges, children, onOpenConversation, 
   };
   const runs = useCodingRuns();
   const liveRuns = runs.filter((r) => r.state === "running").length;
+  const [folded, setFolded] = useState(loadFolded);
+  const [paneBusy, setPaneBusy] = useState(false);
+  const pane: Pane = {
+    folded,
+    fold: (on) => { setFolded(on); try { localStorage.setItem(FOLD_KEY, on ? "1" : "0"); } catch { /* fine */ } },
+    setBusy: setPaneBusy,
+  };
+  // The pane is the Menu home's; from any other page its toggle brings you
+  // home with it open. In 3D there is no pane, so no toggle.
+  const withPane = view === "home" || view === "chat";
+  const paneShown = mode === "menu" && withPane && !folded;
+  const togglePane = () => {
+    if (paneShown) { pane.fold(true); return; }
+    pane.fold(false);
+    if (!withPane) navigate(PATHS.home);
+  };
+  // Dashboards and Stats: a page in Menu mode, a window over the world in 3D;
+  // pressed again, back to where you were.
+  const sideOn = (k: ViewKey) => view === k && mode !== "world";
+  const openSide = (k: ViewKey) => {
+    if (sideOn(k)) {
+      if (mode === "window") setMode("world");
+      else navigate(PATHS.home);
+      return;
+    }
+    if (mode === "menu") navigate(PATHS[k]);
+    else window.dispatchEvent(new CustomEvent("superai:window", { detail: PATHS[k] }));
+  };
 
   // The older screens paint with the app-wide tokens; desk.css gives them the
   // hive's while this shell is up.
@@ -149,12 +189,32 @@ export default function DeskShell({ view, badges, children, onOpenConversation, 
   return (
     <ThemeCtx.Provider value={{ theme, setTheme }}>
     <WorldCtx.Provider value={world}>
+    <PaneCtx.Provider value={pane}>
       {/* Menu mode keeps the world's styling, which every page is tuned
           for, and shows the rail and pages full width with no world drawn. */}
       <div className={`cv-root dk-shell dk-world${world ? "" : " panel-on dk-flat"}${served ? " served" : ""}${view === "home" ? " on-home" : ""}${mode === "window" ? " window-on" : ""} ${theme.mode === "dark" ? "dk-dark" : ""}`} style={themeVars(theme)}>
         {world && <World view={view} />}
         <div className="dk-bar" style={drag} />
-        <div className="dk-corner" style={noDrag}>
+        {/* One toolbar, top right, the same in every mode and on every page:
+            the pane's toggle at the inner end (absent in 3D, where there is no
+            pane), then Dashboards, Stats, and the bell at the edge. */}
+        <div className="dk-toolbar" style={noDrag} role="toolbar">
+          {mode === "menu" && (
+            <button type="button" className={`dk-tool dk-tool-pane${paneShown ? " on" : ""}`} aria-pressed={paneShown}
+              title={paneShown ? t("Hide this pane") : t("Show the hive")} aria-label={paneShown ? t("Hide this pane") : t("Show the hive")} onClick={togglePane}>
+              {paneShown ? <PanelRightCloseIcon size={18} /> : <PanelRightOpenIcon size={18} />}
+              {!paneShown && (paneBusy || liveRuns > 0) && <i className="dk-livedot" />}
+            </button>
+          )}
+          {SIDE.map((k) => {
+            const Icon = k === "dashboards" ? LayoutDashboardIcon : ChartColumnIcon;
+            return (
+              <button key={k} type="button" className={`dk-tool${sideOn(k) ? " on" : ""}`} aria-pressed={sideOn(k)}
+                title={t(TITLES[k])} aria-label={t(TITLES[k])} onClick={() => openSide(k)}>
+                <Icon size={18} />
+              </button>
+            );
+          })}
           <NotificationCenter variant="desk" onOpenConversation={onOpenConversation} />
         </div>
         <nav className="dk-rail" style={drag}>
@@ -175,22 +235,8 @@ export default function DeskShell({ view, badges, children, onOpenConversation, 
           </button>
         </nav>
         {theming && <ThemePanel className="dk-theme" theme={theme} onChange={setTheme} onClose={() => setTheming(false)} />}
-        {view !== "home" && (
-          <nav className="dk-live-strip dk-side-strip" style={noDrag}>
-            <button className="cv-glass dk-unfold" title={t("Show the hive")} onClick={() => navigate(PATHS.home)}><PanelRightOpenIcon size={18} /></button>
-            {SIDE.map((k) => {
-              const Icon = k === "dashboards" ? LayoutDashboardIcon : ChartColumnIcon;
-              // The page's own button closes it, back to the home it was opened from.
-              return (
-                <button key={k} className={`cv-glass dk-unfold${view === k ? " on" : ""}`} title={t(TITLES[k])} onClick={() => navigate(view === k ? PATHS.home : PATHS[k])}>
-                  <Icon size={18} />
-                </button>
-              );
-            })}
-          </nav>
-        )}
         {view === "home" ? children : (
-          <main className={`cv-glass dk-page with-side page-${view}`}>
+          <main className={`cv-glass dk-page page-${view}`}>
             <div className="content">{children}</div>
           </main>
         )}
@@ -203,6 +249,7 @@ export default function DeskShell({ view, badges, children, onOpenConversation, 
         </FabStack>
         <DeskStatusBar status={status} loading={loading} codingRuns={liveRuns}/>
       </div>
+    </PaneCtx.Provider>
     </WorldCtx.Provider>
     </ThemeCtx.Provider>
   );

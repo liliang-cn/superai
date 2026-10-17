@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   ArrowUpIcon, HexagonIcon, 
   PlusIcon, SquareIcon, SquarePenIcon, CalendarIcon, AlarmClockIcon, TerminalIcon, TriangleAlertIcon, XIcon, ChevronRightIcon,
-  LayoutDashboardIcon, ChartColumnIcon, PanelRightCloseIcon, PanelRightOpenIcon, ActivityIcon, GaugeIcon,
+  LayoutDashboardIcon, ActivityIcon, GaugeIcon,
 } from "lucide-react";
 import { useI18n } from "../lib/i18n";
 import { getQueenName, queenNamed, queenRef, queenTitle, useQueenName } from "../lib/queenName";
@@ -33,7 +33,7 @@ import LiveRun, { useRun } from "./LiveRun";
 import LiveStatus from "./LiveStatus";
 import StatsBlock from "../components/StatsBlock";
 import { takeCompose } from "../lib/compose";
-import { useDeskTheme, useDeskWorld } from "./DeskShell";
+import { useDeskPane, useDeskTheme, useDeskWorld } from "./DeskShell";
 
 type TabKey = string; // "hive" | "run:<id>" | "dash:<id>"
 
@@ -126,7 +126,6 @@ function useLink() {
 
 /** The tabs the right pane always has. */
 const FIXED: TabKey[] = ["hive", "status", "stats"];
-const FOLD_KEY = "superai-desk-live-folded";
 /** Which of the fixed tabs was last in front, so a home left on its figures
  *  opens on them. */
 const TAB_KEY = "superai-desk-live-tab";
@@ -150,12 +149,8 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
   const { t } = useI18n();
   const queen = useQueenName();
   const navigate = useNavigate();
-  // Kept the way it was left; in a narrow window, where it would float over
-  // the conversation, it starts folded.
-  const [folded, setFolded] = useState(() => {
-    try { const v = localStorage.getItem(FOLD_KEY); if (v !== null) return v === "1"; } catch { /* fine */ }
-    return window.matchMedia("(max-width: 1240px)").matches;
-  });
+  // Kept the way it was left, by the shell, whose toolbar holds its toggle.
+  const { folded, fold, setBusy } = useDeskPane();
   const layoutRef = useRef<HTMLDivElement>(null);
   const [sideWidth, setSideWidth] = useState(() => {
     try { const n = Number(localStorage.getItem("superai-desk-side-width")); return Number.isFinite(n) && n >= 200 ? Math.min(480, n) : 252; } catch { return 252; }
@@ -287,8 +282,6 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
     setClosed((c) => new Set(c).add(k));
     if (current === k) setActive(fixed[0]);
   };
-  // The right pane folds away to a strip, and stays the way it was left.
-  const fold = (on: boolean) => { setFolded(on); try { localStorage.setItem(FOLD_KEY, on ? "1" : "0"); } catch { /* fine */ } };
 
   const runOf = (k: TabKey) => runs.find((r) => "run:" + r.id === k);
   const dashOf = (k: TabKey) => pins.find((d) => "dash:" + d.id === k);
@@ -346,6 +339,8 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
     ...hive.tasks.filter((t) => t.state === "running").map((t) => t.worker),
     ...runs.filter((r) => r.state === "running").map((r) => r.agent),
   ]).size;
+  useEffect(() => { setBusy(busyWorkers > 0); }, [busyWorkers, setBusy]);
+  useEffect(() => () => setBusy(false), [setBusy]);
   const live = hive.members.filter((m) => m.state === "live" && !/queen/.test(m.name)).length;
   const workers = hive.members.filter((m) => !/queen/.test(m.name)).length;
   const status = !hive.loaded ? t("Finding the hive…") : !hive.role ? t("This Mac on its own") : `${live} of ${workers} workers up, ${busyWorkers} busy`;
@@ -506,20 +501,9 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
       }} />}
       {saveError && <div className="dk-dashboard-error" role="alert">{saveError}<button onClick={() => setSaveError("")} aria-label={t("Close")}><XIcon size={16}/></button></div>}
 
-      {folded ? (
-        <section className="dk-live-strip">
-          <button className="cv-glass dk-unfold" title={t("Show the hive")} onClick={() => fold(false)}>
-            <PanelRightOpenIcon size={18} />
-            {busyWorkers > 0 && <i className="dk-livedot" />}
-          </button>
-          <button className="cv-glass dk-unfold" title={t("Dashboards")} onClick={() => navigate(PATHS.dashboards)}>
-            <LayoutDashboardIcon size={18} />
-          </button>
-          <button className="cv-glass dk-unfold" title={t("Stats")} onClick={() => navigate(PATHS.stats)}>
-            <ChartColumnIcon size={18} />
-          </button>
-        </section>
-      ) : (
+      {/* Folded, the pane is simply gone; its toggle stays in the shell's
+          toolbar, top right. */}
+      {!folded && (
       <section className="dk-live">
         <div className="dk-tabs">
           {tabs.map((k) => {
@@ -535,15 +519,8 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
             );
           })}
           <button className="dk-icon" title="Open a coding run" onClick={() => navigate(PATHS.coding)}><PlusIcon size={17} /></button>
-          <button className="dk-icon dk-fold" title={t("Dashboards")} onClick={() => navigate(PATHS.dashboards)}><LayoutDashboardIcon size={17} /></button>
-          <button className="dk-icon" title={t("Stats")} onClick={() => navigate(PATHS.stats)}><ChartColumnIcon size={17} /></button>
-          <button className="dk-icon" title={t("Hide this pane")} onClick={() => fold(true)}><PanelRightCloseIcon size={17} /></button>
         </div>
         <div className={current === "hive" ? "dk-screen see-world" : "cv-glass dk-screen"}>
-          {/* Shown when the pane floats over the conversation (a narrow
-              window): its tab row is up in the title bar there, where the
-              Mac app's own title bar can take the click. */}
-          <button className="dk-icon dk-float-x" title={t("Hide this pane")} aria-label={t("Hide this pane")} onClick={() => fold(true)}><XIcon size={16} /></button>
           <div className="dk-in">
             {/* The hive tab is a window onto the world behind the app. */}
             {current === "status" && <LiveStatus hive={hive} now={now} agents={linked} runs={runs} />}
