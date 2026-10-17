@@ -22,6 +22,10 @@ if [ -n "${SUPERAI_TOKEN:-}" ]; then
 JSON
 fi
 
+# Settings a client changes at run time and that must outlive this rewrite are
+# kept beside it in $home and laid over it on load: queen.json (her name),
+# queenengine.json (her engine, fallback, public URL), agentlink.json (relays)
+# and linked.json (other SuperAIs). Nothing here touches them.
 if [ -n "${SUPERAI_SETTINGS_JSON:-}" ]; then
   printf '%s' "$SUPERAI_SETTINGS_JSON" > "$home/settings.json"
 fi
