@@ -271,6 +271,10 @@ type Settings struct {
 	// See queen_name.go.
 	QueenName    string   `json:"queen_name,omitempty"`
 	QueenAliases []string `json:"queen_aliases,omitempty"`
+
+	// AgentLink is how core treats the agents that dial in: which of them are
+	// relays rather than machines. See agentlink_settings.go.
+	AgentLink AgentLinkSettings `json:"agent_link,omitzero"`
 }
 
 // Defaults for APNsSettings: the developer team and the SuperAI iOS app.
@@ -550,6 +554,7 @@ func LoadSettings() (*Settings, error) {
 	if s != nil {
 		s.mergeLinked(LoadLinkedSuperAIs())
 		s.mergeQueenIdentity()
+		s.mergeAgentLink()
 	}
 	return s, err
 }
@@ -693,6 +698,7 @@ func (s *Settings) Save() error {
 	s.ExternalAgents.normalize()
 	s.RemoteAgents.normalize()
 	s.normalizeQueen()
+	s.AgentLink.normalize()
 	raw, err := json.MarshalIndent(s, "", "  ")
 	if err != nil {
 		return err
@@ -700,7 +706,10 @@ func (s *Settings) Save() error {
 	if err := os.WriteFile(settingsPath(), raw, 0o644); err != nil {
 		return err
 	}
-	return s.saveQueenIdentity()
+	if err := s.saveQueenIdentity(); err != nil {
+		return err
+	}
+	return s.saveAgentLink()
 }
 
 // WebSearch returns the endpoint the built-in web_search tool should use,

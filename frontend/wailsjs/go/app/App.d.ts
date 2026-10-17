@@ -144,6 +144,8 @@ export function LinkSuperAI(arg1:string,arg2:string,arg3:string):Promise<string>
 
 export function LinkedAgents():Promise<Array<app.LinkedAgent>>;
 
+export function LinkedAgentsAll():Promise<Array<app.LinkedAgent>>;
+
 export function LinkedSuperAIs():Promise<Array<app.LinkedSuperAI>>;
 
 export function ListApprovalRules():Promise<Array<backend.ApprovalRule>>;

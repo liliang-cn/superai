@@ -259,7 +259,10 @@ type Hello struct {
 	// Coding CLIs installed there: "claude", "codex", ...
 	Clis []string `protobuf:"bytes,6,rep,name=clis,proto3" json:"clis,omitempty"`
 	// Other agents it can reach and run for core: openclaw, hermes, ...
-	Agents        []*NamedAgent `protobuf:"bytes,7,rep,name=agents,proto3" json:"agents,omitempty"`
+	Agents []*NamedAgent `protobuf:"bytes,7,rep,name=agents,proto3" json:"agents,omitempty"`
+	// What the process is besides an agent: "worker" for a hive worker, which
+	// core then shows as a worker and never as a machine. Empty is a machine.
+	Role          string `protobuf:"bytes,8,opt,name=role,proto3" json:"role,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -341,6 +344,13 @@ func (x *Hello) GetAgents() []*NamedAgent {
 		return x.Agents
 	}
 	return nil
+}
+
+func (x *Hello) GetRole() string {
+	if x != nil {
+		return x.Role
+	}
+	return ""
 }
 
 type NamedAgent struct {
@@ -722,7 +732,7 @@ const file_agentlink_v1_agentlink_proto_rawDesc = "" +
 	"\awelcome\x18\x01 \x01(\v2\x1d.superai.agentlink.v1.WelcomeH\x00R\awelcome\x120\n" +
 	"\x04call\x18\x02 \x01(\v2\x1a.superai.agentlink.v1.CallH\x00R\x04call\x120\n" +
 	"\x04ping\x18\x03 \x01(\v2\x1a.superai.agentlink.v1.PingH\x00R\x04pingB\x06\n" +
-	"\x04kind\"\xbb\x01\n" +
+	"\x04kind\"\xcf\x01\n" +
 	"\x05Hello\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
 	"\x04host\x18\x02 \x01(\tR\x04host\x12\x0e\n" +
@@ -730,7 +740,8 @@ const file_agentlink_v1_agentlink_proto_rawDesc = "" +
 	"\x04arch\x18\x04 \x01(\tR\x04arch\x12\x18\n" +
 	"\aversion\x18\x05 \x01(\tR\aversion\x12\x12\n" +
 	"\x04clis\x18\x06 \x03(\tR\x04clis\x128\n" +
-	"\x06agents\x18\a \x03(\v2 .superai.agentlink.v1.NamedAgentR\x06agents\"6\n" +
+	"\x06agents\x18\a \x03(\v2 .superai.agentlink.v1.NamedAgentR\x06agents\x12\x12\n" +
+	"\x04role\x18\b \x01(\tR\x04role\"6\n" +
 	"\n" +
 	"NamedAgent\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +

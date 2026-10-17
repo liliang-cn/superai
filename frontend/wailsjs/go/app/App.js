@@ -278,6 +278,10 @@ export function LinkedAgents() {
   return window['go']['app']['App']['LinkedAgents']();
 }
 
+export function LinkedAgentsAll() {
+  return window['go']['app']['App']['LinkedAgentsAll']();
+}
+
 export function LinkedSuperAIs() {
   return window['go']['app']['App']['LinkedSuperAIs']();
 }

@@ -77,8 +77,9 @@ func selfTools() []selfTool {
 		},
 		{
 			Name: "linked_agents", Title: "Linked agents", ReadOnly: true,
-			Description: "The machines whose agent is connected to this SuperAI (host, OS, the coding CLIs and agents each offers, when last heard), and the ones that dropped recently without coming back.",
-			Run:         func(a *App, _ map[string]any) (any, error) { return a.selfLinkedAgents(), nil },
+			Description: "The agents connected to this SuperAI over the agent link (host, OS, the coding CLIs and agents each offers, when last heard), and the ones that dropped recently without coming back." +
+				" Each says what it is: role machine (machine true) is a machine machine_inspect and machine_act look after; worker is a hive worker's pod, reached through the hive tools; relay is there only for the named agents it serves.",
+			Run: func(a *App, _ map[string]any) (any, error) { return a.selfLinkedAgents(), nil },
 		},
 		{
 			Name: "mcp_servers", Title: "MCP servers", ReadOnly: true,
@@ -240,10 +241,12 @@ func (a *App) selfStatus() map[string]any {
 
 func (a *App) selfLinkedAgents() map[string]any {
 	lost := []map[string]any{}
+	roleOf := a.agentRoles()
 	for name, seen := range a.agents().lostAgents(time.Now()) {
-		lost = append(lost, map[string]any{"name": name, "lastSeen": seen})
+		role := roleOf(name, a.agents().declaredRole(name))
+		lost = append(lost, map[string]any{"name": name, "lastSeen": seen, "role": role, "machine": role == agentRoleMachine})
 	}
-	return map[string]any{"connected": a.LinkedAgents(), "notAnswering": lost}
+	return map[string]any{"connected": a.LinkedAgentsAll(), "notAnswering": lost}
 }
 
 // selfMCPServers names each server and its tools. The command line is left

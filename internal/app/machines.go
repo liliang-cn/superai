@@ -30,12 +30,23 @@ func isCoreMachine(name string) bool {
 // onMachine calls method on the named machine and decodes its answer into out.
 func (a *App) onMachine(name string, d time.Duration, method string, args []any, out any) error {
 	c := a.agents().get(strings.TrimSpace(name))
-	if c == nil {
+	role := agentRoleMachine
+	if c != nil {
+		role = a.agentRole(c)
+	}
+	if c == nil || role != agentRoleMachine {
 		names := []string{"core"}
-		for _, l := range a.agents().list() {
-			names = append(names, l.name())
+		for _, l := range a.LinkedAgents() {
+			names = append(names, l.Name)
 		}
-		return fmt.Errorf("no machine called %q is linked; there is %s", name, strings.Join(names, ", "))
+		there := "; the machines are " + strings.Join(names, ", ")
+		switch role {
+		case agentRoleWorker:
+			return fmt.Errorf("%s is a hive worker, not a machine (hive_members and hive_command reach it)%s", name, there)
+		case agentRoleRelay:
+			return fmt.Errorf("%s is an agent relay, not a machine: it is there for the agents it serves, not to be looked after%s", name, there)
+		}
+		return fmt.Errorf("no machine called %q is linked%s", name, there)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), d)
 	defer cancel()
@@ -158,7 +169,7 @@ func intArg(v any) int {
 // machineTools are the two tools of the self table (selfmcp.go) that look
 // after machines: one only reads, the other changes things and so is asked.
 func machineTools() []selfTool {
-	machine := map[string]any{"type": "string", "description": "A linked machine's name (linked_agents lists them), or \"core\" for the machine this SuperAI runs on."}
+	machine := map[string]any{"type": "string", "description": "A linked machine's name (the linked_agents entries with machine true), or \"core\" for the machine this SuperAI runs on. Hive workers and relays are not machines."}
 	return []selfTool{
 		{
 			Name: "machine_inspect", Title: "Inspect a machine", ReadOnly: true,

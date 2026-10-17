@@ -94,7 +94,14 @@ func (a *App) Attention() []AttentionItem {
 		}
 	}
 
+	// A worker's pod also dials the agent link; the roster above already
+	// says when one is not answering.
+	role := a.agents().declaredRole
+	roleOf := a.agentRoles()
 	for name, seen := range a.agents().lostAgents(now) {
+		if roleOf(name, role(name)) == agentRoleWorker {
+			continue
+		}
 		needs = append(needs, AttentionItem{Level: "needs", Kind: "lost", Title: name + " is not answering",
 			Detail: "Last heard " + ago(now, seen), At: &seen, Ref: name, Open: "hive"})
 	}

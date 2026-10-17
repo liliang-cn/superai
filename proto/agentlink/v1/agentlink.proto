@@ -51,6 +51,9 @@ message Hello {
   repeated string clis = 6;
   // Other agents it can reach and run for core: openclaw, hermes, ...
   repeated NamedAgent agents = 7;
+  // What the process is besides an agent: "worker" for a hive worker, which
+  // core then shows as a worker and never as a machine. Empty is a machine.
+  string role = 8;
 }
 
 message NamedAgent {
