@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { SendIcon } from "lucide-react";
 import { AskRemoteAgent, ChatHistory, FollowUpCLIRun, SendChat, StandingReports, StartCLIRun, WakeStandingAgent } from "../../wailsjs/go/app/App";
 import { EventsOn } from "../../wailsjs/runtime";
-import { QUEEN_SESSION } from "../canvas/data";
+import { loadQueenSession, queenSession } from "../lib/queenConsole";
 import { useI18n } from "../lib/i18n";
 import { useImeGuard } from "../lib/ime";
 import { say, sayDone } from "./bubbles";
@@ -61,6 +61,8 @@ export default function Talk({ who, placeholder }: { who: Talker; placeholder: s
   const [text, setText] = useState("");
   const [busy, setBusy] = useState("");
   const live = useRef("");
+  // What this card just sent, until SendChat names its request.
+  const mine = useRef("");
   const end = useRef<HTMLDivElement>(null);
   const alive = useRef(true);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
@@ -69,7 +71,7 @@ export default function Talk({ who, placeholder }: { who: Talker; placeholder: s
   // The queen's card opens on where the conversation with her is.
   useEffect(() => {
     if (who.kind !== "queen" || threads.get(key)?.lines.length) return;
-    ChatHistory(QUEEN_SESSION).then((turns: any[]) => {
+    loadQueenSession().then((id) => ChatHistory(id)).then((turns: any[]) => {
       const last = (turns ?? []).filter((x) => (x.role === "user" || x.role === "assistant") && x.kind !== "context" && x.content).slice(-6);
       const th = { lines: last.map((x) => ({ who: x.role === "user" ? "you" : "it", text: String(x.content).slice(0, 600) }) as Line) };
       threads.set(key, th);
@@ -87,10 +89,23 @@ export default function Talk({ who, placeholder }: { who: Talker; placeholder: s
     setLines(th.lines);
   };
 
-  // The queen's answer streams in on the chat events of this request.
+  // The queen's answer streams in on the chat events of this request. A turn
+  // another device takes in the same conversation shows here too: its words
+  // when it starts, its answer when it ends.
   useEffect(() => {
     if (who.kind !== "queen") return;
+    const others = new Set<string>();
     const offs = [
+      EventsOn("chat:turn", (p: any) => {
+        if (!p?.requestId || p.sessionId !== queenSession() || p.requestId === live.current) return;
+        // Ours, before SendChat answered with its id.
+        if (mine.current && mine.current === p.message) { mine.current = ""; return; }
+        others.add(p.requestId);
+        push({ who: "you", text: String(p.message ?? "") });
+      }),
+      EventsOn("chat:done", (p: any) => { if (others.delete(p?.requestId)) push({ who: "it", text: String(p.final ?? "") }); }),
+      EventsOn("chat:error", (p: any) => { if (others.delete(p?.requestId)) push({ who: "it", text: String(p.error ?? ""), bad: true }); }),
+      EventsOn("chat:cancelled", (p: any) => { others.delete(p?.requestId); }),
       EventsOn("chat:event", (p: any) => {
         if (!live.current || p?.requestId !== live.current) return;
         if (p.type === "tool_call" && p.tool) setBusy(t("Using {tool}…", { tool: p.tool }));
@@ -122,7 +137,9 @@ export default function Talk({ who, placeholder }: { who: Talker; placeholder: s
     try {
       switch (who.kind) {
         case "queen":
-          live.current = await SendChat(QUEEN_SESSION, s, []);
+          mine.current = s;
+          live.current = await SendChat(queenSession(), s, []);
+          mine.current = "";
           break;
         case "worker": case "agent": {
           const r: any = await AskRemoteAgent(who.name, s);

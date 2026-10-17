@@ -118,3 +118,27 @@ test('calendar aliases and timezone-equivalent meeting times do not duplicate ap
  const result=calendarEvents(meetings);assert.equal(result.length,3);assert.equal(result[0].id,'a');assert.equal(result[1].id,'c');assert.equal(meetings.length,4);
  assert.equal(calendarEvents([{title:'A',start_at:'2026-10-06T09:00:00Z'},{title:'B',start_at:'2026-10-06T09:00:00Z'}]).length,2);
 });
+
+test('one queen conversation on every device; the old per-device consoles are listed by device',async()=>{
+ const qc=load('src/lib/queenConsole.ts');
+ // A core without QueenConsole (and a window whose bindings lack it): the shared constant.
+ assert.equal(await qc.loadQueenSession(true),'hive-console');assert.equal(qc.queenSession(),'hive-console');
+ fakeWindow.go.app.App.QueenConsole=async()=>({session:'hive-console-shared-x'});
+ assert.equal(await qc.loadQueenSession(true),'hive-console-shared-x');
+ fakeWindow.go.app.App.QueenConsole=async()=>{throw new Error('404 no such method');};
+ assert.equal(await qc.loadQueenSession(true),'hive-console');
+ delete fakeWindow.go.app.App.QueenConsole;
+ const devices=[{id:'d4388704550c2bd9',name:'iPad'},{id:'p1',name:'iPhone 17'}];
+ assert.equal(qc.legacyConsoleTitle('hive-console-d4388704550c2bd9',devices),'蜂群指令 · iPad');
+ assert.equal(qc.legacyConsoleTitle('hive-console-web',devices),'蜂群指令 · 网页');
+ assert.equal(qc.legacyConsoleTitle('hive-console-gone',devices),'蜂群指令 · 旧');
+ const keep=['abc','hive-console-web','hive-console-p1'];
+ const hide=['hive-console','hive:order-1','hive-mail:w1','hive-order-1','tile-k2','dashboard:x'];
+ for (const id of keep) assert.ok(qc.isPersonalConversation({id,title:'t'},'hive-console'),id);
+ for (const id of hide) assert.ok(!qc.isPersonalConversation({id,title:'t'},'hive-console'),id);
+ assert.ok(!qc.isPersonalConversation({id:'u1',title:'You hold a standing responsibility: x'},'hive-console'));
+ fakeWindow.go.app.App.PairedDevices=async()=>devices;
+ const titled=await qc.withConsoleTitles([{id:'abc',title:'hi'},{id:'hive-console-p1',title:'old words'}]);
+ assert.deepEqual(titled.map(s=>s.title),['hi','蜂群指令 · iPhone 17']);
+ delete fakeWindow.go.app.App.PairedDevices;
+});

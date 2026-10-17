@@ -426,6 +426,10 @@ export function Pulse() {
   return window['go']['app']['App']['Pulse']();
 }
 
+export function QueenConsole() {
+  return window['go']['app']['App']['QueenConsole']();
+}
+
 export function QueenEngines() {
   return window['go']['app']['App']['QueenEngines']();
 }

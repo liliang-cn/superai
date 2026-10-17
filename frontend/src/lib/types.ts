@@ -24,6 +24,8 @@ export type ViewKey =
  */
 export interface ChatEvent {
   requestId: string;
+  /** The conversation, on a core that says (chat:turn's sessionId). */
+  sessionId?: string;
   type: string;
   content: string;
   tool: string;
@@ -32,6 +34,19 @@ export interface ChatEvent {
   debugType: string;
   /** The agent CLI thinking for the queen ("claude", "claude.mac"); absent for SuperAI's own agent. */
   engine?: string;
+}
+
+/**
+ * A turn the core took in a conversation, from any device: the words that
+ * started it, before any of its events. A window on the same conversation
+ * that did not send it follows it under its request id.
+ */
+export interface ChatTurn {
+  requestId: string;
+  sessionId: string;
+  message: string;
+  at?: string;
+  images?: number;
 }
 
 export interface ChatDone {

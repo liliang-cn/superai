@@ -19,7 +19,7 @@ import type { ToolApproval } from "../lib/useToolApprovals";
 import { PATHS } from "../lib/routes";
 import { withoutCallNotes } from "../lib/format";
 import { Response } from "@/components/ai-elements/response";
-import { Bee, QUEEN_SESSION, elapsed, short, useBees, useLinkedAgents, useCodingRuns, useHive, useUpcoming } from "../canvas/data";
+import { Bee, elapsed, short, useBees, useLinkedAgents, useCodingRuns, useHive, useUpcoming } from "../canvas/data";
 import type { CodingRun, UpcomingItem } from "../canvas/tiles";
 import NameDashboardModal from "../components/NameDashboardModal";
 import { dashboards, hasRenderableBlock, suggestName, Dashboard } from "../lib/dashboards";
@@ -33,6 +33,7 @@ import LiveRun, { useRun } from "./LiveRun";
 import LiveStatus from "./LiveStatus";
 import StatsBlock from "../components/StatsBlock";
 import { takeCompose } from "../lib/compose";
+import { isPersonalConversation, loadQueenSession, queenSession, useQueenSession, withConsoleTitles } from "../lib/queenConsole";
 import { useDeskPane, useDeskTheme, useDeskWorld } from "./DeskShell";
 
 type TabKey = string; // "hive" | "run:<id>" | "dash:<id>"
@@ -53,7 +54,8 @@ interface Session { id: string; title: string; updated_at: string }
 /** The conversations, newest first, without the ones the screens keep for
  *  themselves: the queen's own, the tiles', and the bees' wake-ups (whose
  *  first message is the standing-agent preamble, not something you said).
- *  The phone's calls with the queen (hive-console-<id>) are kept. */
+ *  The old per-device consoles (hive-console-<device>) are kept, titled
+ *  after their device; the shared one has its own row. */
 /** "Tue 15:00", "Today 09:00": when a coming-up item is, in one short line. */
 function shortWhen(at: string | undefined, now: Date | number, t: (k: string) => string): string {
   if (!at) return "";
@@ -71,11 +73,12 @@ function useRecents(sending: boolean): Session[] {
   const [list, setList] = useState<Session[]>([]);
   const load = useCallback(() => {
     ChatSessions()
-      .then((l) => setList(((l ?? []) as unknown as Session[])
-        .filter((s) => s.id !== QUEEN_SESSION && !s.id.startsWith("tile-") && !s.id.startsWith("hive-") && !s.title.startsWith("You hold a standing responsibility"))
+      .then((l) => withConsoleTitles(((l ?? []) as unknown as Session[])
+        .filter((s) => isPersonalConversation(s, queenSession()))
         .map((s) => ({ ...s, title: withoutCallNotes(s.title) }))
         .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
         .slice(0, 9)))
+      .then(setList)
       .catch(() => {});
   }, []);
   useEffect(() => {
@@ -172,6 +175,7 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
   const runs = useCodingRuns();
   const linked = useLinkedAgents();
   const chat = useChat();
+  const queenId = useQueenSession();
   const pulse = usePulse();
   const recents = useRecents(chat.sending);
   const link = useLink();
@@ -208,14 +212,14 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!openSession) chat.loadSession(QUEEN_SESSION).catch(() => {});
+    if (!openSession) loadQueenSession().then((id) => chat.loadSession(id)).catch(() => {});
     dashboards.list().then((l) => setPins(l ?? [])).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     if (!openSession) return;
-    setOnQueen(openSession === QUEEN_SESSION);
+    setOnQueen(openSession === queenSession());
     chat.loadSession(openSession).catch(() => {});
     onSessionOpened?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -302,7 +306,7 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
   };
 
   const pickSession = (id: string) => {
-    setOnQueen(id === QUEEN_SESSION);
+    setOnQueen(id === queenSession());
     chat.loadSession(id).catch(() => {});
   };
 
@@ -314,7 +318,7 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
   useEffect(() => {
     const compose = () => {
       if (!takeCompose()) return;
-      if (!onQueenRef.current) { setOnQueen(true); chatRef.current.loadSession(QUEEN_SESSION).catch(() => {}); }
+      if (!onQueenRef.current) { setOnQueen(true); chatRef.current.loadSession(queenSession()).catch(() => {}); }
       // After the shell has shown this page (a window opening, a page
       // changing): a hidden box takes no focus.
       window.setTimeout(() => composerRef.current?.focus(), 80);
@@ -353,7 +357,7 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
           <b>SuperAI</b>
           <button className="dk-icon" title={t("New chat")} aria-label={t("New chat")} onClick={() => { chat.newSession(); setOnQueen(false); }}><SquarePenIcon size={17} /></button>
         </div>
-        <button className={onQueen ? "dk-row on" : "dk-row"} onClick={() => pickSession(QUEEN_SESSION)}><span className="dk-qhex">Q</span>{queenTitle(queen)}</button>
+        <button className={onQueen ? "dk-row on" : "dk-row"} onClick={() => pickSession(queenId)}><span className="dk-qhex">Q</span>{queenTitle(queen)}</button>
         {(needs > 0 || attentionError) && (
           <button className="dk-row need" onClick={() => navigate(PATHS.tasks)} title={attention.filter((i) => i.level === "needs").slice(0, 3).map(attentionTitle).join("\n")}>
             <TriangleAlertIcon size={16} />

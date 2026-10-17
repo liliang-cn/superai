@@ -218,6 +218,8 @@ export function PreviewPrompt(arg1:string,arg2:string):Promise<backend.PromptPre
 
 export function Pulse():Promise<backend.PulseSnapshot>;
 
+export function QueenConsole():Promise<Record<string, string>>;
+
 export function QueenEngines():Promise<Record<string, any>>;
 
 export function QueenIdentity():Promise<Record<string, any>>;

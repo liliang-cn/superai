@@ -6,7 +6,6 @@ import {
   RefreshDashboard, RemoveMCPServer, RemoveSkill, ResolveToolApproval, ResumeStandingAgent, SendChat, StandingReports,
   StartCLIRun, WakeStandingAgent,
 } from "../../wailsjs/go/app/App";
-import { QUEEN_SESSION } from "../canvas/data";
 import { useI18n } from "../lib/i18n";
 import { queenNamed, queenRef, useQueenName } from "../lib/queenName";
 import { toast } from "../lib/toasts";

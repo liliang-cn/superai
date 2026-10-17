@@ -118,8 +118,8 @@ export function useBees(): Bee[] {
   return bees;
 }
 
-/** The one conversation with the queen that the home screens share. */
-export const QUEEN_SESSION = "hive-console-web";
+// The conversation with the queen the home screens share is the person's one
+// conversation with her on every device: lib/queenConsole.ts.
 
 export const isToday = (iso?: string) => {
   if (!iso) return false;
