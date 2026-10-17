@@ -249,8 +249,13 @@ func TestSendChatWithoutBackendStillIdentifiesTheAsk(t *testing.T) {
 		t.Fatal("SendChat must return its id even when it starts nothing, or the caller cannot bind the failure event to the ask")
 	}
 
+	// The turn is announced to every client (chat:turn), then fails.
 	events := log.snapshot()
-	if len(events) != 1 || events[0].name != "chat:error" {
+	if len(events) != 2 || events[0].name != "chat:turn" || events[0].requestID() != id {
+		t.Fatalf("want the turn announced first, got %v", events)
+	}
+	events = events[1:]
+	if events[0].name != "chat:error" {
 		t.Fatalf("want exactly one chat:error, got %v", events)
 	}
 	if got := events[0].requestID(); got != id {

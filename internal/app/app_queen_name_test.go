@@ -44,7 +44,11 @@ func TestAnAddressToTheQueenNeverGoesToAnAgentOfTheSameName(t *testing.T) {
 	}
 	a.SendChat("s1", "@bee 帮我看看", nil)
 	// No service: the turn stays here and says so, rather than going out.
+	// After the announcement every client gets of a turn taken (chat:turn).
 	events := log.snapshot()
+	if len(events) > 0 && events[0].name == "chat:turn" {
+		events = events[1:]
+	}
 	if len(events) == 0 || events[0].name != "chat:error" || !strings.Contains(events[0].text(), "backend not ready") {
 		t.Fatalf("%+v", events)
 	}
