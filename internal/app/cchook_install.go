@@ -333,13 +333,37 @@ func settingsHaveOurHook(content []byte, bin string) bool {
 	for event, groups := range s.Hooks {
 		for _, g := range groups {
 			for _, h := range g.Hooks {
-				if isOurHook(h.Command, event) && strings.Contains(h.Command, bin) {
+				if isOurHook(h.Command, event) && sameFile(hookCommandBinary(h.Command), bin) {
 					return true
 				}
 			}
 		}
 	}
 	return false
+}
+
+// hookCommandBinary is the binary a SuperAI hook command runs: what comes
+// before ` hook <Event>`, unquoted.
+func hookCommandBinary(command string) string {
+	loc := regexp.MustCompile(`['"]?\s+hook\s+[A-Za-z]+`).FindStringIndex(command)
+	if loc == nil {
+		return ""
+	}
+	return strings.Trim(strings.TrimSpace(command[:loc[0]]), `'"`)
+}
+
+// sameFile says whether two paths are one file, links followed: /tmp is
+// /private/tmp on a Mac.
+func sameFile(a, b string) bool {
+	if a == "" || b == "" {
+		return false
+	}
+	if a == b {
+		return true
+	}
+	ra, err1 := filepath.EvalSymlinks(a)
+	rb, err2 := filepath.EvalSymlinks(b)
+	return err1 == nil && err2 == nil && ra == rb
 }
 
 // hookBinary is this binary's real path, or "" for one that would make a

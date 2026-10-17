@@ -215,6 +215,25 @@ func TestOnlyAnOptedInSettingsFileIsUpgraded(t *testing.T) {
 	if settingsHaveOurHook([]byte(otherToolsSettings), "/elsewhere/superai") {
 		t.Fatal("another binary's hooks count as this one's")
 	}
+	for cmd, want := range map[string]string{
+		"/x/superai hook Stop":                             "/x/superai",
+		"'/a b/superai' hook PermissionRequest --wait 100": "/a b/superai",
+		"superai hook Stop":                                "superai",
+		"/opt/homebrew/bin/anywhered PreToolUse":           "",
+	} {
+		if got := hookCommandBinary(cmd); got != want {
+			t.Errorf("hookCommandBinary(%q) = %q, want %q", cmd, got, want)
+		}
+	}
+	// The same binary through a link is the same binary.
+	dir0 := t.TempDir()
+	bin0 := filepath.Join(dir0, "superai")
+	_ = os.WriteFile(bin0, []byte("x"), 0o755)
+	_ = os.Symlink(dir0, filepath.Join(dir0, "via"))
+	linked := `{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"` + filepath.Join(dir0, "via", "superai") + ` hook Stop"}]}]}}`
+	if !settingsHaveOurHook([]byte(linked), bin0) {
+		t.Error("a hook through a linked directory was not this binary's")
+	}
 	onlyOthers := `{"hooks":{"PreToolUse":[{"hooks":[{"type":"command","command":"/opt/homebrew/bin/anywhered hook PreToolUse"}]}]}}`
 	if settingsHaveOurHook([]byte(onlyOthers), "/opt/homebrew/bin/anywhered") {
 		t.Fatal("anywhered's hook taken for SuperAI's")
