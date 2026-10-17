@@ -213,6 +213,15 @@ CLI 本身（`claude`、`codex`、`gemini` 等）要在这台机器上装好，�
 
 一台已经在跑 `superai serve` 的机器，也可以加上同样的 `-core` 等参数，同时作为另一个 core 的 agent。
 
+**终端里的 Claude Code 也算进来（可选）。**人在终端里开的 Claude Code 会话，装上 hook 之后，core 和 3D 里就能看到这台机器的 claude 在干活、在等你，还是空闲（只上报状态、工具名和项目目录名，不上报提示词和工具参数）。把 `superai-cchook` 放在 `superai` 旁边（每次提问、每次工具调用都会跑它，比整个 `superai` 启动快得多），然后装一次 hook：
+
+```sh
+go build -o ~/.superai-node/bin/superai-cchook ./cmd/superai-cchook   # 或 make cchook 后拷过去
+~/.superai-node/bin/superai hook install    # 合并进 ~/.claude/settings.json，不动别的工具的 hook，重复跑不会重复添加
+```
+
+之后升级二进制、重启 agent 时，它会自动补上新的 hook，并把老的提问/工具 hook 换成 `superai-cchook`。新开的 Claude Code 会话才生效。
+
 连上的每台机器都会出现在 3D 视图里，没装 CLI 的也一样。点开机器能看到负载、内存、磁盘和服务列表（失败的排在前面），可以查看日志、重启服务，或者执行一条命令。queen 用 `machine_inspect` 和 `machine_act` 两个工具做同样的事；`machine_act` 会改动机器，所以要先经过审批。MCP 客户端里对应的是 `superai_machine_inspect` 和 `superai_machine_act`。core 自己的机器名叫 `core`。
 
 ### 另一种接法：`superai node`（配对码）

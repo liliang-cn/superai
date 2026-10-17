@@ -48,6 +48,10 @@ web:
 serve: web
 	./build/bin/superai-web serve
 
+## cchook: build the small Claude Code hook for prompts and tool calls -> build/bin/superai-cchook (ship it beside superai)
+cchook:
+	go build -trimpath -ldflags "-s -w" -o build/bin/superai-cchook ./cmd/superai-cchook
+
 ## daemon: build the background scheduler binary
 daemon:
 	go build -o build/bin/superai-daemon ./cmd/superai-daemon
@@ -94,4 +98,4 @@ deps:
 clean:
 	rm -rf build/bin frontend/dist
 
-.PHONY: help dev build run package cli daemon install-daemon uninstall-daemon daemon-status bindings test smoke check fmt deps clean
+.PHONY: help dev build run package cli cchook daemon install-daemon uninstall-daemon daemon-status bindings test smoke check fmt deps clean
