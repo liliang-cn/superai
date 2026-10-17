@@ -5,7 +5,7 @@ import { INK, pose, robot, setState, type RobotState } from "./robots";
 import { forgetActor, registerActor } from "./bubbles";
 import { Packets, type Link } from "./packets";
 import { CSS2DObject } from "three/examples/jsm/renderers/CSS2DRenderer.js";
-import type { Bee, CCActivitySession, Hive, LinkedAgent } from "../canvas/data";
+import type { Bee, CCActivity, CCActivitySession, CLIActivity, Hive, LinkedAgent, RelayAgent } from "../canvas/data";
 import type { CodingRun } from "../canvas/tiles";
 import type { AttentionItem } from "../canvas/attention";
 import type { Member } from "../components/HiveMeter";
@@ -39,12 +39,25 @@ export interface WorldData {
 const short = (n: string) => n.replace(/^superai-worker-/, "w").replace(/^superai-/, "");
 /** A tool as a screen line shows it: an MCP tool by its own name, not its server's. */
 const toolName = (t?: string) => (t && t.startsWith("mcp__") ? t.split("__").pop() || t : t || "");
-/** What a terminal Claude Code session is on, in one line: "superai: Bash". */
-export function sessionLine(s: CCActivitySession): string {
+/** What a terminal session of a coding CLI is on, in one line: "superai: Bash". */
+export function sessionLine(s: CCActivitySession, cli = "claude"): string {
   const what = s.state === "waiting"
     ? (s.wait === "permission" ? translate("waiting for your OK") + (s.tool ? ` · ${toolName(s.tool)}` : "") : translate("waiting for you"))
     : s.state === "working" ? toolName(s.tool) || translate("thinking") : translate("idle");
-  return `${s.project || "claude"}: ${what}`;
+  return `${s.project || cli}: ${what}`;
+}
+/** Every coding CLI on a machine, by CLI: its cliActivity, with claude's
+ *  terminal sessions from an older core's activity when that is all there is. */
+export function clisOf(a: { activity?: CCActivity | null; cliActivity?: Record<string, CLIActivity> }): Record<string, CCActivity> {
+  const out: Record<string, CCActivity> = { ...(a.cliActivity ?? {}) };
+  if (!out.claude && a.activity?.sessions?.length) out.claude = a.activity;
+  return out;
+}
+/** A robot's own terminal state from its CLI's sessions: what its label says. */
+function termState(act: CCActivity | undefined) {
+  const work = act?.working ?? 0, wait = act?.waiting ?? 0;
+  const status = work ? translate("{count} sessions working", { count: work }) : wait ? translate("waiting for you") : "";
+  return { work, wait, status };
 }
 const clip = (s: string, n = 30) => { const t = s.replace(/\s+/g, " ").trim(); return t.length > n ? t.slice(0, n - 1) + "…" : t; };
 /** The queen's name over her robot, with the engine thinking for her when it is not SuperAI's own: "queen · Claude Code". */
@@ -577,6 +590,9 @@ export const cluster: District<WorldData> = {
     const workers = new Map<string, { r: THREE.Group; label: Label; node: string }>();
     // ── Linked machines and their coding agents ──────────────────────────
     const machines = new Map<string, { dev: THREE.Group; label: Label; cable: ReturnType<typeof cable>; at: THREE.Vector3; clis: Map<string, { r: THREE.Group; label: Label }> }>();
+    // ── Relays: the named agents a relay serves (openclaw, hermes, pi), on a
+    // pad of their own. Not a machine: no desk, no machine card.
+    const relays = new Map<string, { pad: THREE.Group; label: Label; cable: ReturnType<typeof cable>; at: THREE.Vector3; bots: Map<string, { r: THREE.Group; label: Label }> }>();
 
     const coreAt = new THREE.Vector3(0, 0, -2.2);
     const cables = new THREE.Group();
@@ -591,6 +607,23 @@ export const cluster: District<WorldData> = {
     const machineSpot = (i: number, n: number) => {
       const a = THREE.MathUtils.degToRad(n === 1 ? 45 : 95 - (i * 90) / Math.max(1, n - 1));
       return new THREE.Vector3(Math.cos(a) * 21, 0, Math.sin(a) * 21);
+    };
+    // Out past the nodes, on the far side from the machines.
+    const relaySpot = (i: number, n: number) => {
+      const a = THREE.MathUtils.degToRad(n === 1 ? 228 : 205 + (i * 50) / Math.max(1, n - 1));
+      return new THREE.Vector3(Math.cos(a) * 23, 0, Math.sin(a) * 23);
+    };
+    /** A relay's pad: a low disc with a light around its rim. */
+    const relayPad = () => {
+      const pad = new THREE.Group();
+      const disc = cyl(3.6, 3.8, 0.22, 64, 0xf4f6f9);
+      disc.receiveShadow = true;
+      const rim = new THREE.Mesh(new THREE.TorusGeometry(3.7, 0.06, 8, 96), new THREE.MeshBasicMaterial({ color: LIGHT.idle, toneMapped: false }));
+      rim.rotation.x = Math.PI / 2;
+      rim.position.y = 0.23;
+      pad.add(disc, rim);
+      pad.userData.strip = rim;
+      return pad;
     };
 
     /** Who carries an order, and where along which cable it goes. */
@@ -607,6 +640,12 @@ export const cluster: District<WorldData> = {
         // A named agent (openclaw) served by this machine.
         const own = m.clis.get(name);
         if (own) return { curve: m.cable.curve, to: own.r };
+      }
+      // A named agent served by a relay.
+      for (const [h, x] of relays) {
+        if (host && h !== host && !h.startsWith(host)) continue;
+        const b = x.bots.get(cli) ?? x.bots.get(name);
+        if (b) return { curve: x.cable.curve, to: b.r };
       }
       return null;
     };
@@ -677,6 +716,7 @@ export const cluster: District<WorldData> = {
       pose(queen, t, ctx.reduced);
       for (const w of workers.values()) pose(w.r, t, ctx.reduced);
       for (const m of machines.values()) for (const c of m.clis.values()) pose(c.r, t, ctx.reduced);
+      for (const x of relays.values()) for (const b of x.bots.values()) pose(b.r, t, ctx.reduced);
       for (const b of bees.values()) {
         pose(b.r, t, ctx.reduced);
         if (b.mode === "orbit" && !ctx.reduced) {
@@ -839,14 +879,15 @@ export const cluster: District<WorldData> = {
           // the ones people look for.
           const FIRST = ["claude", "codex", "pi", "openclaw", "gemini", "opencode", "hermes"];
           const rank = (n: string) => { const i = FIRST.indexOf(n); return i < 0 ? 99 : i; };
-          // The terminal Claude Code sessions people run on it: work that is
-          // not SuperAI's, done by the same claude.
-          const act = a.activity ?? null;
-          const ccWork = act?.working ?? 0, ccWait = act?.waiting ?? 0;
-          const ccOn = (act?.sessions ?? []).filter((s) => s.state !== "idle");
-          const names = [...(a.clis ?? []), ...(a.agents ?? []).map((n) => n.name)];
-          if (act?.sessions?.length && !names.includes("claude")) names.push("claude");
-          const who = names.sort((x, y) => rank(x) - rank(y)).slice(0, 5);
+          // The terminal sessions people run on it, every coding CLI's: work
+          // that is not SuperAI's, done by the same CLIs.
+          const term = clisOf(a);
+          const running = Object.keys(term);
+          const ccWork = running.reduce((n, c) => n + (term[c].working ?? 0), 0);
+          const ccOn = running.flatMap((c) => (term[c].sessions ?? []).filter((s) => s.state !== "idle").map((s) => ({ s, c })));
+          const names = [...new Set([...(a.clis ?? []), ...(a.agents ?? []).map((n) => n.name), ...running])];
+          // The ones running first, then the best known.
+          const who = names.sort((x, y) => (term[y] ? 1 : 0) - (term[x] ? 1 : 0) || rank(x) - rank(y)).slice(0, 6);
           for (const [n, c] of x.clis) if (!who.includes(n)) { c.label.remove(); g.remove(c.r); x.clis.delete(n); }
           who.forEach((n, k) => {
             let c = x!.clis.get(n);
@@ -873,13 +914,12 @@ export const cluster: District<WorldData> = {
             const live = runs.filter((r) => r.state === "running");
             const delegated = run.filter((t) => t.worker === `${n}.${a.name}` || t.worker === n || t.worker.startsWith(n + "."));
             const asks = asking.some((s) => s === `${n}.${a.name}` || s.startsWith(n + "."));
-            const term = n === "claude" ? { work: ccWork, wait: ccWait } : { work: 0, wait: 0 };
+            const own = termState(term[n]);
             const st: RobotState = asks ? "wait"
-              : live.length || delegated.length || term.work ? "work" : term.wait ? "wait" : runs[0]?.state === "failed" ? "fail" : "idle";
+              : live.length || delegated.length || own.work ? "work" : own.wait ? "wait" : runs[0]?.state === "failed" ? "fail" : "idle";
             setState(c.r, st);
             const status = asks ? "needs your OK" : live.length ? clip(live[0].prompt, 24) : delegated.length ? clip(delegated[0].prompt, 24)
-              : term.work ? translate("{count} sessions working", { count: term.work }) : term.wait ? translate("waiting for you")
-              : st === "fail" ? "failed" : "idle";
+              : own.status || (st === "fail" ? "failed" : "idle");
             c.label.set(n, status, st === "wait" ? "wait" : st === "work" ? "work" : st === "fail" ? "bad" : "idle");
           });
           const runsHere = d.runs.filter((r) => (r.remote || "core") === a.name);
@@ -890,11 +930,73 @@ export const cluster: District<WorldData> = {
           // each by its project and the tool it is on.
           const said = [
             liveHere.length ? `${liveHere.length} running` : "",
-            ccWork ? `claude · ${translate("{count} sessions working", { count: ccWork })}` : ccWait ? `claude · ${translate("waiting for you")}` : "",
+            ...running.filter((c) => term[c].working || term[c].waiting).slice(0, 2).map((c) => {
+              const s = termState(term[c]);
+              return `${c} · ${s.status}`;
+            }),
           ].filter(Boolean);
           show((x.dev.userData.screens as Screen[])[0], a.name, said.length ? said.join(" · ") : `${who.length} agents ready`,
-            [...ccOn.slice(0, 4).map(sessionLine), ...(liveHere.length ? liveHere : ccOn.length ? [] : runsHere.slice(0, 4)).map((r) => `${r.agent}: ${r.prompt}`)],
+            [...ccOn.slice(0, 4).map(({ s, c }) => `${c} · ${sessionLine(s, c)}`), ...(liveHere.length ? liveHere : ccOn.length ? [] : runsHere.slice(0, 4)).map((r) => `${r.agent}: ${r.prompt}`)],
             liveHere.length > 0 || ccWork > 0);
+        });
+
+        // Relays and the named agents they serve, each robot with what runs
+        // as it on the relay: working while its processes are busy.
+        const rl: RelayAgent[] = (d.hive.relays ?? []).filter((r) => r?.name && (r.agents ?? []).length > 0);
+        for (const [h, x] of relays) if (!rl.some((r) => r.name === h)) {
+          x.label.remove(); x.bots.forEach((b, n) => { b.label.remove(); g.remove(b.r); forgetActor(`agent:${n}.${h}`); });
+          g.remove(x.pad); cables.remove(x.cable.tube); x.cable.tube.userData.dispose?.(); relays.delete(h);
+        }
+        rl.forEach((rel, i) => {
+          const at = relaySpot(i, rl.length);
+          let x = relays.get(rel.name);
+          if (x && !x.at.equals(at)) { x.pad.position.copy(at); }
+          if (!x) {
+            const pad = relayPad();
+            pad.position.copy(at);
+            g.add(pad);
+            const c = cable(coreAt, at, hash01(rel.name));
+            cables.add(c.tube);
+            const plate = new THREE.Object3D();
+            plate.position.set(0, 3.4, -2.6);
+            pad.add(plate);
+            x = { pad, label: ctx.label(plate, "", rel.name, 0), cable: c, at, bots: new Map() };
+            relays.set(rel.name, x);
+          }
+          x.at = at;
+          const names = (rel.agents ?? []).map((n) => n.name).slice(0, 6);
+          x.label.set(names.join(" · "), rel.name, "idle");
+          for (const [n, b] of x.bots) if (!names.includes(n)) { b.label.remove(); g.remove(b.r); x.bots.delete(n); forgetActor(`agent:${n}.${rel.name}`); }
+          const term = rel.cliActivity ?? {};
+          let busyHere = false;
+          names.forEach((n, k) => {
+            let b = x!.bots.get(n);
+            if (!b) {
+              const r = robot("cli", TRIMS[Math.floor(hash01(n) * TRIMS.length)]);
+              g.add(r);
+              ctx.pickable(r, { kind: "agent", id: `${n}.${rel.name}`, title: `${n} · ${rel.name}` });
+              b = { r, label: ctx.label(r, n, "", k % 2 ? 2.9 : 2.1) };
+              x!.bots.set(n, b);
+              registerActor(`agent:${n}.${rel.name}`, r);
+              registerActor("agent:" + n, r);
+            }
+            // In a ring on the pad, facing out to the core.
+            const ang = (k / Math.max(1, names.length)) * Math.PI * 2 + Math.PI / 2;
+            const world = new THREE.Vector3(Math.cos(ang) * 2.1, 0.22, Math.sin(ang) * 2.1).add(at);
+            b.r.position.copy(world);
+            b.r.userData.base = 0.22;
+            b.r.lookAt(coreAt.clone().setY(0.22));
+            const delegated = run.filter((t) => t.worker === `${n}.${rel.name}` || t.worker === n || t.worker.startsWith(n + "."));
+            const asks = asking.some((s) => s === `${n}.${rel.name}` || s === n || s.startsWith(n + "."));
+            const own = termState(term[n]);
+            const st: RobotState = asks ? "wait" : delegated.length || own.work ? "work" : own.wait ? "wait" : "idle";
+            busyHere = busyHere || st === "work";
+            setState(b.r, st);
+            b.label.set(n, asks ? "needs your OK" : delegated.length ? clip(delegated[0].prompt, 24) : own.status || "idle",
+              st === "wait" ? "wait" : st === "work" ? "work" : "idle");
+          });
+          setLight(x.pad, busyHere ? "busy" : "idle");
+          x.cable.setActive(run.some((t) => route(t.worker)?.curve === x!.cable.curve));
         });
 
         // Bees: one small robot each, circling while out, resting on the dais
@@ -960,6 +1062,7 @@ export const cluster: District<WorldData> = {
             const [cli, ...rest] = agent.split(".");
             const host = rest.join(".");
             for (const [h, m] of machines) if (!host || h === host || h.startsWith(host)) { const c = m.clis.get(cli); if (c) return c.r; }
+            for (const [h, x] of relays) if (!host || h === host || h.startsWith(host)) { const b = x.bots.get(cli); if (b) return b.r; }
             return null;
           };
           const whoFor = (it: AttentionItem): THREE.Object3D | null => {

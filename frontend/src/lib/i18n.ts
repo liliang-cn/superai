@@ -126,7 +126,7 @@ const zh: Record<string,string> = {
   "Talk to {name}":"和{name}对话", "Choose figures":"选择指标", "Working now":"运行中", "Move up":"上移", "Move down":"下移",
   "tokens today":"今日 tokens", "tokens all time":"累计 tokens", "tokens this process":"本进程 tokens", "cached":"缓存", "turns":"轮次", "tool calls":"工具调用", "reads":"读取", "writes":"写入", "shells":"命令", "mcp calls":"MCP 调用", "memory calls":"记忆调用", "failed":"失败", "cpu":"CPU", "heap":"堆内存", "goroutines":"协程", "orders in flight":"进行中的指令", "coding runs going":"进行中的编程",
   "{count} sessions working":"{count} 个会话在干活", "waiting for you":"等你", "waiting for your OK":"等你批准", "thinking":"思考中", "idle":"空闲",
-  "Terminal sessions":"终端会话", "working":"干活中", "waiting":"等你", "since {time}":"自 {time}", "{count} tool calls":"{count} 次工具调用",
+  "Terminal sessions":"终端会话", "by its processes":"按进程判断", "working":"干活中", "waiting":"等你", "since {time}":"自 {time}", "{count} tool calls":"{count} 次工具调用",
   "today":"今日", "all time":"累计", "tokens":"tokens", "calls":"调用", "mcp":"MCP", "memory":"记忆", "orders":"指令", "coding":"编程", "workers busy":"忙碌的工作节点", "failed today":"今日失败",
 };
 export function translate(key:string, values:Record<string,string|number> = {}) {

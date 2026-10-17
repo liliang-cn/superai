@@ -6,7 +6,7 @@ import {
   RefreshDashboard, RemoveMCPServer, RemoveSkill, ResolveToolApproval, ResumeStandingAgent, SendChat, StandingReports,
   StartCLIRun, WakeStandingAgent,
 } from "../../wailsjs/go/app/App";
-import { type CCActivity } from "../canvas/data";
+import { type CCActivity, type CLIActivity } from "../canvas/data";
 import { useI18n } from "../lib/i18n";
 import { queenNamed, queenRef, useQueenName } from "../lib/queenName";
 import { toast } from "../lib/toasts";
@@ -16,7 +16,7 @@ import { openSwitcher } from "../lib/hivelink";
 import Talk from "./Talk";
 import MachineHost from "./MachineHost";
 import type { Picked } from "./engine";
-import { sessionLine, type WorldData } from "./cluster";
+import { clisOf, sessionLine, type WorldData } from "./cluster";
 import { agendaWhen, type AgendaEntry } from "./agenda";
 
 const KIND: Record<AgendaEntry["kind"], string> = { event: "Event", reminder: "Reminder", todo: "To-do", timer: "Timing" };
@@ -141,10 +141,12 @@ export default function Inspector({ picked, data, onClose, open, openDash }: {
       kind = "Machine";
       if (a) rows.push(["System", `${a.os} ${a.arch}`]);
       rows.push(["Running", String(live.length)], ["Sessions", String(mine.length)]);
-      if (a?.activity) rows.push(["Terminal sessions", `${a.activity.working} ${t("working")} · ${a.activity.waiting} ${t("waiting")}`]);
+      const term = a ? clisOf(a) : {};
+      const tw = Object.values(term).reduce((n, x) => n + (x.working ?? 0), 0), tq = Object.values(term).reduce((n, x) => n + (x.waiting ?? 0), 0);
+      if (Object.keys(term).length) rows.push(["Terminal sessions", `${tw} ${t("working")} · ${tq} ${t("waiting")}`]);
       body = (
         <>
-          <TermSessions act={a?.activity} />
+          <TermSessions clis={term} />
           <MachineHost name={host} />
           {clis.length > 0 && <NewRun clis={clis} host={host} onStart={(agent, prompt) => act("run", () => StartCLIRun(agent, prompt, "", "", true), "Run started")} busy={busy === "run"} />}
           <ul className="wi-list">
@@ -163,10 +165,12 @@ export default function Inspector({ picked, data, onClose, open, openDash }: {
       const live = mine.filter((r) => r.state === "running");
       kind = picked.kind === "cli" ? "Coding agent" : "Agent";
       rows.push(["On", host], ["Running", String(live.length)]);
-      const term = name === "claude" ? data.linked.find((x) => x.name === host)?.activity : null;
+      // Its own terminal sessions, on a machine or on a relay.
+      const on = data.linked.find((x) => x.name === host) ?? data.hive.relays?.find((x) => x.name === host);
+      const mineTerm = on ? clisOf(on)[name] : undefined;
       body = (
         <>
-          <TermSessions act={term} />
+          <TermSessions clis={mineTerm ? { [name]: mineTerm } : {}} />
           <Talk who={picked.kind === "cli" ? { kind: "cli", agent: picked.id } : { kind: "agent", name }} placeholder={picked.kind === "cli" ? `What should ${name} do?` : `Talk to ${name}…`} />
           {live.length > 0 && (
             <ul className="wi-list">
@@ -513,12 +517,14 @@ function McpShop({ servers }: { servers: WorldData["mcp"] }) {
   );
 }
 
-/** The Claude Code sessions people run in a machine's terminals: each by
+/** The sessions people run in a machine's terminals, by coding CLI: each by
  *  its project, what it is on, and since when. Only what the machine sent —
  *  never a prompt. */
-function TermSessions({ act }: { act?: CCActivity | null }) {
+function TermSessions({ clis }: { clis: Record<string, CCActivity> }) {
   const { t } = useI18n();
-  if (!act?.sessions?.length) return null;
+  const order = Object.keys(clis).filter((c) => clis[c]?.sessions?.length)
+    .sort((x, y) => (clis[y].working + clis[y].waiting) - (clis[x].working + clis[x].waiting) || x.localeCompare(y));
+  if (!order.length) return null;
   const since = (s: string) => {
     const d = new Date(s);
     return isNaN(+d) ? "" : d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
@@ -526,15 +532,23 @@ function TermSessions({ act }: { act?: CCActivity | null }) {
   return (
     <div className="wi-cc">
       <p className="wi-cap">{t("Terminal sessions")}</p>
-      <ul className="wi-list">
-        {act.sessions.slice(0, 8).map((s) => (
-          <li key={s.id} title={s.tools ? t("{count} tool calls", { count: s.tools }) : undefined}>
-            <i className={`wi-dot ${s.state === "working" ? "running" : s.state === "waiting" ? "waiting" : ""}`} />
-            {sessionLine(s)}
-            <em>{t("since {time}", { time: since(s.since) })}</em>
-          </li>
-        ))}
-      </ul>
+      {order.map((c) => {
+        const act = clis[c] as CLIActivity;
+        return (
+          <div key={c} className="wi-cc-cli">
+            <p className="wi-cc-name">{c}{act.source === "process" && <em>{t("by its processes")}</em>}</p>
+            <ul className="wi-list">
+              {act.sessions.slice(0, 8).map((s) => (
+                <li key={s.id} title={s.tools ? t("{count} tool calls", { count: s.tools }) : undefined}>
+                  <i className={`wi-dot ${s.state === "working" ? "running" : s.state === "waiting" ? "waiting" : ""}`} />
+                  {sessionLine(s, c)}
+                  <em>{t("since {time}", { time: since(s.since) })}</em>
+                </li>
+              ))}
+            </ul>
+          </div>
+        );
+      })}
     </div>
   );
 }

@@ -969,6 +969,7 @@ export namespace app {
 	    version?: string;
 	    control: boolean;
 	    claude?: CCActivity;
+	    cliActivity?: Record<string, any>;
 	
 	    static createFrom(source: any = {}) {
 	        return new HostInfo(source);
@@ -989,6 +990,7 @@ export namespace app {
 	        this.version = source["version"];
 	        this.control = source["control"];
 	        this.claude = this.convertValues(source["claude"], CCActivity);
+	        this.cliActivity = source["cliActivity"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -1085,6 +1087,7 @@ export namespace app {
 	    machine: boolean;
 	    role: string;
 	    activity?: CCActivity;
+	    cliActivity?: Record<string, any>;
 	
 	    static createFrom(source: any = {}) {
 	        return new LinkedAgent(source);
@@ -1104,6 +1107,7 @@ export namespace app {
 	        this.machine = source["machine"];
 	        this.role = source["role"];
 	        this.activity = this.convertValues(source["activity"], CCActivity);
+	        this.cliActivity = source["cliActivity"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
