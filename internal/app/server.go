@@ -99,19 +99,24 @@ func parseEventFilter(r *http.Request) eventFilter {
 }
 
 // Heartbeat bounds for /api/events. A browser or a phone in front keeps the
-// default; a phone holding the stream open in the background asks for fewer
-// wake-ups with ?heartbeat=<seconds>, which stays under the idle timeouts of
-// mobile NATs and proxies at the top of the range.
+// default; a phone holding the stream open in the background (Android's
+// 保持连接) asks for fewer wake-ups with ?heartbeat=<seconds> or its alias
+// ?keepalive=<seconds>, which stays under the idle timeouts of mobile NATs and
+// proxies at the top of the range.
 const (
 	defaultHeartbeat = 25 * time.Second
 	minHeartbeat     = 10 * time.Second
 	maxHeartbeat     = 300 * time.Second
 )
 
-// heartbeatEvery reads ?heartbeat=<seconds>, clamped to the bounds; the
+// heartbeatEvery reads ?heartbeat= (or ?keepalive=) <seconds>, clamped to the bounds; the
 // default when it is absent or not a number.
 func heartbeatEvery(r *http.Request) time.Duration {
-	v := strings.TrimSpace(r.URL.Query().Get("heartbeat"))
+	q := r.URL.Query()
+	v := strings.TrimSpace(q.Get("heartbeat"))
+	if v == "" {
+		v = strings.TrimSpace(q.Get("keepalive"))
+	}
 	if v == "" {
 		return defaultHeartbeat
 	}
