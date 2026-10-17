@@ -43,6 +43,9 @@ type HostInfo struct {
 	Version string     `json:"version,omitempty"`
 	// Control says whether this machine accepts service actions and commands.
 	Control bool `json:"control"`
+	// Claude is what the machine's interactive Claude Code sessions are
+	// doing, as core last heard (cchook_activity.go); core fills it in.
+	Claude *CCActivity `json:"claude,omitempty"`
 }
 
 type HostMemory struct {

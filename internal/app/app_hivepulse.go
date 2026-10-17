@@ -38,6 +38,11 @@ type MemberPulse struct {
 	Doing string `json:"doing,omitempty"`
 	Round int    `json:"round,omitempty"`
 	At    string `json:"at"`
+	// CCWorking and CCWaiting are the member machine's interactive Claude
+	// Code sessions that are working and waiting for the person
+	// (cchook_activity.go): work the meter's own figures do not see.
+	CCWorking int `json:"ccWorking,omitempty"`
+	CCWaiting int `json:"ccWaiting,omitempty"`
 }
 
 // HivePulse is every member's meter and their sum.
@@ -106,10 +111,15 @@ func (a *App) HivePulse() HivePulse {
 	if h := a.hiveSelfName(); h != "" {
 		self.Name = h
 	}
+	if p := a.ccSelfActivity.Load(); p != nil {
+		self.CCWorking, self.CCWaiting = p.Working, p.Waiting
+	}
 	out := HivePulse{Members: []MemberPulse{self}}
 	linked := map[string]bool{}
+	act := map[string]*CCActivity{}
 	for _, c := range a.agents().list() {
 		linked[c.name()] = true
+		act[c.name()] = c.activity.Load()
 	}
 	cutoff := time.Now().Add(-10 * time.Second)
 	a.memberPulses.Range(func(k, v any) bool {
@@ -117,6 +127,9 @@ func (a *App) HivePulse() HivePulse {
 		at, _ := time.Parse(time.RFC3339Nano, m.At)
 		if !linked[m.Name] || at.Before(cutoff) {
 			return true
+		}
+		if p := act[m.Name]; p != nil {
+			m.CCWorking, m.CCWaiting = p.Working, p.Waiting
 		}
 		out.Members = append(out.Members, m)
 		return true
@@ -138,6 +151,11 @@ func (a *App) HivePulse() HivePulse {
 		t.Fails += m.Fails
 		t.MCP += m.MCP
 		t.TokPerSec += m.TokPerSec
+	}
+	// Every machine's terminal sessions, meter or not.
+	for _, act := range a.CCActivityAll() {
+		t.CCWorking += act.Working
+		t.CCWaiting += act.Waiting
 	}
 	out.Total = t
 	return out

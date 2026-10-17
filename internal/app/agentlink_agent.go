@@ -227,6 +227,9 @@ func (a *App) agentLinkOnce(ctx context.Context, o AgentLinkOptions) error {
 	a.agentTap.Store(&tap)
 	defer a.agentTap.Store(nil)
 	go a.sendPulseSummaries(sctx, hello.GetName(), tap)
+	// What the terminal Claude Code sessions here are doing, again: a core
+	// that just took this link has not heard it.
+	ccActivityState().resend()
 
 	// A changed set of CLIs or agents is said again, so core's menus follow.
 	go func() {

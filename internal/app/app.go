@@ -32,6 +32,10 @@ type App struct {
 	agentTap     atomic.Pointer[func(string, map[string]any)]
 	// memberPulses is the latest meter summary from each linked agent.
 	memberPulses sync.Map
+	// ccSelfActivity is this machine's own Claude Code sessions when it is
+	// not linked to a core (cchook_activity.go); a linked agent's are on its
+	// agentConn.
+	ccSelfActivity atomic.Pointer[CCActivity]
 	// openTurns are the turns still running, by request id, as the session
 	// list shows them (ChatSessions).
 	openTurns sync.Map

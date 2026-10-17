@@ -258,6 +258,7 @@ func (a *App) handleCCPermission(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 	l := ccLocalState()
 	l.observe(&ev, now)
+	observeCCActivity(ev)
 	// Somebody at this machine, and the phone has not said away: the
 	// terminal's own dialog is the answer, at once — asking core first cost
 	// every prompt a round trip.
@@ -281,6 +282,7 @@ func (a *App) handleCCPermission(w http.ResponseWriter, r *http.Request) {
 	}
 	if ans.Behavior != "" {
 		l.setState(ev.Session, ccWorking)
+		observeCCActivity(ccHookEvent{Event: ccPermissionAnswered, Session: ev.Session})
 		log.Printf("cc relay: %s in %s: %s from the phone", ev.Tool, ev.Session, ans.Behavior)
 	}
 	writeJSON(w, ans)

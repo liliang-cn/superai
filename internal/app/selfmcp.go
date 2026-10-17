@@ -78,7 +78,8 @@ func selfTools() []selfTool {
 		{
 			Name: "linked_agents", Title: "Linked agents", ReadOnly: true,
 			Description: "The agents connected to this SuperAI over the agent link (host, OS, the coding CLIs and agents each offers, when last heard), and the ones that dropped recently without coming back." +
-				" Each says what it is: role machine (machine true) is a machine machine_inspect and machine_act look after; worker is a hive worker's pod, reached through the hive tools; relay is there only for the named agents it serves.",
+				" Each says what it is: role machine (machine true) is a machine machine_inspect and machine_act look after; worker is a hive worker's pod, reached through the hive tools; relay is there only for the named agents it serves." +
+				" activity, when present, is what the interactive Claude Code sessions people run in that machine's terminals are doing (not SuperAI's own runs): working and waiting counts, and per session its project (the directory's name), state (working, waiting — wait says permission or input — or idle), the tool it is on and since when. No prompts or tool arguments are ever in it.",
 			Run: func(a *App, _ map[string]any) (any, error) { return a.selfLinkedAgents(), nil },
 		},
 		{
