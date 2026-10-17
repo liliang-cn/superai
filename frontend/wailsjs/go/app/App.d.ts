@@ -10,6 +10,8 @@ export function AddRecord(arg1:string,arg2:string,arg3:string,arg4:Array<string>
 
 export function AddSchedule(arg1:string,arg2:string,arg3:string,arg4:Array<string>):Promise<Record<string, any>>;
 
+export function AlarmRings(arg1:number):Promise<any>;
+
 export function AnswerCCPermission(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function AskRemoteAgent(arg1:string,arg2:string):Promise<backend.RemoteResult>;

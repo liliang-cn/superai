@@ -54,12 +54,15 @@ type Device struct {
 	TokenHash string    `json:"token_hash"`
 	CreatedAt time.Time `json:"created_at"`
 	LastSeen  time.Time `json:"last_seen,omitzero"`
-	// PushToken is the APNs device token the app registered, and PushEnv the
-	// environment its build talks to ("sandbox" or "production"; empty means
-	// the server's default). See app_alarms.go.
-	PushToken   string    `json:"push_token,omitempty"`
-	PushEnv     string    `json:"push_env,omitempty"`
-	PushUpdated time.Time `json:"push_updated,omitzero"`
+	// PushToken is the device token the app registered, and PushEnv the
+	// APNs environment its build talks to ("sandbox" or "production"; empty
+	// means the server's default). See app_alarms.go.
+	PushToken string `json:"push_token,omitempty"`
+	PushEnv   string `json:"push_env,omitempty"`
+	// PushProvider is who delivers to PushToken: empty or "apns" for an
+	// iPhone, a vendor channel ("mipush", "hms", …) for an Android phone.
+	PushProvider string    `json:"push_provider,omitempty"`
+	PushUpdated  time.Time `json:"push_updated,omitzero"`
 }
 
 // deviceStore is the paired devices and the codes waiting to be claimed.
@@ -224,9 +227,10 @@ func (s *deviceStore) deviceFor(tok string) (string, bool) {
 }
 
 // setPushToken records where device id is reached by push, replacing what it
-// had. An empty token unregisters it. A token another device still holds is
-// taken from it: the same phone paired twice must not be woken twice.
-func (s *deviceStore) setPushToken(id, token, env string) error {
+// had. An empty token unregisters it. A token another device still holds with
+// the same provider is taken from it: the same phone paired twice must not be
+// woken twice.
+func (s *deviceStore) setPushToken(id, token, env, provider string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	at := -1
@@ -240,19 +244,22 @@ func (s *deviceStore) setPushToken(id, token, env string) error {
 	}
 	now := s.now().UTC()
 	if token == "" {
-		env = ""
+		env, provider = "", ""
+	}
+	if provider == pushAPNs {
+		provider = ""
 	}
 	changed := false
 	if token != "" {
 		for i := range s.devices {
-			if i != at && s.devices[i].PushToken == token {
-				s.devices[i].PushToken, s.devices[i].PushEnv, s.devices[i].PushUpdated = "", "", now
+			if d := &s.devices[i]; i != at && d.PushToken == token && d.PushProvider == provider {
+				d.PushToken, d.PushEnv, d.PushProvider, d.PushUpdated = "", "", "", now
 				changed = true
 			}
 		}
 	}
-	if d := &s.devices[at]; d.PushToken != token || d.PushEnv != env {
-		d.PushToken, d.PushEnv, d.PushUpdated = token, env, now
+	if d := &s.devices[at]; d.PushToken != token || d.PushEnv != env || d.PushProvider != provider {
+		d.PushToken, d.PushEnv, d.PushProvider, d.PushUpdated = token, env, provider, now
 		changed = true
 	}
 	if !changed {
@@ -266,16 +273,35 @@ type pushTarget struct {
 	DeviceID string
 	Token    string
 	Env      string
+	// Provider is pushAPNs or a vendor channel.
+	Provider string
 }
 
-// pushTargets is every device with a push token.
+// pushTargets is every device with an APNs token, the ones the APNs client
+// sends to. A phone registered with any other provider is reached through
+// pushToVendors (push_vendor.go).
 func (s *deviceStore) pushTargets() []pushTarget {
+	var out []pushTarget
+	for _, t := range s.allPushTargets() {
+		if t.Provider == pushAPNs {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+// allPushTargets is every device with a push token, whatever delivers it.
+func (s *deviceStore) allPushTargets() []pushTarget {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	var out []pushTarget
 	for _, d := range s.devices {
 		if d.PushToken != "" {
-			out = append(out, pushTarget{DeviceID: d.ID, Token: d.PushToken, Env: d.PushEnv})
+			p := d.PushProvider
+			if p == "" {
+				p = pushAPNs
+			}
+			out = append(out, pushTarget{DeviceID: d.ID, Token: d.PushToken, Env: d.PushEnv, Provider: p})
 		}
 	}
 	return out
@@ -288,7 +314,7 @@ func (s *deviceStore) dropPushToken(id, token string) error {
 	defer s.mu.Unlock()
 	for i := range s.devices {
 		if s.devices[i].ID == id && s.devices[i].PushToken == token {
-			s.devices[i].PushToken, s.devices[i].PushEnv, s.devices[i].PushUpdated = "", "", s.now().UTC()
+			s.devices[i].PushToken, s.devices[i].PushEnv, s.devices[i].PushProvider, s.devices[i].PushUpdated = "", "", "", s.now().UTC()
 			return s.saveLocked()
 		}
 	}
@@ -358,15 +384,18 @@ func pairRoutes(mux *http.ServeMux, c *credentials) {
 // to know which paired device is calling, and only the request knows that.
 const registerPushPath = "/api/rpc/RegisterPushToken"
 
-// registerPushRoute records a paired phone's APNs token.
+// registerPushRoute records a paired phone's push token.
 //
 //	POST /api/rpc/RegisterPushToken  ["<hex device token>","sandbox"|"production"|""]
+//	POST /api/rpc/RegisterPushToken  ["<token>","","mipush"|"hms"|"honor"|"oppo"|"vivo"|"sse"|"apns"]
 //	→ {"ok":true,"device_id":"…"}
 //
-// Only a paired device's own token may call it (403 otherwise): a push token
-// belongs to a device, and the shared token and a browser session are not
-// one. An empty device token unregisters. Unpairing the device drops its push
-// token with it.
+// Two arguments are an iPhone's APNs token, as the iOS app has always sent
+// them; a third names the provider, so an Android phone can register the
+// token its vendor channel gave it. Only a paired device's own token may call
+// it (403 otherwise): a push token belongs to a device, and the shared token
+// and a browser session are not one. An empty device token unregisters.
+// Unpairing the device drops its push token with it.
 func registerPushRoute(mux *http.ServeMux, c *credentials) {
 	mux.HandleFunc(registerPushPath, func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
@@ -384,25 +413,56 @@ func registerPushRoute(mux *http.ServeMux, c *credentials) {
 			return
 		}
 		var args []string
-		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<10)).Decode(&args); err != nil || len(args) != 2 {
-			http.Error(w, "RegisterPushToken takes 2 arguments: token, env", http.StatusBadRequest)
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<10)).Decode(&args); err != nil || len(args) < 2 || len(args) > 3 {
+			http.Error(w, "RegisterPushToken takes 2 or 3 arguments: token, env[, provider]", http.StatusBadRequest)
 			return
 		}
-		token, env := strings.ToLower(strings.TrimSpace(args[0])), strings.ToLower(strings.TrimSpace(args[1]))
-		if token != "" && !validPushToken(token) {
-			http.Error(w, "token is not an APNs device token (hex)", http.StatusBadRequest)
+		provider := pushAPNs
+		if len(args) == 3 {
+			if p := strings.ToLower(strings.TrimSpace(args[2])); p != "" {
+				provider = p
+			}
+		}
+		if !pushProviders[provider] {
+			http.Error(w, "provider must be one of apns, mipush, hms, honor, oppo, vivo, sse", http.StatusBadRequest)
 			return
 		}
-		if env != "" && env != "sandbox" && env != "production" {
-			http.Error(w, `env must be "sandbox" or "production"`, http.StatusBadRequest)
-			return
+		token, env := strings.TrimSpace(args[0]), strings.ToLower(strings.TrimSpace(args[1]))
+		if provider == pushAPNs {
+			token = strings.ToLower(token)
+			if token != "" && !validPushToken(token) {
+				http.Error(w, "token is not an APNs device token (hex)", http.StatusBadRequest)
+				return
+			}
+			if env != "" && env != "sandbox" && env != "production" {
+				http.Error(w, `env must be "sandbox" or "production"`, http.StatusBadRequest)
+				return
+			}
+		} else {
+			if token != "" && !validVendorToken(token) {
+				http.Error(w, "token is not a push token", http.StatusBadRequest)
+				return
+			}
+			env = ""
 		}
-		if err := c.devices.setPushToken(id, token, env); err != nil {
+		if err := c.devices.setPushToken(id, token, env, provider); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		writeJSON(w, map[string]any{"ok": true, "device_id": id})
 	})
+}
+
+// pushAPNs is Apple's push service, the provider of a token registered
+// without one.
+const pushAPNs = "apns"
+
+// pushProviders is who RegisterPushToken takes tokens for. APNs has its
+// client; the vendor channels and sse have their senders in push_vendor.go
+// ("sse" is a phone with no vendor channel holding the event stream open, its
+// token any id of its own).
+var pushProviders = map[string]bool{
+	pushAPNs: true, "mipush": true, "hms": true, "honor": true, "oppo": true, "vivo": true, pushSSE: true,
 }
 
 // validPushToken is hex of a plausible length: 32 bytes today, and Apple says
@@ -413,6 +473,20 @@ func validPushToken(t string) bool {
 	}
 	_, err := hex.DecodeString(t)
 	return err == nil
+}
+
+// validVendorToken is a vendor's registration id: printable, no spaces, at
+// most 512 bytes. Each vendor has its own alphabet, so this checks no more.
+func validVendorToken(t string) bool {
+	if len(t) < 8 || len(t) > 512 {
+		return false
+	}
+	for _, r := range t {
+		if r <= ' ' || r > '~' {
+			return false
+		}
+	}
+	return true
 }
 
 // PairCode is a code a phone can be paired with.

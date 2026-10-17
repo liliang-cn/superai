@@ -109,7 +109,7 @@ func pairedWithPush(t *testing.T) *deviceStore {
 			t.Fatal(ok, err)
 		}
 		env := []string{"sandbox", ""}[i]
-		if err := s.setPushToken(d.ID, tok, env); err != nil {
+		if err := s.setPushToken(d.ID, tok, env, ""); err != nil {
 			t.Fatal(err)
 		}
 	}

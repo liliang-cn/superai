@@ -1,0 +1,1152 @@
+{
+  "description": "Shared fixtures for the alarm schedule engine (docs/alarms.md). Each case: an alarm (schedule, holidayPolicy, region; enabled defaults to true), a time `now`, and the rings strictly after now: `expected` holds the first `limit` of them, `total` how many there are in one expansion (today plus 180 days in the alarm's zone, at most 200). Compare times as instants. `holidays` is the CN calendar the cases use (only read when region is CN); dates it does not list are ordinary days. Run by internal/alarm (Go) and by the SuperAI iOS engine (Swift).",
+  "version": 1,
+  "windowDays": 180,
+  "maxOccurrences": 200,
+  "defaultEndTime": "22:00",
+  "holidays": {
+    "CN": [
+      {
+        "date": "2026-01-01",
+        "kind": "holiday",
+        "name": "元旦"
+      },
+      {
+        "date": "2026-01-02",
+        "kind": "holiday",
+        "name": "元旦"
+      },
+      {
+        "date": "2026-01-03",
+        "kind": "holiday",
+        "name": "元旦"
+      },
+      {
+        "date": "2026-01-04",
+        "kind": "workday",
+        "name": "元旦"
+      },
+      {
+        "date": "2026-02-14",
+        "kind": "workday",
+        "name": "春节"
+      },
+      {
+        "date": "2026-02-15",
+        "kind": "holiday",
+        "name": "春节"
+      },
+      {
+        "date": "2026-02-16",
+        "kind": "holiday",
+        "name": "春节"
+      },
+      {
+        "date": "2026-02-17",
+        "kind": "holiday",
+        "name": "春节"
+      },
+      {
+        "date": "2026-02-18",
+        "kind": "holiday",
+        "name": "春节"
+      },
+      {
+        "date": "2026-02-19",
+        "kind": "holiday",
+        "name": "春节"
+      },
+      {
+        "date": "2026-02-20",
+        "kind": "holiday",
+        "name": "春节"
+      },
+      {
+        "date": "2026-02-21",
+        "kind": "holiday",
+        "name": "春节"
+      },
+      {
+        "date": "2026-02-22",
+        "kind": "holiday",
+        "name": "春节"
+      },
+      {
+        "date": "2026-02-23",
+        "kind": "holiday",
+        "name": "春节"
+      },
+      {
+        "date": "2026-02-28",
+        "kind": "workday",
+        "name": "春节"
+      },
+      {
+        "date": "2026-04-04",
+        "kind": "holiday",
+        "name": "清明节"
+      },
+      {
+        "date": "2026-04-05",
+        "kind": "holiday",
+        "name": "清明节"
+      },
+      {
+        "date": "2026-04-06",
+        "kind": "holiday",
+        "name": "清明节"
+      },
+      {
+        "date": "2026-05-01",
+        "kind": "holiday",
+        "name": "劳动节"
+      },
+      {
+        "date": "2026-05-02",
+        "kind": "holiday",
+        "name": "劳动节"
+      },
+      {
+        "date": "2026-05-03",
+        "kind": "holiday",
+        "name": "劳动节"
+      },
+      {
+        "date": "2026-05-04",
+        "kind": "holiday",
+        "name": "劳动节"
+      },
+      {
+        "date": "2026-05-05",
+        "kind": "holiday",
+        "name": "劳动节"
+      },
+      {
+        "date": "2026-05-09",
+        "kind": "workday",
+        "name": "劳动节"
+      },
+      {
+        "date": "2026-06-19",
+        "kind": "holiday",
+        "name": "端午节"
+      },
+      {
+        "date": "2026-06-20",
+        "kind": "holiday",
+        "name": "端午节"
+      },
+      {
+        "date": "2026-06-21",
+        "kind": "holiday",
+        "name": "端午节"
+      },
+      {
+        "date": "2026-09-20",
+        "kind": "workday",
+        "name": "国庆节"
+      },
+      {
+        "date": "2026-09-25",
+        "kind": "holiday",
+        "name": "中秋节"
+      },
+      {
+        "date": "2026-09-26",
+        "kind": "holiday",
+        "name": "中秋节"
+      },
+      {
+        "date": "2026-09-27",
+        "kind": "holiday",
+        "name": "中秋节"
+      },
+      {
+        "date": "2026-10-01",
+        "kind": "holiday",
+        "name": "国庆节"
+      },
+      {
+        "date": "2026-10-02",
+        "kind": "holiday",
+        "name": "国庆节"
+      },
+      {
+        "date": "2026-10-03",
+        "kind": "holiday",
+        "name": "国庆节"
+      },
+      {
+        "date": "2026-10-04",
+        "kind": "holiday",
+        "name": "国庆节"
+      },
+      {
+        "date": "2026-10-05",
+        "kind": "holiday",
+        "name": "国庆节"
+      },
+      {
+        "date": "2026-10-06",
+        "kind": "holiday",
+        "name": "国庆节"
+      },
+      {
+        "date": "2026-10-07",
+        "kind": "holiday",
+        "name": "国庆节"
+      },
+      {
+        "date": "2026-10-10",
+        "kind": "workday",
+        "name": "国庆节"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "oneshot-future",
+      "description": "明天 7 点叫我起床",
+      "now": "2026-10-13T22:00:00+08:00",
+      "alarm": {
+        "schedule": {
+          "kind": "oneShot",
+          "at": "2026-10-14T07:00:00+08:00",
+          "timeZone": "Asia/Shanghai"
+        },
+        "holidayPolicy": "none",
+        "region": "CN"
+      },
+      "limit": 5,
+      "expected": [
+        "2026-10-14T07:00:00+08:00"
+      ],
+      "total": 1
+    },
+    {
+      "name": "oneshot-past",
+      "description": "a one-shot whose time has passed rings no more",
+      "now": "2026-10-13T08:00:00+08:00",
+      "alarm": {
+        "schedule": {
+          "kind": "oneShot",
+          "at": "2026-10-13T07:00:00+08:00",
+          "timeZone": "Asia/Shanghai"
+        },
+        "holidayPolicy": "none",
+        "region": "CN"
+      },
+      "limit": 5,
+      "expected": [],
+      "total": 0
+    },
+    {
+      "name": "oneshot-now",
+      "description": "a ring exactly at now is not in the future",
+      "now": "2026-10-13T07:00:00+08:00",
+      "alarm": {
+        "schedule": {
+          "kind": "oneShot",
+          "at": "2026-10-13T07:00:00+08:00",
+          "timeZone": "Asia/Shanghai"
+        },
+        "holidayPolicy": "none",
+        "region": "CN"
+      },
+      "limit": 5,
+      "expected": [],
+      "total": 0
+    },
+    {
+      "name": "oneshot-ignores-policy",
+      "description": "holiday policies do not apply to one-shots (2026-10-01 is 国庆节)",
+      "now": "2026-09-30T12:00:00+08:00",
+      "alarm": {
+        "schedule": {
+          "kind": "oneShot",
+          "at": "2026-10-01T07:00:00+08:00",
+          "timeZone": "Asia/Shanghai"
+        },
+        "holidayPolicy": "workdayOnly",
+        "region": "CN"
+      },
+      "limit": 5,
+      "expected": [
+        "2026-10-01T07:00:00+08:00"
+      ],
+      "total": 1
+    },
+    {
+      "name": "disabled",
+      "description": "a disabled alarm never rings",
+      "now": "2026-10-13T06:00:00+08:00",
+      "alarm": {
+        "schedule": {
+          "kind": "recurring",
+          "anchor": "2026-10-13",
+          "timeZone": "Asia/Shanghai",
+          "recurrence": {
+            "interval": 1,
+            "freq": "daily"
+          },
+          "time": "07:00"
+        },
+        "holidayPolicy": "none",
+        "region": "CN",
+        "enabled": false
+      },
+      "limit": 5,
+      "expected": [],
+      "total": 0
+    },
+    {
+      "name": "daily",
+      "description": "每天 7 点",
+      "now": "2026-10-13T06:00:00+08:00",
+      "alarm": {
+        "schedule": {
+          "kind": "recurring",
+          "anchor": "2026-10-13",
+          "timeZone": "Asia/Shanghai",
+          "recurrence": {
+            "interval": 1,
+            "freq": "daily"
+          },
+          "time": "07:00"
+        },
+        "holidayPolicy": "none",
+        "region": "CN"
+      },
+      "limit": 5,
+      "expected": [
+        "2026-10-13T07:00:00+08:00",
+        "2026-10-14T07:00:00+08:00",
+        "2026-10-15T07:00:00+08:00",
+        "2026-10-16T07:00:00+08:00",
+        "2026-10-17T07:00:00+08:00"
+      ],
+      "total": 181
+    },
+    {
+      "name": "daily-today-passed",
+      "description": "today's time has passed, so tomorrow first",
+      "now": "2026-10-13T08:00:00+08:00",
+      "alarm": {
+        "schedule": {
+          "kind": "recurring",
+          "anchor": "2026-10-13",
+          "timeZone": "Asia/Shanghai",
+          "recurrence": {
+            "interval": 1,
+            "freq": "daily"
+          },
+          "time": "07:00"
+        },
+        "holidayPolicy": "none",
+        "region": "CN"
+      },
+      "limit": 5,
+      "expected": [
+        "2026-10-14T07:00:00+08:00",
+        "2026-10-15T07:00:00+08:00",
+        "2026-10-16T07:00:00+08:00",
+        "2026-10-17T07:00:00+08:00",
+        "2026-10-18T07:00:00+08:00"
+      ],
+      "total": 180
+    },
+    {
+      "name": "daily-future-anchor",
+      "description": "nothing rings before the anchor day",
+      "now": "2026-10-13T06:00:00+08:00",
+      "alarm": {
+        "schedule": {
+          "kind": "recurring",
+          "anchor": "2026-10-20",
+          "timeZone": "Asia/Shanghai",
+          "recurrence": {
+            "interval": 1,
+            "freq": "daily"
+          },
+          "time": "07:00"
+        },
+        "holidayPolicy": "none",
+        "region": "CN"
+      },
+      "limit": 5,
+      "expected": [
+        "2026-10-20T07:00:00+08:00",
+        "2026-10-21T07:00:00+08:00",
+        "2026-10-22T07:00:00+08:00",
+        "2026-10-23T07:00:00+08:00",
+        "2026-10-24T07:00:00+08:00"
+      ],
+      "total": 174
+    },
+    {
+      "name": "daily-every-other-day",
+      "description": "每隔一天 9 点: days counted from the anchor",
+      "now": "2026-10-13T12:00:00+08:00",
+      "alarm": {
+        "schedule": {
+          "kind": "recurring",
+          "anchor": "2026-10-02",
+          "timeZone": "Asia/Shanghai",
+          "recurrence": {
+            "interval": 2,
+            "freq": "daily"
+          },
+          "time": "09:00"
+        },
+        "holidayPolicy": "none",
+        "region": "CN"
+      },
+      "limit": 5,
+      "expected": [
+        "2026-10-14T09:00:00+08:00",
+        "2026-10-16T09:00:00+08:00",
+        "2026-10-18T09:00:00+08:00",
+        "2026-10-20T09:00:00+08:00",
+        "2026-10-22T09:00:00+08:00"
+      ],
+      "total": 90
+    },
+    {
+      "name": "daily-interval-3",
+      "description": "每 3 天: 10-01, 04, 07, 10, 13 (passed), 16 ...",
+      "now": "2026-10-13T12:00:00+08:00",
+      "alarm": {
+        "schedule": {
+          "kind": "recurring",
+          "anchor": "2026-10-01",
+          "timeZone": "Asia/Shanghai",
+          "recurrence": {
+            "interval": 3,
+            "freq": "daily"
+          },
+          "time": "09:00"
+        },
+        "holidayPolicy": "none",
+        "region": "CN"
+      },
+      "limit": 5,
+      "expected": [
+        "2026-10-16T09:00:00+08:00",
+        "2026-10-19T09:00:00+08:00",
+        "2026-10-22T09:00:00+08:00",
+        "2026-10-25T09:00:00+08:00",
+        "2026-10-28T09:00:00+08:00"
+      ],
+      "total": 60
+    },
+    {
+      "name": "daily-bytime",
+      "description": "每天早中晚 08:00 12:00 18:00",
+      "now": "2026-10-13T11:00:00+08:00",
+      "alarm": {
+        "schedule": {
+          "kind": "recurring",
+          "anchor": "2026-10-13",
+          "timeZone": "Asia/Shanghai",
+          "recurrence": {
+            "interval": 1,
+            "freq": "daily",
+            "byTime": [
+              "08:00",
+              "12:00",
+              "18:00"
+            ]
+          }
+        },
+        "holidayPolicy": "none",
+        "region": "CN"
+      },
+      "limit": 5,
+      "expected": [
+        "2026-10-13T12:00:00+08:00",
+        "2026-10-13T18:00:00+08:00",
+        "2026-10-14T08:00:00+08:00",
+        "2026-10-14T12:00:00+08:00",
+        "2026-10-14T18:00:00+08:00"
+      ],
+      "total": 200
+    },
+    {
+      "name": "daily-until",
+      "description": "每晚 9 点, until 10-15 (inclusive)",
+      "now": "2026-10-13T12:00:00+08:00",
+      "alarm": {
+        "schedule": {
+          "kind": "recurring",
+          "anchor": "2026-10-13",
+          "timeZone": "Asia/Shanghai",
+          "recurrence": {
+            "interval": 1,
+            "freq": "daily",
+            "until": "2026-10-15"
+          },
+          "time": "21:00"
+        },
+        "holidayPolicy": "none",
+        "region": "CN"
+      },
+      "limit": 5,
+      "expected": [
+        "2026-10-13T21:00:00+08:00",
+        "2026-10-14T21:00:00+08:00",
+        "2026-10-15T21:00:00+08:00"
+      ],
+      "total": 3
+    },
+    {
+      "name": "daily-count",
+      "description": "count 5 from 10-10: 10-10, 11, 12 have rung, two are left",
+      "now": "2026-10-12T08:00:00+08:00",
+      "alarm": {
+        "schedule": {
+          "kind": "recurring",
+          "anchor": "2026-10-10",
+          "timeZone": "Asia/Shanghai",
+          "recurrence": {
+            "interval": 1,
+            "freq": "daily",
+            "count": 5
+          },
+          "time": "07:00"
+        },
+        "holidayPolicy": "none",
+        "region": "CN"
+      },
+      "limit": 5,
+      "expected": [
+        "2026-10-13T07:00:00+08:00",
+        "2026-10-14T07:00:00+08:00"
+      ],
+      "total": 2
+    },
+    {
+      "name": "workday-national-day",
+      "description": "工作日 7 点 over 国庆: 10-01..07 off, Sat 10-10 is a 调休 workday",
+      "now": "2026-09-28T08:00:00+08:00",
+      "alarm": {
+        "schedule": {
+          "kind": "recurring",
+          "anchor": "2026-09-25",
+          "timeZone": "Asia/Shanghai",
+          "recurrence": {
+            "interval": 1,
+            "freq": "daily"
+          },
+          "time": "07:00"
+        },
+        "holidayPolicy": "workdayOnly",
+        "region": "CN"
+      },
+      "limit": 5,
+      "expected": [
+        "2026-09-29T07:00:00+08:00",
+        "2026-09-30T07:00:00+08:00",
+        "2026-10-08T07:00:00+08:00",
+        "2026-10-09T07:00:00+08:00",
+        "2026-10-10T07:00:00+08:00"
+      ],
+      "total": 125
+    },
+    {
+      "name": "workday-makeup-sunday",
+      "description": "Sun 09-20 is a 调休 workday; Fri 09-25 is 中秋",
+      "now": "2026-09-18T08:00:00+08:00",
+      "alarm": {
+        "schedule": {
+          "kind": "recurring",
+          "anchor": "2026-09-01",
+          "timeZone": "Asia/Shanghai",
+          "recurrence": {
+            "interval": 1,
+            "freq": "daily"
+          },
+          "time": "07:00"
+        },
+        "holidayPolicy": "workdayOnly",
+        "region": "CN"
+      },
+      "limit": 5,
+      "expected": [
+        "2026-09-20T07:00:00+08:00",
+        "2026-09-21T07:00:00+08:00",
+        "2026-09-22T07:00:00+08:00",
+        "2026-09-23T07:00:00+08:00",
+        "2026-09-24T07:00:00+08:00"
+      ],
+      "total": 124
+    },
+    {
+      "name": "follow-statutory",
+      "description": "followStatutory rings on the same days as workdayOnly",
+      "now": "2026-09-28T08:00:00+08:00",
+      "alarm": {
+        "schedule": {
+          "kind": "recurring",
+          "anchor": "2026-09-25",
+          "timeZone": "Asia/Shanghai",
+          "recurrence": {
+            "interval": 1,
+            "freq": "daily"
+          },
+          "time": "07:00"
+        },
+        "holidayPolicy": "followStatutory",
+        "region": "CN"
+      },
+      "limit": 5,
+      "expected": [
+        "2026-09-29T07:00:00+08:00",
+        "2026-09-30T07:00:00+08:00",
+        "2026-10-08T07:00:00+08:00",
+        "2026-10-09T07:00:00+08:00",
+        "2026-10-10T07:00:00+08:00"
+      ],
+      "total": 125
+    },
+    {
+      "name": "skip-holiday",
+      "description": "节假日不响: 10-01..07 skipped, weekends still ring",
+      "now": "2026-09-30T09:00:00+08:00",
+      "alarm": {
+        "schedule": {
+          "kind": "recurring",
+          "anchor": "2026-09-01",
+          "timeZone": "Asia/Shanghai",
+          "recurrence": {
+            "interval": 1,
+            "freq": "daily"
+          },
+          "time": "08:00"
+        },
+        "holidayPolicy": "skipHoliday",
+        "region": "CN"
+      },
+      "limit": 5,
+      "expected": [
+        "2026-10-08T08:00:00+08:00",
+        "2026-10-09T08:00:00+08:00",
+        "2026-10-10T08:00:00+08:00",
+        "2026-10-11T08:00:00+08:00",
+        "2026-10-12T08:00:00+08:00"
+      ],
+      "total": 173
+    },
+    {
+      "name": "workday-no-region",
+      "description": "outside CN a workday is Monday to Friday, holidays or not",
+      "now": "2026-09-28T08:00:00+08:00",
+      "alarm": {
+        "schedule": {
+          "kind": "recurring",
+          "anchor": "2026-09-25",
+          "timeZone": "Asia/Shanghai",
+          "recurrence": {
+            "interval": 1,
+            "freq": "daily"
+          },
+          "time": "07:00"
+        },
+        "holidayPolicy": "workdayOnly",
+        "region": ""
+      },
+      "limit": 5,
+      "expected": [
+        "2026-09-29T07:00:00+08:00",
+        "2026-09-30T07:00:00+08:00",
+        "2026-10-01T07:00:00+08:00",
+        "2026-10-02T07:00:00+08:00",
+        "2026-10-05T07:00:00+08:00"
+      ],
+      "total": 129
+    },
+    {
+      "name": "skip-holiday-no-region",
+      "description": "outside CN there is no holiday data: rings as usual",
+      "now": "2026-09-30T09:00:00+08:00",
+      "alarm": {
+        "schedule": {
+          "kind": "recurring",
+          "anchor": "2026-09-01",
+          "timeZone": "Asia/Shanghai",
+          "recurrence": {
+            "interval": 1,
+            "freq": "daily"
+          },
+          "time": "08:00"
+        },
+        "holidayPolicy": "skipHoliday",
+        "region": ""
+      },
+      "limit": 5,
+      "expected": [
+        "2026-10-01T08:00:00+08:00",
+        "2026-10-02T08:00:00+08:00",
+        "2026-10-03T08:00:00+08:00",
+        "2026-10-04T08:00:00+08:00",
+        "2026-10-05T08:00:00+08:00"
+      ],
+      "total": 180
+    },
+    {
+      "name": "workday-beyond-data",
+      "description": "years without data (2027 here) are ordinary: Mon-Fri work",
+      "now": "2026-12-31T08:00:00+08:00",
+      "alarm": {
+        "schedule": {
+          "kind": "recurring",
+          "anchor": "2026-12-01",
+          "timeZone": "Asia/Shanghai",
+          "recurrence": {
+            "interval": 1,
+            "freq": "daily"
+          },
+          "time": "07:00"
+        },
+        "holidayPolicy": "workdayOnly",
+        "region": "CN"
+      },
+      "limit": 5,
+      "expected": [
+        "2027-01-01T07:00:00+08:00",
+        "2027-01-04T07:00:00+08:00",
+        "2027-01-05T07:00:00+08:00",
+        "2027-01-06T07:00:00+08:00",
+        "2027-01-07T07:00:00+08:00"
+      ],
+      "total": 128
+    },
+    {
+      "name": "weekly-biweekly",
+      "description": "每隔一周的周一 15:15 接三宝",
+      "now": "2026-10-13T10:00:00+08:00",
+      "alarm": {
+        "schedule": {
+          "kind": "recurring",
+          "anchor": "2026-10-12",
+          "timeZone": "Asia/Shanghai",
+          "recurrence": {
+            "interval": 2,
+            "freq": "weekly",
+            "byDay": [
+              "MON"
+            ]
+          },
+          "time": "15:15"
+        },
+        "holidayPolicy": "none",
+        "region": "CN"
+      },
+      "limit": 5,
+      "expected": [
+        "2026-10-26T15:15:00+08:00",
+        "2026-11-09T15:15:00+08:00",
+        "2026-11-23T15:15:00+08:00",
+        "2026-12-07T15:15:00+08:00",
+        "2026-12-21T15:15:00+08:00"
+      ],
+      "total": 12
+    },
+    {
+      "name": "weekly-biweekly-midweek-anchor",
+      "description": "weeks count from the Monday of the anchor's week; Mon 10-12 is before the anchor",
+      "now": "2026-10-13T10:00:00+08:00",
+      "alarm": {
+        "schedule": {
+          "kind": "recurring",
+          "anchor": "2026-10-14",
+          "timeZone": "Asia/Shanghai",
+          "recurrence": {
+            "interval": 2,
+            "freq": "weekly",
+            "byDay": [
+              "MON",
+              "THU"
+            ]
+          },
+          "time": "15:15"
+        },
+        "holidayPolicy": "none",
+        "region": "CN"
+      },
+      "limit": 5,
+      "expected": [
+        "2026-10-15T15:15:00+08:00",
+        "2026-10-26T15:15:00+08:00",
+        "2026-10-29T15:15:00+08:00",
+        "2026-11-09T15:15:00+08:00",
+        "2026-11-12T15:15:00+08:00"
+      ],
+      "total": 25
+    },
+    {
+      "name": "weekly-weekend",
+      "description": "周六日早上十点",
+      "now": "2026-10-13T12:00:00+08:00",
+      "alarm": {
+        "schedule": {
+          "kind": "recurring",
+          "anchor": "2026-10-13",
+          "timeZone": "Asia/Shanghai",
+          "recurrence": {
+            "interval": 1,
+            "freq": "weekly",
+            "byDay": [
+              "SAT",
+              "SUN"
+            ]
+          },
+          "time": "10:00"
+        },
+        "holidayPolicy": "none",
+        "region": "CN"
+      },
+      "limit": 5,
+      "expected": [
+        "2026-10-17T10:00:00+08:00",
+        "2026-10-18T10:00:00+08:00",
+        "2026-10-24T10:00:00+08:00",
+        "2026-10-25T10:00:00+08:00",
+        "2026-10-31T10:00:00+08:00"
+      ],
+      "total": 52
+    },
+    {
+      "name": "weekly-skip-holiday",
+      "description": "每周四 19:00, 节假日不响: Thu 10-01 is 国庆",
+      "now": "2026-09-24T20:00:00+08:00",
+      "alarm": {
+        "schedule": {
+          "kind": "recurring",
+          "anchor": "2026-09-01",
+          "timeZone": "Asia/Shanghai",
+          "recurrence": {
+            "interval": 1,
+            "freq": "weekly",
+            "byDay": [
+              "THU"
+            ]
+          },
+          "time": "19:00"
+        },
+        "holidayPolicy": "skipHoliday",
+        "region": "CN"
+      },
+      "limit": 5,
+      "expected": [
+        "2026-10-08T19:00:00+08:00",
+        "2026-10-15T19:00:00+08:00",
+        "2026-10-22T19:00:00+08:00",
+        "2026-10-29T19:00:00+08:00",
+        "2026-11-05T19:00:00+08:00"
+      ],
+      "total": 24
+    },
+    {
+      "name": "weekly-makeup-saturday",
+      "description": "Saturdays that are 调休 workdays only: just 10-10 is left in 2026",
+      "now": "2026-09-01T00:00:00+08:00",
+      "alarm": {
+        "schedule": {
+          "kind": "recurring",
+          "anchor": "2026-09-01",
+          "timeZone": "Asia/Shanghai",
+          "recurrence": {
+            "interval": 1,
+            "freq": "weekly",
+            "byDay": [
+              "SAT"
+            ]
+          },
+          "time": "09:00"
+        },
+        "holidayPolicy": "workdayOnly",
+        "region": "CN"
+      },
+      "limit": 5,
+      "expected": [
+        "2026-10-10T09:00:00+08:00"
+      ],
+      "total": 1
+    },
+    {
+      "name": "monthly-15th",
+      "description": "每月 15 号 9 点",
+      "now": "2026-10-13T10:00:00+08:00",
+      "alarm": {
+        "schedule": {
+          "kind": "recurring",
+          "anchor": "2026-10-13",
+          "timeZone": "Asia/Shanghai",
+          "recurrence": {
+            "interval": 1,
+            "freq": "monthly",
+            "byMonthDay": 15
+          },
+          "time": "09:00"
+        },
+        "holidayPolicy": "none",
+        "region": "CN"
+      },
+      "limit": 5,
+      "expected": [
+        "2026-10-15T09:00:00+08:00",
+        "2026-11-15T09:00:00+08:00",
+        "2026-12-15T09:00:00+08:00",
+        "2027-01-15T09:00:00+08:00",
+        "2027-02-15T09:00:00+08:00"
+      ],
+      "total": 6
+    },
+    {
+      "name": "monthly-31st",
+      "description": "months without a 31st are skipped; 2027-03-31 is past the 180-day window (ends 2027-03-30)",
+      "now": "2026-10-01T00:00:00+08:00",
+      "alarm": {
+        "schedule": {
+          "kind": "recurring",
+          "anchor": "2026-10-01",
+          "timeZone": "Asia/Shanghai",
+          "recurrence": {
+            "interval": 1,
+            "freq": "monthly",
+            "byMonthDay": 31
+          },
+          "time": "09:00"
+        },
+        "holidayPolicy": "none",
+        "region": "CN"
+      },
+      "limit": 5,
+      "expected": [
+        "2026-10-31T09:00:00+08:00",
+        "2026-12-31T09:00:00+08:00",
+        "2027-01-31T09:00:00+08:00"
+      ],
+      "total": 3
+    },
+    {
+      "name": "monthly-every-2",
+      "description": "every other month on the 15th, counted from the anchor's month",
+      "now": "2026-10-13T10:00:00+08:00",
+      "alarm": {
+        "schedule": {
+          "kind": "recurring",
+          "anchor": "2026-10-13",
+          "timeZone": "Asia/Shanghai",
+          "recurrence": {
+            "interval": 2,
+            "freq": "monthly",
+            "byMonthDay": 15
+          },
+          "time": "09:00"
+        },
+        "holidayPolicy": "none",
+        "region": "CN"
+      },
+      "limit": 5,
+      "expected": [
+        "2026-10-15T09:00:00+08:00",
+        "2026-12-15T09:00:00+08:00",
+        "2027-02-15T09:00:00+08:00"
+      ],
+      "total": 3
+    },
+    {
+      "name": "minutely-window",
+      "description": "今天 9 点到 10 点每 15 分钟",
+      "now": "2026-10-13T09:20:00+08:00",
+      "alarm": {
+        "schedule": {
+          "kind": "recurring",
+          "anchor": "2026-10-13",
+          "timeZone": "Asia/Shanghai",
+          "recurrence": {
+            "interval": 15,
+            "freq": "minutely",
+            "endTime": "10:00"
+          },
+          "time": "09:00"
+        },
+        "holidayPolicy": "none",
+        "region": "CN"
+      },
+      "limit": 5,
+      "expected": [
+        "2026-10-13T09:30:00+08:00",
+        "2026-10-13T09:45:00+08:00",
+        "2026-10-13T10:00:00+08:00"
+      ],
+      "total": 3
+    },
+    {
+      "name": "hourly-default-end",
+      "description": "每小时 from 18:00; no endTime means 22:00 (inclusive), anchor day only",
+      "now": "2026-10-13T08:00:00+08:00",
+      "alarm": {
+        "schedule": {
+          "kind": "recurring",
+          "anchor": "2026-10-13",
+          "timeZone": "Asia/Shanghai",
+          "recurrence": {
+            "interval": 1,
+            "freq": "hourly"
+          },
+          "time": "18:00"
+        },
+        "holidayPolicy": "none",
+        "region": "CN"
+      },
+      "limit": 10,
+      "expected": [
+        "2026-10-13T18:00:00+08:00",
+        "2026-10-13T19:00:00+08:00",
+        "2026-10-13T20:00:00+08:00",
+        "2026-10-13T21:00:00+08:00",
+        "2026-10-13T22:00:00+08:00"
+      ],
+      "total": 5
+    },
+    {
+      "name": "hourly-days-until-workday",
+      "description": "工作日 9-18 点每 4 小时 until 10-09: the window repeats each day, holidays skipped",
+      "now": "2026-09-30T14:00:00+08:00",
+      "alarm": {
+        "schedule": {
+          "kind": "recurring",
+          "anchor": "2026-09-30",
+          "timeZone": "Asia/Shanghai",
+          "recurrence": {
+            "interval": 4,
+            "freq": "hourly",
+            "endTime": "18:00",
+            "until": "2026-10-09"
+          },
+          "time": "09:00"
+        },
+        "holidayPolicy": "workdayOnly",
+        "region": "CN"
+      },
+      "limit": 10,
+      "expected": [
+        "2026-09-30T17:00:00+08:00",
+        "2026-10-08T09:00:00+08:00",
+        "2026-10-08T13:00:00+08:00",
+        "2026-10-08T17:00:00+08:00",
+        "2026-10-09T09:00:00+08:00",
+        "2026-10-09T13:00:00+08:00",
+        "2026-10-09T17:00:00+08:00"
+      ],
+      "total": 7
+    },
+    {
+      "name": "hourly-expired",
+      "description": "a minutely/hourly alarm without until or count ends with its anchor day",
+      "now": "2026-10-13T08:00:00+08:00",
+      "alarm": {
+        "schedule": {
+          "kind": "recurring",
+          "anchor": "2026-10-12",
+          "timeZone": "Asia/Shanghai",
+          "recurrence": {
+            "interval": 1,
+            "freq": "hourly"
+          },
+          "time": "09:00"
+        },
+        "holidayPolicy": "none",
+        "region": "CN"
+      },
+      "limit": 5,
+      "expected": [],
+      "total": 0
+    },
+    {
+      "name": "minutely-cap",
+      "description": "every minute 08:00-22:00 is 841 rings; one expansion stops at 200",
+      "now": "2026-10-13T07:00:00+08:00",
+      "alarm": {
+        "schedule": {
+          "kind": "recurring",
+          "anchor": "2026-10-13",
+          "timeZone": "Asia/Shanghai",
+          "recurrence": {
+            "interval": 1,
+            "freq": "minutely"
+          },
+          "time": "08:00"
+        },
+        "holidayPolicy": "none",
+        "region": "CN"
+      },
+      "limit": 5,
+      "expected": [
+        "2026-10-13T08:00:00+08:00",
+        "2026-10-13T08:01:00+08:00",
+        "2026-10-13T08:02:00+08:00",
+        "2026-10-13T08:03:00+08:00",
+        "2026-10-13T08:04:00+08:00"
+      ],
+      "total": 200
+    },
+    {
+      "name": "count-counts-rings",
+      "description": "count counts rings that happen: holidays skipped do not use it up",
+      "now": "2026-10-01T00:00:00+08:00",
+      "alarm": {
+        "schedule": {
+          "kind": "recurring",
+          "anchor": "2026-10-01",
+          "timeZone": "Asia/Shanghai",
+          "recurrence": {
+            "interval": 1,
+            "freq": "daily",
+            "count": 3
+          },
+          "time": "07:00"
+        },
+        "holidayPolicy": "workdayOnly",
+        "region": "CN"
+      },
+      "limit": 5,
+      "expected": [
+        "2026-10-08T07:00:00+08:00",
+        "2026-10-09T07:00:00+08:00",
+        "2026-10-10T07:00:00+08:00"
+      ],
+      "total": 3
+    },
+    {
+      "name": "other-zone-dst",
+      "description": "times are wall-clock in the alarm's zone, across a DST change (New York, 2026-11-01)",
+      "now": "2026-10-29T13:00:00Z",
+      "alarm": {
+        "schedule": {
+          "kind": "recurring",
+          "anchor": "2026-10-01",
+          "timeZone": "America/New_York",
+          "recurrence": {
+            "interval": 1,
+            "freq": "daily"
+          },
+          "time": "08:00"
+        },
+        "holidayPolicy": "none",
+        "region": ""
+      },
+      "limit": 5,
+      "expected": [
+        "2026-10-30T08:00:00-04:00",
+        "2026-10-31T08:00:00-04:00",
+        "2026-11-01T08:00:00-05:00",
+        "2026-11-02T08:00:00-05:00",
+        "2026-11-03T08:00:00-05:00"
+      ],
+      "total": 180
+    }
+  ]
+}

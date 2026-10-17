@@ -306,6 +306,9 @@ type noticePush struct {
 	unread func(id string) int
 	// done, when set, hears when a notice has been sent to every device.
 	done func()
+	// vendors picks the sender for an Android phone's provider
+	// (vendorSenderFor when nil). See push_vendor.go.
+	vendors func(provider string) vendorSender
 }
 
 // apnsNoticeSink is the subscriber that puts pushed notices on the phones.
@@ -356,6 +359,8 @@ func (np noticePush) deliver(ctx context.Context, alert apns.Alert, badge bool) 
 		log.Printf("notifications: no devices to push to: %v", err)
 		return
 	}
+	// Android phones first: their channels need no APNs client.
+	pushToVendors(ctx, store, "notifications", np.vendors, vendorAlert(alert))
 	// No phone, no client: a machine nobody paired a phone to never builds
 	// one, nor logs that it cannot.
 	if len(store.pushTargets()) == 0 {
@@ -375,6 +380,20 @@ func (np noticePush) deliver(ctx context.Context, alert apns.Alert, badge bool) 
 	pushToDevices(ctx, store, "notifications", func(ctx context.Context, t pushTarget) error {
 		return p.Alert(ctx, t.Token, t.Env, alert)
 	})
+}
+
+// vendorAlert is an APNs alert as a vendor channel carries it, on the
+// Android notification channel its kind belongs on.
+func vendorAlert(a apns.Alert) vendorPush {
+	ch := "general"
+	switch a.ThreadID {
+	case "approval":
+		ch = "approval"
+	case backend.KindReminder, backend.KindAlert:
+		ch = "reminder"
+	}
+	data, _ := a.Data.(map[string]any)
+	return vendorPush{Title: a.Title, Body: a.Body, Channel: ch, Data: data}
 }
 
 // alertFor is how a notice looks on the lock screen, by kind:

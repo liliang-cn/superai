@@ -98,6 +98,35 @@ func parseEventFilter(r *http.Request) eventFilter {
 	return f
 }
 
+// Heartbeat bounds for /api/events. A browser or a phone in front keeps the
+// default; a phone holding the stream open in the background (Android's
+// 保持连接) asks for fewer wake-ups with ?heartbeat=<seconds> or its alias
+// ?keepalive=<seconds>, which stays under the idle timeouts of mobile NATs and
+// proxies at the top of the range.
+const (
+	defaultHeartbeat = 25 * time.Second
+	minHeartbeat     = 10 * time.Second
+	maxHeartbeat     = 300 * time.Second
+)
+
+// heartbeatEvery reads ?heartbeat= (or ?keepalive=) <seconds>, clamped to the bounds; the
+// default when it is absent or not a number.
+func heartbeatEvery(r *http.Request) time.Duration {
+	q := r.URL.Query()
+	v := strings.TrimSpace(q.Get("heartbeat"))
+	if v == "" {
+		v = strings.TrimSpace(q.Get("keepalive"))
+	}
+	if v == "" {
+		return defaultHeartbeat
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil {
+		return defaultHeartbeat
+	}
+	return min(max(time.Duration(n)*time.Second, minHeartbeat), maxHeartbeat)
+}
+
 func newEventHub() *eventHub {
 	return &eventHub{subs: make(map[chan []byte]eventFilter)}
 }
@@ -151,7 +180,7 @@ func (h *eventHub) serveSSE(w http.ResponseWriter, r *http.Request) {
 	// frontend knows the stream is live before the first real event.
 	fmt.Fprint(w, ": connected\n\n")
 	fl.Flush()
-	keepalive := time.NewTicker(25 * time.Second)
+	keepalive := time.NewTicker(heartbeatEvery(r))
 	defer keepalive.Stop()
 	for {
 		select {
@@ -302,6 +331,8 @@ func newAPIMux(app *App, hub *eventHub, creds *credentials, handoff *handoffStor
 	handoffRoute(mux, creds, handoff)
 	mux.HandleFunc("/api/rpc/", func(w http.ResponseWriter, r *http.Request) { rpcCall(app, w, r) })
 	mux.HandleFunc("/api/events", hub.serveSSE)
+	// The sideloaded Android app's updates: latest.json and the APK it names.
+	androidRoutes(mux, androidReleaseDir)
 	// Speech. One sentence in, mp3 out. It is a route rather than an RPC
 	// method because the answer is bytes: the RPC surface marshals results as
 	// JSON, and base64 inside JSON would cost a third of the size and all of

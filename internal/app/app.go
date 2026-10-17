@@ -80,6 +80,8 @@ type App struct {
 	pushBuilt  bool
 	pushKey    string
 	pushV      alarmPusher
+	// Each year's holidays AlarmRings expanded with. See app_alarm_rings.go.
+	ringHolidays holidayCache
 
 	mu       sync.Mutex
 	svc      *backend.Service
