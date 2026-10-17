@@ -134,7 +134,9 @@ func (l *ccLocal) observe(ev *ccHookEvent, now time.Time) string {
 		l.sessions[ev.Session] = s
 	}
 	s.Seen = now
-	if ev.Cwd != "" {
+	// superai-cchook sends only the directory's last element; the full one
+	// comes with the session's other events.
+	if ev.Cwd != "" && (!ccActivityOnly[ev.Event] || s.Cwd == "") {
 		s.Cwd = ev.Cwd
 	}
 	if ev.TTY != "" {

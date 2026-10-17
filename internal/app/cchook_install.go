@@ -35,6 +35,10 @@ type ccHookSpec struct {
 	Matcher string // "" for none
 	Args    string // after `hook <Event>`
 	Timeout int    // seconds
+	// Slim is an event that fires on every prompt or tool call: it runs
+	// superai-cchook, the small binary beside superai, when there is one —
+	// starting all of SuperAI for it cost each tool call 50 ms or more.
+	Slim bool
 }
 
 // ccHookSpecs are SuperAI's hooks. The activity-only ones get a short
@@ -46,9 +50,38 @@ var ccHookSpecs = []ccHookSpec{
 	{Event: "StopFailure", Timeout: 5},
 	{Event: "Notification", Matcher: "permission_prompt|idle_prompt", Timeout: 5},
 	{Event: "PermissionRequest", Args: "--wait 100", Timeout: 120},
-	{Event: "UserPromptSubmit", Timeout: 2},
-	{Event: "PreToolUse", Matcher: "*", Timeout: 2},
-	{Event: "PostToolUse", Matcher: "*", Timeout: 2},
+	{Event: "UserPromptSubmit", Timeout: 2, Slim: true},
+	{Event: "PreToolUse", Matcher: "*", Timeout: 2, Slim: true},
+	{Event: "PostToolUse", Matcher: "*", Timeout: 2, Slim: true},
+}
+
+// ccSlimHookName is the small hook binary's name, beside superai
+// (cmd/superai-cchook).
+const ccSlimHookName = "superai-cchook"
+
+// slimHookRE finds `superai-cchook <Event>` in a hook command.
+var slimHookRE = regexp.MustCompile(`(?:^|[/\s'"])superai-cchook['"]?\s+([A-Za-z]+)`)
+
+// isOurSlimHook says whether a command is superai-cchook for event.
+func isOurSlimHook(command, event string) bool {
+	for _, m := range slimHookRE.FindAllStringSubmatch(command, -1) {
+		if m[1] == event {
+			return true
+		}
+	}
+	return false
+}
+
+// slimHookBeside is superai-cchook next to bin, or "" when it is not there.
+func slimHookBeside(bin string) string {
+	if bin == "" {
+		return ""
+	}
+	p := filepath.Join(filepath.Dir(bin), ccSlimHookName)
+	if st, err := os.Stat(p); err == nil && st.Mode().IsRegular() && st.Mode().Perm()&0o111 != 0 {
+		return p
+	}
+	return ""
 }
 
 // ourHookRE finds `superai hook <Event>` in a hook command, whatever the
@@ -74,8 +107,12 @@ func hookQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
-// ccHookCommand is the command line for one spec.
-func ccHookCommand(bin string, sp ccHookSpec) string {
+// ccHookCommand is the command line for one spec: superai-cchook for a
+// slim event when slim names it, else `superai hook`.
+func ccHookCommand(bin, slim string, sp ccHookSpec) string {
+	if sp.Slim && slim != "" {
+		return hookQuote(slim) + " " + sp.Event
+	}
 	cmd := hookQuote(bin) + " hook " + sp.Event
 	if sp.Args != "" {
 		cmd += " " + sp.Args
@@ -183,7 +220,14 @@ type ccHookCmd struct {
 // groupsHaveOurHook says whether an event's groups already run SuperAI's
 // hook for it.
 func groupsHaveOurHook(groups []json.RawMessage, event string) bool {
-	for _, g := range groups {
+	_, _, found := findOurHook(groups, event, isOurHook)
+	return found
+}
+
+// findOurHook finds the first group with a command is accepts for event, and
+// that command.
+func findOurHook(groups []json.RawMessage, event string, is func(cmd, event string) bool) (int, string, bool) {
+	for i, g := range groups {
 		var gr struct {
 			Hooks []struct {
 				Command string `json:"command"`
@@ -193,18 +237,21 @@ func groupsHaveOurHook(groups []json.RawMessage, event string) bool {
 			continue
 		}
 		for _, h := range gr.Hooks {
-			if isOurHook(h.Command, event) {
-				return true
+			if is(h.Command, event) {
+				return i, h.Command, true
 			}
 		}
 	}
-	return false
+	return -1, "", false
 }
 
 // mergeCCHooks adds the specs missing from a settings file's content and
-// returns the new content and the events added; the content is unchanged
-// when nothing was missing.
-func mergeCCHooks(content []byte, bin string, specs []ccHookSpec) ([]byte, []string, error) {
+// returns the new content and what changed, by event; the content is
+// unchanged when nothing did. With slim (superai-cchook's path) a slim
+// event's `superai hook` entry, as an older install wrote it, is moved to
+// slim in place: only that command string changes, nothing else in its
+// group or the file.
+func mergeCCHooks(content []byte, bin, slim string, specs []ccHookSpec) ([]byte, []string, error) {
 	if len(bytes.TrimSpace(content)) == 0 {
 		content = []byte("{}")
 	}
@@ -238,10 +285,23 @@ func mergeCCHooks(content []byte, bin string, specs []ccHookSpec) ([]byte, []str
 				}
 			}
 		}
-		if groupsHaveOurHook(groups, sp.Event) {
-			continue
+		change := sp.Event
+		if _, _, ok := findOurHook(groups, sp.Event, isOurSlimHook); ok {
+			continue // superai-cchook already, whichever binary is here now
 		}
-		groups = append(groups, marshalPlain(ccHookGroup{Matcher: sp.Matcher, Hooks: []ccHookCmd{{Type: "command", Command: ccHookCommand(bin, sp), Timeout: sp.Timeout}}}))
+		if gi, cmd, ok := findOurHook(groups, sp.Event, isOurHook); ok {
+			if !sp.Slim || slim == "" {
+				continue
+			}
+			moved := bytes.Replace(groups[gi], marshalPlain(cmd), marshalPlain(ccHookCommand(bin, slim, sp)), 1)
+			if bytes.Equal(moved, groups[gi]) {
+				continue // written some other way than ours; left as it is
+			}
+			groups[gi] = moved
+			change = sp.Event + " (now " + ccSlimHookName + ")"
+		} else {
+			groups = append(groups, marshalPlain(ccHookGroup{Matcher: sp.Matcher, Hooks: []ccHookCmd{{Type: "command", Command: ccHookCommand(bin, slim, sp), Timeout: sp.Timeout}}}))
+		}
 		parts := make([][]byte, len(groups))
 		for i, g := range groups {
 			parts[i] = g
@@ -253,7 +313,7 @@ func mergeCCHooks(content []byte, bin string, specs []ccHookSpec) ([]byte, []str
 		} else {
 			events[ei].Val = val
 		}
-		added = append(added, sp.Event)
+		added = append(added, change)
 	}
 	if len(added) == 0 {
 		return content, nil, nil
@@ -276,6 +336,11 @@ func mergeCCHooks(content []byte, bin string, specs []ccHookSpec) ([]byte, []str
 // creating it when there is none. It writes only when something was missing,
 // keeping the file as it was beside it first.
 func installCCHooks(path, bin string) ([]string, error) {
+	return installCCHooksWith(path, bin, slimHookBeside(bin))
+}
+
+// installCCHooksWith is installCCHooks with superai-cchook named (or "").
+func installCCHooksWith(path, bin, slim string) ([]string, error) {
 	if real, err := filepath.EvalSymlinks(path); err == nil {
 		path = real // a settings file kept in a dotfiles repo stays a link
 	}
@@ -291,7 +356,7 @@ func installCCHooks(path, bin string) ([]string, error) {
 	default:
 		return nil, err
 	}
-	next, added, err := mergeCCHooks(old, bin, ccHookSpecs)
+	next, added, err := mergeCCHooks(old, bin, slim, ccHookSpecs)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", path, err)
 	}
@@ -403,16 +468,21 @@ func autoUpgradeCCHooks() {
 	case err != nil:
 		log.Printf("cc relay: upgrading the Claude Code hooks in %s: %v", path, err)
 	case len(added) > 0:
-		log.Printf("cc relay: added Claude Code hooks %s to %s (new sessions pick them up)", strings.Join(added, ", "), path)
+		log.Printf("cc relay: Claude Code hooks %s set in %s (new sessions pick them up)", strings.Join(added, ", "), path)
 	}
 }
 
-// HookInstallMain is `superai hook install [-settings path] [-bin path]`.
+// HookInstallMain is `superai hook install [-settings path] [-bin path]
+// [-cchook path]`.
 func HookInstallMain(argv []string) {
 	fl := flag.NewFlagSet("hook install", flag.ExitOnError)
 	settings := fl.String("settings", claudeSettingsPath(), "Claude Code's settings file")
 	bin := fl.String("bin", hookBinary(), "the superai binary the hooks run")
+	slim := fl.String("cchook", "", "superai-cchook, for the prompt and tool events; default: the one beside -bin, if there is one")
 	_ = fl.Parse(argv)
+	if *slim == "" {
+		*slim = slimHookBeside(*bin)
+	}
 	if strings.TrimSpace(*bin) == "" {
 		fmt.Fprintln(os.Stderr, "superai hook install: say which binary the hooks run with -bin")
 		os.Exit(2)
@@ -421,7 +491,7 @@ func HookInstallMain(argv []string) {
 		fmt.Fprintln(os.Stderr, "superai hook install: no home directory; say where the settings are with -settings")
 		os.Exit(2)
 	}
-	added, err := installCCHooks(*settings, *bin)
+	added, err := installCCHooksWith(*settings, *bin, *slim)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "superai hook install:", err)
 		os.Exit(1)
@@ -430,5 +500,5 @@ func HookInstallMain(argv []string) {
 		fmt.Printf("%s already has every SuperAI hook\n", *settings)
 		return
 	}
-	fmt.Printf("added %s to %s; Claude Code sessions started from now on use them\n", strings.Join(added, ", "), *settings)
+	fmt.Printf("set %s in %s; Claude Code sessions started from now on use them\n", strings.Join(added, ", "), *settings)
 }

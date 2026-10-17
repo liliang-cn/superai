@@ -90,7 +90,7 @@ func commands(t *testing.T, settings map[string]any, event string) []string {
 }
 
 func TestInstallAddsOnlyWhatIsMissingAndKeepsEveryoneElses(t *testing.T) {
-	next, added, err := mergeCCHooks([]byte(otherToolsSettings), testBin, ccHookSpecs)
+	next, added, err := mergeCCHooks([]byte(otherToolsSettings), testBin, "", ccHookSpecs)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -129,19 +129,19 @@ func TestInstallAddsOnlyWhatIsMissingAndKeepsEveryoneElses(t *testing.T) {
 	}
 
 	// Again: nothing to do, the same bytes.
-	again, added, err := mergeCCHooks(next, testBin, ccHookSpecs)
+	again, added, err := mergeCCHooks(next, testBin, "", ccHookSpecs)
 	if err != nil || len(added) != 0 || string(again) != string(next) {
 		t.Fatalf("second install added %v (%v)", added, err)
 	}
 	// Another path to SuperAI is still SuperAI: not a second set.
-	if _, added, _ := mergeCCHooks(next, "/usr/local/bin/superai", ccHookSpecs); len(added) != 0 {
+	if _, added, _ := mergeCCHooks(next, "/usr/local/bin/superai", "", ccHookSpecs); len(added) != 0 {
 		t.Fatalf("a second binary added %v", added)
 	}
 }
 
 func TestInstallFromNothing(t *testing.T) {
 	for _, in := range []string{"", "{}", `{"hooks": null}`} {
-		next, added, err := mergeCCHooks([]byte(in), "/opt/super ai/superai", ccHookSpecs)
+		next, added, err := mergeCCHooks([]byte(in), "/opt/super ai/superai", "", ccHookSpecs)
 		if err != nil || len(added) != len(ccHookSpecs) {
 			t.Fatalf("%q: added %v (%v)", in, added, err)
 		}
@@ -150,10 +150,10 @@ func TestInstallFromNothing(t *testing.T) {
 			t.Fatalf("%q: %v", in, got)
 		}
 	}
-	if _, _, err := mergeCCHooks([]byte(`["not", "settings"]`), testBin, ccHookSpecs); err == nil {
+	if _, _, err := mergeCCHooks([]byte(`["not", "settings"]`), testBin, "", ccHookSpecs); err == nil {
 		t.Fatal("a list was taken for settings")
 	}
-	if _, _, err := mergeCCHooks([]byte(`{"hooks": {"Stop": {"oops": 1}}}`), testBin, ccHookSpecs); err == nil {
+	if _, _, err := mergeCCHooks([]byte(`{"hooks": {"Stop": {"oops": 1}}}`), testBin, "", ccHookSpecs); err == nil {
 		t.Fatal("a broken hooks entry was written over")
 	}
 }
