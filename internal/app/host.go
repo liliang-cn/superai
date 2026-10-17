@@ -46,6 +46,9 @@ type HostInfo struct {
 	// Claude is what the machine's interactive Claude Code sessions are
 	// doing, as core last heard (cchook_activity.go); core fills it in.
 	Claude *CCActivity `json:"claude,omitempty"`
+	// CLIActivity is every coding CLI running on it, by CLI, as core last
+	// heard (cli_activity.go); core fills it in.
+	CLIActivity map[string]CLIActivity `json:"cliActivity,omitempty"`
 }
 
 type HostMemory struct {

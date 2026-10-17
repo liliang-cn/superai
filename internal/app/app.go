@@ -36,6 +36,13 @@ type App struct {
 	// not linked to a core (cchook_activity.go); a linked agent's are on its
 	// agentConn.
 	ccSelfActivity atomic.Pointer[CCActivity]
+	// cliSelf is this machine's own other coding CLIs when it is not linked
+	// (cli_activity.go); cliSelfMu orders the writes.
+	cliSelfMu sync.Mutex
+	cliSelf   atomic.Pointer[cliMap]
+	// cliPoll, set by a test before the hook socket starts, replaces the
+	// process look's clock and ps (cli_procs.go).
+	cliPoll *cliPollConfig
 	// openTurns are the turns still running, by request id, as the session
 	// list shows them (ChatSessions).
 	openTurns sync.Map

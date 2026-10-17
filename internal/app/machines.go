@@ -59,11 +59,13 @@ func (a *App) MachineStatus(name string) (HostInfo, error) {
 		h, err := a.HostStatus()
 		h.Name = "core"
 		h.Claude = a.machineActivity("core")
+		h.CLIActivity = a.machineCLIs("core")
 		return h, err
 	}
 	var h HostInfo
 	err := a.onMachine(name, 30*time.Second, "HostStatus", []any{}, &h)
 	h.Claude = a.machineActivity(name)
+	h.CLIActivity = a.machineCLIs(name)
 	return h, err
 }
 

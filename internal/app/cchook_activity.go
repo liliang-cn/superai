@@ -32,6 +32,12 @@ const ccActivityEvent = "cc:activity"
 // permission prompt: the turn goes on. Not a hook; the machine's own.
 const ccPermissionAnswered = "PermissionAnswered"
 
+// Events only other CLIs' plugins send (cli_activity.go).
+const (
+	cliWorking   = "Working"   // a turn is running
+	cliWaitInput = "WaitInput" // it asked the person a question
+)
+
 // A session's state, as the hive shows it.
 const (
 	actWorking = "working" // a turn is running: thinking, or a tool
@@ -208,6 +214,14 @@ func (t *ccActivity) observe(ev ccHookEvent, now time.Time) bool {
 		s.inTool = true
 	case ccPermissionAnswered:
 		set(actWorking, "")
+	case cliWorking:
+		// Another CLI's plugin: the session is busy (a turn running), with
+		// nothing said about a prompt or a tool.
+		set(actWorking, "")
+	case cliWaitInput:
+		// Another CLI's plugin: it asked the person a question.
+		set(actWaiting, actWaitInput)
+		s.inTool = false
 	case "Notification":
 		switch ev.Kind {
 		case "permission_prompt":
@@ -483,6 +497,7 @@ func (a *App) noteCCActivity(c *agentConn, payloadJSON string) {
 		c.activity.Store(&act)
 	}
 	a.emit(ccActivityEvent, map[string]any{"agent": c.name(), "activity": activityOrNil(c.activity.Load())})
+	a.emitClaudeCLI(c.name(), c.activity.Load(), c.clis.Load())
 }
 
 // storeCCActivity keeps this machine's own snapshot (agent "") and tells the
@@ -499,6 +514,7 @@ func (a *App) storeCCActivity(agent string, act CCActivity) {
 		name = "core"
 	}
 	a.emit(ccActivityEvent, map[string]any{"agent": name, "activity": activityOrNil(a.ccSelfActivity.Load())})
+	a.emitClaudeCLI(name, a.ccSelfActivity.Load(), a.cliSelf.Load())
 }
 
 func activityOrNil(p *CCActivity) any {
