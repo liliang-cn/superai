@@ -244,7 +244,7 @@ func (a *App) wakeFor(m backend.HiveMessage) {
 		if !ready {
 			return // nothing here can run a turn; the inbox keeps it
 		}
-		wake = func(session, prompt string) { a.SendChat(session, prompt, nil) }
+		wake = func(session, prompt string) { a.sendChat(session, prompt, nil, true) }
 	}
 	session := HiveMailSessionPrefix + m.From
 	a.mailWakeMu.Lock()

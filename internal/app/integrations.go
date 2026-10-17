@@ -218,6 +218,26 @@ func (s *integrationStore) authenticate(tok string) (scope string, ok bool) {
 	return "", false
 }
 
+// holds reports whether tok is a live token of scope, without counting this
+// as a use of it.
+func (s *integrationStore) holds(tok, scope string) bool {
+	if tok == "" {
+		return false
+	}
+	h := hashToken(tok)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.reloadLocked() != nil {
+		return false
+	}
+	for _, t := range s.tokens {
+		if subtle.ConstantTimeCompare([]byte(t.TokenHash), []byte(h)) == 1 {
+			return t.Scope == scope
+		}
+	}
+	return false
+}
+
 func (s *integrationStore) list() ([]integrationToken, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

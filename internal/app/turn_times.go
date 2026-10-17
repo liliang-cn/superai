@@ -24,10 +24,22 @@ import (
 // A line names its ask by a hash of the text rather than by position: the
 // transcript can lose turns to compaction or gain ones the agent injected, and
 // a position would then point at the wrong message.
+//
+// The line also says who answered, when it was not SuperAI's own agent: the
+// queen engine's name, what that turn cost, and — for a turn SuperAI's agent
+// took because the engine could not — which engine it stood in for.
 type turnTime struct {
 	Hash      string    `json:"h"`
 	At        time.Time `json:"at"`
 	ElapsedMs int64     `json:"ms"`
+	turnBy
+}
+
+// turnBy is who answered a turn; the zero value is SuperAI's own agent.
+type turnBy struct {
+	Engine     string  `json:"e,omitempty"`
+	CostUSD    float64 `json:"c,omitempty"`
+	StoodInFor string  `json:"f,omitempty"`
 }
 
 var turnTimesMu sync.Mutex
@@ -45,7 +57,12 @@ func askHash(text string) string {
 // recordTurnTime notes one finished turn. Failing to write it loses a
 // timestamp, never the turn, so errors are dropped.
 func recordTurnTime(sessionID, ask string, at time.Time, elapsed time.Duration) {
-	line, err := json.Marshal(turnTime{Hash: askHash(ask), At: at.UTC(), ElapsedMs: elapsed.Milliseconds()})
+	recordTurnTimeBy(sessionID, ask, at, elapsed, turnBy{})
+}
+
+// recordTurnTimeBy is recordTurnTime with who answered.
+func recordTurnTimeBy(sessionID, ask string, at time.Time, elapsed time.Duration, by turnBy) {
+	line, err := json.Marshal(turnTime{Hash: askHash(ask), At: at.UTC(), ElapsedMs: elapsed.Milliseconds(), turnBy: by})
 	if err != nil {
 		return
 	}
@@ -112,6 +129,10 @@ func withTurnTimes(sessionID string, turns []backend.ChatTurn) []backend.ChatTur
 			if open != nil {
 				t.At = open.At.Add(time.Duration(open.ElapsedMs) * time.Millisecond).Format(time.RFC3339)
 				t.ElapsedMs = open.ElapsedMs
+				t.Engine, t.CostUSD = open.Engine, open.CostUSD
+				if open.StoodInFor != "" {
+					t.Content = standInNote(open.StoodInFor) + t.Content
+				}
 				open = nil
 			}
 		}

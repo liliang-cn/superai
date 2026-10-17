@@ -47,6 +47,13 @@ type App struct {
 	gateForMCP *backend.ToolGate
 	// delegations are superai_hive_delegate's runs (mcp_hive.go).
 	delegations delegationStore
+	// ownTurnFn and appendFn, when set, stand in for a turn with this app's
+	// model and for writing an exchange into its conversation; a test sets
+	// them. queenToken is the queen engine's /mcp token, minted on first use
+	// (app_queen_engine.go).
+	ownTurnFn  func(requestID, sessionID, message, standIn string)
+	appendFn   func(sessionID, question, answer string) error
+	queenToken queenTokenCache
 	// Direct MCP calls from chat-block buttons and home tiles. See
 	// app_actions.go.
 	actionsOnce sync.Once
@@ -450,6 +457,15 @@ func (a *App) SaveSettings(s backend.Settings) error {
 	if err := backend.ValidateQueenName(s.QueenName, s.QueenAliases); err != nil {
 		return err
 	}
+	a.mu.Lock()
+	prev := ""
+	if a.settings != nil {
+		prev = a.settings.Hive.QueenEngine
+	}
+	a.mu.Unlock()
+	if err := a.validQueenEngine(&s, prev); err != nil {
+		return err
+	}
 	if err := s.Save(); err != nil {
 		return err
 	}
@@ -838,7 +854,23 @@ func (a *App) GraphView() map[string]any {
 // under "requestId" — one conversation may have several asks in flight, and
 // without the tag the second ask's stream lands in the first one's bubble. An
 // empty string means nothing was started (the error event carries the reason).
+//
+// With a queen engine set (Settings → Hive), a person's turn here is thought
+// by that agent CLI instead of this app's model; see app_queen_engine.go.
 func (a *App) SendChat(sessionID, message string, imagePaths []string) string {
+	return a.sendChat(sessionID, message, imagePaths, false)
+}
+
+// SendCallChat is SendChat for a turn said in a voice call. SuperAI's own
+// agent answers it whatever the queen engine is: an engine takes seconds to
+// start, and a call cannot wait them out.
+func (a *App) SendCallChat(sessionID, message string, imagePaths []string) string {
+	return a.sendChat(sessionID, message, imagePaths, true)
+}
+
+// sendChat is SendChat; own keeps the turn with this app's model, never the
+// queen engine.
+func (a *App) sendChat(sessionID, message string, imagePaths []string, own bool) string {
 	requestID := uuid.NewString()
 
 	// A message addressed to another agent goes there instead, and this app's
@@ -858,6 +890,28 @@ func (a *App) SendChat(sessionID, message string, imagePaths []string) string {
 		return requestID
 	}
 
+	// The queen's engine, when one is set and this is a person talking to her.
+	// A conversation already answering keeps the rules below: an engine
+	// session takes one turn at a time.
+	if !own && !a.sessionBusy(sessionID) {
+		if engine := a.queenEngineFor(sessionID, imagePaths); engine != "" {
+			a.routeToEngine(requestID, sessionID, engine, message)
+			return requestID
+		}
+	}
+
+	a.ownTurn(requestID, sessionID, message, imagePaths, toQueen, "")
+	return requestID
+}
+
+// ownTurn runs a turn with this app's model. standIn names the queen engine
+// it answers for when that engine could not take the turn: the answer then
+// opens with a line saying so.
+func (a *App) ownTurn(requestID, sessionID, message string, imagePaths []string, toQueen bool, standIn string) {
+	if a.ownTurnFn != nil {
+		a.ownTurnFn(requestID, sessionID, message, standIn)
+		return
+	}
 	a.mu.Lock()
 	svc := a.svc
 	driver := a.avatar
@@ -875,7 +929,7 @@ func (a *App) SendChat(sessionID, message string, imagePaths []string) string {
 			"requestId": requestID,
 			"error":     "backend not ready: " + buildErr,
 		})
-		return requestID
+		return
 	}
 
 	// Asked again while the queen is still answering here: a free worker takes
@@ -885,7 +939,7 @@ func (a *App) SendChat(sessionID, message string, imagePaths []string) string {
 	if len(imagePaths) == 0 && !toQueen && a.sessionBusy(sessionID) {
 		if w := a.idleWorker(); w != "" {
 			a.routeToIdleWorker(requestID, sessionID, w, message)
-			return requestID
+			return
 		}
 	}
 
@@ -930,9 +984,14 @@ func (a *App) SendChat(sessionID, message string, imagePaths []string) string {
 		defer cancel()
 		defer a.untrackRun(requestID)
 		defer a.openTurns.Delete(requestID)
-		defer func() { recordTurnTime(sessionID, asked, askedAt, time.Since(askedAt)) }()
+		defer func() {
+			recordTurnTimeBy(sessionID, asked, askedAt, time.Since(askedAt), turnBy{StoodInFor: standIn})
+		}()
 
 		driver.Emit(backend.AvatarEvent{Type: "state", State: backend.AvatarStateThinking})
+		if standIn != "" {
+			a.emit("chat:event", map[string]any{"requestId": requestID, "type": "partial", "content": standInNote(standIn)})
+		}
 
 		pulser := backend.NewPulser(func(kind, tool string, n int) { board.Pulse(taskID, kind, tool, n) })
 		turn, err := svc.StreamTurn(ctx, sessionID, message, imagePaths, func(ev *agent.Event) {
@@ -1022,10 +1081,12 @@ func (a *App) SendChat(sessionID, message string, imagePaths []string) string {
 				"cache_write_tokens":   turn.Usage.CacheWriteTokens,
 			}
 		}
+		if standIn != "" {
+			done["final"] = standInNote(standIn) + reply
+			done["standInFor"] = standIn
+		}
 		a.emit("chat:done", done)
 	}()
-
-	return requestID
 }
 
 // chatRun is one streaming turn, as far as stopping it is concerned.
