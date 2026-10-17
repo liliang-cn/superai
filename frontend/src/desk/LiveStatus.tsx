@@ -22,11 +22,15 @@ export default function LiveStatus({ hive, now, agents, runs }: { hive: Hive; no
         {agents.map((a) => {
           const going = runs.filter((r) => r.remote === a.name && r.state === "running").length;
           const can = [...a.clis, ...(a.agents ?? []).map((x) => x.name)];
+          // Its terminal Claude Code sessions, beside SuperAI's own runs.
+          const cc = a.activity;
+          const term = cc?.working ? `claude: ${cc.working} session${cc.working > 1 ? "s" : ""} working` : cc?.waiting ? "claude: waiting for you" : "";
+          const what = [going ? `${going} coding run${going > 1 ? "s" : ""}` : "", term].filter(Boolean).join(" · ");
           return (
-            <div key={a.name} className={going ? "dk-st busy" : "dk-st"} title={`${a.host} · ${a.os}/${a.arch}${a.version ? " · " + a.version : ""}`}>
+            <div key={a.name} className={going || cc?.working ? "dk-st busy" : "dk-st"} title={`${a.host} · ${a.os}/${a.arch}${a.version ? " · " + a.version : ""}`}>
               <i />
               <b>{a.name}</b>
-              <span className="dk-st-what">{going ? `${going} coding run${going > 1 ? "s" : ""}` : can.length ? can.join(", ") : `${a.os}/${a.arch}, nothing to run yet`}</span>
+              <span className="dk-st-what">{what || (can.length ? can.join(", ") : `${a.os}/${a.arch}, nothing to run yet`)}</span>
               <em>{elapsed(a.connected, now.getTime())}</em>
             </div>
           );

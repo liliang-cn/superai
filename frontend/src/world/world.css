@@ -153,6 +153,10 @@
 .wi-list em { margin-left: auto; font-style: normal; font: 11px "Geist Mono", monospace; color: #5f6d77; }
 .wi-dot { width: 7px; height: 7px; border-radius: 50%; background: #b8c2cf; flex: none; }
 .wi-dot.running { background: #f2b416; } .wi-dot.done { background: #22a06b; } .wi-dot.failed { background: #e2553f; }
+.wi-dot.waiting { background: #2f6bff; }
+.wi-cc { display: flex; flex-direction: column; gap: 4px; }
+.wi-cc li { cursor: default; }
+.wi-cap { margin: 0; font: 600 10.5px "Geist Mono", monospace; letter-spacing: 0.04em; text-transform: uppercase; color: #5f6d77; }
 .wi-x { margin-left: auto; border: 0; background: #f1f4f8; border-radius: 6px; width: 22px; height: 22px; display: grid; place-items: center; cursor: pointer; }
 .wi-latest { background: #f6f8fa; border-radius: 8px; padding: 8px 9px; font-size: 12.5px; }
 .wi-latest em { font: 11px "Geist Mono", monospace; color: #5f6d77; font-style: normal; }

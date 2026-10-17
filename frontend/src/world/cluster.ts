@@ -5,7 +5,7 @@ import { INK, pose, robot, setState, type RobotState } from "./robots";
 import { forgetActor, registerActor } from "./bubbles";
 import { Packets, type Link } from "./packets";
 import { CSS2DObject } from "three/examples/jsm/renderers/CSS2DRenderer.js";
-import type { Bee, Hive, LinkedAgent } from "../canvas/data";
+import type { Bee, CCActivitySession, Hive, LinkedAgent } from "../canvas/data";
 import type { CodingRun } from "../canvas/tiles";
 import type { AttentionItem } from "../canvas/attention";
 import type { Member } from "../components/HiveMeter";
@@ -37,6 +37,15 @@ export interface WorldData {
 }
 
 const short = (n: string) => n.replace(/^superai-worker-/, "w").replace(/^superai-/, "");
+/** A tool as a screen line shows it: an MCP tool by its own name, not its server's. */
+const toolName = (t?: string) => (t && t.startsWith("mcp__") ? t.split("__").pop() || t : t || "");
+/** What a terminal Claude Code session is on, in one line: "superai: Bash". */
+export function sessionLine(s: CCActivitySession): string {
+  const what = s.state === "waiting"
+    ? (s.wait === "permission" ? translate("waiting for your OK") + (s.tool ? ` · ${toolName(s.tool)}` : "") : translate("waiting for you"))
+    : s.state === "working" ? toolName(s.tool) || translate("thinking") : translate("idle");
+  return `${s.project || "claude"}: ${what}`;
+}
 const clip = (s: string, n = 30) => { const t = s.replace(/\s+/g, " ").trim(); return t.length > n ? t.slice(0, n - 1) + "…" : t; };
 /** The queen's name over her robot, with the engine thinking for her when it is not SuperAI's own: "queen · Claude Code". */
 const queenLabel = (engine?: string) => (engine ? `${getQueenName().name} · ${engineLabel(engine)}` : getQueenName().name);
@@ -830,7 +839,14 @@ export const cluster: District<WorldData> = {
           // the ones people look for.
           const FIRST = ["claude", "codex", "pi", "openclaw", "gemini", "opencode", "hermes"];
           const rank = (n: string) => { const i = FIRST.indexOf(n); return i < 0 ? 99 : i; };
-          const who = [...(a.clis ?? []), ...(a.agents ?? []).map((n) => n.name)].sort((x, y) => rank(x) - rank(y)).slice(0, 5);
+          // The terminal Claude Code sessions people run on it: work that is
+          // not SuperAI's, done by the same claude.
+          const act = a.activity ?? null;
+          const ccWork = act?.working ?? 0, ccWait = act?.waiting ?? 0;
+          const ccOn = (act?.sessions ?? []).filter((s) => s.state !== "idle");
+          const names = [...(a.clis ?? []), ...(a.agents ?? []).map((n) => n.name)];
+          if (act?.sessions?.length && !names.includes("claude")) names.push("claude");
+          const who = names.sort((x, y) => rank(x) - rank(y)).slice(0, 5);
           for (const [n, c] of x.clis) if (!who.includes(n)) { c.label.remove(); g.remove(c.r); x.clis.delete(n); }
           who.forEach((n, k) => {
             let c = x!.clis.get(n);
@@ -856,18 +872,29 @@ export const cluster: District<WorldData> = {
             const runs = d.runs.filter((r) => (r.remote || "core") === a.name && (r.agent === n || r.agent.startsWith(n + ".")));
             const live = runs.filter((r) => r.state === "running");
             const delegated = run.filter((t) => t.worker === `${n}.${a.name}` || t.worker === n || t.worker.startsWith(n + "."));
-            const st: RobotState = asking.some((s) => s === `${n}.${a.name}` || s.startsWith(n + ".")) ? "wait"
-              : live.length || delegated.length ? "work" : runs[0]?.state === "failed" ? "fail" : "idle";
+            const asks = asking.some((s) => s === `${n}.${a.name}` || s.startsWith(n + "."));
+            const term = n === "claude" ? { work: ccWork, wait: ccWait } : { work: 0, wait: 0 };
+            const st: RobotState = asks ? "wait"
+              : live.length || delegated.length || term.work ? "work" : term.wait ? "wait" : runs[0]?.state === "failed" ? "fail" : "idle";
             setState(c.r, st);
-            c.label.set(n, st === "wait" ? "needs your OK" : live.length ? clip(live[0].prompt, 24) : delegated.length ? clip(delegated[0].prompt, 24) : st === "fail" ? "failed" : "idle",
-              st === "wait" ? "wait" : st === "work" ? "work" : st === "fail" ? "bad" : "idle");
+            const status = asks ? "needs your OK" : live.length ? clip(live[0].prompt, 24) : delegated.length ? clip(delegated[0].prompt, 24)
+              : term.work ? translate("{count} sessions working", { count: term.work }) : term.wait ? translate("waiting for you")
+              : st === "fail" ? "failed" : "idle";
+            c.label.set(n, status, st === "wait" ? "wait" : st === "work" ? "work" : st === "fail" ? "bad" : "idle");
           });
           const runsHere = d.runs.filter((r) => (r.remote || "core") === a.name);
           const liveHere = runsHere.filter((r) => r.state === "running");
           x.cable.setActive(liveHere.length > 0 || run.some((t) => route(t.worker)?.curve === x!.cable.curve));
-          setLight(x.dev, liveHere.length ? "busy" : "idle");
-          show((x.dev.userData.screens as Screen[])[0], a.name, liveHere.length ? `${liveHere.length} running` : `${who.length} agents ready`,
-            (liveHere.length ? liveHere : runsHere.slice(0, 4)).map((r) => `${r.agent}: ${r.prompt}`), liveHere.length > 0);
+          setLight(x.dev, liveHere.length || ccWork ? "busy" : "idle");
+          // The screen: SuperAI's runs, and the terminal sessions beside them,
+          // each by its project and the tool it is on.
+          const said = [
+            liveHere.length ? `${liveHere.length} running` : "",
+            ccWork ? `claude · ${translate("{count} sessions working", { count: ccWork })}` : ccWait ? `claude · ${translate("waiting for you")}` : "",
+          ].filter(Boolean);
+          show((x.dev.userData.screens as Screen[])[0], a.name, said.length ? said.join(" · ") : `${who.length} agents ready`,
+            [...ccOn.slice(0, 4).map(sessionLine), ...(liveHere.length ? liveHere : ccOn.length ? [] : runsHere.slice(0, 4)).map((r) => `${r.agent}: ${r.prompt}`)],
+            liveHere.length > 0 || ccWork > 0);
         });
 
         // Bees: one small robot each, circling while out, resting on the dais
