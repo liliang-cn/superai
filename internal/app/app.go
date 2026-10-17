@@ -104,6 +104,10 @@ type App struct {
 	selfPendingMu sync.Mutex
 	selfPending   map[string]any
 	runs          map[string]*chatRun
+	// turnQueue is the turns waiting, per conversation, for the one running in
+	// it; runFreed wakes them. Both under runMu. See turn_queue.go.
+	turnQueue map[string][]string
+	runFreed  chan struct{}
 
 	// wall narrates every long run into state a window can draw. It outlives
 	// a rebuild on purpose: a settings save must not erase the run wall.
@@ -893,24 +897,34 @@ func (a *App) sendChat(sessionID, message string, imagePaths []string, own bool)
 		return requestID
 	}
 
-	// The queen's engine, when one is set and this is a person talking to her.
-	// A conversation already answering keeps the rules below: an engine
-	// session takes one turn at a time.
-	if !own && !a.sessionBusy(sessionID) {
+	// Asked again while this conversation is still answering: the turn waits
+	// for that answer and then starts as it would have (see turn_queue.go).
+	// Never a worker: it has none of what the queen has.
+	start := func() { a.startTurn(requestID, sessionID, message, imagePaths, own) }
+	if !a.queueTurn(requestID, sessionID, start) {
+		start()
+	}
+	return requestID
+}
+
+// startTurn runs a turn in a conversation that is free: with the queen's
+// engine, when one is set and this is a person talking to her (an engine
+// session takes one turn at a time, which the queue in front of this keeps),
+// and with this app's model otherwise.
+func (a *App) startTurn(requestID, sessionID, message string, imagePaths []string, own bool) {
+	if !own {
 		if engine := a.queenEngineFor(sessionID, imagePaths); engine != "" {
 			a.routeToEngine(requestID, sessionID, engine, message)
-			return requestID
+			return
 		}
 	}
-
-	a.ownTurn(requestID, sessionID, message, imagePaths, toQueen, "")
-	return requestID
+	a.ownTurn(requestID, sessionID, message, imagePaths, "")
 }
 
 // ownTurn runs a turn with this app's model. standIn names the queen engine
 // it answers for when that engine could not take the turn: the answer then
 // opens with a line saying so.
-func (a *App) ownTurn(requestID, sessionID, message string, imagePaths []string, toQueen bool, standIn string) {
+func (a *App) ownTurn(requestID, sessionID, message string, imagePaths []string, standIn string) {
 	if a.ownTurnFn != nil {
 		a.ownTurnFn(requestID, sessionID, message, standIn)
 		return
@@ -933,17 +947,6 @@ func (a *App) ownTurn(requestID, sessionID, message string, imagePaths []string,
 			"error":     "backend not ready: " + buildErr,
 		})
 		return
-	}
-
-	// Asked again while the queen is still answering here: a free worker takes
-	// it (see busy_dispatch.go). Pictures stay with the queen; a worker is
-	// asked in words only.
-	// Addressed to her by name, it stays with her.
-	if len(imagePaths) == 0 && !toQueen && a.sessionBusy(sessionID) {
-		if w := a.idleWorker(); w != "" {
-			a.routeToIdleWorker(requestID, sessionID, w, message)
-			return
-		}
 	}
 
 	// Registered here rather than inside the goroutine: SendChat returns the id
@@ -1124,6 +1127,7 @@ func (a *App) untrackRun(requestID string) {
 	a.runMu.Lock()
 	defer a.runMu.Unlock()
 	delete(a.runs, requestID)
+	a.wakeQueueLocked()
 }
 
 // runSession records which conversation a tracked turn belongs to.
@@ -1155,6 +1159,11 @@ func (a *App) runningSessions() []string {
 func (a *App) sessionBusy(sessionID string) bool {
 	a.runMu.Lock()
 	defer a.runMu.Unlock()
+	return a.sessionBusyLocked(sessionID)
+}
+
+// sessionBusyLocked is sessionBusy with runMu held.
+func (a *App) sessionBusyLocked(sessionID string) bool {
 	for _, r := range a.runs {
 		if r.session == sessionID {
 			return true

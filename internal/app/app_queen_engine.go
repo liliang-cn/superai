@@ -215,7 +215,7 @@ func (a *App) routeToEngine(requestID, sessionID, engine, message string) {
 		}
 		a.emit("chat:event", map[string]any{"requestId": requestID, "type": "state_update",
 			"content": label + " could not take this turn (" + reason + "); SuperAI answers it"})
-		a.ownTurn(requestID, sessionID, message, nil, true, engine)
+		a.ownTurn(requestID, sessionID, message, nil, engine)
 	}
 
 	kit, err := a.queenKitFor(engine, &s)

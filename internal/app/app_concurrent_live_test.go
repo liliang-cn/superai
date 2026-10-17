@@ -16,8 +16,9 @@ import (
 // Two questions at once, end to end through App.
 //
 // The unit tests cover the tagging contract with a stub; this drives the real
-// SendChat against a provider that answers slowly, so the two asks genuinely
-// overlap, and checks what a UI would actually receive: two ids, two streams
+// SendChat against a provider that answers slowly, so the second ask is sent
+// while the first is running (it waits its turn in the conversation, see
+// turn_queue.go), and checks what a UI would actually receive: two ids, two streams
 // that never carry each other's text, one terminal event each, and progress
 // events for both while they run.
 
@@ -33,11 +34,12 @@ func (p *overlappingProvider) start(t *testing.T) string {
 			_, _ = io.WriteString(w, `{"object":"list","data":[{"id":"test-model"}]}`)
 			return
 		}
-		tag := "NONE"
+		// The latest question's tag: a second ask in one conversation waits for
+		// the first, and then carries the first in its history.
+		tag, at := "NONE", -1
 		for _, candidate := range []string{"ALPHA", "BRAVO"} {
-			if strings.Contains(string(body), candidate) {
-				tag = candidate
-				break
+			if i := strings.LastIndex(string(body), "请回答 "+candidate); i > at {
+				tag, at = candidate, i
 			}
 		}
 		time.Sleep(p.delay)
