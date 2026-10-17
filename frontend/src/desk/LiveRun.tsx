@@ -38,7 +38,8 @@ export function useRun(id: string): RunDetail | null {
     let alive = true;
     CLIRunDetail(id).then((r) => { if (alive) setRun(r as unknown as RunDetail); }).catch(() => {});
     const offEv = EventsOn("cli:event", (p: { run?: string; event?: RunEvent }) => {
-      if (p?.run !== id || !p.event) return;
+      // A queen run's text as it is written; the run keeps it whole.
+      if (p?.run !== id || !p.event || (p.event as { kind?: string }).kind === "delta") return;
       setRun((cur) => {
         if (!cur) return cur;
         const evs = cur.events ?? [];

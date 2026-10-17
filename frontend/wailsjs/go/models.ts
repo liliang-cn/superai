@@ -623,6 +623,7 @@ export namespace app {
 	    session?: string;
 	    ask: boolean;
 	    chat?: string;
+	    queen?: boolean;
 	    remote?: string;
 	    remoteRun?: string;
 	    state: string;
@@ -654,6 +655,7 @@ export namespace app {
 	        this.session = source["session"];
 	        this.ask = source["ask"];
 	        this.chat = source["chat"];
+	        this.queen = source["queen"];
 	        this.remote = source["remote"];
 	        this.remoteRun = source["remoteRun"];
 	        this.state = source["state"];
@@ -941,6 +943,7 @@ export namespace app {
 	export class IntegrationToken {
 	    id: string;
 	    name: string;
+	    scope: string;
 	    // Go type: time
 	    created_at: any;
 	    // Go type: time
@@ -954,6 +957,7 @@ export namespace app {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
 	        this.name = source["name"];
+	        this.scope = source["scope"];
 	        this.created_at = this.convertValues(source["created_at"], null);
 	        this.last_used = this.convertValues(source["last_used"], null);
 	    }
@@ -1070,6 +1074,7 @@ export namespace app {
 	export class NewIntegrationToken {
 	    id: string;
 	    name: string;
+	    scope: string;
 	    // Go type: time
 	    created_at: any;
 	    // Go type: time
@@ -1084,6 +1089,7 @@ export namespace app {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
 	        this.name = source["name"];
+	        this.scope = source["scope"];
 	        this.created_at = this.convertValues(source["created_at"], null);
 	        this.last_used = this.convertValues(source["last_used"], null);
 	        this.token = source["token"];
@@ -1237,6 +1243,66 @@ export namespace app {
 	        this.id = source["id"];
 	        this.duplicate = source["duplicate"];
 	    }
+	}
+	export class QueenKit {
+	    systemPrompt: string;
+	    servers: Record<string, any>;
+	    allowed?: string[];
+	    env?: Record<string, string>;
+	
+	    static createFrom(source: any = {}) {
+	        return new QueenKit(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.systemPrompt = source["systemPrompt"];
+	        this.servers = source["servers"];
+	        this.allowed = source["allowed"];
+	        this.env = source["env"];
+	    }
+	}
+	export class QueenRunRequest {
+	    agent: string;
+	    prompt: string;
+	    cwd?: string;
+	    model?: string;
+	    ask: boolean;
+	    session?: string;
+	    kit: QueenKit;
+	
+	    static createFrom(source: any = {}) {
+	        return new QueenRunRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.agent = source["agent"];
+	        this.prompt = source["prompt"];
+	        this.cwd = source["cwd"];
+	        this.model = source["model"];
+	        this.ask = source["ask"];
+	        this.session = source["session"];
+	        this.kit = this.convertValues(source["kit"], QueenKit);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class RemoteAgentStatus {
 	    name: string;
@@ -1520,6 +1586,8 @@ export namespace backend {
 	    steps?: string[];
 	    at?: string;
 	    elapsed_ms?: number;
+	    engine?: string;
+	    cost_usd?: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new ChatTurn(source);
@@ -1534,6 +1602,8 @@ export namespace backend {
 	        this.steps = source["steps"];
 	        this.at = source["at"];
 	        this.elapsed_ms = source["elapsed_ms"];
+	        this.engine = source["engine"];
+	        this.cost_usd = source["cost_usd"];
 	    }
 	}
 	export class Dashboard {
@@ -1777,6 +1847,9 @@ export namespace backend {
 	    max_concurrent_orders?: number;
 	    delegation?: string;
 	    delegate_timeout_seconds?: number;
+	    queen_engine?: string;
+	    queen_fallback?: boolean;
+	    public_url?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new HiveSettings(source);
@@ -1795,6 +1868,9 @@ export namespace backend {
 	        this.max_concurrent_orders = source["max_concurrent_orders"];
 	        this.delegation = source["delegation"];
 	        this.delegate_timeout_seconds = source["delegate_timeout_seconds"];
+	        this.queen_engine = source["queen_engine"];
+	        this.queen_fallback = source["queen_fallback"];
+	        this.public_url = source["public_url"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -2289,6 +2365,7 @@ export namespace backend {
 	    ms: number;
 	    task_id?: string;
 	    usage?: domain.TokenUsage;
+	    cancelled?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new RemoteResult(source);
@@ -2304,6 +2381,7 @@ export namespace backend {
 	        this.ms = source["ms"];
 	        this.task_id = source["task_id"];
 	        this.usage = this.convertValues(source["usage"], domain.TokenUsage);
+	        this.cancelled = source["cancelled"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

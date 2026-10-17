@@ -194,6 +194,8 @@ export function useChat(): UseChatResult {
         emotion?: string;
         error?: string;
         cancelled?: boolean;
+        engine?: string;
+        costUsd?: number;
       },
     ) => {
       running.current.delete(askId);
@@ -206,6 +208,8 @@ export function useChat(): UseChatResult {
         emotion: opts.emotion || m.emotion,
         error: opts.error || m.error,
         cancelled: opts.cancelled || m.cancelled,
+        engine: opts.engine || m.engine,
+        costUsd: opts.costUsd || m.costUsd,
         stopping: false,
         streaming: false,
         finishedAt: Date.now(),
@@ -239,6 +243,10 @@ function lintRetryLine(content: string | undefined): string {
 
   const applyEvent = useCallback(
     (askId: string, ev: ChatEvent) => {
+      if (ev.engine) {
+        const engine = ev.engine;
+        patchMessage(askId, (m) => (m.engine === engine ? m : { ...m, engine }));
+      }
       switch (ev.type) {
         case "partial": {
           if (!ev.content) return;
@@ -376,6 +384,8 @@ function lintRetryLine(content: string | undefined): string {
           finishAsk(askId, {
             final: item.payload?.final,
             emotion: item.payload?.emotion,
+            engine: item.payload?.engine,
+            costUsd: item.payload?.costUsd,
           });
           if (doneCb.current) doneCb.current();
           break;
@@ -613,6 +623,8 @@ function lintRetryLine(content: string | undefined): string {
                 ? ("interim" as const)
                 : undefined,
           emotion: t.emotion || undefined,
+          engine: t.engine || undefined,
+          costUsd: t.cost_usd || undefined,
           // The working, recovered from the scripts the transcript hid, so a
           // reopened conversation still shows what the agent did and not just
           // what it concluded. Same progress block as a live turn, already

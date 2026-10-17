@@ -106,6 +106,10 @@ export function CreateIntegrationToken(arg1) {
   return window['go']['app']['App']['CreateIntegrationToken'](arg1);
 }
 
+export function CreateQueenToken(arg1) {
+  return window['go']['app']['App']['CreateQueenToken'](arg1);
+}
+
 export function Dashboard() {
   return window['go']['app']['App']['Dashboard']();
 }
@@ -418,6 +422,10 @@ export function Pulse() {
   return window['go']['app']['App']['Pulse']();
 }
 
+export function QueenEngines() {
+  return window['go']['app']['App']['QueenEngines']();
+}
+
 export function QueenIdentity() {
   return window['go']['app']['App']['QueenIdentity']();
 }
@@ -522,6 +530,10 @@ export function SearchSkills(arg1) {
   return window['go']['app']['App']['SearchSkills'](arg1);
 }
 
+export function SendCallChat(arg1, arg2, arg3) {
+  return window['go']['app']['App']['SendCallChat'](arg1, arg2, arg3);
+}
+
 export function SendChat(arg1, arg2, arg3) {
   return window['go']['app']['App']['SendChat'](arg1, arg2, arg3);
 }
@@ -540,6 +552,10 @@ export function SetHomeLayout(arg1, arg2) {
 
 export function SetLocalHive(arg1, arg2, arg3) {
   return window['go']['app']['App']['SetLocalHive'](arg1, arg2, arg3);
+}
+
+export function SetQueenEngine(arg1, arg2) {
+  return window['go']['app']['App']['SetQueenEngine'](arg1, arg2);
 }
 
 export function SetQueenIdentity(arg1, arg2) {
@@ -576,6 +592,10 @@ export function StandingWakes(arg1) {
 
 export function StartCLIRun(arg1, arg2, arg3, arg4, arg5) {
   return window['go']['app']['App']['StartCLIRun'](arg1, arg2, arg3, arg4, arg5);
+}
+
+export function StartQueenCLIRun(arg1) {
+  return window['go']['app']['App']['StartQueenCLIRun'](arg1);
 }
 
 export function StartYoloMode() {

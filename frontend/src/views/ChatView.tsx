@@ -62,6 +62,7 @@ function bylineMeta(m: ChatMessage): string {
   }
   const tools = m.progress?.filter((p) => p.kind === "tool").length ?? 0;
   if (tools) bits.push(`${tools} tool${tools === 1 ? "" : "s"}`);
+  if (m.costUsd) bits.push(`$${m.costUsd.toFixed(3)}`);
   return bits.join(" · ");
 }
 
@@ -274,6 +275,7 @@ export default function ChatView({
                                 <MessageByline
                                   name="SuperAI"
                                   meta={bylineMeta(m)}
+                                  engine={m.engine}
                                 />
                                 {m.progress && m.progress.length > 0 && (
                                   <AgentProgress

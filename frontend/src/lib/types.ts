@@ -30,12 +30,17 @@ export interface ChatEvent {
   args: Record<string, any>;
   result: any;
   debugType: string;
+  /** The agent CLI thinking for the queen ("claude", "claude.mac"); absent for SuperAI's own agent. */
+  engine?: string;
 }
 
 export interface ChatDone {
   requestId: string;
   final: string;
   emotion: string;
+  engine?: string;
+  /** What the engine's turn cost, when its CLI said. */
+  costUsd?: number;
 }
 
 export interface ChatError {
@@ -112,6 +117,9 @@ export interface ChatMessage {
    */
   startedAt?: number;
   finishedAt?: number;
+  /** Who thought for the queen in this answer, when it was not SuperAI's own agent. */
+  engine?: string;
+  costUsd?: number;
 }
 
 export interface TraceItem {
