@@ -307,6 +307,21 @@ var codeFetchFragments = []string{"install_", "add_mcp_server"}
 // deleteFragments name the calls whose effect survives saying "undo it".
 var deleteFragments = []string{"delete", "remove", "destroy"}
 
+// alwaysAsked are the calls that change the cluster rather than this
+// process, which no fragment above names: a command or a service on a
+// machine, letting a worker go mid-order, stopping an order. Asked about
+// whoever makes them, the queen's own run or an agent over /mcp.
+func alwaysAsked(name string, args map[string]any) bool {
+	switch name {
+	case "machine_act", "hive_task_cancel":
+		return true
+	case "hive_retire":
+		force, _ := args["force"].(bool)
+		return force
+	}
+	return false
+}
+
 func toolNeedsApproval(req agent.PermissionRequest) bool {
 	// The tool registry's own read-only flag wins: a call that cannot change
 	// anything has nothing to approve, and asking about it is pure noise.
@@ -316,6 +331,9 @@ func toolNeedsApproval(req agent.PermissionRequest) bool {
 	name := strings.ToLower(strings.TrimSpace(req.ToolName))
 	if name == "" {
 		return false
+	}
+	if alwaysAsked(name, req.ToolArgs) {
+		return true
 	}
 	for _, group := range [][]string{shellFragments, codeFetchFragments, deleteFragments} {
 		for _, frag := range group {
@@ -519,6 +537,9 @@ func approvalCommand(tool string, args map[string]any) string {
 	if c := delegatedCommand(tool, args); c != "" {
 		return c
 	}
+	if c := machineCommand(tool, args); c != "" {
+		return c
+	}
 	return commandOf(tool, args)
 }
 
@@ -540,6 +561,25 @@ func commandOf(tool string, args map[string]any) string {
 		}
 	}
 	return ""
+}
+
+// machineCommand is what machine_act is about to do, and where: the command
+// for exec, the service action otherwise, so the card names the machine.
+func machineCommand(tool string, args map[string]any) string {
+	if tool != "machine_act" || args == nil {
+		return ""
+	}
+	machine, _ := args["machine"].(string)
+	if strings.TrimSpace(machine) == "" {
+		machine = "core"
+	}
+	action, _ := args["action"].(string)
+	if action == "exec" {
+		cmd, _ := args["command"].(string)
+		return cmd + "   on " + machine
+	}
+	svc, _ := args["service"].(string)
+	return action + " " + svc + "   on " + machine
 }
 
 // delegatedCommand renders what cli_agent_run is about to hand to another

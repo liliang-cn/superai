@@ -2,6 +2,8 @@ package backend
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -105,7 +107,16 @@ type TaskBoard struct {
 	tasks   []*HiveTask
 	emit    func(HiveTask)
 	pulseFn func(HivePulse)
+	// stops are how the running tasks this instance can stop are stopped, by
+	// id: an order it gave (the run's context) or one it is carrying out (the
+	// turn). Dropped when the task settles.
+	stops map[string]func()
 }
+
+// ErrTaskStopped is the cause a task's context carries when it was stopped by
+// request, which is how a delegation tells "stop this" from "this worker
+// failed" and does not hand the piece to someone else.
+var ErrTaskStopped = errors.New("the order was stopped on request")
 
 // NewTaskBoard builds a board; emit is called with a copy after every change,
 // outside the lock.
@@ -225,6 +236,7 @@ func (b *TaskBoard) Progress(id, phase, tool string) {
 // and then reports done a moment later stays cancelled.
 func (b *TaskBoard) Finish(id, state, result, errMsg string) {
 	b.update(id, func(t *HiveTask) bool {
+		delete(b.stops, id)
 		if t.State != TaskRunning {
 			return false
 		}
@@ -309,6 +321,67 @@ func (b *TaskBoard) Get(id string) (HiveTask, bool) {
 		}
 	}
 	return HiveTask{}, false
+}
+
+// OnStop says how a running task is stopped. Only the instance running the
+// order (or giving it) can stop it, so a task reported from elsewhere has none.
+func (b *TaskBoard) OnStop(id string, stop func()) {
+	if b == nil || id == "" || stop == nil {
+		return
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	for _, t := range b.tasks {
+		if t.ID == id && t.State == TaskRunning {
+			if b.stops == nil {
+				b.stops = map[string]func(){}
+			}
+			b.stops[id] = stop
+			return
+		}
+	}
+}
+
+// Stoppable says whether Stop would stop the task.
+func (b *TaskBoard) Stoppable(id string) bool {
+	if b == nil {
+		return false
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.stops[id] != nil
+}
+
+// Stop stops a running task, or says why it cannot. The task settles as
+// cancelled through its own Finish, once whatever ran it has stopped.
+func (b *TaskBoard) Stop(id string) error {
+	if b == nil {
+		return errors.New("there is no task board here")
+	}
+	b.mu.Lock()
+	var found *HiveTask
+	for _, t := range b.tasks {
+		if t.ID == id {
+			found = t
+			break
+		}
+	}
+	stop := b.stops[id]
+	state := ""
+	if found != nil {
+		state = found.State
+	}
+	b.mu.Unlock()
+	switch {
+	case found == nil:
+		return errors.New("no such task here: only recent orders are kept, and not across a restart")
+	case state != TaskRunning:
+		return fmt.Errorf("the task already ended: %s", state)
+	case stop == nil:
+		return errors.New("this instance neither gave nor is carrying out that order, so it cannot stop it")
+	}
+	stop()
+	return nil
 }
 
 // note appends a step to the timeline, keeping the newest when it is full.

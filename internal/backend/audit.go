@@ -150,6 +150,10 @@ var assignedSecretRe = regexp.MustCompile(`(?i)\b([A-Za-z_][A-Za-z0-9_]*(?:passw
 const redacted = "[redacted]"
 
 // summarizeArgs renders a tool call as one redacted, truncated line.
+// SummarizeArgs is a call's arguments in one line, with secrets redacted, as
+// the audit log writes them.
+func SummarizeArgs(tool string, args map[string]any) string { return summarizeArgs(tool, args) }
+
 func summarizeArgs(tool string, args map[string]any) string {
 	if cmd := commandOf(tool, args); cmd != "" {
 		return clipRunes(assignedSecretRe.ReplaceAllString(cmd, "$1="+redacted), summaryLimit)

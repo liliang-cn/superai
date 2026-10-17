@@ -381,3 +381,20 @@ func TestAWorkersToolsAndApprovalsReachTheQueen(t *testing.T) {
 		t.Fatalf("events %+v", events)
 	}
 }
+
+// A piece whose order was stopped on request is not given to another worker or
+// to the queen: stopping it is the answer.
+func TestAStoppedPieceIsNotHandedOn(t *testing.T) {
+	f := &fakeEnv{workers: []string{"w1", "w2"}}
+	f.answer = func(ctx context.Context, worker, prompt string) (RemoteResult, error) {
+		return RemoteResult{Failed: true, Cancelled: true, Reason: ErrTaskStopped.Error(), TaskID: "t-" + worker}, nil
+	}
+	res := RunDelegated(context.Background(), f.env(), []DelegateTask{{Task: "x"}})
+	r := res[0]
+	if !r.Failed || r.Fallback || r.Worker != "w1" || r.TaskID != "t-w1" || r.Reason != ErrTaskStopped.Error() {
+		t.Fatalf("%+v", r)
+	}
+	if len(f.asked) != 1 || len(f.self) != 0 {
+		t.Fatalf("handed on: asked %v, self %v", f.asked, f.self)
+	}
+}
