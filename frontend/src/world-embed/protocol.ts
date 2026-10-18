@@ -1,4 +1,5 @@
 import type { WorldData } from "../world/cluster";
+import type { HAService, Host } from "../canvas/data";
 
 // The embed's side of its conversation with a native host (the Android app).
 // Everything is a JSON object with a "type"; strings are parsed, objects are
@@ -92,5 +93,12 @@ export function normalize(d: Partial<WorldData> | undefined): WorldData {
     knowledge: num(x.knowledge),
     meter: { total, members },
     busy: !!x.busy,
+    // Hosts.hosts / HiveTopology: left out by a host that does not send
+    // them, and then the hive is drawn the old way.
+    hosts: Array.isArray(x.hosts) ? x.hosts.filter((h) => h && typeof h.id === "string")
+      .map((h) => ({ ...h, name: str(h.name) || h.id, kind: str(h.kind) as Host["kind"], state: (str(h.state) || "configured") as Host["state"],
+        agents: arr<Host["agents"][number]>(h.agents).filter((a) => a && typeof a.name === "string").map((a) => ({ ...a, kind: a.kind, state: str(a.state) })) })) : undefined,
+    services: arr<HAService>(x.services).filter((s) => s && typeof s.name === "string")
+      .map((s) => ({ ...s, provider: str(s.provider), state: str(s.state), units: arr<string>(s.units), standbys: arr<HAService["standbys"][number]>(s.standbys) })),
   };
 }

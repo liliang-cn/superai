@@ -1,11 +1,12 @@
 import * as THREE from "three";
 import type { District, DistrictCtx, Label } from "./engine";
 import { FIN, beam, box, contact, cyl, hash01, mat, ownMat, projector, rbox, screen, smooth } from "./kit";
-import { INK, pose, robot, setState, type RobotState } from "./robots";
+import { INK, ghost, pose, robot, setState, type RobotState } from "./robots";
 import { forgetActor, registerActor } from "./bubbles";
 import { Packets, type Link } from "./packets";
 import { CSS2DObject } from "three/examples/jsm/renderers/CSS2DRenderer.js";
-import type { Bee, CCActivity, CCActivitySession, CLIActivity, Hive, LinkedAgent, RelayAgent } from "../canvas/data";
+import type { Bee, CCActivity, CCActivitySession, CLIActivity, HAService, Hive, HiveTask, Host, HostAgent, LinkedAgent, RelayAgent } from "../canvas/data";
+import { SLAB_TOP, cliName, floorLink, forgetLines, isStandby, kindLabel, planHosts, pod, serviceMarker, setLinesNight, setServiceState, slab, type HostPlan, type Plot } from "./hosts";
 import type { CodingRun } from "../canvas/tiles";
 import type { AttentionItem } from "../canvas/attention";
 import type { Member } from "../components/HiveMeter";
@@ -34,6 +35,11 @@ export interface WorldData {
   knowledge: number;
   meter: { total: Member; members: Member[] };
   busy: boolean;
+  /** The hosts the hive runs on, each with what runs on it. Absent on a core
+   *  from before hosts: the hive is drawn from the roster and the links. */
+  hosts?: Host[] | null;
+  /** The HA services that move between hosts. */
+  services?: HAService[];
 }
 
 const short = (n: string) => n.replace(/^superai-worker-/, "w").replace(/^superai-/, "");
@@ -594,6 +600,23 @@ export const cluster: District<WorldData> = {
     // pad of their own. Not a machine: no desk, no machine card.
     const relays = new Map<string, { pad: THREE.Group; label: Label; cable: ReturnType<typeof cable>; at: THREE.Vector3; bots: Map<string, { r: THREE.Group; label: Label }> }>();
 
+    // ── Hosts: when the core lists them, each box is a plot of its own with
+    // its pods and agents on it (hosts.ts plans where), and the maps above
+    // hold what stands on the plots, so orders and tokens find them.
+    const hostLayer = new THREE.Group();
+    g.add(hostLayer);
+    ctx.night(setLinesNight);
+    let hostSig = "";
+    let hostMode = false;
+    let plan: HostPlan | null = null;
+    let hostLabels: Label[] = [];
+    let actors: string[] = [];
+    // Robots that are not at a desk or on a pad: HA standbys (ghosts), and the
+    // CLIs on the core's own host, on the dais.
+    const extras = new Map<string, { r: THREE.Group; label: Label; a: HostAgent; host: Host }>();
+    const plotViews = new Map<string, { p: Plot; label: Label; cable: ReturnType<typeof cable>; dev?: THREE.Group; crew: Map<string, HostAgent> }>();
+    const serviceViews = new Map<string, { m: THREE.Group; label: Label; svc: HAService }>();
+
     const coreAt = new THREE.Vector3(0, 0, -2.2);
     const cables = new THREE.Group();
     g.add(cables);
@@ -717,6 +740,8 @@ export const cluster: District<WorldData> = {
       for (const w of workers.values()) pose(w.r, t, ctx.reduced);
       for (const m of machines.values()) for (const c of m.clis.values()) pose(c.r, t, ctx.reduced);
       for (const x of relays.values()) for (const b of x.bots.values()) pose(b.r, t, ctx.reduced);
+      for (const x of extras.values()) pose(x.r, t, ctx.reduced);
+      for (const x of serviceViews.values()) if (!ctx.reduced) { const gem = x.m.userData.gem as THREE.Object3D; gem.rotation.y = t * 0.9; gem.position.y = 2.6 + Math.sin(t * 1.5) * 0.1; }
       for (const b of bees.values()) {
         pose(b.r, t, ctx.reduced);
         if (b.mode === "orbit" && !ctx.reduced) {
@@ -765,239 +790,545 @@ export const cluster: District<WorldData> = {
       if (w.to) ctx.spark(w.to.getWorldPosition(new THREE.Vector3()).setY(2.6), c);
     };
 
+    /** Takes down everything standing for a member, machine, relay or host,
+     *  for a switch between the two ways of drawing the hive or a new plan. */
+    const clearCrew = () => {
+      const drop = (c: ReturnType<typeof cable>) => { cables.remove(c.tube); c.tube.userData.dispose?.(); };
+      for (const x of nodes.values()) { x.label.remove(); x.box.removeFromParent(); drop(x.cable); }
+      nodes.clear();
+      for (const [n, w] of workers) { w.label.remove(); w.r.removeFromParent(); forgetActor("worker:" + n); }
+      workers.clear();
+      for (const x of machines.values()) { x.label.remove(); x.clis.forEach((c) => { c.label.remove(); c.r.removeFromParent(); }); x.dev.removeFromParent(); drop(x.cable); }
+      machines.clear();
+      for (const [h, x] of relays) { x.label.remove(); x.bots.forEach((b, n) => { b.label.remove(); b.r.removeFromParent(); forgetActor(`agent:${n}.${h}`); }); x.pad.removeFromParent(); drop(x.cable); }
+      relays.clear();
+      for (const x of extras.values()) { x.label.remove(); x.r.removeFromParent(); }
+      extras.clear();
+      for (const x of plotViews.values()) { x.label.remove(); drop(x.cable); }
+      plotViews.clear();
+      for (const x of serviceViews.values()) x.label.remove();
+      serviceViews.clear();
+      hostLabels.forEach((l) => l.remove());
+      hostLabels = [];
+      actors.forEach(forgetActor);
+      actors = [];
+      forgetLines(hostLayer);
+      hostLayer.clear();
+      plan = null;
+    };
+    /** Where the line from a plot's centre toward `to` leaves it. */
+    const edgeOf = (p: Plot, to: THREE.Vector3, pad = 0.3) => {
+      const dir = to.clone().sub(p.at).setY(0);
+      if (dir.lengthSq() < 1e-6) return p.at.clone();
+      dir.normalize();
+      const t = Math.min(Math.abs(dir.x) > 1e-6 ? (p.w / 2) / Math.abs(dir.x) : Infinity, Math.abs(dir.z) > 1e-6 ? (p.d / 2) / Math.abs(dir.z) : Infinity);
+      return p.at.clone().addScaledVector(dir, t + pad);
+    };
+    const trim = (n: string) => TRIMS[Math.floor(hash01(n) * TRIMS.length)];
+    const actor = (key: string, r: THREE.Object3D) => { registerActor(key, r); actors.push(key); };
+
+    /** Builds the plots, pods, stations and services for a new plan. */
+    const buildHosts = (pl: HostPlan) => {
+      plan = pl;
+      hostBounds = pl.bounds;
+      // HA services, first so a service is found by its marker before its
+      // ghosts: a marker with the service IP out past its hosts, a
+      // solid line to where it runs and dashed ones to where it can go.
+      for (const sp of pl.services) {
+        const m = serviceMarker();
+        m.position.copy(sp.at);
+        hostLayer.add(m);
+        ctx.pickable(m, { kind: "service", id: sp.svc.name, title: sp.svc.name });
+        if (sp.active) hostLayer.add(floorLink(sp.at, edgeOf(sp.active, sp.at), "active"));
+        for (const b of sp.standbys) hostLayer.add(floorLink(sp.at, edgeOf(b.plot, sp.at), b.ready ? "standby" : "unready"));
+        serviceViews.set(sp.svc.name, { m, label: ctx.label(m, sp.svc.name, "", 3.6), svc: sp.svc });
+      }
+
+      for (const p of pl.plots) {
+        const grp = new THREE.Group();
+        grp.position.copy(p.at);
+        hostLayer.add(grp);
+        const sl = slab(p.w, p.d, p.host.state);
+        grp.add(sl);
+        ctx.pickable(sl, { kind: "host", id: p.host.id, title: p.host.name });
+        // Its name and kind at the front edge, on the floor.
+        const plate = new THREE.Object3D();
+        plate.position.set(0, 0.3, p.d / 2 + 0.4);
+        grp.add(plate);
+        const label = ctx.label(plate, `${p.host.name} · ${translate(kindLabel(p.host.kind))}`, "", 0);
+        const c = cable(coreAt, edgeOf(p, new THREE.Vector3()), hash01(p.host.id));
+        c.setOk(p.host.state === "live");
+        cables.add(c.tube);
+        nodes.set(p.host.id, { box: grp, label, cable: c, at: p.at });
+        const crew = new Map<string, HostAgent>();
+        const clis = new Map<string, { r: THREE.Group; label: Label }>();
+        let dev: THREE.Group | undefined;
+        if (p.station) {
+          dev = p.station === "pad" ? relayPad() : workstation(p.station === "laptop" ? "laptop" : "desktop");
+          if (p.small) dev.scale.setScalar(0.75);
+          const at = new THREE.Vector3(p.cols.station, SLAB_TOP, p.station === "pad" ? 0 : p.small ? -1 : -1.9);
+          dev.position.copy(at);
+          grp.add(dev);
+          ctx.pickable(dev, { kind: "host", id: p.host.id, title: p.host.name });
+          p.crew.forEach((a, k) => {
+            const n = a.kind === "cli" ? cliName(a) : a.name;
+            const r = robot("cli", trim(n));
+            grp.add(r);
+            const via = a.via || p.via;
+            ctx.pickable(r, { kind: a.kind === "cli" ? "cli" : "agent", id: `${n}.${via}`, title: `${n} · ${p.host.name}` });
+            let pos: THREE.Vector3, face: THREE.Vector3;
+            if (p.station === "pad") {
+              // In a ring on the pad, facing out.
+              const ang = (k / Math.max(1, p.crew.length)) * Math.PI * 2 + Math.PI / 2;
+              pos = new THREE.Vector3(Math.cos(ang) * 2.1, 0.22, Math.sin(ang) * 2.1).add(at);
+              face = pos.clone().sub(at).multiplyScalar(2).add(at);
+            } else {
+              // In a row before the desk, turned to its screen.
+              const spread = Math.min(2.4, 4.8 / Math.max(1, p.crew.length - 1));
+              const ang = (k - (p.crew.length - 1) / 2) * spread * 0.32;
+              pos = new THREE.Vector3(Math.sin(ang) * 4.2, 0, 2.6 + Math.cos(ang) * 1.4).add(at);
+              face = at.clone().add(new THREE.Vector3(0, 0, -0.6));
+              r.userData.desk = true;
+            }
+            r.position.copy(pos);
+            r.userData.base = pos.y;
+            r.rotation.y = Math.atan2(face.x - pos.x, face.z - pos.z);
+            clis.set(n, { r, label: ctx.label(r, n, "", k % 2 ? 2.9 : 2.1) });
+            crew.set(n, a);
+            actor((a.kind === "cli" ? "cli:" : "agent:") + `${n}.${via}`, r);
+            if (a.kind !== "cli") actor("agent:" + n, r);
+          });
+        }
+        // Its pods, each with its SuperAI standing inside.
+        p.pods.forEach((h, i) => {
+          const pd = pod(h.state);
+          pd.position.set(p.cols.pods[i], SLAB_TOP, p.station && !p.small ? 1.2 : 0.2);
+          grp.add(pd);
+          ctx.pickable(pd, { kind: "host", id: h.id, title: h.name });
+          const sup = h.agents.filter((a) => a.kind === "superai").slice(0, 2);
+          sup.forEach((a, k) => {
+            const r = robot("worker");
+            r.position.set(pd.position.x + (sup.length > 1 ? (k - 0.5) * 1.3 : 0), SLAB_TOP + 0.2, pd.position.z);
+            r.userData.base = r.position.y;
+            grp.add(r);
+            ctx.pickable(r, { kind: "worker", id: a.name, title: a.name });
+            workers.set(a.name, { r, label: ctx.label(r, short(a.name), "", 2.4), node: p.host.id });
+            actor("worker:" + a.name, r);
+          });
+        });
+        // What stands on the plot itself.
+        p.loose.forEach((a, k) => {
+          const x = p.cols.loose + k * 2.4;
+          const z = p.station ? 1.6 : 0.4;
+          if (a.kind === "superai") {
+            const r = robot("worker");
+            r.position.set(x, SLAB_TOP, z);
+            r.userData.base = SLAB_TOP;
+            grp.add(r);
+            ctx.pickable(r, { kind: "worker", id: a.name, title: a.name });
+            workers.set(a.name, { r, label: ctx.label(r, short(a.name), "", 2.4), node: p.host.id });
+            actor("worker:" + a.name, r);
+            return;
+          }
+          const n = a.kind === "cli" ? cliName(a) : a.name;
+          const r = robot("cli", trim(n));
+          r.position.set(x, SLAB_TOP, z);
+          r.userData.base = SLAB_TOP;
+          grp.add(r);
+          if (isStandby(a)) {
+            // Where an HA service would move to: its agent as a ghost.
+            ghost(r, a.state === "standby-unready");
+            ctx.pickable(r, { kind: "service", id: a.service || a.name, title: a.service || a.name });
+            extras.set(`${a.name}@${p.host.id}`, { r, label: ctx.label(r, n, "", k % 2 ? 2.9 : 2.1), a, host: p.host });
+            return;
+          }
+          const via = a.via || p.via;
+          ctx.pickable(r, { kind: a.kind === "cli" ? "cli" : "agent", id: `${n}.${via}`, title: `${n} · ${p.host.name}` });
+          clis.set(n, { r, label: ctx.label(r, n, "", k % 2 ? 2.9 : 2.1) });
+          crew.set(n, a);
+          actor((a.kind === "cli" ? "cli:" : "agent:") + `${n}.${via}`, r);
+          if (a.kind !== "cli") actor("agent:" + n, r);
+        });
+        if (dev || clis.size) machines.set(p.station ? p.via : p.host.name, { dev: dev ?? grp, label, cable: c, at: p.at, clis });
+        plotViews.set(p.host.id, { p, label, cable: c, dev, crew });
+      }
+
+      // The core's own host is the dais: its name on the front edge, a thin
+      // line to the node it runs inside, its CLIs on the dais.
+      if (pl.core) {
+        const plate = new THREE.Object3D();
+        plate.position.set(0, 0.45, 7.9);
+        hostLayer.add(plate);
+        hostLabels.push(ctx.label(plate, `${pl.core.name} · ${translate(kindLabel(pl.core.kind))}`, pl.coreParent ? translate("on {name}", { name: pl.coreParent.host.name }) : translate("this core"), 0));
+        if (pl.coreParent) {
+          const to = edgeOf(pl.coreParent, new THREE.Vector3());
+          const from = to.clone().setY(0).normalize().multiplyScalar(7.7);
+          hostLayer.add(floorLink(from, to, "parent"));
+        }
+        pl.coreCrew.slice(0, 3).forEach((a, k) => {
+          const n = a.kind === "cli" ? cliName(a) : a.name;
+          const r = robot("cli", trim(n));
+          const ang = THREE.MathUtils.degToRad(4 + k * 20);
+          r.position.set(Math.cos(ang) * 5.7, 0.35, Math.sin(ang) * 5.7);
+          r.userData.base = 0.35;
+          r.rotation.y = Math.atan2(-r.position.x, -r.position.z) + Math.PI;
+          hostLayer.add(r);
+          ctx.pickable(r, { kind: a.kind === "cli" ? "cli" : "agent", id: n, title: n });
+          extras.set(`${a.name}@core`, { r, label: ctx.label(r, n, "", k % 2 ? 2.9 : 2.1), a, host: pl.core! });
+          actor((a.kind === "cli" ? "cli:" : "agent:") + n, r);
+        });
+      }
+
+    };
+
+    /** A robot's state from what it is doing for core and in its terminals,
+     *  with what its host last said when nothing else does. */
+    const crewState = (d: WorldData, n: string, host: string, term: Record<string, CCActivity>, a: HostAgent | undefined, run: HiveTask[], asking: string[]) => {
+      const runs = d.runs.filter((r) => (r.remote || "core") === host && (r.agent === n || r.agent.startsWith(n + ".")));
+      const live = runs.filter((r) => r.state === "running");
+      const delegated = run.filter((t) => t.worker === `${n}.${host}` || t.worker === n || t.worker.startsWith(n + "."));
+      const asks = asking.some((s) => s === `${n}.${host}` || s === n || s.startsWith(n + "."));
+      const own = termState(term[n]);
+      const said = a?.state;
+      const st: RobotState = asks ? "wait"
+        : live.length || delegated.length || own.work || (!term[n] && said === "working") ? "work"
+        : own.wait || (!term[n] && said === "waiting") ? "wait"
+        : runs[0]?.state === "failed" ? "fail" : said === "lost" ? "lost" : "idle";
+      const status = asks ? translate("needs your OK") : live.length ? clip(live[0].prompt, 24) : delegated.length ? clip(delegated[0].prompt, 24)
+        : own.status || (st === "work" ? translate("working") : st === "wait" ? translate("waiting for you") : st === "fail" ? translate("failed")
+          : st === "lost" ? translate("not answering") : said === "configured" ? translate("configured") : translate("idle"));
+      return { st, status, live: live.length };
+    };
+    const tone = (st: RobotState) => (st === "wait" ? "wait" : st === "work" ? "work" : st === "fail" || st === "lost" ? "bad" : "idle") as "wait" | "work" | "bad" | "idle";
+
+    /** The hive by host: a new plan when what stands where changes, and
+     *  every robot, screen and label set from the newest figures. */
+    const updateHosts = (d: WorldData, run: HiveTask[], failed: Set<string>, asking: string[]) => {
+      const hosts = d.hosts ?? [];
+      const svcs = d.services ?? [];
+      const sig = JSON.stringify([
+        hosts.map((h) => [h.id, h.name, h.kind, h.parent, h.state, h.os, h.agents.map((a) => [a.name, a.kind, a.role, a.via, isStandby(a) ? a.state : ""])]),
+        svcs.map((s) => [s.name, s.active, s.standbys]),
+      ]);
+      if (sig !== hostSig || !plan) { hostSig = sig; clearCrew(); buildHosts(planHosts(hosts, svcs)); }
+      const agentOf = new Map<string, HostAgent>();
+      for (const h of hosts) for (const a of h.agents) if (a.kind === "superai") agentOf.set(a.name, a);
+
+      // Workers, in their pods.
+      for (const [name, w] of workers) {
+        const m = d.hive.members.find((x) => x.name === name);
+        const a = agentOf.get(name);
+        const mine = run.filter((x) => x.worker === name);
+        const pulse = d.meter.members.find((x) => x.name === name);
+        if (pulse) {
+          const was = lastCalls.get(name);
+          if (was !== undefined && pulse.calls > was) { w.r.userData.gestureUntil = clock + 0.9; ctx.spark(w.r.getWorldPosition(new THREE.Vector3()).setY(3.2)); }
+          lastCalls.set(name, pulse.calls);
+        }
+        const lost = (m?.state ?? a?.state) === "lost";
+        const st: RobotState = lost ? "lost" : mine.length ? (mine[0].tool ? "work" : "think") : failed.has(name) ? "fail" : pulse?.live ? "think" : "idle";
+        setState(w.r, st);
+        if (st === "think" && mine.length) (w.r.userData.carry as THREE.Object3D).visible = true;
+        w.label.set(short(name), st === "lost" ? translate("not answering") : mine.length ? clip(mine[0].tool ? `${mine[0].tool} · ${mine[0].prompt}` : mine[0].prompt, 28) : st === "fail" ? translate("failed") : translate("idle"), tone(st));
+      }
+
+      // Each plot: its station's screen and light, the agents at it, its label.
+      for (const v of plotViews.values()) {
+        const p = v.p;
+        const la = d.linked.find((x) => x.name === p.via) ?? d.hive.relays?.find((x) => x.name === p.via);
+        const term = la ? clisOf(la) : {};
+        const m = machines.get(p.station ? p.via : p.host.name);
+        let busy = false;
+        for (const [n, c] of m?.clis ?? []) {
+          const s = crewState(d, n, p.via, term, v.crew.get(n), run, asking);
+          busy ||= s.st === "work";
+          setState(c.r, s.st);
+          c.label.set(n, s.status, tone(s.st));
+        }
+        const runsHere = d.runs.filter((r) => (r.remote || "core") === p.via);
+        const liveHere = runsHere.filter((r) => r.state === "running");
+        const onNode = run.some((x) => workers.get(x.worker)?.node === p.host.id);
+        v.cable.setActive(onNode || liveHere.length > 0 || run.some((t) => route(t.worker)?.curve === v.cable.curve));
+        if (v.dev?.userData.strip) setLight(v.dev, p.host.state === "lost" ? "lost" : busy || liveHere.length ? "busy" : "idle");
+        const screens = v.dev?.userData.screens as Screen[] | undefined;
+        if (screens?.[0]) {
+          const running = Object.keys(term);
+          const ccOn = running.flatMap((c) => (term[c].sessions ?? []).filter((s) => s.state !== "idle").map((s) => ({ s, c })));
+          const said = [liveHere.length ? translate("{count} running", { count: liveHere.length }) : "",
+            ...running.filter((c) => term[c].working || term[c].waiting).slice(0, 2).map((c) => `${c} · ${termState(term[c]).status}`)].filter(Boolean);
+          show(screens[0], p.host.name, p.host.state === "lost" ? translate("not answering") : said.length ? said.join(" · ") : translate("{count} agents ready", { count: m?.clis.size ?? 0 }),
+            [...ccOn.slice(0, 4).map(({ s, c }) => `${c} · ${sessionLine(s, c)}`), ...(liveHere.length ? liveHere : ccOn.length ? [] : runsHere.slice(0, 4)).map((r) => `${r.agent}: ${r.prompt}`)],
+            liveHere.length > 0 || ccOn.some(({ s }) => s.state === "working"));
+        }
+        const pods = p.pods.length;
+        const agents = p.host.agents.filter((a) => !isStandby(a)).length + p.pods.reduce((n, h) => n + h.agents.length, 0);
+        const status = p.host.state === "lost" ? translate("not answering") : p.host.state === "configured" ? translate("not linked")
+          : [pods ? translate(pods === 1 ? "1 pod" : "{count} pods", { count: pods }) : "", translate(agents === 1 ? "1 agent" : "{count} agents", { count: agents })].filter(Boolean).join(" · ");
+        v.label.set(`${p.host.name} · ${translate(kindLabel(p.host.kind))}`, status, p.host.state === "lost" ? "bad" : onNode || busy || liveHere.length ? "work" : "idle");
+      }
+
+      // Ghosts and the CLIs on the dais.
+      for (const x of extras.values()) {
+        const n = x.a.kind === "cli" ? cliName(x.a) : x.a.name;
+        if (isStandby(x.a)) {
+          setState(x.r, "idle");
+          x.label.set(n, x.a.state === "standby" ? translate("standby") : translate("standby · not ready"), x.a.state === "standby" ? "idle" : "bad");
+          continue;
+        }
+        const s = crewState(d, n, "core", {}, x.a, run, asking);
+        setState(x.r, s.st);
+        x.label.set(n, s.status, tone(s.st));
+      }
+
+      // Services: what they run, at which address, and how they stand.
+      for (const v of serviceViews.values()) {
+        const s = svcs.find((x) => x.name === v.svc.name) ?? v.svc;
+        setServiceState(v.m, s.state);
+        const where = s.active ? `${s.vip ? s.vip + " · " : ""}${s.active}` : s.vip ?? "";
+        v.label.set(s.name, s.state === "active" ? where : `${translate(s.state)}${where ? " · " + where : ""}`, s.state === "down" ? "bad" : s.state === "degraded" ? "wait" : "idle");
+      }
+    };
+
     return {
       update(d) {
-        // Nodes: from where the workers say they run; a worker that does not
-        // say gets a node of its own, so it still has somewhere to stand.
-        const members = d.hive.members.filter((m) => !/queen/.test(m.name));
-        const nodeOf = (m: { name: string; node?: string }) => m.node || "node-" + short(m.name);
-        const names = [...new Set(members.map(nodeOf))].sort();
-        for (const [n, x] of nodes) if (!names.includes(n)) { x.label.remove(); g.remove(x.box); cables.remove(x.cable.tube); x.cable.tube.userData.dispose?.(); nodes.delete(n); }
-        names.forEach((n, i) => {
-          let x = nodes.get(n);
-          const at = nodeSpot(i, names.length);
-          if (!x || !x.at.equals(at)) {
-            if (x) { x.label.remove(); g.remove(x.box); cables.remove(x.cable.tube); x.cable.tube.userData.dispose?.(); }
-            const b = workstation("desktop");
-            b.position.copy(at);
-            b.rotation.y = 0;
-            g.add(b);
-            const c = cable(coreAt, at, hash01(n));
-            cables.add(c.tube);
-            const plate = new THREE.Object3D();
-            plate.position.set(4, 2.6, 0.4);
-            b.add(plate);
-            x = { box: b, label: ctx.label(plate, n, "node", 0), cable: c, at };
-            nodes.set(n, x);
-            ctx.pickable(b, { kind: "node", id: n, title: n });
-          }
-        });
-
-        // Workers on their nodes.
-        for (const [n, w] of workers) if (!members.some((m) => m.name === n)) { w.label.remove(); g.remove(w.r); workers.delete(n); forgetActor("worker:" + n); }
-        const perNode = new Map<string, number>();
-        const count = new Map<string, number>();
-        members.forEach((m) => count.set(nodeOf(m), (count.get(nodeOf(m)) ?? 0) + 1));
         const run = d.hive.tasks.filter((x) => x.state === "running");
         const failed = new Set(d.attention.filter((a) => a.kind === "failed" || a.kind === "lost").map((a) => a.title.split(" ")[0]));
-        members.forEach((m) => {
-          const node = nodeOf(m);
-          const nx = nodes.get(node);
-          if (!nx) return;
-          let w = workers.get(m.name);
-          if (!w) {
-            const r = robot("worker");
-            g.add(r);
-            ctx.pickable(r, { kind: "worker", id: m.name, title: m.name });
-            w = { r, label: ctx.label(r, short(m.name), "", 2.4), node };
-            workers.set(m.name, w);
-            registerActor("worker:" + m.name, r);
-          }
-          w.node = node;
-          const k = perNode.get(node) ?? 0;
-          perNode.set(node, k + 1);
-          // At the desk, turned to the screen: one in the middle, two side by side.
-          const n = count.get(node)!;
-          const spots = nx.box.userData.spots as THREE.Vector3[];
-          const spot = n === 1 ? spots[0] : n === 2 ? [spots[1], spots[2]][k % 2] : spots[k % 3];
-          const world = nx.box.localToWorld(spot.clone());
-          w.r.position.copy(world);
-          w.r.userData.base = world.y;
-          w.r.userData.desk = true;
-          w.r.lookAt(nx.box.localToWorld(new THREE.Vector3(spot.x, 0, -0.6)).setY(world.y));
-          const mine = run.filter((x) => x.worker === m.name);
-          const pulse = d.meter.members.find((x) => x.name === m.name);
-          // Every tool call: a hand up and a spark.
-          if (pulse) {
-            const was = lastCalls.get(m.name);
-            if (was !== undefined && pulse.calls > was) {
-              w.r.userData.gestureUntil = clock + 0.9;
-              ctx.spark(w.r.getWorldPosition(new THREE.Vector3()).setY(3.2));
-            }
-            lastCalls.set(m.name, pulse.calls);
-          }
-          const st: RobotState = m.state === "lost" ? "lost" : mine.length ? (mine[0].tool ? "work" : "think") : failed.has(m.name) ? "fail" : pulse?.live ? "think" : "idle";
-          setState(w.r, st);
-          if (st === "think" && mine.length) (w.r.userData.carry as THREE.Object3D).visible = true;
-          nx.cable.setActive(run.some((x) => workers.get(x.worker)?.node === node));
-          w.label.set(short(m.name), st === "lost" ? "not answering" : mine.length ? clip(mine[0].tool ? `${mine[0].tool} · ${mine[0].prompt}` : mine[0].prompt, 28) : st === "fail" ? "failed" : "idle",
-            st === "lost" || st === "fail" ? "bad" : st === "work" || st === "think" ? "work" : "idle");
-        });
-
-        // Each node's screen: its workers and what they are doing.
-        for (const [n, x] of nodes) {
-          const on = members.filter((m) => nodeOf(m) === n);
-          const doing = on.flatMap((m) => run.filter((t) => t.worker === m.name).map((t) => `${short(m.name)}: ${t.tool ? t.tool + " · " : ""}${t.prompt}`));
-          const lost = on.some((m) => m.state === "lost");
-          setLight(x.box, lost ? "lost" : doing.length ? "busy" : "idle");
-          show((x.box.userData.screens as Screen[])[0], n, lost ? "a worker is not answering" : doing.length ? `${doing.length} order${doing.length > 1 ? "s" : ""} running` : "idle",
-            doing.length ? doing : on.map((m) => `${short(m.name)} · ${m.state === "lost" ? "lost" : "ready"}`), doing.length > 0);
-        }
-
-        // Linked machines and the coding agents on them. A machine with
-        // nothing to run is still one to look after, so every one is here.
-        const linked = d.linked;
-        for (const [h, x] of machines) if (!linked.some((a) => a.name === h)) {
-          x.label.remove(); x.clis.forEach((c) => c.label.remove()); g.remove(x.dev); cables.remove(x.cable.tube); x.cable.tube.userData.dispose?.(); machines.delete(h);
-        }
         const asking = d.attention.filter((a) => a.kind === "approval").map((a) => a.title.split(" asks")[0].split(" · ")[0].trim());
-        linked.forEach((a, i) => {
-          let x = machines.get(a.name);
-          const at = machineSpot(i, linked.length);
-          if (!x) {
-            const dev = workstation(/mac|darwin/i.test(a.name + a.os) ? "laptop" : "desktop");
-            dev.position.copy(at);
-            dev.rotation.y = 0;
-            g.add(dev);
-            const c = cable(coreAt, at, hash01(a.name));
-            cables.add(c.tube);
-            ctx.pickable(dev, { kind: "machine", id: a.name, title: a.name });
-            x = { dev, label: ctx.label(dev, a.name, `${a.os} ${a.arch}`, 4.6), cable: c, at, clis: new Map() };
-            machines.set(a.name, x);
-          }
-          // The best-known agents first, so a machine with a dozen CLIs shows
-          // the ones people look for.
-          const FIRST = ["claude", "codex", "pi", "openclaw", "gemini", "opencode", "hermes"];
-          const rank = (n: string) => { const i = FIRST.indexOf(n); return i < 0 ? 99 : i; };
-          // The terminal sessions people run on it, every coding CLI's: work
-          // that is not SuperAI's, done by the same CLIs.
-          const term = clisOf(a);
-          const running = Object.keys(term);
-          const ccWork = running.reduce((n, c) => n + (term[c].working ?? 0), 0);
-          const ccOn = running.flatMap((c) => (term[c].sessions ?? []).filter((s) => s.state !== "idle").map((s) => ({ s, c })));
-          const names = [...new Set([...(a.clis ?? []), ...(a.agents ?? []).map((n) => n.name), ...running])];
-          // The ones running first, then the best known.
-          const who = names.sort((x, y) => (term[y] ? 1 : 0) - (term[x] ? 1 : 0) || rank(x) - rank(y)).slice(0, 6);
-          for (const [n, c] of x.clis) if (!who.includes(n)) { c.label.remove(); g.remove(c.r); x.clis.delete(n); }
-          who.forEach((n, k) => {
-            let c = x!.clis.get(n);
-            if (!c) {
-              const r = robot("cli", TRIMS[Math.floor(hash01(n) * TRIMS.length)]);
-              g.add(r);
-              const isCli = (a.clis ?? []).includes(n);
-              ctx.pickable(r, { kind: isCli ? "cli" : "agent", id: isCli ? `${n}.${a.name}` : `${n}.${a.name}`, title: `${n} · ${a.name}` });
-              c = { r, label: ctx.label(r, n, "", k % 2 ? 2.9 : 2.1) };
-              x!.clis.set(n, c);
-              registerActor((isCli ? "cli:" : "agent:") + `${n}.${a.name}`, r);
-              if (!isCli) registerActor("agent:" + n, r);
+        // The hosts, where the core lists them; else the hive the old way,
+        // from the roster, the linked machines and the relays.
+        const byHost = Array.isArray(d.hosts) && d.hosts.length > 0;
+        if (byHost !== hostMode) { clearCrew(); hostMode = byHost; hostSig = ""; }
+        if (byHost) updateHosts(d, run, failed, asking);
+        else {
+          // Nodes: from where the workers say they run; a worker that does not
+          // say gets a node of its own, so it still has somewhere to stand.
+          const members = d.hive.members.filter((m) => !/queen/.test(m.name));
+          const nodeOf = (m: { name: string; node?: string }) => m.node || "node-" + short(m.name);
+          const names = [...new Set(members.map(nodeOf))].sort();
+          for (const [n, x] of nodes) if (!names.includes(n)) { x.label.remove(); g.remove(x.box); cables.remove(x.cable.tube); x.cable.tube.userData.dispose?.(); nodes.delete(n); }
+          names.forEach((n, i) => {
+            let x = nodes.get(n);
+            const at = nodeSpot(i, names.length);
+            if (!x || !x.at.equals(at)) {
+              if (x) { x.label.remove(); g.remove(x.box); cables.remove(x.cable.tube); x.cable.tube.userData.dispose?.(); }
+              const b = workstation("desktop");
+              b.position.copy(at);
+              b.rotation.y = 0;
+              g.add(b);
+              const c = cable(coreAt, at, hash01(n));
+              cables.add(c.tube);
+              const plate = new THREE.Object3D();
+              plate.position.set(4, 2.6, 0.4);
+              b.add(plate);
+              x = { box: b, label: ctx.label(plate, n, "node", 0), cable: c, at };
+              nodes.set(n, x);
+              ctx.pickable(b, { kind: "node", id: n, title: n });
             }
-            // In a row in front of the machine.
-            const spread = Math.min(2.4, 4.8 / Math.max(1, who.length - 1));
-            const ang = (k - (who.length - 1) / 2) * spread * 0.32;
-            const local = new THREE.Vector3(Math.sin(ang) * 4.2, 0, 2.6 + Math.cos(ang) * 1.4);
-            const world = x!.dev.localToWorld(local.clone()).setY(0);
-            c.r.position.copy(world);
-            c.r.userData.base = 0;
-            c.r.userData.desk = true;
-            c.r.lookAt(x!.dev.localToWorld(new THREE.Vector3(0, 0, -0.6)).setY(0));
-            const runs = d.runs.filter((r) => (r.remote || "core") === a.name && (r.agent === n || r.agent.startsWith(n + ".")));
-            const live = runs.filter((r) => r.state === "running");
-            const delegated = run.filter((t) => t.worker === `${n}.${a.name}` || t.worker === n || t.worker.startsWith(n + "."));
-            const asks = asking.some((s) => s === `${n}.${a.name}` || s.startsWith(n + "."));
-            const own = termState(term[n]);
-            const st: RobotState = asks ? "wait"
-              : live.length || delegated.length || own.work ? "work" : own.wait ? "wait" : runs[0]?.state === "failed" ? "fail" : "idle";
-            setState(c.r, st);
-            const status = asks ? "needs your OK" : live.length ? clip(live[0].prompt, 24) : delegated.length ? clip(delegated[0].prompt, 24)
-              : own.status || (st === "fail" ? "failed" : "idle");
-            c.label.set(n, status, st === "wait" ? "wait" : st === "work" ? "work" : st === "fail" ? "bad" : "idle");
           });
-          const runsHere = d.runs.filter((r) => (r.remote || "core") === a.name);
-          const liveHere = runsHere.filter((r) => r.state === "running");
-          x.cable.setActive(liveHere.length > 0 || run.some((t) => route(t.worker)?.curve === x!.cable.curve));
-          setLight(x.dev, liveHere.length || ccWork ? "busy" : "idle");
-          // The screen: SuperAI's runs, and the terminal sessions beside them,
-          // each by its project and the tool it is on.
-          const said = [
-            liveHere.length ? `${liveHere.length} running` : "",
-            ...running.filter((c) => term[c].working || term[c].waiting).slice(0, 2).map((c) => {
-              const s = termState(term[c]);
-              return `${c} · ${s.status}`;
-            }),
-          ].filter(Boolean);
-          show((x.dev.userData.screens as Screen[])[0], a.name, said.length ? said.join(" · ") : `${who.length} agents ready`,
-            [...ccOn.slice(0, 4).map(({ s, c }) => `${c} · ${sessionLine(s, c)}`), ...(liveHere.length ? liveHere : ccOn.length ? [] : runsHere.slice(0, 4)).map((r) => `${r.agent}: ${r.prompt}`)],
-            liveHere.length > 0 || ccWork > 0);
-        });
 
-        // Relays and the named agents they serve, each robot with what runs
-        // as it on the relay: working while its processes are busy.
-        const rl: RelayAgent[] = (d.hive.relays ?? []).filter((r) => r?.name && (r.agents ?? []).length > 0);
-        for (const [h, x] of relays) if (!rl.some((r) => r.name === h)) {
-          x.label.remove(); x.bots.forEach((b, n) => { b.label.remove(); g.remove(b.r); forgetActor(`agent:${n}.${h}`); });
-          g.remove(x.pad); cables.remove(x.cable.tube); x.cable.tube.userData.dispose?.(); relays.delete(h);
-        }
-        rl.forEach((rel, i) => {
-          const at = relaySpot(i, rl.length);
-          let x = relays.get(rel.name);
-          if (x && !x.at.equals(at)) { x.pad.position.copy(at); }
-          if (!x) {
-            const pad = relayPad();
-            pad.position.copy(at);
-            g.add(pad);
-            const c = cable(coreAt, at, hash01(rel.name));
-            cables.add(c.tube);
-            const plate = new THREE.Object3D();
-            plate.position.set(0, 3.4, -2.6);
-            pad.add(plate);
-            x = { pad, label: ctx.label(plate, "", rel.name, 0), cable: c, at, bots: new Map() };
-            relays.set(rel.name, x);
-          }
-          x.at = at;
-          const names = (rel.agents ?? []).map((n) => n.name).slice(0, 6);
-          x.label.set(names.join(" · "), rel.name, "idle");
-          for (const [n, b] of x.bots) if (!names.includes(n)) { b.label.remove(); g.remove(b.r); x.bots.delete(n); forgetActor(`agent:${n}.${rel.name}`); }
-          const term = rel.cliActivity ?? {};
-          let busyHere = false;
-          names.forEach((n, k) => {
-            let b = x!.bots.get(n);
-            if (!b) {
-              const r = robot("cli", TRIMS[Math.floor(hash01(n) * TRIMS.length)]);
+          // Workers on their nodes.
+          for (const [n, w] of workers) if (!members.some((m) => m.name === n)) { w.label.remove(); g.remove(w.r); workers.delete(n); forgetActor("worker:" + n); }
+          const perNode = new Map<string, number>();
+          const count = new Map<string, number>();
+          members.forEach((m) => count.set(nodeOf(m), (count.get(nodeOf(m)) ?? 0) + 1));
+          members.forEach((m) => {
+            const node = nodeOf(m);
+            const nx = nodes.get(node);
+            if (!nx) return;
+            let w = workers.get(m.name);
+            if (!w) {
+              const r = robot("worker");
               g.add(r);
-              ctx.pickable(r, { kind: "agent", id: `${n}.${rel.name}`, title: `${n} · ${rel.name}` });
-              b = { r, label: ctx.label(r, n, "", k % 2 ? 2.9 : 2.1) };
-              x!.bots.set(n, b);
-              registerActor(`agent:${n}.${rel.name}`, r);
-              registerActor("agent:" + n, r);
+              ctx.pickable(r, { kind: "worker", id: m.name, title: m.name });
+              w = { r, label: ctx.label(r, short(m.name), "", 2.4), node };
+              workers.set(m.name, w);
+              registerActor("worker:" + m.name, r);
             }
-            // In a ring on the pad, facing out to the core.
-            const ang = (k / Math.max(1, names.length)) * Math.PI * 2 + Math.PI / 2;
-            const world = new THREE.Vector3(Math.cos(ang) * 2.1, 0.22, Math.sin(ang) * 2.1).add(at);
-            b.r.position.copy(world);
-            b.r.userData.base = 0.22;
-            b.r.lookAt(coreAt.clone().setY(0.22));
-            const delegated = run.filter((t) => t.worker === `${n}.${rel.name}` || t.worker === n || t.worker.startsWith(n + "."));
-            const asks = asking.some((s) => s === `${n}.${rel.name}` || s === n || s.startsWith(n + "."));
-            const own = termState(term[n]);
-            const st: RobotState = asks ? "wait" : delegated.length || own.work ? "work" : own.wait ? "wait" : "idle";
-            busyHere = busyHere || st === "work";
-            setState(b.r, st);
-            b.label.set(n, asks ? "needs your OK" : delegated.length ? clip(delegated[0].prompt, 24) : own.status || "idle",
-              st === "wait" ? "wait" : st === "work" ? "work" : "idle");
+            w.node = node;
+            const k = perNode.get(node) ?? 0;
+            perNode.set(node, k + 1);
+            // At the desk, turned to the screen: one in the middle, two side by side.
+            const n = count.get(node)!;
+            const spots = nx.box.userData.spots as THREE.Vector3[];
+            const spot = n === 1 ? spots[0] : n === 2 ? [spots[1], spots[2]][k % 2] : spots[k % 3];
+            const world = nx.box.localToWorld(spot.clone());
+            w.r.position.copy(world);
+            w.r.userData.base = world.y;
+            w.r.userData.desk = true;
+            w.r.lookAt(nx.box.localToWorld(new THREE.Vector3(spot.x, 0, -0.6)).setY(world.y));
+            const mine = run.filter((x) => x.worker === m.name);
+            const pulse = d.meter.members.find((x) => x.name === m.name);
+            // Every tool call: a hand up and a spark.
+            if (pulse) {
+              const was = lastCalls.get(m.name);
+              if (was !== undefined && pulse.calls > was) {
+                w.r.userData.gestureUntil = clock + 0.9;
+                ctx.spark(w.r.getWorldPosition(new THREE.Vector3()).setY(3.2));
+              }
+              lastCalls.set(m.name, pulse.calls);
+            }
+            const st: RobotState = m.state === "lost" ? "lost" : mine.length ? (mine[0].tool ? "work" : "think") : failed.has(m.name) ? "fail" : pulse?.live ? "think" : "idle";
+            setState(w.r, st);
+            if (st === "think" && mine.length) (w.r.userData.carry as THREE.Object3D).visible = true;
+            nx.cable.setActive(run.some((x) => workers.get(x.worker)?.node === node));
+            w.label.set(short(m.name), st === "lost" ? "not answering" : mine.length ? clip(mine[0].tool ? `${mine[0].tool} · ${mine[0].prompt}` : mine[0].prompt, 28) : st === "fail" ? "failed" : "idle",
+              st === "lost" || st === "fail" ? "bad" : st === "work" || st === "think" ? "work" : "idle");
           });
-          setLight(x.pad, busyHere ? "busy" : "idle");
-          x.cable.setActive(run.some((t) => route(t.worker)?.curve === x!.cable.curve));
-        });
+
+          // Each node's screen: its workers and what they are doing.
+          for (const [n, x] of nodes) {
+            const on = members.filter((m) => nodeOf(m) === n);
+            const doing = on.flatMap((m) => run.filter((t) => t.worker === m.name).map((t) => `${short(m.name)}: ${t.tool ? t.tool + " · " : ""}${t.prompt}`));
+            const lost = on.some((m) => m.state === "lost");
+            setLight(x.box, lost ? "lost" : doing.length ? "busy" : "idle");
+            show((x.box.userData.screens as Screen[])[0], n, lost ? "a worker is not answering" : doing.length ? `${doing.length} order${doing.length > 1 ? "s" : ""} running` : "idle",
+              doing.length ? doing : on.map((m) => `${short(m.name)} · ${m.state === "lost" ? "lost" : "ready"}`), doing.length > 0);
+          }
+
+          // Linked machines and the coding agents on them. A machine with
+          // nothing to run is still one to look after, so every one is here.
+          const linked = d.linked;
+          for (const [h, x] of machines) if (!linked.some((a) => a.name === h)) {
+            x.label.remove(); x.clis.forEach((c) => c.label.remove()); g.remove(x.dev); cables.remove(x.cable.tube); x.cable.tube.userData.dispose?.(); machines.delete(h);
+          }
+          linked.forEach((a, i) => {
+            let x = machines.get(a.name);
+            const at = machineSpot(i, linked.length);
+            if (!x) {
+              const dev = workstation(/mac|darwin/i.test(a.name + a.os) ? "laptop" : "desktop");
+              dev.position.copy(at);
+              dev.rotation.y = 0;
+              g.add(dev);
+              const c = cable(coreAt, at, hash01(a.name));
+              cables.add(c.tube);
+              ctx.pickable(dev, { kind: "machine", id: a.name, title: a.name });
+              x = { dev, label: ctx.label(dev, a.name, `${a.os} ${a.arch}`, 4.6), cable: c, at, clis: new Map() };
+              machines.set(a.name, x);
+            }
+            // The best-known agents first, so a machine with a dozen CLIs shows
+            // the ones people look for.
+            const FIRST = ["claude", "codex", "pi", "openclaw", "gemini", "opencode", "hermes"];
+            const rank = (n: string) => { const i = FIRST.indexOf(n); return i < 0 ? 99 : i; };
+            // The terminal sessions people run on it, every coding CLI's: work
+            // that is not SuperAI's, done by the same CLIs.
+            const term = clisOf(a);
+            const running = Object.keys(term);
+            const ccWork = running.reduce((n, c) => n + (term[c].working ?? 0), 0);
+            const ccOn = running.flatMap((c) => (term[c].sessions ?? []).filter((s) => s.state !== "idle").map((s) => ({ s, c })));
+            const names = [...new Set([...(a.clis ?? []), ...(a.agents ?? []).map((n) => n.name), ...running])];
+            // The ones running first, then the best known.
+            const who = names.sort((x, y) => (term[y] ? 1 : 0) - (term[x] ? 1 : 0) || rank(x) - rank(y)).slice(0, 6);
+            for (const [n, c] of x.clis) if (!who.includes(n)) { c.label.remove(); g.remove(c.r); x.clis.delete(n); }
+            who.forEach((n, k) => {
+              let c = x!.clis.get(n);
+              if (!c) {
+                const r = robot("cli", TRIMS[Math.floor(hash01(n) * TRIMS.length)]);
+                g.add(r);
+                const isCli = (a.clis ?? []).includes(n);
+                ctx.pickable(r, { kind: isCli ? "cli" : "agent", id: isCli ? `${n}.${a.name}` : `${n}.${a.name}`, title: `${n} · ${a.name}` });
+                c = { r, label: ctx.label(r, n, "", k % 2 ? 2.9 : 2.1) };
+                x!.clis.set(n, c);
+                registerActor((isCli ? "cli:" : "agent:") + `${n}.${a.name}`, r);
+                if (!isCli) registerActor("agent:" + n, r);
+              }
+              // In a row in front of the machine.
+              const spread = Math.min(2.4, 4.8 / Math.max(1, who.length - 1));
+              const ang = (k - (who.length - 1) / 2) * spread * 0.32;
+              const local = new THREE.Vector3(Math.sin(ang) * 4.2, 0, 2.6 + Math.cos(ang) * 1.4);
+              const world = x!.dev.localToWorld(local.clone()).setY(0);
+              c.r.position.copy(world);
+              c.r.userData.base = 0;
+              c.r.userData.desk = true;
+              c.r.lookAt(x!.dev.localToWorld(new THREE.Vector3(0, 0, -0.6)).setY(0));
+              const runs = d.runs.filter((r) => (r.remote || "core") === a.name && (r.agent === n || r.agent.startsWith(n + ".")));
+              const live = runs.filter((r) => r.state === "running");
+              const delegated = run.filter((t) => t.worker === `${n}.${a.name}` || t.worker === n || t.worker.startsWith(n + "."));
+              const asks = asking.some((s) => s === `${n}.${a.name}` || s.startsWith(n + "."));
+              const own = termState(term[n]);
+              const st: RobotState = asks ? "wait"
+                : live.length || delegated.length || own.work ? "work" : own.wait ? "wait" : runs[0]?.state === "failed" ? "fail" : "idle";
+              setState(c.r, st);
+              const status = asks ? "needs your OK" : live.length ? clip(live[0].prompt, 24) : delegated.length ? clip(delegated[0].prompt, 24)
+                : own.status || (st === "fail" ? "failed" : "idle");
+              c.label.set(n, status, st === "wait" ? "wait" : st === "work" ? "work" : st === "fail" ? "bad" : "idle");
+            });
+            const runsHere = d.runs.filter((r) => (r.remote || "core") === a.name);
+            const liveHere = runsHere.filter((r) => r.state === "running");
+            x.cable.setActive(liveHere.length > 0 || run.some((t) => route(t.worker)?.curve === x!.cable.curve));
+            setLight(x.dev, liveHere.length || ccWork ? "busy" : "idle");
+            // The screen: SuperAI's runs, and the terminal sessions beside them,
+            // each by its project and the tool it is on.
+            const said = [
+              liveHere.length ? `${liveHere.length} running` : "",
+              ...running.filter((c) => term[c].working || term[c].waiting).slice(0, 2).map((c) => {
+                const s = termState(term[c]);
+                return `${c} · ${s.status}`;
+              }),
+            ].filter(Boolean);
+            show((x.dev.userData.screens as Screen[])[0], a.name, said.length ? said.join(" · ") : `${who.length} agents ready`,
+              [...ccOn.slice(0, 4).map(({ s, c }) => `${c} · ${sessionLine(s, c)}`), ...(liveHere.length ? liveHere : ccOn.length ? [] : runsHere.slice(0, 4)).map((r) => `${r.agent}: ${r.prompt}`)],
+              liveHere.length > 0 || ccWork > 0);
+          });
+
+          // Relays and the named agents they serve, each robot with what runs
+          // as it on the relay: working while its processes are busy.
+          const rl: RelayAgent[] = (d.hive.relays ?? []).filter((r) => r?.name && (r.agents ?? []).length > 0);
+          for (const [h, x] of relays) if (!rl.some((r) => r.name === h)) {
+            x.label.remove(); x.bots.forEach((b, n) => { b.label.remove(); g.remove(b.r); forgetActor(`agent:${n}.${h}`); });
+            g.remove(x.pad); cables.remove(x.cable.tube); x.cable.tube.userData.dispose?.(); relays.delete(h);
+          }
+          rl.forEach((rel, i) => {
+            const at = relaySpot(i, rl.length);
+            let x = relays.get(rel.name);
+            if (x && !x.at.equals(at)) { x.pad.position.copy(at); }
+            if (!x) {
+              const pad = relayPad();
+              pad.position.copy(at);
+              g.add(pad);
+              const c = cable(coreAt, at, hash01(rel.name));
+              cables.add(c.tube);
+              const plate = new THREE.Object3D();
+              plate.position.set(0, 3.4, -2.6);
+              pad.add(plate);
+              x = { pad, label: ctx.label(plate, "", rel.name, 0), cable: c, at, bots: new Map() };
+              relays.set(rel.name, x);
+            }
+            x.at = at;
+            const names = (rel.agents ?? []).map((n) => n.name).slice(0, 6);
+            x.label.set(names.join(" · "), rel.name, "idle");
+            for (const [n, b] of x.bots) if (!names.includes(n)) { b.label.remove(); g.remove(b.r); x.bots.delete(n); forgetActor(`agent:${n}.${rel.name}`); }
+            const term = rel.cliActivity ?? {};
+            let busyHere = false;
+            names.forEach((n, k) => {
+              let b = x!.bots.get(n);
+              if (!b) {
+                const r = robot("cli", TRIMS[Math.floor(hash01(n) * TRIMS.length)]);
+                g.add(r);
+                ctx.pickable(r, { kind: "agent", id: `${n}.${rel.name}`, title: `${n} · ${rel.name}` });
+                b = { r, label: ctx.label(r, n, "", k % 2 ? 2.9 : 2.1) };
+                x!.bots.set(n, b);
+                registerActor(`agent:${n}.${rel.name}`, r);
+                registerActor("agent:" + n, r);
+              }
+              // In a ring on the pad, facing out to the core.
+              const ang = (k / Math.max(1, names.length)) * Math.PI * 2 + Math.PI / 2;
+              const world = new THREE.Vector3(Math.cos(ang) * 2.1, 0.22, Math.sin(ang) * 2.1).add(at);
+              b.r.position.copy(world);
+              b.r.userData.base = 0.22;
+              b.r.lookAt(coreAt.clone().setY(0.22));
+              const delegated = run.filter((t) => t.worker === `${n}.${rel.name}` || t.worker === n || t.worker.startsWith(n + "."));
+              const asks = asking.some((s) => s === `${n}.${rel.name}` || s === n || s.startsWith(n + "."));
+              const own = termState(term[n]);
+              const st: RobotState = asks ? "wait" : delegated.length || own.work ? "work" : own.wait ? "wait" : "idle";
+              busyHere = busyHere || st === "work";
+              setState(b.r, st);
+              b.label.set(n, asks ? "needs your OK" : delegated.length ? clip(delegated[0].prompt, 24) : own.status || "idle",
+                st === "wait" ? "wait" : st === "work" ? "work" : "idle");
+            });
+            setLight(x.pad, busyHere ? "busy" : "idle");
+            x.cable.setActive(run.some((t) => route(t.worker)?.curve === x!.cable.curve));
+          });
+        }
 
         // Bees: one small robot each, circling while out, resting on the dais
         // when not; one that waits for you hovers at the queen's side with its
@@ -1053,7 +1384,7 @@ export const cluster: District<WorldData> = {
         show(s3, "orders out", String(run.length), run.slice(0, 5).map((t) => `${short(t.worker)}: ${t.prompt}`), run.length > 0);
         // Marks over whatever needs you, each tied to the one it is about.
         const needs = d.attention.filter((a) => a.level === "needs");
-        const bSig = JSON.stringify([needs.map((a) => [a.kind, a.ref, a.title]), workers.size, bees.size, machines.size]);
+        const bSig = JSON.stringify([needs.map((a) => [a.kind, a.ref, a.title]), workers.size, bees.size, machines.size, hostSig]);
         if (bSig !== beaconSig) {
           beaconSig = bSig;
           for (const b of beacons.values()) g.remove(b.obj);
@@ -1209,4 +1540,22 @@ export const LENSES: Record<string, { x: number; z: number; zoom: number }> = {
   tasks: { x: 0, z: 4, zoom: 1.15 },
   settings: { x: 0, z: -2.2, zoom: 2.4 },
 };
-export const lensOf = (view: string) => LENSES[view === "chat" ? "home" : view] ?? LENSES.home;
+/** Where the hosts stand, once a plan is drawn. */
+let hostBounds: HostPlan["bounds"] | null = null;
+/** Drawn by host, the hive stands on a ring further out: the pages that
+ *  show the whole of it stand further back. */
+const HOST_LENSES: Record<string, { x: number; z: number; zoom: number }> = {
+  home: { x: 3, z: -6, zoom: 1.08 },
+  hive: { x: 0, z: -8, zoom: 1.12 },
+  stats: { x: 3, z: -6, zoom: 1.08 },
+  tasks: { x: 0, z: -2, zoom: 0.95 },
+};
+export const lensOf = (view: string, byHost = false) => {
+  const v = view === "chat" ? "home" : view;
+  // The whole hive in view: its circle across the window's width (the
+  // camera stands 104 / zoom away, 30° high, the window about 16:10).
+  if (byHost && hostBounds && (v === "home" || v === "hive" || v === "stats")) {
+    return { x: hostBounds.x, z: hostBounds.z, zoom: Math.min(1.35, Math.max(0.75, 104 / ((hostBounds.r + 10) / 0.43))) };
+  }
+  return (byHost ? HOST_LENSES[v] : undefined) ?? LENSES[v] ?? LENSES.home;
+};
