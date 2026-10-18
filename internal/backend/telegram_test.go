@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 // fakeBotAPI stands in for api.telegram.org and records what was asked of it.
@@ -153,6 +154,68 @@ func TestTheBacklogIsDiscardedRatherThanAnswered(t *testing.T) {
 	if got := api.sent(); len(got) != 0 {
 		t.Fatalf("a message queued while the app was down was answered: %v", got)
 	}
+}
+
+func TestAMessageIsAnsweredWhileAnEarlierTurnIsStillRunning(t *testing.T) {
+	api := newFakeBotAPI(t)
+	var polls int
+	api.reply = func(method string, q url.Values) string {
+		if method != "getUpdates" {
+			return ""
+		}
+		api.mu.Lock()
+		polls++
+		n := polls
+		api.mu.Unlock()
+		// The first poll is the backlog drain; the second brings the two
+		// messages; after that nothing more arrives.
+		if n == 2 {
+			return `{"ok":true,"result":[` +
+				`{"update_id":1,"message":{"text":"slow","chat":{"id":111}}},` +
+				`{"update_id":2,"message":{"text":"quick","chat":{"id":111}}}]}`
+		}
+		time.Sleep(20 * time.Millisecond)
+		return ""
+	}
+	b := bridgeForTest(t, api, 111)
+
+	release := make(chan struct{})
+	b.turn = func(ctx context.Context, session, text string) (string, error) {
+		if text == "slow" {
+			select {
+			case <-release:
+			case <-ctx.Done():
+			}
+		}
+		return "re: " + text, nil
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		b.poll(ctx)
+	}()
+	defer func() {
+		close(release)
+		cancel()
+		<-done
+		b.turns.Wait()
+	}()
+
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		for _, m := range api.sent() {
+			if m.Get("text") == "re: slow" {
+				t.Fatal("the slow turn finished before it was released")
+			}
+			if m.Get("text") == "re: quick" {
+				return
+			}
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatal("the second message waited behind the first turn and was never answered")
 }
 
 func TestALongAnswerIsSplitIntoSendablePieces(t *testing.T) {

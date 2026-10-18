@@ -86,6 +86,13 @@ type TelegramBridge struct {
 	stop context.CancelFunc
 	done chan struct{}
 	lock *FileLock
+
+	// turns is every message being answered. Each has its own goroutine, so a
+	// turn that takes twenty minutes does not hold up the next message.
+	turns sync.WaitGroup
+
+	// turn runs one message; nil means svc.Stream. Tests swap it.
+	turn func(ctx context.Context, session, text string) (string, error)
 }
 
 // NewTelegramBridge builds a bridge from settings. It returns (nil, nil) when
@@ -164,12 +171,18 @@ func (b *TelegramBridge) Stop() {
 		stop()
 	}
 	if done != nil {
-		// Bounded: a turn in flight holds the loop, and with no deadline on a
-		// turn that wait is unbounded — shutdown must not hang on a model
-		// still talking. Cancelling ctx above is what actually ends it; this
-		// only decides how long to be polite about it.
+		// Bounded: with no deadline on a turn the wait for the turns in flight
+		// is unbounded — shutdown must not hang on a model still talking.
+		// Cancelling ctx above is what actually ends them; this only decides
+		// how long to be polite about it.
+		turns := make(chan struct{})
+		go func() {
+			<-done
+			b.turns.Wait()
+			close(turns)
+		}()
 		select {
-		case <-done:
+		case <-turns:
 		case <-time.After(5 * time.Second):
 		}
 	}
@@ -208,11 +221,18 @@ func (b *TelegramBridge) poll(ctx context.Context) {
 		fails = 0
 		offset = next
 
+		// Every message is answered at once, on its own goroutine: a turn
+		// still running, here or in the same chat, never makes the next
+		// message wait for it.
 		for _, u := range updates {
 			if ctx.Err() != nil {
 				return
 			}
-			b.handle(ctx, u)
+			b.turns.Add(1)
+			go func() {
+				defer b.turns.Done()
+				b.handle(ctx, u)
+			}()
 		}
 	}
 }
@@ -310,18 +330,20 @@ func (b *TelegramBridge) handle(ctx context.Context, u telegramUpdate) {
 	// No deadline, the same as the UI. A turn that takes twenty minutes is a
 	// turn that was worth twenty minutes; cutting it off would send "that turn
 	// failed: context deadline exceeded" to someone who was waiting for the
-	// answer, and throw the work away.
-	//
-	// The cost is that this loop answers one message at a time, so a genuinely
-	// wedged provider call now blocks the bot until the process restarts,
-	// where before it cleared itself after ten minutes. That is the trade the
-	// deadline was making, and it is the caller's to make: shutdown still cuts
-	// through it, because ctx is the poller's.
+	// answer, and throw the work away. It costs the next message nothing,
+	// since each runs on its own goroutine, and shutdown still cuts through
+	// it, because ctx is the poller's.
 	turnCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	run := b.turn
+	if run == nil {
+		run = func(ctx context.Context, session, text string) (string, error) {
+			return b.svc.Stream(ctx, session, text, nil, nil)
+		}
+	}
 	stopTyping := b.keepTyping(turnCtx, chat)
-	final, err := b.svc.Stream(turnCtx, b.sessionFor(chat), text, nil, nil)
+	final, err := run(turnCtx, b.sessionFor(chat), text)
 	stopTyping()
 
 	if err != nil {
