@@ -6,7 +6,7 @@ import {
   RefreshDashboard, RemoveMCPServer, RemoveSkill, ResolveToolApproval, ResumeStandingAgent, SendChat, StandingReports,
   StartCLIRun, WakeStandingAgent,
 } from "../../wailsjs/go/app/App";
-import { type CCActivity, type CLIActivity } from "../canvas/data";
+import { type CCActivity, type CLIActivity, type HAService, type Host, type HostAgent } from "../canvas/data";
 import { useI18n } from "../lib/i18n";
 import { queenNamed, queenRef, useQueenName } from "../lib/queenName";
 import { toast } from "../lib/toasts";
@@ -18,8 +18,12 @@ import MachineHost from "./MachineHost";
 import type { Picked } from "./engine";
 import { clisOf, sessionLine, type WorldData } from "./cluster";
 import { agendaWhen, type AgendaEntry } from "./agenda";
+import { cliName, isCore, isHost, isStandby, kindLabel } from "./hosts";
 
 const KIND: Record<AgendaEntry["kind"], string> = { event: "Event", reminder: "Reminder", todo: "To-do", timer: "Timing" };
+
+const HOST_STATE: Record<string, string> = { live: "Live", lost: "Not answering", configured: "Only in the settings" };
+const SVC_STATE: Record<string, string> = { active: "Running", degraded: "Running, no standby ready", down: "Down" };
 
 const fmt = (n: number) => (n >= 1e6 ? (n / 1e6).toFixed(2) + "M" : n >= 1e3 ? (n / 1e3).toFixed(1) + "k" : String(Math.round(n)));
 const when = (s?: string) => {
@@ -82,6 +86,8 @@ export default function Inspector({ picked, data, onClose, open, openDash }: {
       const now = mine.find((x) => x.state === "running");
       kind = "Worker";
       rows.push(["State", m?.state === "lost" ? "Not answering" : now ? "Working" : "Idle"]);
+      const on = data.hosts?.find((h) => h.agents.some((a) => a.kind === "superai" && a.name === picked.id));
+      if (on) rows.push([kindLabel(on.kind), on.parent ? `${on.name} · ${data.hosts?.find((h) => h.id === on.parent)?.name ?? on.parent}` : on.name]);
       if (now) rows.push(["Doing", now.prompt]);
       if (p) rows.push(["Tokens", fmt(p.tokens)], ["Tool calls", String(p.calls)]);
       body = (
@@ -279,6 +285,7 @@ export default function Inspector({ picked, data, onClose, open, openDash }: {
             <button key={v} role="radio" aria-checked={language === v} className={language === v ? "on" : ""} onClick={() => setLanguage(v)}>{label}</button>
           ))}
         </div>
+        {(() => { const h = data.hosts?.find((x) => x.agents.some(isCore)); return h ? <HostCard host={h} data={data} withControls={false} /> : null; })()}
         <div className="wi-acts">
           <button onClick={() => open(PATHS.settings, true)}>{t("Settings")}</button>
           <button onClick={() => window.dispatchEvent(new Event("superai:theme"))}>{t("Theme")}</button>
@@ -288,6 +295,30 @@ export default function Inspector({ picked, data, onClose, open, openDash }: {
         </>
       );
       break;
+    case "host": {
+      const h = data.hosts?.find((x) => x.id === picked.id);
+      kind = h ? kindLabel(h.kind) : "Host";
+      if (!h) { body = <p className="wi-note">{t("This host is no longer listed.")}</p>; break; }
+      if (h.hostname && h.hostname !== h.name) rows.push(["Hostname", h.hostname]);
+      if (h.os || h.arch) rows.push(["System", [h.os, h.arch].filter(Boolean).join(" ")]);
+      if (h.parent) rows.push(["Inside", data.hosts?.find((x) => x.id === h.parent)?.name ?? h.parent]);
+      rows.push(["State", HOST_STATE[h.state] ?? h.state]);
+      if (h.state !== "live" && h.lastSeen && !h.lastSeen.startsWith("0001")) rows.push(["Last seen", when(h.lastSeen)]);
+      const svc = (data.services ?? []).filter((s) => isHost(h, s.active) || s.standbys.some((b) => isHost(h, b.host)));
+      if (svc.length) rows.push(["HA services", svc.map((s) => `${s.name} (${isHost(h, s.active) ? t("active") : t("standby")})`).join(", ")]);
+      body = <HostCard host={h} data={data} withControls onRun={(agent, prompt) => act("run", () => StartCLIRun(agent, prompt, "", "", true), "Run started")} busy={busy === "run"} />;
+      break;
+    }
+    case "service": {
+      const s = data.services?.find((x) => x.name === picked.id);
+      kind = "HA service";
+      if (!s) { body = <p className="wi-note">{t("This service is no longer listed.")}</p>; break; }
+      if (s.vip) rows.push(["Service IP", s.vip]);
+      rows.push(["Runs on", s.active || "—"], ["State", SVC_STATE[s.state] ?? s.state], ["Kept up by", s.provider || "—"]);
+      if (s.units.length) rows.push(["Units", s.units.join(", ")]);
+      body = <ServiceCard svc={s} hosts={data.hosts ?? []} />;
+      break;
+    }
     case "node": {
       kind = "Node";
       const on = data.hive.members.filter((m) => (m as any).node === picked.id);
@@ -358,7 +389,7 @@ export default function Inspector({ picked, data, onClose, open, openDash }: {
     bee: PATHS.agents + "?agent=" + encodeURIComponent(picked.id), machine: PATHS.coding, cli: PATHS.coding, agent: PATHS.coding,
     brain: PATHS.knowledge, skills: PATHS.skills, skill: PATHS.skills, mcphub: PATHS.mcp, mcp: PATHS.mcp,
     dashboard: PATHS.dashboards, records: PATHS.records, event: PATHS.records, reminder: PATHS.records,
-    figure: PATHS.stats, settings: PATHS.settings,
+    figure: PATHS.stats, settings: PATHS.settings, host: PATHS.hive, service: PATHS.hive,
   };
   const screen = full[picked.kind] ?? PATHS.tasks;
   return (
@@ -570,5 +601,109 @@ function RunLine({ run, onStop }: { run: { id: string; prompt: string; state: st
       </li>
       {open && out && <pre className="wi-text">{out}</pre>}
     </>
+  );
+}
+
+const AGENT_STATE: Record<string, string> = {
+  live: "done", working: "running", waiting: "waiting", idle: "", installed: "", lost: "failed", configured: "", standby: "", "standby-unready": "failed",
+};
+/** What a role or a state reads as, short. */
+const roleLabel = (r?: string) => (r === "queen" ? "queen" : r === "worker" ? "worker" : r === "machine" ? "machine agent" : r === "relay" ? "relay" : r === "standalone" ? "on its own" : r || "");
+
+/**
+ * A host's agents in three groups, each a click away in the world: the
+ * SuperAIs (with their part in the hive and the MCP servers they can call),
+ * the coding CLIs, the named agents (with the SuperAI that runs them and the
+ * HA service that keeps them up); the hosts inside it; and, for a machine
+ * agent's host or the core's, the machine itself to look after.
+ */
+function HostCard({ host, data, withControls, onRun, busy }: { host: Host; data: WorldData; withControls: boolean; onRun?: (agent: string, prompt: string) => Promise<unknown>; busy?: boolean }) {
+  const { t } = useI18n();
+  const sup = host.agents.filter((a) => a.kind === "superai");
+  const clis = host.agents.filter((a) => a.kind === "cli");
+  const named = host.agents.filter((a) => a.kind === "agent");
+  const inside = (data.hosts ?? []).filter((x) => x.parent === host.id);
+  const machine = sup.find((a) => a.role === "machine");
+  const core = sup.some(isCore);
+  // What to look after: core's own machine, or the machine agent's.
+  const care = core ? "core" : machine?.name;
+  const runVia = core ? "core" : machine?.name ?? clis[0]?.via;
+  const stateWord = (a: HostAgent) => t(a.state === "standby-unready" ? "standby · not ready" : a.state);
+  const focusOf = (a: HostAgent) => {
+    if (a.kind === "superai") return isCore(a) ? focusInWorld("hall", "queen") : focusInWorld("worker", a.name);
+    if (a.kind === "cli") return focusInWorld("cli", core ? cliName(a) : `${cliName(a)}.${a.via}`);
+    if (isStandby(a)) return focusInWorld("service", a.service || a.name);
+    return focusInWorld("agent", `${a.name}.${a.via || host.name}`);
+  };
+  const row = (a: HostAgent, name: string, tail: string) => (
+    <li key={a.kind + a.name} onClick={() => focusOf(a)} title={a.about || undefined}>
+      <i className={`wi-dot ${AGENT_STATE[a.state] ?? ""}`} />{name}<em>{tail}</em>
+    </li>
+  );
+  return (
+    <div className="wi-host">
+      {sup.length > 0 && <>
+        <p className="wi-cap">SuperAI</p>
+        <ul className="wi-list">
+          {sup.flatMap((a) => [
+            row(a, a.name, [t(roleLabel(a.role)), a.version?.split("-")[0]].filter(Boolean).join(" · ")),
+            (a.mcp?.length ?? 0) > 0 ? <li key={a.name + ":mcp"} className="wi-host-mcp">MCP · {a.mcp!.join(", ")}</li> : null,
+          ])}
+        </ul>
+      </>}
+      {clis.length > 0 && <>
+        <p className="wi-cap">{t("Coding CLIs")}</p>
+        <ul className="wi-list">{clis.map((a) => row(a, cliName(a), stateWord(a)))}</ul>
+      </>}
+      {named.length > 0 && <>
+        <p className="wi-cap">{t("Agents")}</p>
+        <ul className="wi-list">{named.map((a) => row(a, a.name, [a.service ? `HA ${a.service}` : "", a.via ? t("via {name}", { name: a.via }) : "", stateWord(a)].filter(Boolean).join(" · ")))}</ul>
+      </>}
+      {inside.length > 0 && <>
+        <p className="wi-cap">{t("Inside")}</p>
+        <ul className="wi-list">
+          {inside.map((x) => (
+            <li key={x.id} onClick={() => focusInWorld("host", x.id)}>
+              <i className={`wi-dot ${x.state === "live" ? "done" : x.state === "lost" ? "failed" : ""}`} />{x.name}
+              <em>{[t(kindLabel(x.kind)), x.agents.filter((a) => a.kind === "superai").map((a) => t(roleLabel(a.role))).join(", ")].filter(Boolean).join(" · ")}</em>
+            </li>
+          ))}
+        </ul>
+      </>}
+      {host.agents.length === 0 && inside.length === 0 && <p className="wi-note">{t("Nothing runs here that this core knows of.")}</p>}
+      {withControls && care && host.state === "live" && <MachineHost name={care} />}
+      {withControls && onRun && runVia && clis.length > 0 && (
+        <NewRun clis={clis.map(cliName)} host={runVia} onStart={onRun} busy={!!busy} />
+      )}
+    </div>
+  );
+}
+
+/** An HA service's hosts: where it runs, where it can go and whether each is
+ *  ready to take it, and the agents it keeps up. */
+function ServiceCard({ svc, hosts }: { svc: HAService; hosts: Host[] }) {
+  const { t } = useI18n();
+  const find = (name: string) => hosts.find((h) => isHost(h, name));
+  const agents = hosts.flatMap((h) => h.agents.filter((a) => a.service === svc.name && !isStandby(a)).map((a) => ({ a, h })));
+  const go = (name: string) => { const h = find(name); if (h) focusInWorld("host", h.id); };
+  return (
+    <div className="wi-host">
+      <p className="wi-cap">{t("Hosts")}</p>
+      <ul className="wi-list">
+        {svc.active && <li onClick={() => go(svc.active!)}><i className="wi-dot done" />{svc.active}<em>{t("active")}</em></li>}
+        {svc.standbys.map((b) => (
+          <li key={b.host} onClick={() => go(b.host)}><i className={`wi-dot ${b.ready ? "" : "failed"}`} />{b.host}<em>{t(b.ready ? "standby, ready" : "standby, not ready")}</em></li>
+        ))}
+        {!svc.active && svc.standbys.length === 0 && <li className="wi-none">{t("No hosts.")}</li>}
+      </ul>
+      {agents.length > 0 && <>
+        <p className="wi-cap">{t("Agents")}</p>
+        <ul className="wi-list">
+          {agents.map(({ a, h }) => (
+            <li key={a.name + h.id} onClick={() => focusInWorld("agent", `${a.name}.${a.via || h.name}`)}><i className="wi-dot done" />{a.name}<em>{t("on {name}", { name: h.name })}</em></li>
+          ))}
+        </ul>
+      </>}
+    </div>
   );
 }
