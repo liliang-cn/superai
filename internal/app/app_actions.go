@@ -84,7 +84,7 @@ func (a *App) CallTool(server, tool string, args any, opts ActionOptions) backen
 		ev["code"] = res.Code
 	}
 	a.emit("chat:action", ev)
-	if res.OK && server == backend.NotedServer && strings.Contains(tool, "alarm") {
+	if res.OK && server == backend.NotedServer && touchesSchedule(tool) {
 		a.alarmsMayHaveChanged()
 	}
 	if res.OK && strings.TrimSpace(opts.SessionID) != "" {

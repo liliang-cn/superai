@@ -86,6 +86,9 @@ type App struct {
 	alarmsMu   sync.Mutex
 	alarmsStop context.CancelFunc
 	alarmsErr  string
+	// The notification-mode fire watcher's last failure (app_noted_schedule.go).
+	firesMu  sync.Mutex
+	firesErr string
 	pushMu     sync.Mutex
 	pushBuilt  bool
 	pushKey    string
