@@ -154,7 +154,7 @@ func (a *App) localAgentNames() []agentexec.Installed {
 		off[strings.ToLower(strings.TrimSpace(n))] = true
 	}
 	var out []agentexec.Installed
-	for _, c := range agentexec.Discover(s.ExternalAgents.Binaries) {
+	for _, c := range installedCLIs(s.ExternalAgents.Binaries) {
 		if !off[strings.ToLower(c.Name)] {
 			out = append(out, c)
 		}

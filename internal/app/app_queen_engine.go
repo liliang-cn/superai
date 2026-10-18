@@ -37,7 +37,6 @@ import (
 	"time"
 
 	"github.com/liliang-cn/agent-go/v3/pkg/agent"
-	"github.com/liliang-cn/agentexec"
 	"github.com/liliang-cn/superai/internal/backend"
 )
 
@@ -563,7 +562,7 @@ func (a *App) validQueenEngine(next *backend.Settings, prev string) error {
 	if !next.ExternalAgents.Enabled {
 		return errors.New("the queen engine is Claude Code on this machine, so External agents has to be on")
 	}
-	for _, c := range agentexec.Discover(next.ExternalAgents.Binaries) {
+	for _, c := range installedCLIs(next.ExternalAgents.Binaries) {
 		if c.Name == "claude" {
 			return nil
 		}
