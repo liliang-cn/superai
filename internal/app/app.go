@@ -773,7 +773,6 @@ func (a *App) emitLogin(status, provider, message string) {
 // GetStatus reports backend readiness for the frontend.
 func (a *App) GetStatus() map[string]any {
 	a.mu.Lock()
-	defer a.mu.Unlock()
 	st := map[string]any{
 		"ready":          a.svc != nil,
 		"error":          a.buildErr,
@@ -795,13 +794,18 @@ func (a *App) GetStatus() map[string]any {
 	}
 	st["queenName"] = a.settings.QueenDisplayName()
 	st["queenAliases"] = a.settings.QueenAliasList()
-	if a.svc != nil {
-		st["skills"] = a.svc.InstalledSkills()
-		st["memoryMode"] = a.svc.MemoryMode
+	svc := a.svc
+	a.mu.Unlock()
+	if svc != nil {
+		// Read without a.mu: asking the service waits on its own locks, and
+		// every message sent takes a.mu first, so a poll held up here would
+		// hold up the next message with it.
+		st["skills"] = svc.InstalledSkills()
+		st["memoryMode"] = svc.MemoryMode
 		// Counted here rather than shipped as the whole list: the status bar
 		// only needs a number, and this is polled every fifteen seconds.
 		running, tools := 0, 0
-		for _, srv := range a.svc.MCPServers() {
+		for _, srv := range svc.MCPServers() {
 			if !srv.Running {
 				continue
 			}
