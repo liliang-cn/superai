@@ -5,14 +5,36 @@ import { contact, ownMat, rbox } from "./kit";
 // The hive as the boxes it runs on. Every host that stands on its own (a VM,
 // a Mac, a bare machine, a container nothing contains) is a plot on the
 // floor; a pod stands on its node's plot as a small framed platform; what
-// runs on a host stands on it. HA services are a marker with their service
-// IP, tied to the host they run on now and, ghosted, to the ones they can
-// move to. This file plans where things go and makes the parts; cluster.ts
-// puts the agents on them.
+// runs on a host stands on it. An HA service is a pin with its service IP
+// standing at the outer edge of the host it runs on now, with a dashed line
+// round the outside of the ring to each host it can move to (where its
+// agent, if it has one, stands as a ghost). This file plans where things go
+// and makes the parts; cluster.ts puts the agents on them.
 
 const KIND: Record<string, string> = { pod: "Pod", container: "Container", mac: "Mac", vm: "VM", metal: "Bare metal" };
-/** What a host is, as a label says it: "VM", "Pod", "Host" when it has not said. */
-export const kindLabel = (k?: string) => KIND[k ?? ""] ?? "Host";
+/** What a host is, as a label says it: "VM", "Pod", "Host" when it has not
+ *  said; "HA node" for one known only as an HA service's node, whose kind
+ *  nothing has said either. */
+export const kindLabel = (k?: string, haNode = false) => KIND[k ?? ""] ?? (haNode ? "HA node" : "Host");
+
+/** The HA services a host runs now and the ones it stands by for. */
+export function haRoles(h: Host, services: HAService[]) {
+  return {
+    runs: services.filter((s) => isHost(h, s.active)).map((s) => s.name),
+    standby: services.filter((s) => !isHost(h, s.active) && s.standbys.some((b) => isHost(h, b.host))).map((s) => s.name),
+  };
+}
+
+/** What a host's label says when nothing on it has linked: what the HA
+ *  services have it doing ("runs cortexdb · standby for openclaw"), else
+ *  that only the settings reach it. Empty when neither. */
+export function unlinkedStatus(h: Host, services: HAService[], t: (k: string, v?: Record<string, string | number>) => string) {
+  const r = haRoles(h, services);
+  const said = [r.runs.length ? t("runs {names}", { names: r.runs.join(", ") }) : "", r.standby.length ? t("standby for {names}", { names: r.standby.join(", ") }) : ""].filter(Boolean);
+  if (said.length) return said.join(" · ");
+  if (h.agents.some((a) => a.kind === "agent" && a.state === "configured")) return t("reached over ssh");
+  return "";
+}
 
 /** Whether a host name (an HA service's, a link's) means this host. */
 export const isHost = (h: Host, name?: string) => {
@@ -54,9 +76,15 @@ export interface Plot {
 
 export interface ServiceSpot {
   svc: HAService;
+  /** Where its pin stands: at the outer edge of the plot it runs on. */
   at: THREE.Vector3;
+  /** How tall its pin is: the pins in one row step up toward the back, so
+   *  their labels stand one above the other. */
+  height: number;
   active?: Plot;
-  standbys: { plot: Plot; ready: boolean }[];
+  /** Each host it can move to, with where its line lands there and the
+   *  point the line bends round, outside the ring. */
+  standbys: { plot: Plot; ready: boolean; to: THREE.Vector3; bend: THREE.Vector3 }[];
 }
 
 export interface HostPlan {
@@ -112,7 +140,11 @@ export function planHosts(hosts: Host[], services: HAService[]): HostPlan {
     const pods = (kids.get(host.id) ?? []).filter((p) => p !== core);
     const sup = host.agents.filter((a) => a.kind === "superai");
     const machine = sup.find((a) => a.role === "machine" || a.role === "standalone") ?? sup.find((a) => a.role === "relay");
-    const others = host.agents.filter((a) => a.kind !== "superai");
+    // A CLI that is also a named agent here (the process detector sees
+    // openclaw run) is that agent, once: a core from before it said so
+    // still lists both.
+    const namedHere = new Set(host.agents.filter((a) => a.kind === "agent").map((a) => a.name));
+    const others = host.agents.filter((a) => a.kind !== "superai" && !(a.kind === "cli" && namedHere.has(cliName(a))));
     const station: Plot["station"] = machine
       ? (machine.role === "relay" && !others.some((a) => a.kind === "cli") ? "pad" : host.kind === "mac" || host.os === "darwin" ? "laptop" : "desk")
       : others.some((a) => a.kind === "cli") ? (host.kind === "mac" ? "laptop" : "desk") : "";
@@ -144,8 +176,10 @@ export function planHosts(hosts: Host[], services: HAService[]): HostPlan {
   const coreParent = core?.parent ? plots.find((p) => p.host.id === top(core).id) : undefined;
   const coreCrew = core && !coreIsPlot ? best(core.agents.filter((a) => a.kind !== "superai" && !isStandby(a)), 4) : [];
   const spots = placeServices(services, plots);
-  // The core, every plot and every service, in one circle.
-  const pts = [new THREE.Vector3(), ...plots.flatMap((p) => [p.at.clone().add(new THREE.Vector3(p.w / 2, 0, p.d / 2)), p.at.clone().sub(new THREE.Vector3(p.w / 2, 0, p.d / 2))]), ...spots.map((s) => s.at)];
+  // The core, every plot and every service, in one circle: a pin with room
+  // for its label beside it, and the lines bowing out to their standbys.
+  const pts = [new THREE.Vector3(), ...plots.flatMap((p) => [p.at.clone().add(new THREE.Vector3(p.w / 2, 0, p.d / 2)), p.at.clone().sub(new THREE.Vector3(p.w / 2, 0, p.d / 2))]),
+    ...spots.flatMap((s) => [s.at.clone().add(new THREE.Vector3(7, 0, 0)), ...s.standbys.map((b) => b.bend)])];
   const box = new THREE.Box3().setFromPoints(pts);
   const c = box.getCenter(new THREE.Vector3());
   const r = Math.max(...pts.map((p) => Math.hypot(p.x - c.x, p.z - c.z)));
@@ -179,33 +213,67 @@ function ring(plots: Plot[]) {
   });
 }
 
-/** Each service out past the hosts it runs on, nearer the one it runs on
- *  now; one on none of the hosts drawn waits at the back. Markers keep
- *  apart along the ring. */
+/** A plot's outer edge, the side facing away from the core: its outward
+ *  normal, the direction along it, and how far out from the centre it is. */
+export function outerEdge(p: Plot) {
+  const alongX = Math.abs(p.at.x) >= Math.abs(p.at.z);
+  const n = alongX ? new THREE.Vector3(Math.sign(p.at.x) || 1, 0, 0) : new THREE.Vector3(0, 0, Math.sign(p.at.z) || 1);
+  const t = alongX ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(1, 0, 0);
+  return { n, t, half: alongX ? p.w / 2 : p.d / 2, len: alongX ? p.d : p.w };
+}
+
+const PIN_OUT = 2.4, PIN_STEP = 4.2;
+/** How high a service pin's gem stands, the lowest of a row. */
+export const PIN_GEM = 1.9;
+
+/**
+ * Each service's pin at the outer edge of the plot it runs on, the
+ * services of one plot in a row along that edge (by name, so they keep
+ * their places). A service running on no plot drawn stands at its first
+ * standby's edge; one on none at all waits at the back. A standby's line
+ * lands on that plot's outer edge, the lines landing on one plot side by
+ * side, and bows outward, each a little more than the last, so lines
+ * between the same two hosts nest instead of crossing.
+ */
 function placeServices(services: HAService[], plots: Plot[]): ServiceSpot[] {
   const deg = THREE.MathUtils.degToRad;
-  const placed = services.map((svc) => {
-    const s: ServiceSpot = {
-      svc, at: new THREE.Vector3(),
-      active: plots.find((p) => isHost(p.host, svc.active)),
-      standbys: svc.standbys.flatMap((b) => { const plot = plots.find((p) => isHost(p.host, b.host)); return plot ? [{ plot, ready: b.ready }] : []; }),
-    };
-    const on = [s.active, s.active, ...s.standbys.map((b) => b.plot)].filter((p): p is Plot => !!p);
-    const mid = new THREE.Vector3();
-    let reach = 0;
-    if (on.length) {
-      on.forEach((p) => { mid.add(p.at); reach = Math.max(reach, Math.max(p.w, p.d) / 2); });
-      mid.divideScalar(on.length);
-    } else mid.set(Math.cos(deg(225)), 0, Math.sin(deg(225))).multiplyScalar(30);
-    return { s, a: Math.atan2(mid.z, mid.x), r: mid.length() + reach + 6 };
+  const spots: (ServiceSpot & { home?: Plot })[] = services.map((svc) => {
+    const active = plots.find((p) => isHost(p.host, svc.active));
+    const standbys = svc.standbys.flatMap((b) => {
+      const plot = plots.find((p) => isHost(p.host, b.host));
+      return plot && plot !== active ? [{ plot, ready: b.ready, to: new THREE.Vector3(), bend: new THREE.Vector3() }] : [];
+    });
+    return { svc, at: new THREE.Vector3(), height: PIN_GEM, active, standbys, home: active ?? standbys[0]?.plot };
   });
-  placed.sort((x, y) => x.a - y.a);
-  for (let i = 1; i < placed.length; i++) {
-    const min = 7 / placed[i].r;
-    if (placed[i].a - placed[i - 1].a < min) placed[i].a = placed[i - 1].a + min;
+  const row = new Map<Plot, typeof spots>();
+  for (const s of [...spots].sort((a, b) => a.svc.name.localeCompare(b.svc.name))) {
+    if (s.home) row.set(s.home, [...(row.get(s.home) ?? []), s]);
+    else s.at.set(Math.cos(deg(225)), 0, Math.sin(deg(225))).multiplyScalar(40);
   }
-  placed.forEach((p) => p.s.at.set(Math.cos(p.a) * p.r, 0, Math.sin(p.a) * p.r));
-  return services.map((svc) => placed.find((p) => p.s.svc === svc)!.s);
+  for (const [p, list] of row) {
+    const e = outerEdge(p);
+    list.forEach((s, k) => {
+      s.at.copy(p.at).addScaledVector(e.n, e.half + PIN_OUT).addScaledVector(e.t, (k - (list.length - 1) / 2) * PIN_STEP);
+    });
+    // Nearest the viewer (the camera looks from +x +z) lowest.
+    [...list].sort((a, b) => (b.at.x * 0.66 + b.at.z) - (a.at.x * 0.66 + a.at.z)).forEach((s, k) => { s.height = PIN_GEM + k * 1.5; });
+  }
+  // Where the lines land, spread along each plot's outer edge.
+  const landing = new Map<Plot, { s: ServiceSpot; b: ServiceSpot["standbys"][number] }[]>();
+  for (const s of spots) for (const b of s.standbys) if (b.plot !== s.home) landing.set(b.plot, [...(landing.get(b.plot) ?? []), { s, b }]);
+  for (const [p, list] of landing) {
+    const e = outerEdge(p);
+    const step = Math.min(2.2, (e.len - 1.5) / Math.max(1, list.length - 1));
+    list.sort((x, y) => x.s.svc.name.localeCompare(y.s.svc.name));
+    list.forEach(({ s, b }, k) => {
+      b.to.copy(p.at).addScaledVector(e.n, e.half + 0.35).addScaledVector(e.t, (k - (list.length - 1) / 2) * step);
+      const mid = s.at.clone().lerp(b.to, 0.5);
+      const out = mid.clone().setY(0);
+      if (out.lengthSq() < 1e-6) out.set(1, 0, 0);
+      b.bend.copy(mid).addScaledVector(out.normalize(), 3 + s.at.distanceTo(b.to) * 0.18 + k * 1.8);
+    });
+  }
+  return spots.map(({ home: _home, ...s }) => s);
 }
 
 // ── Parts ────────────────────────────────────────────────────────────────
@@ -313,9 +381,10 @@ export function pod(state: Host["state"]) {
 }
 
 /** A link on the floor between two points: solid for where a service runs,
- *  dashed for where it can go, faint red-grey for a standby that is not ready. */
-export function floorLink(a: THREE.Vector3, b: THREE.Vector3, how: "active" | "standby" | "unready" | "parent") {
-  const mid = a.clone().lerp(b, 0.5);
+ *  dashed for where it can go, faint red-grey for a standby that is not
+ *  ready. It bows toward `bend` when given, else runs straight. */
+export function floorLink(a: THREE.Vector3, b: THREE.Vector3, how: "active" | "standby" | "unready" | "parent", bend?: THREE.Vector3) {
+  const mid = bend ? bend.clone() : a.clone().lerp(b, 0.5);
   const curve = new THREE.QuadraticBezierCurve3(a.clone().setY(0.09), mid.setY(0.09), b.clone().setY(0.09));
   const m = how === "active" ? lineMat(BLUE, 0x5b9dff, 0.9, false)
     : how === "standby" ? lineMat(0x6b7a8c, NIGHT_LINE, 0.75, true)
@@ -327,25 +396,36 @@ export function floorLink(a: THREE.Vector3, b: THREE.Vector3, how: "active" | "s
   return line;
 }
 
+/** A small open ring on the floor where a standby line lands. */
+export function socket(ready: boolean) {
+  const m = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.035, 6, 40), ownMat(0xffffff, { emissive: ready ? 0x6b7a8c : 0xc0796b, glow: 0.5 }));
+  m.rotation.x = Math.PI / 2;
+  m.position.y = 0.1;
+  m.raycast = () => {};
+  return m;
+}
+
 const SVC: Record<string, number> = { active: BLUE, degraded: 0xf2b416, down: 0xe2553f };
 /**
- * An HA service: a slim post with a ring of light at its foot and a diamond
- * over it, blue while it runs, honey with no standby ready, red when down.
+ * An HA service: a pin at the edge of the host it runs on, a slim post with
+ * a ring of light at its foot and a diamond on top, blue while it runs,
+ * honey with no standby ready, red when down.
  */
-export function serviceMarker() {
+export function serviceMarker(height = PIN_GEM) {
   const g = new THREE.Group();
-  const foot = rbox(1.6, 0.12, 1.6, ownMat(0xf6f8fa, { rough: 0.55 }), 0.3);
+  const foot = rbox(1.15, 0.1, 1.15, ownMat(0xf6f8fa, { rough: 0.55 }), 0.25);
   const glow = ownMat(0xd8e4ff, { emissive: BLUE, glow: 0.9 });
-  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.62, 0.03, 8, 64), glow);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.44, 0.03, 8, 48), glow);
   ring.rotation.x = Math.PI / 2;
-  ring.position.y = 0.13;
-  const post = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 2.1, 12), ownMat(0x9aa1a9, { rough: 0.35, metal: 0.6 }));
-  post.position.y = 1.15;
-  const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.42, 0), ownMat(BLUE, { emissive: BLUE, glow: 0.55, rough: 0.25 }));
-  gem.position.y = 2.6;
+  ring.position.y = 0.11;
+  const post = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, height - 0.3, 12), ownMat(0x9aa1a9, { rough: 0.35, metal: 0.6 }));
+  post.position.y = (height - 0.3) / 2 + 0.1;
+  const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.3, 0), ownMat(BLUE, { emissive: BLUE, glow: 0.55, rough: 0.25 }));
+  gem.position.y = height;
   gem.castShadow = true;
-  g.add(foot, ring, post, gem, contact(3, 3, 0.12));
+  g.add(foot, ring, post, gem, contact(2, 2, 0.1));
   g.userData.gem = gem;
+  g.userData.gemY = height;
   g.userData.glow = glow;
   return g;
 }

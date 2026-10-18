@@ -18,7 +18,7 @@ import MachineHost from "./MachineHost";
 import type { Picked } from "./engine";
 import { clisOf, sessionLine, type WorldData } from "./cluster";
 import { agendaWhen, type AgendaEntry } from "./agenda";
-import { cliName, isCore, isHost, isStandby, kindLabel } from "./hosts";
+import { cliName, haRoles, isCore, isHost, isStandby, kindLabel, unlinkedStatus } from "./hosts";
 
 const KIND: Record<AgendaEntry["kind"], string> = { event: "Event", reminder: "Reminder", todo: "To-do", timer: "Timing" };
 
@@ -297,12 +297,17 @@ export default function Inspector({ picked, data, onClose, open, openDash }: {
       break;
     case "host": {
       const h = data.hosts?.find((x) => x.id === picked.id);
-      kind = h ? kindLabel(h.kind) : "Host";
+      const roles = h ? haRoles(h, data.services ?? []) : { runs: [], standby: [] };
+      const haNode = roles.runs.length + roles.standby.length > 0;
+      kind = h ? kindLabel(h.kind, haNode) : "Host";
       if (!h) { body = <p className="wi-note">{t("This host is no longer listed.")}</p>; break; }
       if (h.hostname && h.hostname !== h.name) rows.push(["Hostname", h.hostname]);
       if (h.os || h.arch) rows.push(["System", [h.os, h.arch].filter(Boolean).join(" ")]);
+      if (h.addresses?.length) rows.push([h.addresses.length > 1 ? "Addresses" : "Address", h.addresses.join(", ")]);
       if (h.parent) rows.push(["Inside", data.hosts?.find((x) => x.id === h.parent)?.name ?? h.parent]);
-      rows.push(["State", HOST_STATE[h.state] ?? h.state]);
+      // A host nothing has linked from, known as an HA service's node, is
+      // where haify says; that is not "only in the settings".
+      rows.push(["State", h.state === "configured" && haNode ? unlinkedStatus(h, data.services ?? [], t) : HOST_STATE[h.state] ?? h.state]);
       if (h.state !== "live" && h.lastSeen && !h.lastSeen.startsWith("0001")) rows.push(["Last seen", when(h.lastSeen)]);
       const svc = (data.services ?? []).filter((s) => isHost(h, s.active) || s.standbys.some((b) => isHost(h, b.host)));
       if (svc.length) rows.push(["HA services", svc.map((s) => `${s.name} (${isHost(h, s.active) ? t("active") : t("standby")})`).join(", ")]);
@@ -657,7 +662,7 @@ function HostCard({ host, data, withControls, onRun, busy }: { host: Host; data:
       </>}
       {named.length > 0 && <>
         <p className="wi-cap">{t("Agents")}</p>
-        <ul className="wi-list">{named.map((a) => row(a, a.name, [a.service ? `HA ${a.service}` : "", a.via ? t("via {name}", { name: a.via }) : "", stateWord(a)].filter(Boolean).join(" · ")))}</ul>
+        <ul className="wi-list">{named.map((a) => row(a, a.name, [a.service ? `HA ${a.service}` : "", a.via ? t("via {name}", { name: a.via }) : "", a.activity ? t(a.activity) : stateWord(a)].filter(Boolean).join(" · ")))}</ul>
       </>}
       {inside.length > 0 && <>
         <p className="wi-cap">{t("Inside")}</p>
