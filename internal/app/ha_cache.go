@@ -24,8 +24,8 @@ type haCache struct {
 }
 
 // haSource is the haify controller to ask: the settings', or
-// SUPERAI_HAIFY_URL and SUPERAI_HAIFY_TOKEN_FILE for a deployment that keeps
-// it out of the settings.
+// SUPERAI_HAIFY_URL with SUPERAI_HAIFY_TOKEN (or SUPERAI_HAIFY_TOKEN_FILE)
+// for a deployment that keeps it out of the settings.
 func (a *App) haSource() backend.HaifySource {
 	a.mu.Lock()
 	var src backend.HaifySource
@@ -35,6 +35,9 @@ func (a *App) haSource() backend.HaifySource {
 	a.mu.Unlock()
 	if u := os.Getenv("SUPERAI_HAIFY_URL"); u != "" {
 		src.URL = u
+	}
+	if t := os.Getenv("SUPERAI_HAIFY_TOKEN"); t != "" {
+		src.Token = t
 	}
 	if f := os.Getenv("SUPERAI_HAIFY_TOKEN_FILE"); f != "" {
 		src.TokenFile = f
