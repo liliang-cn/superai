@@ -182,15 +182,15 @@ func TestOwnRunsAndReusedPIDsAreNotSessions(t *testing.T) {
 	ps := "4000     1  1.0 05:00 0:30.00 /Users/me/.superai-node/bin/superai agent\n" +
 		"4001  4000  0.0 01:00 0:00.01 /bin/sh -c opencode run\n" +
 		"4002  4001 50.0 01:00 0:20.00 opencode run do-it\n" +
-		"5000     1  0.0 01:00 0:00.10 gemini\n"
+		"5000     1  0.0 01:00 0:00.10 agy\n"
 	out := p.look(parsePS([]byte(ps)), time.Now())
-	if len(out["opencode"]) != 0 || len(out["gemini"]) != 1 {
+	if len(out["opencode"]) != 0 || len(out["agy"]) != 1 {
 		t.Fatalf("%+v", out)
 	}
 	// The pid comes back as another program: a new session from then.
-	t0 := out["gemini"][0].Started
+	t0 := out["agy"][0].Started
 	out = p.look(parsePS([]byte("5000     1  0.0 00:05 0:00.10 goose\n")), time.Now())
-	if len(out["goose"]) != 1 || len(out["gemini"]) != 0 || out["goose"][0].Started.Equal(t0) {
+	if len(out["goose"]) != 1 || len(out["agy"]) != 0 || out["goose"][0].Started.Equal(t0) {
 		t.Fatalf("reused %+v", out)
 	}
 	if len(p.seen) != 1 {
