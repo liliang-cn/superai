@@ -126,10 +126,6 @@ type App struct {
 	selfPendingMu sync.Mutex
 	selfPending   map[string]any
 	runs          map[string]*chatRun
-	// turnQueue is the turns waiting, per conversation, for the one running in
-	// it; runFreed wakes them. Both under runMu. See turn_queue.go.
-	turnQueue map[string][]string
-	runFreed  chan struct{}
 
 	// wall narrates every long run into state a window can draw. It outlives
 	// a rebuild on purpose: a settings save must not erase the run wall.
@@ -925,23 +921,23 @@ func (a *App) sendChat(sessionID, message string, imagePaths []string, own bool)
 		return requestID
 	}
 
-	// Asked again while this conversation is still answering: the turn waits
-	// for that answer and then starts as it would have (see turn_queue.go).
-	// Never a worker: it has none of what the queen has.
-	start := func() { a.startTurn(requestID, sessionID, message, imagePaths, own) }
-	if !a.queueTurn(requestID, sessionID, start) {
-		start()
-	}
+	// Asked again while this conversation is still answering: it starts now
+	// all the same (see turn_at_once.go).
+	a.startTurn(requestID, sessionID, message, imagePaths, own)
 	return requestID
 }
 
-// startTurn runs a turn in a conversation that is free: with the queen's
-// engine, when one is set and this is a person talking to her (an engine
-// session takes one turn at a time, which the queue in front of this keeps),
-// and with this app's model otherwise.
+// startTurn runs a turn now: with the queen's engine, when one is set and this
+// is a person talking to her, and with this app's model otherwise. An engine
+// session takes one turn at a time, so while the conversation is busy this
+// app's model stands in for the engine rather than the turn waiting for it.
 func (a *App) startTurn(requestID, sessionID, message string, imagePaths []string, own bool) {
 	if !own {
 		if engine := a.queenEngineFor(sessionID, imagePaths); engine != "" {
+			if a.sessionBusy(sessionID) {
+				a.ownTurn(requestID, sessionID, message, imagePaths, engine)
+				return
+			}
 			a.routeToEngine(requestID, sessionID, engine, message)
 			return
 		}
@@ -1155,7 +1151,6 @@ func (a *App) untrackRun(requestID string) {
 	a.runMu.Lock()
 	defer a.runMu.Unlock()
 	delete(a.runs, requestID)
-	a.wakeQueueLocked()
 }
 
 // runSession records which conversation a tracked turn belongs to.

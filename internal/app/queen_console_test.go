@@ -46,21 +46,17 @@ func TestATurnIsAnnouncedAndItsEventsCarryTheConversation(t *testing.T) {
 	}
 }
 
-// A queued turn's waiting note is stamped too: it is the first thing the
-// other device sees of a turn that waits behind its own.
-func TestAQueuedTurnsNoteCarriesTheConversation(t *testing.T) {
+// A turn started while another is running in the conversation is stamped
+// too: the other device has to know which conversation it belongs to.
+func TestAnOverlappingTurnCarriesTheConversation(t *testing.T) {
 	h := newEngineHarness(t, fakeClaudeTurn, 0)
 	h.a.settings.Hive.QueenEngine = ""
 	end := busyWith(h.a, "call-1", QueenConsoleSession)
+	defer end()
 
 	id := h.a.SendChat(QueenConsoleSession, "还有一件事", nil)
-	notes := h.ev.all("chat:event", id)
-	if len(notes) == 0 || notes[0]["sessionId"] != QueenConsoleSession {
-		t.Fatalf("waiting note: %v", notes)
-	}
-	end()
-	if name, _ := h.ev.wait(t, id); name != "chat:done" {
-		t.Fatalf("ended with %s", name)
+	if name, done := h.ev.wait(t, id); name != "chat:done" || done["sessionId"] != QueenConsoleSession {
+		t.Fatalf("ended with %s %v", name, done)
 	}
 }
 
