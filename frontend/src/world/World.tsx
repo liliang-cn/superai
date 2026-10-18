@@ -184,7 +184,8 @@ export default function World({ view }: { view: ViewKey }) {
   return (
     <div className="wl-root">
       <div ref={host} className="wl-host" />
-      <svg className="wl-lead"><line ref={line} /></svg>
+      {/* The leader to the open card; none when no card is open. */}
+      <svg className="wl-lead" style={{ display: picked ? "" : "none" }}><line ref={line} /></svg>
       <div className="wl-cam">
         <button title="Zoom in" onClick={() => engine.current?.zoomBy(1.3)}><PlusIcon size={16} /></button>
         <button title="Zoom out" onClick={() => engine.current?.zoomBy(1 / 1.3)}><MinusIcon size={16} /></button>
@@ -204,7 +205,7 @@ export default function World({ view }: { view: ViewKey }) {
         <button className={holo ? "on" : ""} aria-pressed={holo} aria-label={t("Stats")} title={`${t("Stats")} (S)`} onClick={flipHolo}><GaugeIcon size={15} /></button>
       </div>
       <div className="wl-corner">
-        <Hud view={view} data={data} />
+        <Hud view={view} data={data} on={holo} />
       </div>
       <StatsHud hive={hive} runs={runs} on={holo} />
       <div ref={card} className="wl-callout" style={{ display: picked ? "" : "none" }}>
@@ -219,8 +220,8 @@ export default function World({ view }: { view: ViewKey }) {
 /** The hive's status, as one pane of light in the top-left corner: what the
  *  cluster spends and how many of its workers answer on the top line, and
  *  opened, its work, how fast tokens have gone lately, and each member's
- *  share. It stays up whether the other corners are shown or not. */
-function Hud({ data }: { view: ViewKey; data: WorldData }) {
+ *  share. It comes and goes with the other corners (the stats switch). */
+function Hud({ data, on }: { view: ViewKey; data: WorldData; on: boolean }) {
   const { t } = useI18n();
   // Folded to its top line unless opened; it remembers.
   const [open, setOpen] = useState(() => { try { return localStorage.getItem("superai-world-stats") === "1"; } catch { return false; } });
@@ -246,7 +247,7 @@ function Hud({ data }: { view: ViewKey; data: WorldData }) {
   const topTokens = Math.max(1, ...members.map((m) => m.tokens));
   const short = (n: string) => n.replace(/^superai-worker-/, "w").replace(/^superai-/, "");
   return (
-    <div className={`wl-holo tl wl-hive${open ? " open" : ""}`}>
+    <div className={`wl-holo tl wl-hive${open ? " open" : ""}${on ? "" : " off"}`} aria-hidden={!on}>
       <button className="wh-hive-top" onClick={toggle} aria-expanded={open} title={t(open ? "Fold" : "Show the figures")}>
         <div className="wh-fig big main">
           <b><i className={tt.tokPerSec > 0.5 ? "wh-dot on" : "wh-dot"} />{fmt(tt.tokens)}</b>
