@@ -226,6 +226,10 @@ export function HiveTaskDetail(arg1) {
   return window['go']['app']['App']['HiveTaskDetail'](arg1);
 }
 
+export function HiveTopology() {
+  return window['go']['app']['App']['HiveTopology']();
+}
+
 export function HomeLayout() {
   return window['go']['app']['App']['HomeLayout']();
 }
@@ -248,6 +252,10 @@ export function HostServices() {
 
 export function HostStatus() {
   return window['go']['app']['App']['HostStatus']();
+}
+
+export function Hosts() {
+  return window['go']['app']['App']['Hosts']();
 }
 
 export function ImportCSV(arg1, arg2) {

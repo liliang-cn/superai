@@ -118,6 +118,8 @@ export function HiveStatus():Promise<Record<string, any>>;
 
 export function HiveTaskDetail(arg1:string):Promise<Record<string, any>>;
 
+export function HiveTopology():Promise<app.HiveTopology>;
+
 export function HomeLayout():Promise<Record<string, any>>;
 
 export function HostExec(arg1:string,arg2:number):Promise<app.HostExecResult>;
@@ -129,6 +131,8 @@ export function HostService(arg1:string,arg2:string):Promise<string>;
 export function HostServices():Promise<Array<app.HostService>>;
 
 export function HostStatus():Promise<app.HostInfo>;
+
+export function Hosts():Promise<Array<app.Host>>;
 
 export function ImportCSV(arg1:string,arg2:string):Promise<string>;
 
