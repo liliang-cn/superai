@@ -26,6 +26,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -241,6 +242,7 @@ func (a *App) startAlarmWatch() {
 	a.alarmsStop = cancel
 	a.alarmsMu.Unlock()
 	go w.run(ctx)
+	a.startFireWatch(ctx)
 }
 
 func (a *App) stopAlarmWatch() {
@@ -298,19 +300,35 @@ func (o alarmToolObserver) OnToolEnd(_ context.Context, info agent.ToolInfo, _ a
 }
 
 // touchesAlarms says whether a call was (or, for a script, may have been) to
-// a noted alarm tool: mcp_noted_create_alarm and its siblings. A false
-// positive costs one list_alarms.
+// a noted tool that changes what the phones ring: mcp_noted_create_alarm and
+// its siblings, and the event and to-do tools. A false positive costs one
+// list_alarms.
 func touchesAlarms(tool string, args map[string]any) bool {
 	prefix := "mcp_" + backend.NotedServer + "_"
 	if strings.HasPrefix(tool, prefix) {
-		return strings.Contains(tool, "alarm")
+		return touchesSchedule(strings.TrimPrefix(tool, prefix))
 	}
 	if tool == "execute_javascript" {
 		b, _ := json.Marshal(args)
-		code := string(b)
-		return strings.Contains(code, prefix) && strings.Contains(code, "alarm")
+		for _, m := range notedToolRE.FindAllString(string(b), -1) {
+			if touchesSchedule(strings.TrimPrefix(m, prefix)) {
+				return true
+			}
+		}
 	}
 	return false
+}
+
+var notedToolRE = regexp.MustCompile(`mcp_` + backend.NotedServer + `_[a-z_]+`)
+
+// touchesSchedule says whether a noted tool may change what the phones ring:
+// a write to an alarm, an event or a to-do (all of them ring or notify now,
+// and the alarms version covers them all).
+func touchesSchedule(tool string) bool {
+	if isReadTool(tool) {
+		return false
+	}
+	return strings.Contains(tool, "alarm") || strings.Contains(tool, "event") || strings.Contains(tool, "task")
 }
 
 // alarmPusher is the APNs client the settings describe, or nil with one log

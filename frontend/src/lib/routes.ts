@@ -18,6 +18,7 @@ export const PATHS: Record<ViewKey, string> = {
   agents: "/agents",
   coding: "/coding",
   tasks: "/tasks",
+  schedule: "/schedule",
   dashboards: "/dashboards",
   knowledge: "/knowledge",
   skills: "/skills",
@@ -32,6 +33,13 @@ export function viewOf(pathname: string): ViewKey {
   const first = "/" + pathname.split("/")[1];
   const hit = (Object.keys(PATHS) as ViewKey[]).find((k) => PATHS[k] === first);
   return hit ?? "home";
+}
+
+/** Where a notice's deeplink opens in this app, or "" for nowhere. */
+export function deeplinkPath(link?: string): string {
+  if (!link) return "";
+  if (/^superai:\/\/schedule\b/.test(link) || /^noted:\/\/(event|task|alarm)\//.test(link)) return PATHS.schedule;
+  return "";
 }
 
 /** The address of one hive task. The id is a UUID, so it needs no escaping. */

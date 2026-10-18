@@ -38,6 +38,10 @@ export function CCSessions() {
   return window['go']['app']['App']['CCSessions']();
 }
 
+export function CLIActivityAll() {
+  return window['go']['app']['App']['CLIActivityAll']();
+}
+
 export function CLIProxyAccounts() {
   return window['go']['app']['App']['CLIProxyAccounts']();
 }
@@ -374,6 +378,14 @@ export function NotedHolidays(arg1) {
   return window['go']['app']['App']['NotedHolidays'](arg1);
 }
 
+export function NotedRings() {
+  return window['go']['app']['App']['NotedRings']();
+}
+
+export function NotedSchedule(arg1, arg2) {
+  return window['go']['app']['App']['NotedSchedule'](arg1, arg2);
+}
+
 export function NotedTimeEntries() {
   return window['go']['app']['App']['NotedTimeEntries']();
 }
@@ -384,6 +396,10 @@ export function NotedTimeWeek() {
 
 export function NotedToday() {
   return window['go']['app']['App']['NotedToday']();
+}
+
+export function NotedUpcoming(arg1) {
+  return window['go']['app']['App']['NotedUpcoming'](arg1);
 }
 
 export function Notifications() {
@@ -468,6 +484,10 @@ export function ReadWorkspaceFileDataURL(arg1) {
 
 export function RefreshDashboard(arg1) {
   return window['go']['app']['App']['RefreshDashboard'](arg1);
+}
+
+export function Relays() {
+  return window['go']['app']['App']['Relays']();
 }
 
 export function Remote(arg1, arg2) {

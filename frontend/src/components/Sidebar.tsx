@@ -4,6 +4,7 @@ import {
   LayoutDashboardIcon,
   ListTodoIcon,
   BrainIcon,
+  CalendarDaysIcon,
   ChartColumnIcon,
   HexagonIcon,
   LayoutGridIcon,
@@ -43,6 +44,7 @@ const NAV: {
     items: [
       { key: "home", label: "Home", Icon: LayoutGridIcon },
       { key: "dashboards", label: "Dashboards", Icon: LayoutDashboardIcon },
+      { key: "schedule", label: "Schedule", Icon: CalendarDaysIcon },
       { key: "tasks", label: "Needs your attention", Icon: ListTodoIcon },
       { key: "chat", label: "Chat", Icon: MessageSquareIcon, shortcut: "1" },
       { key: "stats", label: "Stats", Icon: ChartColumnIcon, shortcut: "2" },

@@ -13,6 +13,7 @@ import {
   useNotificationList,
   useUnreadNotifications,
 } from "../lib/notifications";
+import { deeplinkPath } from "../lib/routes";
 
 /**
  * What SuperAI said while you were not looking.
@@ -149,7 +150,14 @@ export default function NotificationCenter({
             )}
             {items.map((n) => {
               const Icon = ICONS[n.level] ?? InfoIcon;
-              const clickable = Boolean(n.session && onOpenConversation);
+              // A conversation's notice opens it; a schedule notice opens 日程安排.
+              const path = n.session && onOpenConversation ? "" : deeplinkPath(n.deeplink);
+              const go = () => {
+                if (path) window.location.hash = "#" + path;
+                else onOpenConversation!(n.session!);
+                setOpen(false);
+              };
+              const clickable = Boolean((n.session && onOpenConversation) || path);
               return (
                 <div
                   key={n.id}
@@ -161,15 +169,10 @@ export default function NotificationCenter({
                   role={clickable ? "button" : undefined}
                   tabIndex={clickable ? 0 : undefined}
                   onKeyDown={clickable ? e => {
-                    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpenConversation!(n.session!); setOpen(false); }
+                    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); }
                   } : undefined}
                   onClick={
-                    clickable
-                      ? () => {
-                          onOpenConversation!(n.session!);
-                          setOpen(false);
-                        }
-                      : undefined
+                    clickable ? go : undefined
                   }
                 >
                   <Icon size={14} className="notif-icon" />

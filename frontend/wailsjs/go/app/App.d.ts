@@ -24,6 +24,8 @@ export function CCAwayHint(arg1:boolean):Promise<Record<string, any>>;
 
 export function CCSessions():Promise<Array<app.CCSession>>;
 
+export function CLIActivityAll():Promise<Record<string, Record<string, app.CLIActivity>>>;
+
 export function CLIProxyAccounts():Promise<Array<backend.CLIProxyAccount>>;
 
 export function CLIProxyLogin(arg1:string,arg2:string):Promise<string>;
@@ -192,11 +194,17 @@ export function NotedHoldings():Promise<any>;
 
 export function NotedHolidays(arg1:number):Promise<any>;
 
+export function NotedRings():Promise<any>;
+
+export function NotedSchedule(arg1:string,arg2:number):Promise<any>;
+
 export function NotedTimeEntries():Promise<any>;
 
 export function NotedTimeWeek():Promise<any>;
 
 export function NotedToday():Promise<any>;
+
+export function NotedUpcoming(arg1:number):Promise<any>;
 
 export function Notifications():Promise<Array<backend.Notification>>;
 
@@ -239,6 +247,8 @@ export function ReadWorkspaceFile(arg1:string):Promise<string>;
 export function ReadWorkspaceFileDataURL(arg1:string):Promise<string>;
 
 export function RefreshDashboard(arg1:string):Promise<Record<string, any>>;
+
+export function Relays():Promise<Array<app.RelayAgent>>;
 
 export function Remote(arg1:string,arg2:Array<any>):Promise<any>;
 

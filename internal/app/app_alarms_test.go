@@ -292,10 +292,14 @@ func TestTouchesAlarms(t *testing.T) {
 	}{
 		{"mcp_noted_create_alarm", nil, true},
 		{"mcp_noted_delete_alarm", nil, true},
-		{"mcp_noted_complete_task", nil, false},
+		{"mcp_noted_complete_task", nil, true}, // a done to-do stops ringing
+		{"mcp_noted_update_event", nil, true},
+		{"mcp_noted_list_events", nil, false},
+		{"mcp_noted_create_note", nil, false},
 		{"mcp_other_set_alarm", nil, false},
 		{"execute_javascript", map[string]any{"code": "await mcp_noted_update_alarm({id:'a1'})"}, true},
 		{"execute_javascript", map[string]any{"code": "await mcp_noted_list_tasks({})"}, false},
+		{"execute_javascript", map[string]any{"code": "const t = await mcp_noted_list_tasks({}); await mcp_noted_update_task({id:t.items[0].id})"}, true},
 	} {
 		if got := touchesAlarms(c.tool, c.args); got != c.want {
 			t.Errorf("touchesAlarms(%s, %v) = %v", c.tool, c.args, got)
