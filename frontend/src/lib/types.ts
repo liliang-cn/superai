@@ -15,6 +15,7 @@ export type ViewKey =
   | "agents"
   | "coding"
   | "tasks"
+  | "schedule"
   | "dashboards";
 
 /**

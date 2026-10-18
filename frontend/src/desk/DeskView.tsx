@@ -33,6 +33,9 @@ import LiveRun, { useRun } from "./LiveRun";
 import LiveStatus from "./LiveStatus";
 import StatsBlock from "../components/StatsBlock";
 import { takeCompose } from "../lib/compose";
+import { useNotedUpcoming } from "../lib/useNotedUpcoming";
+import { notifyOf, ringSummary, upcomingWhen, type ScheduleItem } from "../lib/schedule";
+import { ModeChip } from "../components/ModeChip";
 import { isPersonalConversation, loadQueenSession, queenSession, useQueenSession, withConsoleTitles } from "../lib/queenConsole";
 import { useDeskPane, useDeskTheme, useDeskWorld } from "./DeskShell";
 
@@ -172,6 +175,7 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
   const hive = useHive();
   const bees = useBees();
   const upcoming = useUpcoming();
+  const next = useNotedUpcoming(5);
   const runs = useCodingRuns();
   const linked = useLinkedAgents();
   const chat = useChat();
@@ -256,6 +260,20 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
   // the rest of what needs you, and what is coming up, sits in the sidebar.
   const needs = attention.filter((i) => i.level === "needs").length;
   const feed = attention.filter((i) => i.level === "soon");
+  // 接下来的安排: noted's next items and SuperAI's own meetings and
+  // reminders, one list by time.
+  const nextRows = useMemo(() => {
+    type R = { key: string; at: number; noted?: ScheduleItem; life?: AttentionItem };
+    const rows: R[] = [];
+    next.items.forEach((it) => {
+      const end = +new Date(it.endTime || it.startTime);
+      if (!it.allDay && end < now.getTime()) return;
+      rows.push({ key: `n-${it.id}-${it.startTime}`, at: +new Date(it.startTime), noted: it });
+    });
+    feed.forEach((it, i) => rows.push({ key: `l-${it.kind}-${it.ref}-${i}`, at: it.at ? +new Date(it.at) : Infinity, life: it }));
+    return rows.sort((a, b) => a.at - b.at).slice(0, 6);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [next.items, feed.map((f) => `${f.ref}@${f.at}`).join(), Math.floor(now.getTime() / 60000)]);
   const [sheet, setSheet] = useState<AttentionItem | null>(null);
   const openItem = (it: AttentionItem) => {
     if (it.kind === "event" || it.kind === "reminder") setSheet(it);
@@ -366,13 +384,31 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
           </button>
         )}
 
-        {feed.length > 0 && <div className="dk-sec">{t("Coming up")}</div>}
-        {feed.slice(0, 4).map((it, i) => (
-          <button key={`${it.kind}-${it.ref}-${i}`} className="dk-rec" onClick={() => openItem(it)} title={[it.title, it.detail, it.place].filter(Boolean).join(" · ")}>
-            {it.kind === "reminder" ? <AlarmClockIcon size={14} /> : <CalendarIcon size={14} />}
-            <span>{it.title}</span><em>{shortWhen(it.at, now, t)}</em>
-          </button>
-        ))}
+        {(nextRows.length > 0 || next.ok) && (
+          <div className="dk-sec dk-sec-link">
+            <span>{t("Up next")}</span>
+            <button onClick={() => navigate(PATHS.schedule)} title={t("Schedule")}>{t("All")}<ChevronRightIcon size={12} /></button>
+          </div>
+        )}
+        {nextRows.length === 0 && next.ok && (
+          <button className="dk-rec dk-next-none" onClick={() => navigate(PATHS.schedule)}><CalendarIcon size={14} /><span>{t("Nothing planned this week")}</span></button>
+        )}
+        <div className="dk-next">
+          {nextRows.map(({ key, noted, life }) => noted ? (
+            <button key={key} className="dk-next-row" onClick={() => navigate(`${PATHS.schedule}?id=${encodeURIComponent(noted.id)}`)}
+              title={[noted.title, ringSummary(noted.ringTimes), noted.location].filter(Boolean).join(" · ")}>
+              <b>{noted.title || t("Untitled")}</b>
+              <em>{upcomingWhen(noted, now)}</em>
+              <ModeChip mode={notifyOf(noted)} />
+            </button>
+          ) : life ? (
+            <button key={key} className="dk-next-row" onClick={() => openItem(life)} title={[life.title, life.detail, life.place].filter(Boolean).join(" · ")}>
+              <b>{life.title}</b>
+              <em>{shortWhen(life.at, now, t)}</em>
+              <span className="mode-chip compact" title={t(life.kind === "reminder" ? "Reminder" : "Event")}>{life.kind === "reminder" ? <AlarmClockIcon size={12} /> : <CalendarIcon size={12} />}</span>
+            </button>
+          ) : null)}
+        </div>
 
         {pins.length > 0 && <div className="dk-sec">{t("Pinned")}</div>}
         {pins.slice(0, 6).map((d) => (

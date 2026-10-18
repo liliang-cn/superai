@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   ListTodoIcon, LayoutDashboardIcon, ChartColumnIcon, PanelRightOpenIcon, PanelRightCloseIcon, BookOpenIcon, BotIcon, HexagonIcon, MessageSquareIcon, PaletteIcon,
   NotebookTabsIcon, PuzzleIcon, SlidersHorizontalIcon, TerminalIcon, XIcon,
-  MoonIcon, SunIcon,
+  MoonIcon, SunIcon, CalendarDaysIcon,
 } from "lucide-react";
 import DeskStatusBar from "./DeskStatusBar";
 import World from "../world/World";
@@ -55,6 +55,7 @@ const loadMode = (): "world" | "menu" => {
 
 const RAIL: { key: ViewKey; label: string; Icon: typeof HexagonIcon; cls: string }[] = [
   { key: "home", label: "The queen", Icon: MessageSquareIcon, cls: "dk-a-chat" },
+  { key: "schedule", label: "Schedule", Icon: CalendarDaysIcon, cls: "dk-a-sched" },
   { key: "tasks", label: "Needs your attention", Icon: ListTodoIcon, cls: "dk-a-later" },
   { key: "hive", label: "Hive", Icon: HexagonIcon, cls: "dk-a-hive" },
   { key: "agents", label: "Bees", Icon: BotIcon, cls: "dk-a-bees" },
@@ -68,7 +69,7 @@ const RAIL: { key: ViewKey; label: string; Icon: typeof HexagonIcon; cls: string
 const SIDE: ViewKey[] = ["dashboards", "stats"];
 
 export const TITLES: Record<ViewKey, string> = {
-  home: "", chat: "Chat", tasks: "Needs your attention", dashboards: "Dashboards", hive: "Hive", agents: "Bees", coding: "Coding", knowledge: "Knowledge",
+  home: "", chat: "Chat", tasks: "Needs your attention", schedule: "Schedule", dashboards: "Dashboards", hive: "Hive", agents: "Bees", coding: "Coding", knowledge: "Knowledge",
   skills: "Skills", mcp: "MCP", stats: "Stats", records: "Records", settings: "Settings",
 };
 
