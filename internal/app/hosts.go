@@ -262,7 +262,9 @@ func (b *hostBook) linked(name string, hello *agentlinkpb.Hello, role string) *H
 		kind = backend.HostKindMac
 	}
 	x := b.host(hello.GetHost(), name, kind, hello.GetOs(), hello.GetArch(), hello.GetParent())
-	if role == agentRoleMachine {
+	// A box its own agent names (the Mac, orange1) goes by that name, even
+	// when it also joined the hive as a worker under its hostname first.
+	if machineToo(role, hello) {
 		x.Name = name
 	}
 	return x
