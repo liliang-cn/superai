@@ -54,7 +54,7 @@
   --holo-ink: #a9c0ff; --holo-dim: rgba(185, 205, 255, 0.84); --holo-glow: rgba(110, 150, 255, 0.55);
   --holo-a: rgba(16, 30, 64, 0.72); --holo-b: rgba(16, 30, 64, 0.28); --holo-scan: rgba(140, 170, 255, 0.08); --holo-bad: #ff7a85; }
 .wl-holo.off { opacity: 0; visibility: hidden; }
-.wl-holo.tr { top: 56px; right: 24px; text-align: right; }
+.wl-holo.tr { top: 56px; right: 76px; text-align: right; }
 .wl-holo.bl { left: 24px; bottom: 44px; }
 .wl-holo.br { right: 86px; bottom: 44px; text-align: right; }
 /* Where the bar to the queen reaches the corners, the bottom panes stand above it. */
