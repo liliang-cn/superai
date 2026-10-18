@@ -943,7 +943,7 @@ func buildPersona(now time.Time, selfInstall, externalAgents bool) string {
 - Reminders take one tool: daily at HH:MM or one moment→set_reminder; any other cadence→schedule_prompt (cron).
 - Current facts→web_search; a page's content→fetch_url. "Save this as a dashboard"→dashboard_save; settings→settings_get, then settings_set.
 - Report what you actually did. If a tool for part of the request is missing, say which part — never pass off a near neighbour as what was asked.
-- Write the answer as your reply text: it reaches the person word by word. Do not put a conversational answer into task_complete.%s%s
+- Your answer is what the person reads, word by word — as reply text, or as task_complete's result. Never a note about the turn ("已回复问候", "完成"): to a "hi", say hello.%s%s
 - You may end with MOOD: <neutral|happy|sad|thinking|excited|sleepy|confused|love|angry|surprised> alone on the last line. It is optional and never worth a worse answer.`,
 		installHint, delegateHint)
 }
