@@ -12,14 +12,15 @@ import { queenRef, queenTitle, useQueenName } from "../lib/queenName";
 import { toast } from "../lib/toasts";
 import { useImeGuard } from "../lib/ime";
 import type { ViewKey } from "../lib/types";
+import PodConfirm, { type PodChange } from "../components/PodConfirm";
 
 
 /** A district's own actions: the things a person does there that are not
  *  about one object. Most start as a sentence to the queen. */
-const ACTIONS: Record<string, { label: string; say?: string; run?: () => Promise<unknown>; ok?: string; icon?: "plus" | "minus" }[]> = {
+const ACTIONS: Record<string, { label: string; say?: string; run?: () => Promise<unknown>; ok?: string; icon?: "plus" | "minus"; pod?: PodChange }[]> = {
   hive: [
-    { label: "Worker", icon: "plus", run: () => HiveSpawn(1), ok: "A worker is starting" },
-    { label: "Worker", icon: "minus", run: () => HiveRetire(1, false), ok: "A worker is leaving" },
+    { label: "Worker", icon: "plus", run: () => HiveSpawn(1), ok: "A worker is starting", pod: "spawn" },
+    { label: "Worker", icon: "minus", run: () => HiveRetire(1, false), ok: "A worker is leaving", pod: "retire" },
   ],
   agents: [{ label: "New bee", icon: "plus", say: "Make a bee that " }],
   coding: [{ label: "New run", icon: "plus", say: "@claude " }],
@@ -51,6 +52,8 @@ export default function Command({ view, onConversation, onTyping }: {
   const [lines, setLines] = useState<{ who: "you" | "queen"; text: string }[]>([]);
   const [live, setLive] = useState("");
   const [open, setOpen] = useState(false);
+  // A pod about to come or go, waiting for the person's yes.
+  const [pod, setPod] = useState<{ change: PodChange; go: () => void } | null>(null);
   const raw = useRef("");
   const box = useRef<HTMLInputElement>(null);
   const end = useRef<HTMLDivElement>(null);
@@ -169,11 +172,14 @@ export default function Command({ view, onConversation, onTyping }: {
           </div>
         </div>
       )}
+      <PodConfirm change={pod?.change ?? null} onAnswer={(yes) => { const p = pod; setPod(null); if (yes) p?.go(); }} />
       <div className="wc-bar">
         {(ACTIONS[district] ?? []).map((a, i) => (
           <button key={i} className="wc-act" disabled={busy === a.label + i}
             onClick={() => {
-              if (a.run) void run(a.label + i, a.run, a.ok ?? "Done");
+              const go = () => { if (a.run) void run(a.label + i, a.run, a.ok ?? "Done"); };
+              if (a.run && a.pod) setPod({ change: a.pod, go });
+              else if (a.run) go();
               else { setText(t(a.say ?? "")); window.setTimeout(() => box.current?.focus(), 0); }
             }}>
             {a.icon === "minus" ? <MinusIcon size={14} /> : <PlusIcon size={14} />}{t(a.label)}

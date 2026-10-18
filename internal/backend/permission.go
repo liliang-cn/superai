@@ -315,9 +315,17 @@ func alwaysAsked(name string, args map[string]any) bool {
 	switch name {
 	case "machine_act", "hive_task_cancel":
 		return true
-	case "hive_retire":
-		force, _ := args["force"].(bool)
-		return force
+	}
+	return confirmedEvenInYolo(name)
+}
+
+// confirmedEvenInYolo are the calls the person confirms whatever the gate is
+// set to: a new worker pod, or one taken away. Everything else may go through
+// on YOLO; how many pods run is theirs to say each time.
+func confirmedEvenInYolo(name string) bool {
+	switch name {
+	case "hive_spawn", "hive_retire":
+		return true
 	}
 	return false
 }
@@ -365,6 +373,9 @@ func (g *ToolGate) decide(ctx context.Context, req agent.PermissionRequest) (*ag
 	// The session's own rule first. A refusal holds even with the gate
 	// switched off or YOLO on: those relax asking, and "never" is not an ask.
 	verdict, why := g.sessionVerdict(req)
+	if verdict == VerdictNone && confirmedEvenInYolo(strings.ToLower(strings.TrimSpace(req.ToolName))) {
+		verdict = VerdictAsk
+	}
 	switch verdict {
 	case VerdictDeny:
 		return g.answer(ask, ApprovalDecision{By: DecidedByRule, Reason: why})

@@ -327,8 +327,10 @@ func TestClusterCallsAreAlwaysAsked(t *testing.T) {
 		{"machine_act", map[string]any{"machine": "orange1", "action": "restart", "service": "nginx"}, true},
 		{"hive_task_cancel", map[string]any{"id": "x"}, true},
 		{"hive_retire", map[string]any{"count": 1, "force": true}, true},
-		{"hive_retire", map[string]any{"count": 1}, false},
-		{"hive_retire", map[string]any{"count": 1, "force": false}, false},
+		// Pods come and go only when the person says so, YOLO or not.
+		{"hive_retire", map[string]any{"count": 1}, true},
+		{"hive_retire", map[string]any{"count": 1, "force": false}, true},
+		{"hive_spawn", map[string]any{"count": 1}, true},
 		{"schedule_remove", map[string]any{"id": "x"}, true},
 		{"machine_inspect", map[string]any{"machine": "orange1"}, false},
 	} {
@@ -346,6 +348,41 @@ func TestClusterCallsAreAlwaysAsked(t *testing.T) {
 		_ = json.Unmarshal([]byte(args), &m)
 		if got := approvalCommand("machine_act", m); got != want {
 			t.Errorf("card for %s = %q, want %q", args, got, want)
+		}
+	}
+}
+
+// YOLO and a gate switched off let everything through but a pod coming or
+// going: that one still waits for the person.
+func TestPodsAreConfirmedEvenInYolo(t *testing.T) {
+	for _, off := range []bool{false, true} {
+		g := NewToolGate(!off, filepath.Join(t.TempDir(), "audit.jsonl"))
+		g.StartYolo()
+		asked := make(chan ApprovalRequest, 1)
+		g.SetApprover(func(ctx context.Context, req ApprovalRequest) (ApprovalDecision, error) {
+			asked <- req
+			return ApprovalDecision{Allowed: true, By: DecidedByUser}, nil
+		})
+		resp, err := g.Handler()(context.Background(), agent.PermissionRequest{ToolName: "hive_spawn", ToolArgs: map[string]any{"count": 1}})
+		if err != nil || resp == nil || !resp.Allowed {
+			t.Fatalf("gate off=%v: %+v %v", off, resp, err)
+		}
+		select {
+		case req := <-asked:
+			if !req.MustAsk {
+				t.Fatalf("gate off=%v: asked, but not as a must-ask: %+v", off, req)
+			}
+		default:
+			t.Fatalf("gate off=%v: hive_spawn went through without asking", off)
+		}
+		resp, _ = g.Handler()(context.Background(), agent.PermissionRequest{ToolName: "bash", ToolArgs: map[string]any{"command": "ls"}})
+		select {
+		case <-asked:
+			t.Fatalf("gate off=%v: bash was asked about under YOLO", off)
+		default:
+		}
+		if resp == nil || !resp.Allowed {
+			t.Fatalf("gate off=%v: bash refused: %+v", off, resp)
 		}
 	}
 }

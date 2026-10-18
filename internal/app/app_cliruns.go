@@ -259,6 +259,11 @@ func (a *App) CancelCLIRun(id string) string {
 
 func (a *App) startCLIRun(o cliStart) (CLIRun, error) {
 	agent, prompt, cwd, model, ask, thread, session := strings.TrimSpace(o.Agent), strings.TrimSpace(o.Prompt), o.Cwd, o.Model, o.Ask, o.Thread, o.Session
+	// With YOLO on, or the gate switched off, nobody is asked: the agent runs
+	// in its own no-prompt mode rather than forwarding prompts to a card.
+	if ask && a.terminalYolo() != "" {
+		ask = false
+	}
 	if prompt == "" {
 		return CLIRun{}, errors.New("the prompt is empty")
 	}

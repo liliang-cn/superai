@@ -1,0 +1,23 @@
+/* The question before a worker pod comes or goes (PodConfirm.tsx). */
+.pc-scrim { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; background: rgba(22, 32, 43, 0.28); animation: pc-fade 0.14s ease-out; }
+@keyframes pc-fade { from { opacity: 0; } }
+.pc-box { width: min(380px, calc(100vw - 32px)); background: #fff; color: #16202b; border-radius: 16px; padding: 18px 18px 14px;
+  box-shadow: 0 24px 60px rgba(22, 32, 43, 0.24), 0 0 0 1px rgba(22, 32, 43, 0.06); font: 14px/1.5 Geist, system-ui, sans-serif; }
+.pc-box h3 { margin: 0 0 6px; font-size: 16px; font-weight: 600; }
+.pc-box p { margin: 0 0 16px; color: #5f6d77; font-size: 13px; }
+.pc-acts { display: flex; justify-content: flex-end; gap: 8px; }
+.pc-acts button { height: 34px; padding: 0 14px; border-radius: 9px; border: 0; font: 600 13px Geist, system-ui, sans-serif; cursor: pointer; }
+.pc-no { background: #f1f4f8; color: #16202b; }
+.pc-no:hover { background: #e4e9f0; }
+.pc-yes { background: #2f5bea; color: #fff; }
+.pc-yes:hover { background: #1d3fb8; }
+.pc-yes.danger { background: #c02a38; }
+.pc-yes.danger:hover { background: #a1232f; }
+.pc-acts button:focus-visible { outline: 2px solid #2f5bea; outline-offset: 2px; }
+:root[data-theme="dark"] .pc-scrim { background: rgba(4, 7, 11, 0.55); }
+:root[data-theme="dark"] .pc-box { background: #18212b; color: #e8edf2; box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(232, 237, 242, 0.1); }
+:root[data-theme="dark"] .pc-box p { color: #9aa8b4; }
+:root[data-theme="dark"] .pc-no { background: #26313d; color: #e8edf2; }
+:root[data-theme="dark"] .pc-no:hover { background: #2f3b48; }
+:root[data-theme="dark"] .pc-yes { background: #3d6bff; }
+@media (prefers-reduced-motion: reduce) { .pc-scrim { animation: none; } }
