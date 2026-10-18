@@ -174,3 +174,34 @@ func TestRingIDIsAUUID(t *testing.T) {
 		t.Error("the zone the time is written in moved the id")
 	}
 }
+
+func TestExpandFollowsNotify(t *testing.T) {
+	now, _ := time.Parse(time.RFC3339, "2026-10-13T08:00:00+08:00")
+	at := Schedule{Kind: KindOneShot, At: "2026-10-14T15:00:00+08:00", TimeZone: "Asia/Shanghai"}
+	p := Expand([]Alarm{
+		{ID: "a", Label: "闹钟", Notify: "alarm", Schedule: at},
+		{ID: "r", Label: "开会", Mode: ModeReminder, Notify: "reminder", RemindBefore: 10, Schedule: at},
+		{ID: "n", Label: "通知", Mode: ModeReminder, Notify: "notification", Schedule: at},
+		{ID: "x", Label: "不提醒", Notify: "none", Schedule: at},
+		{ID: "u", Label: "未知", Notify: "loud", Schedule: at},
+		{ID: "o", Label: "旧闹钟", Schedule: at},
+	}, nil, now, 7)
+	got := map[string]string{}
+	for _, r := range p.Rings {
+		got[r.AlarmID] = r.Mode + " " + r.Fire
+	}
+	want := map[string]string{
+		"a": "alarm 2026-10-14T15:00:00+08:00",
+		"r": "reminder 2026-10-14T14:50:00+08:00",
+		"u": "reminder 2026-10-14T15:00:00+08:00",
+		"o": "alarm 2026-10-14T15:00:00+08:00",
+	}
+	if len(got) != len(want) {
+		t.Fatalf("rings: %v", got)
+	}
+	for id, w := range want {
+		if got[id] != w {
+			t.Errorf("%s: %q, want %q", id, got[id], w)
+		}
+	}
+}

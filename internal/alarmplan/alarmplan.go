@@ -86,6 +86,29 @@ type Alarm struct {
 	HolidayPolicy string   `json:"holidayPolicy"`
 	Region        string   `json:"region"`
 	Note          string   `json:"note,omitempty"`
+	// Notify is how the item reaches the person (list_alarms notify all):
+	// alarm, reminder, notification or none; empty for a noted that predates
+	// it, then Mode says. RemindBefore is the lead taken off every ring.
+	Notify       string `json:"notify,omitempty"`
+	RemindBefore int    `json:"remindBeforeMinutes,omitempty"`
+}
+
+// Rings reports how the phone rings the item, if at all: ModeAlarm or
+// ModeReminder; "" for notification (posted as a notice by the core) and
+// none. An unknown notify is a reminder, never an alarm.
+func (a Alarm) Rings() string {
+	switch a.Notify {
+	case "":
+		if a.Mode == ModeReminder {
+			return ModeReminder
+		}
+		return ModeAlarm
+	case ModeAlarm:
+		return ModeAlarm
+	case "notification", "none":
+		return ""
+	}
+	return ModeReminder
 }
 
 // On reports whether the alarm rings at all.
@@ -395,16 +418,15 @@ type Plan struct {
 func Expand(alarms []Alarm, cal *Calendar, now time.Time, days int) Plan {
 	p := Plan{Rings: []Ring{}, Skipped: []Skip{}}
 	for _, a := range alarms {
-		if !a.On() {
+		mode := a.Rings()
+		if !a.On() || mode == "" {
 			continue
-		}
-		mode := a.Mode
-		if mode != ModeReminder {
-			mode = ModeAlarm
 		}
 		loc := Zone(a.Schedule.TimeZone)
 		rang := map[string]bool{}
-		for _, f := range Occurrences(a, cal, now, 0, days) {
+		lead := time.Duration(a.RemindBefore) * time.Minute
+		for _, f := range Occurrences(a, cal, now.Add(lead), 0, days) {
+			f = f.Add(-lead)
 			r := Ring{
 				ID: RingID(a.ID, f, mode, a.Label, a.Note), AlarmID: a.ID, Label: a.Label, Note: a.Note, Mode: mode,
 				Fire: f.Format(time.RFC3339), FireMs: f.UnixMilli(), TimeZone: a.Schedule.TimeZone,

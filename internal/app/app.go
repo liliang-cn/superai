@@ -87,12 +87,12 @@ type App struct {
 	alarmsStop context.CancelFunc
 	alarmsErr  string
 	// The notification-mode fire watcher's last failure (app_noted_schedule.go).
-	firesMu  sync.Mutex
-	firesErr string
-	pushMu     sync.Mutex
-	pushBuilt  bool
-	pushKey    string
-	pushV      alarmPusher
+	firesMu   sync.Mutex
+	firesErr  string
+	pushMu    sync.Mutex
+	pushBuilt bool
+	pushKey   string
+	pushV     alarmPusher
 	// Each year's holidays AlarmRings expanded with. See app_alarm_rings.go.
 	ringHolidays holidayCache
 
