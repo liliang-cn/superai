@@ -483,6 +483,14 @@ func (a *App) askCCPermissionCore(agent string, r ccReport) {
 			log.Printf("cc relay: answering %s's permission request: %v", orThis(agent), err)
 		}
 	}
+	// YOLO, or the approval gate switched off, covers the terminals too: a
+	// coding agent's prompt is allowed without a card, and still logged.
+	if by := a.terminalYolo(); by != "" {
+		ccPermAuditLine(ccPermAudit{At: time.Now(), Agent: agent, Session: r.Session, Tool: r.Tool,
+			Project: projectName(r.Cwd), Outcome: by})
+		say(ccPermAllow, "")
+		return
+	}
 	if !(r.Away || a.Presence().Away) {
 		say(ccPermPass, "") // somebody is at the machine; the terminal asks them
 		return
@@ -527,6 +535,22 @@ func (a *App) askCCPermissionCore(agent string, r ccReport) {
 	}
 }
 
+// terminalYolo says why a terminal prompt needs no asking: "yolo" while YOLO
+// is on, "gate-disabled" while the gate is off; empty when it must be asked.
+func (a *App) terminalYolo() string {
+	g := a.mcpToolGate()
+	if g == nil {
+		return ""
+	}
+	if on, _ := g.YoloStatus(); on {
+		return "yolo"
+	}
+	if !g.Enabled() {
+		return "gate-disabled"
+	}
+	return ""
+}
+
 func orThis(agent string) string {
 	if agent == "" {
 		return "this machine"
@@ -543,7 +567,7 @@ type ccPermAudit struct {
 	Session  string    `json:"session"`
 	Tool     string    `json:"tool"`
 	Project  string    `json:"project,omitempty"`
-	Outcome  string    `json:"outcome"` // allowed | denied | unanswered
+	Outcome  string    `json:"outcome"` // allowed | denied | unanswered | yolo | gate-disabled
 	WaitedMS int64     `json:"waited_ms"`
 }
 

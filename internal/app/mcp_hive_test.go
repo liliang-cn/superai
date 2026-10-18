@@ -256,9 +256,9 @@ func TestDestructiveMCPCallsWaitForThePerson(t *testing.T) {
 		{"task cancel", "superai_hive_task_cancel", "hive_task_cancel",
 			func() map[string]any { return map[string]any{"id": runningTask()} },
 			true, func(s string) bool { return strings.Contains(s, "stopping") }},
-		{"plain retire", "superai_hive_retire", "",
+		{"plain retire", "superai_hive_retire", "hive_retire",
 			func() map[string]any { return map[string]any{"count": 1} },
-			false, func(s string) bool { return !strings.Contains(s, "was not done") }},
+			true, func(s string) bool { return !strings.Contains(s, "was not done") }},
 	} {
 		for _, allow := range []bool{true, false} {
 			if !c.asks && !allow {

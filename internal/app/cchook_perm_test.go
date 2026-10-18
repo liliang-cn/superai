@@ -434,6 +434,19 @@ func TestATerminalPermissionPromptIsAnsweredFromThePhone(t *testing.T) {
 	if r.a.Behavior != "" || time.Since(start) > 3*time.Second || len(core.PendingToolApprovals()) != 0 {
 		t.Fatalf("at the desk: %+v after %s, cards %d", r.a, time.Since(start), len(core.PendingToolApprovals()))
 	}
+
+	// YOLO covers a terminal nobody is at: allowed at once, no card. (One
+	// with somebody at it still asks them there, as it always did.)
+	core.gateForMCP = backend.NewToolGate(true, filepath.Join(home, "audit.jsonl"))
+	core.gateForMCP.StartYolo()
+	idleMu.Lock()
+	idle = 600
+	idleMu.Unlock()
+	start = time.Now()
+	r = <-ask()
+	if r.a.Behavior != "allow" || time.Since(start) > 3*time.Second || len(core.PendingToolApprovals()) != 0 {
+		t.Fatalf("yolo: %+v after %s, cards %d", r.a, time.Since(start), len(core.PendingToolApprovals()))
+	}
 }
 
 // The command itself, with no SuperAI to ask: silent, and quick.

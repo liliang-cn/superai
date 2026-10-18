@@ -10,6 +10,7 @@ import type { StageHandle, StagePulse, StageTask } from "../components/HiveStage
 import { QUEEN, SELF } from "../components/hiveFx";
 import { useHiveMeter } from "../components/HiveMeter";
 import { useHosts, type Host, type HostAgent } from "../canvas/data";
+import PodConfirm, { type PodChange } from "../components/PodConfirm";
 import { cliName, isCore, isStandby, kindLabel } from "../world/hosts";
 
 const short = (n: string) => n.replace(/^superai-/, "");
@@ -113,6 +114,7 @@ export default function HiveView() {
   // reads as working and not as a dead button.
   const [making, setMaking] = useState<"" | "spawn" | "retire">("");
   const [note, setNote] = useState("");
+  const [asking, setAsking] = useState<PodChange | null>(null);
 
   const resize = async (kind: "spawn" | "retire") => {
     setMaking(kind);
@@ -263,12 +265,13 @@ export default function HiveView() {
         </div>
         {st?.role === "queen" && st.spawner?.enabled && (
           <div className="vh-actions hive-spawn">
-            <button className="btn ghost sm" disabled={making !== ""} onClick={() => resize("retire")}>
+            <button className="btn ghost sm" disabled={making !== ""} onClick={() => setAsking("retire")}>
               {making === "retire" ? "Retiring…" : "− Worker"}
             </button>
-            <button className="btn sm" disabled={making !== ""} onClick={() => resize("spawn")}>
+            <button className="btn sm" disabled={making !== ""} onClick={() => setAsking("spawn")}>
               {making === "spawn" ? "Starting…" : "+ Worker"}
             </button>
+            <PodConfirm change={asking} onAnswer={(yes) => { const k = asking; setAsking(null); if (yes && k) void resize(k); }} />
           </div>
         )}
       </div>
