@@ -275,6 +275,9 @@ type Settings struct {
 	// AgentLink is how core treats the agents that dial in: which of them are
 	// relays rather than machines. See agentlink_settings.go.
 	AgentLink AgentLinkSettings `json:"agent_link,omitzero"`
+	// HA is where core learns about HA services (one active copy moving
+	// between hosts behind a service IP), like openclaw kept up by haify.
+	HA HASettings `json:"ha,omitzero"`
 }
 
 // Defaults for APNsSettings: the developer team and the SuperAI iOS app.

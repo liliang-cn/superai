@@ -554,9 +554,10 @@ func (a *App) registerHiveTools(svc *backend.Service, cfg *backend.Settings) {
 		"Every host in the hive and what runs on each: the box (a pod, a container, a Mac, a VM or bare metal, and the"+
 			" VM a pod sits on), whether it answers, and its agents: SuperAI itself with its role (queen, worker, machine,"+
 			" relay), the coding CLIs installed there (address one as cli.machine, like claude.mac) and named agents such"+
-			" as openclaw. Look here to know where something can run before sending work there.",
+			" as openclaw, and the HA services (like openclaw kept up by haify): where each runs now, its standbys and the"+
+			" service IP to reach it at. Look here to know where something can run before sending work there.",
 		map[string]any{"type": "object", "properties": map[string]any{}},
-		func(ctx context.Context, _ map[string]any) (any, error) { return hostsText(a.Hosts()), nil },
+		func(ctx context.Context, _ map[string]any) (any, error) { return topologyText(a.HiveTopology()), nil },
 		agent.ToolMetadata{ReadOnly: true, ConcurrencySafe: true})
 
 	inner.AddToolWithMetadata("hive_command",

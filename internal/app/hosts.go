@@ -68,11 +68,31 @@ type HostAgent struct {
 	Via string `json:"via,omitempty"`
 	// MCP is the MCP servers a SuperAI can call, where it has said.
 	MCP []string `json:"mcp,omitempty"`
+	// Service is the HA service it belongs to, when it is kept up as one:
+	// it runs on the service's active host and stands by on the others
+	// (state standby), and is reached at the service's IP.
+	Service string `json:"service,omitempty"`
+}
+
+// HiveTopology is the hive in one answer: the hosts with what runs on each,
+// and the HA services that move between them.
+type HiveTopology struct {
+	Hosts    []Host              `json:"hosts"`
+	Services []backend.HAService `json:"services"`
+}
+
+// HiveTopology lists the hosts and the HA services together, read at the
+// same moment.
+func (a *App) HiveTopology() HiveTopology {
+	svcs := a.haServices()
+	return HiveTopology{Hosts: a.hostsWith(svcs), Services: svcs}
 }
 
 // Hosts lists every host this core knows of, parents before the hosts
 // inside them, with what runs on each.
-func (a *App) Hosts() []Host {
+func (a *App) Hosts() []Host { return a.hostsWith(a.haServices()) }
+
+func (a *App) hostsWith(services []backend.HAService) []Host {
 	a.mu.Lock()
 	s, h := a.settings, a.hive
 	a.mu.Unlock()
@@ -146,12 +166,22 @@ func (a *App) Hosts() []Host {
 		b.agent(x, HostAgent{Name: name, Kind: hostAgentSuperAI, Role: r, State: "lost", Version: hello.GetVersion()})
 	}
 
+	// HA services: an agent one of them runs is that service's, live on its
+	// active host and standing by on the others, wherever it was found.
+	var agentNames []string
+	if s != nil {
+		agentNames = s.RemoteAgents.Names()
+	}
+	for _, sv := range services {
+		b.service(sv, agentNames)
+	}
+
 	// Agents only the settings know, reached over ssh, where no linked
-	// SuperAI serves them already.
+	// SuperAI or HA service serves them already.
 	if s != nil && s.RemoteAgents.Enabled {
 		for _, n := range s.RemoteAgents.Names() {
 			ra := s.RemoteAgents.Agents[n]
-			if ra.URL != "" || len(ra.Hosts) == 0 || onlyLocal(ra.Hosts) || b.served(n) {
+			if ra.URL != "" || len(ra.Hosts) == 0 || onlyLocal(ra.Hosts) || b.served(n) || haServes(services, n) {
 				continue
 			}
 			x := b.host(sshHost(ra.Hosts[0]), "", "", "", "", "")
@@ -303,6 +333,78 @@ func (b *hostBook) clis(x *Host, via string, names []string, act cliMap) {
 	}
 }
 
+// service places sv's agents: on the active host as running (filling in the
+// one a linked relay already reported), on each standby as standing by.
+// Its agents are the named agents it runs a unit for, among those seen on
+// the link or in the settings.
+func (b *hostBook) service(sv backend.HAService, configured []string) {
+	names := map[string]bool{}
+	for n := range b.names {
+		names[n] = true
+	}
+	for _, n := range configured {
+		names[n] = true
+	}
+	var its []string
+	for n := range names {
+		if sv.Serves(n) {
+			its = append(its, n)
+		}
+	}
+	sort.Strings(its)
+	if len(its) == 0 {
+		return
+	}
+	// Whatever host already reported the agent but is not the active one
+	// is out of date (it moved); the service's word wins.
+	for _, x := range b.byID {
+		for i := range x.Agents {
+			g := &x.Agents[i]
+			if g.Kind == hostAgentNamed && sv.Serves(g.Name) {
+				g.Service = sv.Name
+			}
+		}
+	}
+	if sv.Active != "" {
+		x := b.host(sv.Active, "", "", "", "", "")
+		if x.State == "" {
+			x.State = "live" // haify sees it running there
+		}
+		for _, n := range its {
+			b.agent(x, HostAgent{Name: n, Kind: hostAgentNamed, State: "live", Service: sv.Name})
+			setService(x, n, sv.Name)
+		}
+	}
+	for _, sb := range sv.Standbys {
+		x := b.host(sb.Host, "", "", "", "", "")
+		x.configured()
+		state := "standby"
+		if !sb.Ready {
+			state = "standby-unready"
+		}
+		for _, n := range its {
+			b.agent(x, HostAgent{Name: n, Kind: hostAgentNamed, State: state, Service: sv.Name})
+		}
+	}
+}
+
+func setService(x *Host, name, service string) {
+	for i := range x.Agents {
+		if x.Agents[i].Name == name && x.Agents[i].Kind == hostAgentNamed {
+			x.Agents[i].Service = service
+		}
+	}
+}
+
+func haServes(services []backend.HAService, name string) bool {
+	for _, sv := range services {
+		if sv.Serves(name) {
+			return true
+		}
+	}
+	return false
+}
+
 // served says whether an agent of this name is already on some host.
 func (b *hostBook) served(name string) bool { return b.names[name] }
 
@@ -366,6 +468,40 @@ func (b *hostBook) list() []Host {
 	return out
 }
 
+// topologyText is the hive as the queen reads it: the hosts, then the HA
+// services with where each runs and can move to.
+func topologyText(t HiveTopology) string {
+	out := hostsText(t.Hosts)
+	if len(t.Services) == 0 {
+		return out
+	}
+	var b strings.Builder
+	b.WriteString(out)
+	b.WriteString("\nHA services (one copy runs, standbys take over; reach them at the service IP):\n")
+	for _, sv := range t.Services {
+		fmt.Fprintf(&b, "- %s: %s, on %s", sv.Name, sv.State, orNone(sv.Active))
+		if sv.VIP != "" {
+			fmt.Fprintf(&b, ", service IP %s", sv.VIP)
+		}
+		for _, sb := range sv.Standbys {
+			r := "ready"
+			if !sb.Ready {
+				r = "not ready"
+			}
+			fmt.Fprintf(&b, ", standby %s (%s)", sb.Host, r)
+		}
+		fmt.Fprintf(&b, " [%s, %s]\n", sv.Provider, strings.Join(sv.Units, " "))
+	}
+	return b.String()
+}
+
+func orNone(s string) string {
+	if s == "" {
+		return "nowhere"
+	}
+	return s
+}
+
 // hostsText is the host list as the queen reads it: one line per host, its
 // agents under it, indented by how deep the host sits.
 func hostsText(hs []Host) string {
@@ -398,6 +534,9 @@ func hostsText(hs []Host) string {
 			fmt.Fprintf(&b, ", %s", g.State)
 			if len(g.MCP) > 0 {
 				fmt.Fprintf(&b, ", mcp %s", strings.Join(g.MCP, " "))
+			}
+			if g.Service != "" {
+				fmt.Fprintf(&b, ", HA service %s", g.Service)
 			}
 			if g.About != "" {
 				fmt.Fprintf(&b, " (%s)", g.About)

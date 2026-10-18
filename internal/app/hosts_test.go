@@ -1,6 +1,9 @@
 package app
 
 import (
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
 	agentlinkpb "github.com/liliang-cn/superai/internal/agentlink/pb"
@@ -172,5 +175,63 @@ func TestHostsKeepALostMachinesKind(t *testing.T) {
 	}
 	if g := agentNamed(mac, "mac"); g == nil || g.State != "lost" {
 		t.Fatalf("its agent: %+v", g)
+	}
+}
+
+// openclaw kept up by haify: it belongs to its HA service, runs on the active
+// node the relay is on, stands by on the other, and is not listed again from
+// the ssh settings that point at a node.
+func TestHostsPlaceHAServices(t *testing.T) {
+	haify := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/nodes":
+			w.Write([]byte(`{"nodes":[{"name":"node-b","hostname":"sds-b"},{"name":"node-e","hostname":"sds-e"}]}`))
+		case "/v1/ha":
+			w.Write([]byte(`{"configs":[{"resource":"openclaw","vip":"192.168.123.252/24","services":["openclaw.service"]},
+				{"resource":"cortexdb","vip":"192.168.123.253/24","services":["cortexdb-grpc.service"]}]}`))
+		case "/v1/ha/openclaw/status":
+			w.Write([]byte(`{"promoters":[{"activeNode":"node-e","standbys":[{"node":"node-b","ready":true}]}]}`))
+		case "/v1/ha/cortexdb/status":
+			w.Write([]byte(`{"promoters":[{"activeNode":"node-b","standbys":[{"node":"node-e","ready":true}]}]}`))
+		}
+	}))
+	defer haify.Close()
+
+	core := NewApp()
+	core.settings = &backend.Settings{
+		AgentLink: backend.AgentLinkSettings{RelayOnly: []string{"sds-e"}},
+		HA:        backend.HASettings{Haify: backend.HaifySource{URL: haify.URL}},
+		RemoteAgents: backend.RemoteAgents{Enabled: true, Agents: map[string]backend.RemoteAgent{
+			"openclaw": {Hosts: []string{"sds@192.168.123.212"}, Command: []string{"openclaw", "{prompt}"}},
+		}},
+	}
+	addr := startCore(t, core)
+	linkHello(t, core, addr, &agentlinkpb.Hello{Name: "sds-e", Host: "sds-e", Kind: "vm",
+		Agents: []*agentlinkpb.NamedAgent{{Name: "openclaw", About: "the gateway"}}})
+
+	core.haServices() // starts the first read
+	waitFor(t, "the HA services", func() bool { return len(core.haServices()) == 2 })
+	top := core.HiveTopology()
+
+	active := hostByName(top.Hosts, "sds-e")
+	if g := agentNamed(active, "openclaw"); g == nil || g.State != "live" || g.Service != "openclaw" || g.Via != "sds-e" {
+		t.Fatalf("openclaw on its active node: %+v", g)
+	}
+	standby := hostByName(top.Hosts, "sds-b")
+	if g := agentNamed(standby, "openclaw"); standby == nil || g == nil || g.State != "standby" || g.Service != "openclaw" {
+		t.Fatalf("openclaw standing by: %+v in %+v", g, standby)
+	}
+	if h := hostByName(top.Hosts, "192.168.123.212"); h != nil {
+		t.Fatalf("openclaw listed again from the settings: %+v", h)
+	}
+	// cortexdb runs no agent anyone knows: a service, not an agent on a host.
+	if g := agentNamed(standby, "cortexdb-grpc"); g != nil {
+		t.Fatalf("cortexdb as an agent: %+v", g)
+	}
+	if len(top.Services) != 2 || top.Services[1].Name != "openclaw" || top.Services[1].VIP != "192.168.123.252" {
+		t.Fatalf("services: %+v", top.Services)
+	}
+	if txt := topologyText(top); !strings.Contains(txt, "openclaw: active, on sds-e, service IP 192.168.123.252, standby sds-b (ready)") {
+		t.Fatalf("the queen's view:\n%s", txt)
 	}
 }
