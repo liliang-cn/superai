@@ -444,7 +444,13 @@ func (r *RemoteRunner) Run(ctx context.Context, name, prompt string) (res Remote
 		return out, nil
 	}
 
-	host, herr := r.host(ctx, name, agent)
+	var host string
+	var herr error
+	if pin, _ := ctx.Value(pinnedHostKey{}).(string); pin != "" {
+		host = pin
+	} else {
+		host, herr = r.host(ctx, name, agent)
+	}
 	if herr != nil {
 		res.Failed, res.Reason = true, herr.Error()
 		return res, nil
@@ -490,6 +496,15 @@ func (r *RemoteRunner) Run(ctx context.Context, name, prompt string) (res Remote
 		res.Failed, res.Reason = true, "the agent exited cleanly without saying anything"
 	}
 	return res, nil
+}
+
+type pinnedHostKey struct{}
+
+// OnRemoteHost has a Run use this ssh destination, one of the agent's
+// hosts, instead of finding the one that holds it: "pi.sds-a" asks the pi
+// on sds-a, wherever else pi runs.
+func OnRemoteHost(ctx context.Context, dest string) context.Context {
+	return context.WithValue(ctx, pinnedHostKey{}, dest)
 }
 
 // host finds the machine currently holding an agent.

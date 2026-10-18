@@ -303,6 +303,9 @@ export interface HostAgent {
    *  CLI; configured for an agent only the settings know; standby (or
    *  standby-unready) for an HA service's agent on a host it is not on now. */
   state: string;
+  /** For a named agent, what the coding CLI of the same name on this host
+   *  is doing (working, waiting, idle): one agent, seen both ways. */
+  activity?: string;
   version?: string;
   /** The SuperAI on this host that runs it for core. */
   via?: string;
@@ -324,6 +327,8 @@ export interface Host {
   parent?: string;
   state: "live" | "lost" | "configured";
   lastSeen?: string;
+  /** Its IP addresses, where something has said them (haify's node list). */
+  addresses?: string[];
   agents: HostAgent[];
 }
 

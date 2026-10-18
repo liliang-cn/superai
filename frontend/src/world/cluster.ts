@@ -6,7 +6,7 @@ import { forgetActor, registerActor } from "./bubbles";
 import { Packets, type Link } from "./packets";
 import { CSS2DObject } from "three/examples/jsm/renderers/CSS2DRenderer.js";
 import type { Bee, CCActivity, CCActivitySession, CLIActivity, HAService, Hive, HiveTask, Host, HostAgent, LinkedAgent, RelayAgent } from "../canvas/data";
-import { SLAB_TOP, cliName, floorLink, forgetLines, isStandby, kindLabel, planHosts, pod, serviceMarker, setLinesNight, setServiceState, slab, type HostPlan, type Plot } from "./hosts";
+import { SLAB_TOP, cliName, floorLink, forgetLines, haRoles, isStandby, kindLabel, planHosts, pod, serviceMarker, setLinesNight, setServiceState, slab, socket, unlinkedStatus, type HostPlan, type Plot } from "./hosts";
 import type { CodingRun } from "../canvas/tiles";
 import type { AttentionItem } from "../canvas/attention";
 import type { Member } from "../components/HiveMeter";
@@ -62,9 +62,11 @@ export function clisOf(a: { activity?: CCActivity | null; cliActivity?: Record<s
 /** A robot's own terminal state from its CLI's sessions: what its label says. */
 function termState(act: CCActivity | undefined) {
   const work = act?.working ?? 0, wait = act?.waiting ?? 0;
-  const status = work ? translate("{count} sessions working", { count: work }) : wait ? translate("waiting for you") : "";
+  const status = work ? translate(work === 1 ? "1 session working" : "{count} sessions working", { count: work }) : wait ? translate("waiting for you") : "";
   return { work, wait, status };
 }
+/** An HA service's pin says which it is and where to reach it: "openclaw · 192.168.123.252". */
+const svcTitle = (s: HAService) => (s.vip ? `${s.name} · ${s.vip}` : s.name);
 const clip = (s: string, n = 30) => { const t = s.replace(/\s+/g, " ").trim(); return t.length > n ? t.slice(0, n - 1) + "…" : t; };
 /** The queen's name over her robot, with the engine thinking for her when it is not SuperAI's own: "queen · Claude Code". */
 const queenLabel = (engine?: string) => (engine ? `${getQueenName().name} · ${engineLabel(engine)}` : getQueenName().name);
@@ -609,6 +611,13 @@ export const cluster: District<WorldData> = {
     let hostSig = "";
     let hostMode = false;
     let plan: HostPlan | null = null;
+    // The HA services as last read: a host known only as their node is
+    // called an HA node rather than a host of no kind.
+    let svcNow: HAService[] = [];
+    const hostTitle = (h: Host) => {
+      const r = haRoles(h, svcNow);
+      return `${h.name} · ${translate(kindLabel(h.kind, r.runs.length + r.standby.length > 0))}`;
+    };
     let hostLabels: Label[] = [];
     let actors: string[] = [];
     // Robots that are not at a desk or on a pad: HA standbys (ghosts), and the
@@ -741,7 +750,7 @@ export const cluster: District<WorldData> = {
       for (const m of machines.values()) for (const c of m.clis.values()) pose(c.r, t, ctx.reduced);
       for (const x of relays.values()) for (const b of x.bots.values()) pose(b.r, t, ctx.reduced);
       for (const x of extras.values()) pose(x.r, t, ctx.reduced);
-      for (const x of serviceViews.values()) if (!ctx.reduced) { const gem = x.m.userData.gem as THREE.Object3D; gem.rotation.y = t * 0.9; gem.position.y = 2.6 + Math.sin(t * 1.5) * 0.1; }
+      for (const x of serviceViews.values()) if (!ctx.reduced) { const gem = x.m.userData.gem as THREE.Object3D; gem.rotation.y = t * 0.9; gem.position.y = (x.m.userData.gemY as number) + Math.sin(t * 1.5) * 0.08; }
       for (const b of bees.values()) {
         pose(b.r, t, ctx.reduced);
         if (b.mode === "orbit" && !ctx.reduced) {
@@ -832,16 +841,21 @@ export const cluster: District<WorldData> = {
       plan = pl;
       hostBounds = pl.bounds;
       // HA services, first so a service is found by its marker before its
-      // ghosts: a marker with the service IP out past its hosts, a
-      // solid line to where it runs and dashed ones to where it can go.
+      // ghosts: a pin with its name and service IP at the edge of the host
+      // it runs on, and a dashed line round the outside to each host it can
+      // move to, ending in a small ring there.
       for (const sp of pl.services) {
-        const m = serviceMarker();
+        const m = serviceMarker(sp.height);
         m.position.copy(sp.at);
         hostLayer.add(m);
         ctx.pickable(m, { kind: "service", id: sp.svc.name, title: sp.svc.name });
-        if (sp.active) hostLayer.add(floorLink(sp.at, edgeOf(sp.active, sp.at), "active"));
-        for (const b of sp.standbys) hostLayer.add(floorLink(sp.at, edgeOf(b.plot, sp.at), b.ready ? "standby" : "unready"));
-        serviceViews.set(sp.svc.name, { m, label: ctx.label(m, sp.svc.name, "", 3.6), svc: sp.svc });
+        for (const b of sp.standbys) {
+          hostLayer.add(floorLink(sp.at, b.to, b.ready ? "standby" : "unready", b.bend));
+          const sk = socket(b.ready);
+          sk.position.add(b.to);
+          hostLayer.add(sk);
+        }
+        serviceViews.set(sp.svc.name, { m, label: ctx.label(m, svcTitle(sp.svc), "", sp.height + 0.75), svc: sp.svc });
       }
 
       for (const p of pl.plots) {
@@ -855,7 +869,7 @@ export const cluster: District<WorldData> = {
         const plate = new THREE.Object3D();
         plate.position.set(0, 0.3, p.d / 2 + 0.4);
         grp.add(plate);
-        const label = ctx.label(plate, `${p.host.name} · ${translate(kindLabel(p.host.kind))}`, "", 0);
+        const label = ctx.label(plate, hostTitle(p.host), "", 0);
         const c = cable(coreAt, edgeOf(p, new THREE.Vector3()), hash01(p.host.id));
         c.setOk(p.host.state === "live");
         cables.add(c.tube);
@@ -989,7 +1003,9 @@ export const cluster: District<WorldData> = {
       const delegated = run.filter((t) => t.worker === `${n}.${host}` || t.worker === n || t.worker.startsWith(n + "."));
       const asks = asking.some((s) => s === `${n}.${host}` || s === n || s.startsWith(n + "."));
       const own = termState(term[n]);
-      const said = a?.state;
+      // A named agent the process detector also sees run carries what that
+      // CLI is doing.
+      const said = a?.activity || a?.state;
       const st: RobotState = asks ? "wait"
         : live.length || delegated.length || own.work || (!term[n] && said === "working") ? "work"
         : own.wait || (!term[n] && said === "waiting") ? "wait"
@@ -1006,6 +1022,7 @@ export const cluster: District<WorldData> = {
     const updateHosts = (d: WorldData, run: HiveTask[], failed: Set<string>, asking: string[]) => {
       const hosts = d.hosts ?? [];
       const svcs = d.services ?? [];
+      svcNow = svcs;
       const sig = JSON.stringify([
         hosts.map((h) => [h.id, h.name, h.kind, h.parent, h.state, h.os, h.agents.map((a) => [a.name, a.kind, a.role, a.via, isStandby(a) ? a.state : ""])]),
         svcs.map((s) => [s.name, s.active, s.standbys]),
@@ -1056,15 +1073,16 @@ export const cluster: District<WorldData> = {
           const ccOn = running.flatMap((c) => (term[c].sessions ?? []).filter((s) => s.state !== "idle").map((s) => ({ s, c })));
           const said = [liveHere.length ? translate("{count} running", { count: liveHere.length }) : "",
             ...running.filter((c) => term[c].working || term[c].waiting).slice(0, 2).map((c) => `${c} · ${termState(term[c]).status}`)].filter(Boolean);
-          show(screens[0], p.host.name, p.host.state === "lost" ? translate("not answering") : said.length ? said.join(" · ") : translate("{count} agents ready", { count: m?.clis.size ?? 0 }),
+          const ready = m?.clis.size ?? 0;
+          show(screens[0], p.host.name, p.host.state === "lost" ? translate("not answering") : said.length ? said.join(" · ") : translate(ready === 1 ? "1 agent ready" : "{count} agents ready", { count: ready }),
             [...ccOn.slice(0, 4).map(({ s, c }) => `${c} · ${sessionLine(s, c)}`), ...(liveHere.length ? liveHere : ccOn.length ? [] : runsHere.slice(0, 4)).map((r) => `${r.agent}: ${r.prompt}`)],
             liveHere.length > 0 || ccOn.some(({ s }) => s.state === "working"));
         }
         const pods = p.pods.length;
         const agents = p.host.agents.filter((a) => !isStandby(a)).length + p.pods.reduce((n, h) => n + h.agents.length, 0);
-        const status = p.host.state === "lost" ? translate("not answering") : p.host.state === "configured" ? translate("not linked")
+        const status = p.host.state === "lost" ? translate("not answering") : p.host.state === "configured" ? unlinkedStatus(p.host, svcs, translate) || translate("not linked")
           : [pods ? translate(pods === 1 ? "1 pod" : "{count} pods", { count: pods }) : "", translate(agents === 1 ? "1 agent" : "{count} agents", { count: agents })].filter(Boolean).join(" · ");
-        v.label.set(`${p.host.name} · ${translate(kindLabel(p.host.kind))}`, status, p.host.state === "lost" ? "bad" : onNode || busy || liveHere.length ? "work" : "idle");
+        v.label.set(hostTitle(p.host), status, p.host.state === "lost" ? "bad" : onNode || busy || liveHere.length ? "work" : "idle");
       }
 
       // Ghosts and the CLIs on the dais.
@@ -1084,8 +1102,12 @@ export const cluster: District<WorldData> = {
       for (const v of serviceViews.values()) {
         const s = svcs.find((x) => x.name === v.svc.name) ?? v.svc;
         setServiceState(v.m, s.state);
-        const where = s.active ? `${s.vip ? s.vip + " · " : ""}${s.active}` : s.vip ?? "";
-        v.label.set(s.name, s.state === "active" ? where : `${translate(s.state)}${where ? " · " + where : ""}`, s.state === "down" ? "bad" : s.state === "degraded" ? "wait" : "idle");
+        const sb = s.standbys.map((b) => (b.ready ? b.host : `${b.host} (${translate("not ready")})`)).join(", ");
+        // Running with a standby ready, the pin and its dashed lines say it
+        // all; the label says more only when something is wrong.
+        const st = s.state === "active" ? ""
+          : s.state === "down" ? translate("down") : [translate(s.state), sb ? translate("standby {names}", { names: sb }) : ""].filter(Boolean).join(" · ");
+        v.label.set(svcTitle(s), st, s.state === "down" ? "bad" : s.state === "degraded" ? "wait" : "idle");
       }
     };
 
