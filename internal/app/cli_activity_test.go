@@ -34,7 +34,7 @@ func TestAPluginSpeaksForItsCLIAndProcessesForTheRest(t *testing.T) {
 	now := time.Now()
 	procs := map[string][]CCActivitySession{
 		"opencode": {{ID: "opencode-500", Project: "web", State: actIdle, Since: now, Started: now, Last: now}},
-		"agy":   {{ID: "agy-600", Project: "api", State: actWorking, Since: now, Started: now, Last: now}},
+		"agy":      {{ID: "agy-600", Project: "api", State: actWorking, Since: now, Started: now, Last: now}},
 		"claude":   {{ID: "claude-700", Project: "x", State: actIdle, Since: now, Started: now, Last: now}},
 	}
 	if ch := tr.setProcs(procs); len(ch) != 3 {
