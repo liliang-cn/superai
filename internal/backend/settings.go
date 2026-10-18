@@ -344,6 +344,9 @@ type ExternalAgents struct {
 	Unattended bool `json:"unattended"`
 	// Binaries overrides where an agent's CLI lives, by name.
 	Binaries map[string]string `json:"binaries,omitempty"`
+	// Disabled names CLIs that are installed but not offered: not listed,
+	// not linked to core, not run.
+	Disabled []string `json:"disabled,omitempty"`
 	// Models overrides which model an agent is asked for, by name.
 	Models map[string]string `json:"models,omitempty"`
 	// TimeoutSeconds bounds one delegated run. Zero takes the default.

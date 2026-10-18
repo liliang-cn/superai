@@ -149,7 +149,17 @@ func (a *App) localAgentNames() []agentexec.Installed {
 	if s == nil || !s.ExternalAgents.Enabled {
 		return nil
 	}
-	return agentexec.Discover(s.ExternalAgents.Binaries)
+	off := map[string]bool{}
+	for _, n := range s.ExternalAgents.Disabled {
+		off[strings.ToLower(strings.TrimSpace(n))] = true
+	}
+	var out []agentexec.Installed
+	for _, c := range agentexec.Discover(s.ExternalAgents.Binaries) {
+		if !off[strings.ToLower(c.Name)] {
+			out = append(out, c)
+		}
+	}
+	return out
 }
 
 // addressable reports whether a name can be reached at all, either way.

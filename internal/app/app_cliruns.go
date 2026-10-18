@@ -281,6 +281,11 @@ func (a *App) startCLIRun(o cliStart) (CLIRun, error) {
 		return CLIRun{}, errors.New("agent CLIs are switched off in Settings (External agents)")
 	}
 	installed := agentexec.Discover(ext.Binaries)
+	for _, d := range ext.Disabled {
+		if strings.EqualFold(strings.TrimSpace(d), agent) {
+			return CLIRun{}, fmt.Errorf("%s is switched off here (external_agents.disabled)", agent)
+		}
+	}
 	registry := agentexec.RegistryFrom(installed)
 	id := uuid.NewString()
 	provider, err := registry.Get(agent)
