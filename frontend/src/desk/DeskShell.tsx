@@ -200,7 +200,8 @@ export default function DeskShell({ view, badges, children, onOpenConversation, 
         {/* One toolbar, top right, the same in every mode and on every page:
             the pane's toggle at the inner end (absent in 3D, where there is no
             pane), then Dashboards, Stats, light or dark, and the bell at the edge. */}
-        <div className="dk-toolbar" style={noDrag} role="toolbar">
+        {/* In 3D the world has the right edge to itself. */}
+        {mode === "menu" && <div className="dk-toolbar" style={noDrag} role="toolbar">
           {mode === "menu" && (
             <button type="button" className={`dk-tool dk-tool-pane${paneShown ? " on" : ""}`} aria-pressed={paneShown}
               title={paneShown ? t("Hide this pane") : t("Show the hive")} aria-label={paneShown ? t("Hide this pane") : t("Show the hive")} onClick={togglePane}>
@@ -223,7 +224,7 @@ export default function DeskShell({ view, badges, children, onOpenConversation, 
             {theme.mode === "dark" ? <SunIcon size={18} /> : <MoonIcon size={18} />}
           </button>
           <NotificationCenter variant="desk" onOpenConversation={onOpenConversation} />
-        </div>
+        </div>}
         <nav className="dk-rail" style={drag}>
           {RAIL.map(({ key, label, Icon, cls }) => (
             <button key={key} title={key === "home" ? queenTitle(queen) : t(label)} style={noDrag} className={`dk-app ${cls} ${view === key || (key === "skills" && view === "mcp") || (key === "home" && view === "chat") ? "on" : ""}`}

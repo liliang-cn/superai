@@ -43,7 +43,7 @@ const (
 // procCLIs are the CLIs looked for, by the names their programs go by.
 var procCLIs = map[string]string{
 	"agy": "agy", "claude": "claude", "codex": "codex", "copilot": "copilot",
-	"cursor-agent": "cursor-agent", "gemini": "gemini", "goose": "goose",
+	"cursor-agent": "cursor-agent", "goose": "goose",
 	"hermes": "hermes", "kimi": "kimi", "opencode": "opencode", "pi": "pi",
 	"openclaw": "openclaw", "openclaw-gateway": "openclaw",
 }
@@ -53,7 +53,6 @@ var procCLIs = map[string]string{
 var procCLIPaths = []struct{ piece, cli string }{
 	{"/pi-coding-agent/", "pi"},
 	{"/@openai/codex/", "codex"},
-	{"/@google/gemini-cli/", "gemini"},
 	{"/@github/copilot/", "copilot"},
 	{"/opencode-ai/", "opencode"},
 	{"/@anthropic-ai/claude-code/", "claude"},

@@ -63,8 +63,8 @@ func TestCLIProcessesAreKnownByWhatTheyRun(t *testing.T) {
 		{"/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python /Users/me/.hermes/hermes-agent/hermes", "hermes"},
 		{"/Users/me/.local/share/uv/tools/kimi-cli/bin/python /Users/me/.local/bin/kimi", "kimi"},
 		{"/Users/me/.local/bin/cursor-agent --use-system-ca /Users/me/.local/share/cursor-agent/versions/2026/index.js", "cursor-agent"},
-		{"node /Users/me/.local/bin/gemini", "gemini"},
-		{"node --no-warnings=DEP0040 /opt/homebrew/lib/node_modules/@google/gemini-cli/dist/index.js", "gemini"},
+		// gemini is gone (agy took its place): its old installs are not a CLI.
+		{"node /Users/me/.local/bin/gemini", ""},
 		{"/Users/me/.local/bin/goose session", "goose"},
 		{"/Users/me/.local/bin/agy", "agy"},
 		{"/opt/homebrew/bin/copilot", "copilot"},
@@ -206,7 +206,7 @@ func TestLsofCwdParses(t *testing.T) {
 }
 
 func TestEveryOfferedCLIIsLookedFor(t *testing.T) {
-	want := []string{"agy", "claude", "codex", "copilot", "cursor-agent", "gemini", "goose", "hermes", "kimi", "opencode", "pi"}
+	want := []string{"agy", "claude", "codex", "copilot", "cursor-agent", "goose", "hermes", "kimi", "opencode", "pi"}
 	var miss []string
 	for _, c := range want {
 		if !knownProcCLI(c) {

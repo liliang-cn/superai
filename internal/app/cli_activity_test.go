@@ -34,7 +34,7 @@ func TestAPluginSpeaksForItsCLIAndProcessesForTheRest(t *testing.T) {
 	now := time.Now()
 	procs := map[string][]CCActivitySession{
 		"opencode": {{ID: "opencode-500", Project: "web", State: actIdle, Since: now, Started: now, Last: now}},
-		"gemini":   {{ID: "gemini-600", Project: "api", State: actWorking, Since: now, Started: now, Last: now}},
+		"agy":   {{ID: "agy-600", Project: "api", State: actWorking, Since: now, Started: now, Last: now}},
 		"claude":   {{ID: "claude-700", Project: "x", State: actIdle, Since: now, Started: now, Last: now}},
 	}
 	if ch := tr.setProcs(procs); len(ch) != 3 {
@@ -125,7 +125,7 @@ func TestOneSnapshotPerCLIASecond(t *testing.T) {
 	waitFor(t, "codex gone", func() bool { mu.Lock(); defer mu.Unlock(); l := got["codex"]; return len(l) == 2 && l[1] == nil })
 }
 
-// The Mac's opencode, codex and gemini reach core's LinkedAgents, HiveStatus
+// The Mac's opencode, codex and agy reach core's LinkedAgents, HiveStatus
 // and screens beside its Claude Code, by plugin, by codex's hooks and by
 // process; what their prompts and tool arguments said does not.
 func TestOtherCLIsShowOnCoreAndTheirPromptsDoNot(t *testing.T) {
@@ -157,7 +157,7 @@ func TestOtherCLIsShowOnCoreAndTheirPromptsDoNot(t *testing.T) {
 	// The machine's processes, as ps would list them; a test changes them.
 	var psMu sync.Mutex
 	ps := "  500     1   0.0 10:00   0:01.00 opencode\n" +
-		"  600     1  80.0 10:00   5:00.00 node /Users/me/.local/bin/gemini\n" +
+		"  600     1  80.0 10:00   5:00.00 /Users/me/.local/bin/agy\n" +
 		"  610     1   0.0 10:00   0:01.00 node /Users/me/.local/bin/codex\n"
 	setPS := func(s string) { psMu.Lock(); ps = s; psMu.Unlock() }
 
@@ -187,10 +187,10 @@ func TestOtherCLIsShowOnCoreAndTheirPromptsDoNot(t *testing.T) {
 		}
 		return LinkedAgent{}
 	}
-	// By process: gemini busy, opencode and codex idle.
+	// By process: agy busy, opencode and codex idle.
 	waitFor(t, "the processes", func() bool {
 		m := mac().CLIActivity
-		return m["gemini"].Working == 1 && m["opencode"].Idle == 1 && m["codex"].Idle == 1 && m["gemini"].Source == cliSourceProcess
+		return m["agy"].Working == 1 && m["opencode"].Idle == 1 && m["codex"].Idle == 1 && m["agy"].Source == cliSourceProcess
 	})
 
 	// opencode's plugin, as it posts to the socket.
@@ -244,7 +244,7 @@ func TestOtherCLIsShowOnCoreAndTheirPromptsDoNot(t *testing.T) {
 		t.Fatalf("claude's activity %+v", la.Activity)
 	}
 	st := core.HiveStatus()
-	if all := st["cli_activity"].(map[string]cliMap); all["mac"]["opencode"].Working != 1 || all["mac"]["gemini"].Working != 1 {
+	if all := st["cli_activity"].(map[string]cliMap); all["mac"]["opencode"].Working != 1 || all["mac"]["agy"].Working != 1 {
 		t.Fatalf("hive status %+v", all)
 	}
 	if h, _ := core.MachineStatus("mac"); h.CLIActivity["opencode"].Working != 1 {
@@ -257,7 +257,7 @@ func TestOtherCLIsShowOnCoreAndTheirPromptsDoNot(t *testing.T) {
 	plugin(ccHookEvent{Event: "PostToolUse", Session: "ses_a", Tool: "bash"})
 	plugin(ccHookEvent{Event: "Stop", Session: "ses_a"})
 	waitFor(t, "opencode idle", func() bool { oc := mac().CLIActivity["opencode"]; return oc.Idle == 1 && oc.Working == 0 })
-	setPS("  600     1  80.0 10:00   5:00.00 node /Users/me/.local/bin/gemini\n" +
+	setPS("  600     1  80.0 10:00   5:00.00 /Users/me/.local/bin/agy\n" +
 		"  610     1   0.0 10:00   0:01.00 node /Users/me/.local/bin/codex\n")
 	waitFor(t, "opencode gone", func() bool { _, ok := mac().CLIActivity["opencode"]; return !ok })
 
@@ -277,7 +277,7 @@ func TestOtherCLIsShowOnCoreAndTheirPromptsDoNot(t *testing.T) {
 			saw[p.Agent+"/"+p.CLI] = true
 		}
 	}
-	for _, want := range []string{"mac/opencode", "mac/codex", "mac/gemini", "mac/claude"} {
+	for _, want := range []string{"mac/opencode", "mac/codex", "mac/agy", "mac/claude"} {
 		if !saw[want] {
 			t.Errorf("core never told the screens %s (told %v)", want, saw)
 		}
