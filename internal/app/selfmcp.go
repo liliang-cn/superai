@@ -84,6 +84,12 @@ func selfTools() []selfTool {
 			Run: func(a *App, _ map[string]any) (any, error) { return a.selfLinkedAgents(), nil },
 		},
 		{
+			Name: "hosts", Title: "Hosts", ReadOnly: true,
+			Description: "Every host this SuperAI knows of and what runs on each. A host is a pod, a container, a Mac, a VM or bare metal (kind), with parent the host it sits inside (a pod's k3s node) and state live, lost or configured (known from the settings only)." +
+				" Its agents are SuperAI itself (kind superai, with role queen, worker, machine, relay or standalone, and the MCP servers it can call), the coding CLIs installed there (kind cli, named cli.machine, with what they are doing) and named agents (kind agent, like openclaw) with via, the SuperAI that runs them.",
+			Run: func(a *App, _ map[string]any) (any, error) { return a.Hosts(), nil },
+		},
+		{
 			Name: "mcp_servers", Title: "MCP servers", ReadOnly: true,
 			Description: "The MCP servers SuperAI has configured: whether each is running and the tools it provides.",
 			Run:         func(a *App, _ map[string]any) (any, error) { return a.selfMCPServers(), nil },

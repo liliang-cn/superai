@@ -109,8 +109,9 @@ func (a *App) RunAgentLink(ctx context.Context, o AgentLinkOptions) {
 }
 
 func (a *App) agentHello(o AgentLinkOptions) *agentlinkpb.Hello {
-	host, _ := os.Hostname()
-	h := &agentlinkpb.Hello{Name: o.Name, Host: host, Os: runtime.GOOS, Arch: runtime.GOARCH, Version: o.Version}
+	host := backend.DetectHost()
+	h := &agentlinkpb.Hello{Name: o.Name, Host: host.Name, Os: runtime.GOOS, Arch: runtime.GOARCH, Version: o.Version,
+		Kind: host.Kind, Parent: host.Parent}
 	// A hive worker says so, and core draws it as a worker, not a machine.
 	a.mu.Lock()
 	if a.settings != nil && a.settings.Hive.Role == backend.HiveRoleWorker {

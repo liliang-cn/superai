@@ -224,6 +224,8 @@ go build -o ~/.superai-node/bin/superai-cchook ./cmd/superai-cchook   # 或 make
 
 连上的每台机器都会出现在 3D 视图里，没装 CLI 的也一样。点开机器能看到负载、内存、磁盘和服务列表（失败的排在前面），可以查看日志、重启服务，或者执行一条命令。queen 用 `machine_inspect` 和 `machine_act` 两个工具做同样的事；`machine_act` 会改动机器，所以要先经过审批。MCP 客户端里对应的是 `superai_machine_inspect` 和 `superai_machine_act`。core 自己的机器名叫 `core`。
 
+**宿主和宿主上的代理。**hive 里的东西分两层：宿主是一个 Pod、容器、Mac、VM 或物理机；宿主上跑着代理，包括 SuperAI 自己（女王、worker、被看护的机器或中转）、装在那里的编码 CLI（叫 `claude.mac` 这样的名字），以及 SuperAI 替它转发的具名代理（openclaw、hermes、pi）。每个 SuperAI 进程启动时自己判断宿主类型，Pod 还会报它所在的 k3s 节点。猜错了可以用 `SUPERAI_HOST_KIND`（`pod`、`container`、`mac`、`vm`、`metal`）和 `SUPERAI_HOST_NAME` 改。core 的 `Hosts` 接口把 hive 成员、agent link 和设置里的远程代理合成一张表；女王用 `hive_hosts` 看，MCP 客户端里是 `superai_hosts`。
+
 ### 另一种接法：`superai node`（配对码）
 
 这是早期的点对点接法：这台机器自己开一个端口（`43779`），由另一个 SuperAI 用 6 位配对码把它添加进去。

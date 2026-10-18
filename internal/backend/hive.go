@@ -166,6 +166,10 @@ type HiveHello struct {
 	// Node is the machine the worker runs on ($SUPERAI_NODE; in k3s the pod's
 	// node), so a client can draw workers where they really are.
 	Node string `json:"node,omitempty"`
+	// Kind and Host say what the worker runs in (a pod, a VM...) and that
+	// box's name; empty from a worker too old to say.
+	Kind string `json:"kind,omitempty"`
+	Host string `json:"host,omitempty"`
 	// MCP names the MCP servers whose tools this worker can call right now, so
 	// the queen sends noted work to a worker that has noted. Nil is a worker
 	// too old to say, which the queen treats as "may have anything".
@@ -195,6 +199,8 @@ type HiveMember struct {
 	StartedAt time.Time `json:"started_at"`
 	Engine    string    `json:"engine,omitempty"`
 	Node      string    `json:"node,omitempty"`
+	Kind      string    `json:"kind,omitempty"`
+	Host      string    `json:"host,omitempty"`
 	// MCP is what the worker last said it can reach (HiveHello.MCP).
 	MCP   []string `json:"mcp"`
 	about string
@@ -264,6 +270,7 @@ func (h *Hive) Join(hello HiveHello) (HiveWelcome, error) {
 	}
 	m.Role, m.URL, m.Version, m.token, m.LastSeen = hello.Role, strings.TrimRight(hello.URL, "/"), hello.Version, hello.Token, now
 	m.StartedAt, m.Engine, m.about, m.Node = hello.StartedAt, hello.Engine, hello.About, hello.Node
+	m.Kind, m.Host = hello.Kind, hello.Host
 	m.MCP = nil
 	if hello.MCP != nil {
 		m.MCP = append([]string{}, hello.MCP...)
@@ -451,10 +458,11 @@ func (a *Announcer) Once(ctx context.Context) (HiveWelcome, error) {
 	if a.started.IsZero() {
 		a.started = time.Now()
 	}
+	host := DetectHost()
 	hello := HiveHello{
 		Protocol: HiveProtocol, Name: a.Name(), Role: HiveRoleWorker, URL: a.advertise(),
 		Token: a.Token, Version: a.Version, StartedAt: a.started, Engine: a.Engine, About: a.About,
-		Node: os.Getenv("SUPERAI_NODE"),
+		Node: os.Getenv("SUPERAI_NODE"), Kind: host.Kind, Host: host.Name,
 	}
 	if a.Capabilities != nil {
 		// Never nil once asked: an empty list is "none", which is not the
