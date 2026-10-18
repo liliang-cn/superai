@@ -22,27 +22,11 @@ function Fig({ v, label, big, main, bad }: { v: React.ReactNode; label: string; 
 const intK = (n: number) => fmtK(Math.round(n));
 const int = (n: number) => String(Math.round(n));
 
-/** The top-left pane: what the core has spent. It stands in the corner's
- *  column, under the hive's pill, so the two never cover each other. */
-export function HoloTokens({ on }: { on: boolean }) {
-  const { t } = useI18n();
-  const p = usePulse();
-  return (
-    <div className={`wl-holo tl${on ? "" : " off"}`} aria-hidden={!on}>
-      <Fig big main v={<><i className={p.live ? "wh-dot on" : "wh-dot"} /><N v={p.tokens} /></>} label={t("tokens this process")} />
-      <div className="wh-row">
-        <Fig v={<N v={tokPerSec(p)} fmt={(n) => (n >= 10 ? intK(n) : n.toFixed(1))} />} label="tok/s" />
-        <Fig v={<N v={p.cached} />} label={t("cached")} />
-      </div>
-    </div>
-  );
-}
-
 /**
  * The core's live figures as panes of light pinned to the corners of the 3D
  * view, over the scene and out of the pointer's way: what it has done (top
  * right), what the hive is carrying (bottom left), what it weighs (bottom
- * right); the top left is HoloTokens. Pushed by the pulse, like everything
+ * right); the top left is the hive's own (World.tsx Hud). Pushed by the pulse, like everything
  * else that moves here.
  */
 export default function StatsHud({ hive, runs, on }: { hive: Hive; runs: CodingRun[]; on: boolean }) {

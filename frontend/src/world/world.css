@@ -439,3 +439,27 @@
 .wi-list li.wi-host-mcp { cursor: default; white-space: normal; padding: 0 4px 4px 18px; background: none; }
 .wi-host-mcp { margin: -1px 0 3px 0; font: 11px "Geist Mono", monospace; color: #5f6d77; white-space: normal; overflow-wrap: anywhere; }
 :root[data-theme="dark"] .wi-host-mcp { color: #9aa8b4; }
+
+/* The hive's status (World.tsx Hud): one pane of light in the top-left
+   corner, the same glass as the others, but it takes the pointer to open. */
+.wl-holo.wl-hive { pointer-events: auto; width: 290px; min-width: 0; }
+.wh-hive-top { display: flex; align-items: flex-start; justify-content: space-between; width: 100%; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.wh-hive-top:focus-visible { outline: 1px solid var(--holo-ink); outline-offset: 3px; border-radius: 4px; }
+.wh-hive-chev { margin-top: 4px; color: var(--holo-dim); transition: transform 0.2s; flex: none; }
+.wl-hive.open .wh-hive-chev { transform: rotate(180deg); }
+.wl-hive .wh-fig.big + .wh-row { margin-top: 10px; }
+.wl-hive .wh-row { gap: 16px; }
+.wh-spark { display: block; width: 100%; height: 40px; margin-top: 12px; }
+.wh-spark .stroke { fill: none; stroke: var(--holo-ink); stroke-width: 1.4; vector-effect: non-scaling-stroke; }
+.wh-spark .fill { fill: var(--holo-scan); stroke: none; }
+.wh-cap { display: flex; justify-content: space-between; margin: 4px 0 8px; font: 600 9.5px/1.2 Geist, system-ui, sans-serif; letter-spacing: 0.08em; text-transform: uppercase; color: var(--holo-dim); }
+.wh-who { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.wh-who li { display: grid; grid-template-columns: 8px 64px 1fr 52px; align-items: center; gap: 7px; font: 600 11px "Geist Mono", ui-monospace, monospace; }
+.wh-who i { width: 6px; height: 6px; border-radius: 50%; background: var(--holo-dim); opacity: 0.45; }
+.wh-who i.on { opacity: 1; background: var(--holo-ink); }
+.wh-who span:nth-child(2) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wh-who .bar { height: 5px; background: var(--holo-scan); border-radius: 3px; overflow: hidden; }
+.wh-who .bar span { display: block; height: 100%; background: var(--holo-ink); opacity: 0.7; border-radius: 3px; transition: width 0.6s; }
+.wh-who b { text-align: right; font-weight: 600; }
+@media (max-width: 600px) { .wl-holo.wl-hive { width: auto; } .wl-hive .wh-row .wh-fig:not(.bad) + .wh-fig:not(.bad) { display: none; } }
+.wl-hive .wh-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; margin-top: 12px; }

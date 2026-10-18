@@ -14,7 +14,7 @@ import { cluster, lensOf, type WorldData } from "./cluster";
 import { worldBus } from "./bus";
 import Inspector from "./Inspector";
 import Command from "./Command";
-import StatsHud, { HoloTokens } from "./StatsHud";
+import StatsHud from "./StatsHud";
 import { agendaOf, touchesNoted, type AgendaEntry } from "./agenda";
 import { dashboards as dashApi, type Dashboard } from "../lib/dashboards";
 import { Response } from "@/components/ai-elements/response";
@@ -205,7 +205,6 @@ export default function World({ view }: { view: ViewKey }) {
       </div>
       <div className="wl-corner">
         <Hud view={view} data={data} />
-        <HoloTokens on={holo} />
       </div>
       <StatsHud hive={hive} runs={runs} on={holo} />
       <div ref={card} className="wl-callout" style={{ display: picked ? "" : "none" }}>
@@ -217,12 +216,13 @@ export default function World({ view }: { view: ViewKey }) {
   );
 }
 
-/** The hive's figures, on one flat screen that stays on the page: the
- *  totals, how fast tokens are going lately, and each member's share. Folds
- *  to its top line. */
+/** The hive's status, as one pane of light in the top-left corner: what the
+ *  cluster spends and how many of its workers answer on the top line, and
+ *  opened, its work, how fast tokens have gone lately, and each member's
+ *  share. It stays up whether the other corners are shown or not. */
 function Hud({ data }: { view: ViewKey; data: WorldData }) {
   const { t } = useI18n();
-  // Folded to one pill unless opened; it remembers.
+  // Folded to its top line unless opened; it remembers.
   const [open, setOpen] = useState(() => { try { return localStorage.getItem("superai-world-stats") === "1"; } catch { return false; } });
   const toggle = () => setOpen((v) => { try { localStorage.setItem("superai-world-stats", v ? "0" : "1"); } catch { /* fine */ } return !v; });
   // Tokens spent between updates, for the line.
@@ -240,45 +240,49 @@ function Hud({ data }: { view: ViewKey; data: WorldData }) {
   const needs = data.attention.filter((a) => a.level === "needs").length;
   const pts = hist.current;
   const max = Math.max(1, ...pts);
-  const W = 260, H = 44;
+  const W = 260, H = 40;
   const line = pts.map((v, i) => `${(i / Math.max(1, pts.length - 1)) * W},${H - 2 - (v / max) * (H - 6)}`).join(" ");
   const members = [...data.meter.members].sort((a, b) => b.tokens - a.tokens).slice(0, 6);
   const topTokens = Math.max(1, ...members.map((m) => m.tokens));
   const short = (n: string) => n.replace(/^superai-worker-/, "w").replace(/^superai-/, "");
   return (
-    <div className={`wl-stats${open ? "" : " folded"}`}>
-      <button className="wl-stats-top" onClick={toggle} title={t(open ? "Fold" : "Show the figures")}>
-        <span className={`wl-stats-dot${tt.tokPerSec > 0.5 ? " on" : ""}`} />
-        <b>{fmt(tt.tokens)}</b><em>{t("tokens")}</em>
-        <b>{Math.round(tt.tokPerSec)}</b><em>tok/s</em>
-        <b className={live < workers.length ? "bad" : ""}>{live}/{workers.length}</b><em>{t("workers")}</em>
-        {needs > 0 && <><b className="warn">{needs}</b><em>{t("need you")}</em></>}
-        <ChevronDownIcon size={15} className="wl-stats-chev" />
+    <div className={`wl-holo tl wl-hive${open ? " open" : ""}`}>
+      <button className="wh-hive-top" onClick={toggle} aria-expanded={open} title={t(open ? "Fold" : "Show the figures")}>
+        <div className="wh-fig big main">
+          <b><i className={tt.tokPerSec > 0.5 ? "wh-dot on" : "wh-dot"} />{fmt(tt.tokens)}</b>
+          <span>{t("hive tokens")}</span>
+        </div>
+        <ChevronDownIcon size={14} className="wh-hive-chev" />
       </button>
+      <div className="wh-row">
+        <div className="wh-fig"><b>{Math.round(tt.tokPerSec)}</b><span>tok/s</span></div>
+        <div className={`wh-fig${live < workers.length ? " bad" : ""}`}><b>{live}/{workers.length}</b><span>{t("workers")}</span></div>
+        {needs > 0 && <div className="wh-fig bad"><b>{needs}</b><span>{t("need you")}</span></div>}
+      </div>
       {open && (
-        <div className="wl-stats-body">
-          <div className="wl-stats-grid">
-            <div><b>{tt.calls}</b><span>{t("tool calls")}</span></div>
-            <div><b>{tt.rounds}</b><span>{t("rounds")}</span></div>
-            <div><b>{run.length}</b><span>{t("orders out")}</span></div>
-            <div><b className={tt.fails ? "bad" : ""}>{tt.fails}</b><span>{t("failures")}</span></div>
+        <>
+          <div className="wh-grid">
+            <div className="wh-fig"><b>{fmt(tt.calls)}</b><span>{t("tool calls")}</span></div>
+            <div className="wh-fig"><b>{tt.rounds}</b><span>{t("rounds")}</span></div>
+            <div className="wh-fig"><b>{run.length}</b><span>{t("orders out")}</span></div>
+            <div className={`wh-fig${tt.fails ? " bad" : ""}`}><b>{tt.fails}</b><span>{t("failures")}</span></div>
           </div>
-          <svg className="wl-spark" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+          <svg className="wh-spark" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
             {pts.length > 1 && <polyline points={`0,${H} ${line} ${W},${H}`} className="fill" />}
             {pts.length > 1 && <polyline points={line} className="stroke" />}
           </svg>
-          <div className="wl-stats-cap"><span>{pts.length > 1 ? t("tokens, lately") : t("tokens, lately — the line starts with the next work")}</span>{pts.length > 1 && <span>{t("peak")} {fmt(max)}</span>}</div>
-          <ul className="wl-stats-who">
+          <div className="wh-cap"><span>{pts.length > 1 ? t("tokens, lately") : t("tokens, lately — the line starts with the next work")}</span>{pts.length > 1 && <span>{t("peak")} {fmt(max)}</span>}</div>
+          <ul className="wh-who">
             {members.map((m) => (
               <li key={m.name}>
                 <i className={m.live ? "on" : ""} />
                 <span>{short(m.name)}</span>
-                <span className={`bar${m.live ? " live" : ""}`}><span style={{ width: `${Math.max(2, (m.tokens / topTokens) * 100)}%` }} /></span>
+                <span className="bar"><span style={{ width: `${Math.max(2, (m.tokens / topTokens) * 100)}%` }} /></span>
                 <b>{fmt(m.tokens)}</b>
               </li>
             ))}
           </ul>
-        </div>
+        </>
       )}
     </div>
   );
