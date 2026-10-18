@@ -380,6 +380,8 @@ func (a *App) startHive() {
 		a.mu.Unlock()
 		return svc.MCPServersWithTools()
 	}
+	// And the coding CLIs installed here: a Mac worker takes the coding work.
+	ann.CLIs = func() []string { return cliNames(a.localAgentNames()) }
 	if err := ann.Validate(); err != nil {
 		log.Printf("hive: not joining: %v", err)
 		return

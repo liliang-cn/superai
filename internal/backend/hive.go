@@ -174,6 +174,9 @@ type HiveHello struct {
 	// the queen sends noted work to a worker that has noted. Nil is a worker
 	// too old to say, which the queen treats as "may have anything".
 	MCP []string `json:"mcp"`
+	// CLIs names the coding CLIs installed where the worker runs (claude,
+	// codex, ...), so work that needs one goes to a worker that has it.
+	CLIs []string `json:"clis,omitempty"`
 }
 
 // HiveWelcome is the queen's answer.
@@ -201,8 +204,10 @@ type HiveMember struct {
 	Node      string    `json:"node,omitempty"`
 	Kind      string    `json:"kind,omitempty"`
 	Host      string    `json:"host,omitempty"`
-	// MCP is what the worker last said it can reach (HiveHello.MCP).
+	// MCP is what the worker last said it can reach (HiveHello.MCP), and
+	// CLIs the coding CLIs installed where it runs.
 	MCP   []string `json:"mcp"`
+	CLIs  []string `json:"clis,omitempty"`
 	about string
 	// State is "live" or "lost", computed when asked rather than stored, so it
 	// cannot go stale between sweeps.
@@ -271,6 +276,7 @@ func (h *Hive) Join(hello HiveHello) (HiveWelcome, error) {
 	m.Role, m.URL, m.Version, m.token, m.LastSeen = hello.Role, strings.TrimRight(hello.URL, "/"), hello.Version, hello.Token, now
 	m.StartedAt, m.Engine, m.about, m.Node = hello.StartedAt, hello.Engine, hello.About, hello.Node
 	m.Kind, m.Host = hello.Kind, hello.Host
+	m.CLIs = append([]string(nil), hello.CLIs...)
 	m.MCP = nil
 	if hello.MCP != nil {
 		m.MCP = append([]string{}, hello.MCP...)
@@ -375,6 +381,8 @@ type Announcer struct {
 	// Capabilities, when set, names the MCP servers this worker can call,
 	// asked again for every hello so a server that came up later is offered.
 	Capabilities func() []string
+	// CLIs, when set, names the coding CLIs installed here.
+	CLIs func() []string
 
 	started time.Time
 	client  *http.Client
@@ -468,6 +476,9 @@ func (a *Announcer) Once(ctx context.Context) (HiveWelcome, error) {
 		// Never nil once asked: an empty list is "none", which is not the
 		// same as a worker that does not say.
 		hello.MCP = append([]string{}, a.Capabilities()...)
+	}
+	if a.CLIs != nil {
+		hello.CLIs = a.CLIs()
 	}
 	body, _ := json.Marshal(hello)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost,

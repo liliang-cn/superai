@@ -34,7 +34,7 @@ func (a *App) onMachine(name string, d time.Duration, method string, args []any,
 	if c != nil {
 		role = a.agentRole(c)
 	}
-	if c == nil || role != agentRoleMachine {
+	if c == nil || !machineToo(role, c.hello) {
 		names := []string{"core"}
 		for _, l := range a.LinkedAgents() {
 			names = append(names, l.Name)

@@ -77,7 +77,11 @@ func (a *App) delegateCandidates(needs []string) []string {
 	}
 	var cs []cand
 	for _, m := range a.liveWorkers() {
-		if backend.HasAll(m.MCP, needs) {
+		have := m.MCP
+		if have != nil {
+			have = append(append([]string{}, m.MCP...), m.CLIs...)
+		}
+		if backend.HasAll(have, needs) {
 			cs = append(cs, cand{m.Name, running[m.Name], m.MCP != nil})
 		}
 	}
@@ -143,7 +147,9 @@ func (a *App) registerDelegateTool(inner *agent.Service, mode string) {
 			"\n\nEach task stands alone — the worker sees nothing of this conversation — so put in it everything needed:"+
 			" what to do, absolute dates and times, ids, what to report. Several independent tasks in one call run at the"+
 			" same time on different workers, idle ones first; split a request that has independent parts. Set needs to"+
-			" the MCP servers a task's tools come from (\"noted\") so it goes to a worker that has them."+
+			" the MCP servers a task's tools come from (\"noted\") so it goes to a worker that has them, and name a coding"+
+			" CLI (\"codex\", \"claude\", \"opencode\") for coding work: it goes to a worker where that CLI is installed,"+
+			" like the Mac, which runs it there."+
 			"\n\nA worker that fails or times out is replaced by another; when no worker can do a task the queen does it"+
 			" herself. The report says who did each task and which tools they called; tell the person in a few words.",
 		map[string]any{
@@ -157,7 +163,7 @@ func (a *App) registerDelegateTool(inner *agent.Service, mode string) {
 							"task": map[string]any{"type": "string", "description": "One self-contained instruction."},
 							"needs": map[string]any{
 								"type": "array", "items": map[string]any{"type": "string"},
-								"description": "MCP servers the task's tools come from, e.g. [\"noted\"].",
+								"description": "MCP servers the task's tools come from, e.g. [\"noted\"], and coding CLIs it needs, e.g. [\"codex\"].",
 							},
 							"worker": map[string]any{"type": "string", "description": "Only to pin the task to one worker; usually omit."},
 						},

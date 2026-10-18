@@ -207,3 +207,39 @@ func TestRelayOnlyRoundTripsThroughTheSettingsRPC(t *testing.T) {
 		t.Fatalf("agentlink.json kept: %v", err)
 	}
 }
+
+// A Mac that joins the hive as a worker is still the Mac: listed and looked
+// after as a machine, while a worker pod is not. And work that needs a
+// coding CLI goes to the worker where it is installed.
+func TestAMacWorkerIsStillAMachine(t *testing.T) {
+	core := NewApp()
+	core.settings = &backend.Settings{Hive: backend.HiveSettings{Role: backend.HiveRoleQueen, Name: "q"}}
+	core.hive = backend.NewHive("q", 0)
+	for _, w := range []backend.HiveHello{
+		{Name: "mac", Kind: "mac", MCP: []string{"noted"}, CLIs: []string{"claude", "codex"}},
+		{Name: "superai-worker-0", Kind: "pod", Node: "orange2", MCP: []string{"noted"}},
+	} {
+		w.Protocol, w.Role, w.URL = backend.HiveProtocol, backend.HiveRoleWorker, "http://"+w.Name+":1"
+		if _, err := core.hive.Join(w); err != nil {
+			t.Fatal(err)
+		}
+	}
+	addr := startCore(t, core)
+	linkHello(t, core, addr, &agentlinkpb.Hello{Name: "mac", Os: "darwin", Kind: "mac", Role: "worker", Clis: []string{"claude", "codex"}})
+	linkHello(t, core, addr, &agentlinkpb.Hello{Name: "superai-worker-0", Kind: "pod", Role: "worker"})
+
+	if got := names(core.LinkedAgents()); got != "mac" {
+		t.Fatalf("machines: %s", got)
+	}
+	for _, la := range core.LinkedAgentsAll() {
+		if la.Name == "mac" && (la.Role != "worker" || !la.Machine) {
+			t.Fatalf("the mac: %+v", la)
+		}
+	}
+	if got := core.delegateCandidates([]string{"codex"}); len(got) != 1 || got[0] != "mac" {
+		t.Fatalf("codex work goes to %v", got)
+	}
+	if got := core.delegateCandidates([]string{"noted"}); len(got) != 2 {
+		t.Fatalf("noted work goes to %v", got)
+	}
+}
