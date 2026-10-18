@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"net"
 	"sort"
 	"strings"
 	"time"
@@ -36,9 +37,13 @@ type Host struct {
 	Parent string `json:"parent,omitempty"`
 	// State is live (something on it answers), lost (it did and stopped) or
 	// configured (only the settings know of it; nobody has looked).
-	State    string      `json:"state"`
-	LastSeen time.Time   `json:"lastSeen,omitempty"`
-	Agents   []HostAgent `json:"agents"`
+	State    string    `json:"state"`
+	LastSeen time.Time `json:"lastSeen,omitempty"`
+	// Addresses are the host's IP addresses where something has said them
+	// (haify's node list), which is how an ssh destination such as
+	// sds@192.168.123.212 is known to mean this host.
+	Addresses []string    `json:"addresses,omitempty"`
+	Agents    []HostAgent `json:"agents"`
 }
 
 // What an agent on a host is.
@@ -61,8 +66,13 @@ type HostAgent struct {
 	// State is live or lost for a SuperAI; for a CLI working, waiting, idle
 	// (a session open) or installed; configured for an agent only the
 	// settings know.
-	State   string `json:"state"`
-	Version string `json:"version,omitempty"`
+	State string `json:"state"`
+	// Activity is, for a named agent, what the coding CLI of the same name on
+	// this host is doing (working, waiting, idle): the process detector sees
+	// openclaw run as a CLI where a relay serves it as an agent, and the two
+	// are one agent.
+	Activity string `json:"activity,omitempty"`
+	Version  string `json:"version,omitempty"`
 	// Via is the SuperAI on this host that runs it for core: a CLI's or a
 	// named agent's.
 	Via string `json:"via,omitempty"`
@@ -175,18 +185,48 @@ func (a *App) hostsWith(services []backend.HAService) []Host {
 	for _, sv := range services {
 		b.service(sv, agentNames)
 	}
+	// What haify calls each node's address, on the hosts already drawn.
+	for _, sv := range services {
+		for hn, addr := range sv.Addresses {
+			if x := b.find(hn); x != nil {
+				x.addAddress(addr)
+			}
+		}
+	}
 
-	// Agents only the settings know, reached over ssh, where no linked
-	// SuperAI or HA service serves them already.
+	// Agents the settings reach over ssh, on every host of theirs: pi and
+	// hermes are installed on several VMs, and are on each of them. A
+	// destination is matched to a host already drawn by its name or
+	// address; one that matches none is a host of its own, unless an HA
+	// service runs the agent: the service says which hosts it is on, and an
+	// unmatched destination is one of those by another name.
 	if s != nil && s.RemoteAgents.Enabled {
 		for _, n := range s.RemoteAgents.Names() {
 			ra := s.RemoteAgents.Agents[n]
-			if ra.URL != "" || len(ra.Hosts) == 0 || onlyLocal(ra.Hosts) || b.served(n) || haServes(services, n) {
+			if ra.URL != "" {
 				continue
 			}
-			x := b.host(sshHost(ra.Hosts[0]), "", "", "", "", "")
-			x.configured()
-			b.agent(x, HostAgent{Name: n, Kind: hostAgentNamed, About: ra.About, State: "configured"})
+			ha := haServes(services, n)
+			for _, dest := range ra.Hosts {
+				hn := sshHost(dest)
+				// This machine, or a forwarded port on it (a Lima VM's
+				// "-p 52848 me@127.0.0.1"), says nothing of which host it is.
+				if hn == "" || backend.IsLocalHost(hn) || loopback(hn) {
+					continue
+				}
+				x := b.find(hn)
+				if x == nil {
+					if ha {
+						continue
+					}
+					x = b.host(hn, "", "", "", "", "")
+				}
+				x.configured()
+				if x.hasNamed(n) {
+					continue
+				}
+				b.agent(x, HostAgent{Name: n, Kind: hostAgentNamed, About: ra.About, State: "configured"})
+			}
 		}
 	}
 	return b.list()
@@ -200,13 +240,159 @@ func cliNames(in []agentexec.Installed) []string {
 	return out
 }
 
-// sshHost is the machine part of an ssh destination: "sds@192.168.123.212"
-// is 192.168.123.212.
+// sshHost is the machine part of an ssh destination, the target being the
+// last word: "sds@192.168.123.212" is 192.168.123.212, and
+// "-F ~/.lima/sds-a/ssh.config lima-sds-a" is lima-sds-a.
 func sshHost(dest string) string {
+	f := strings.Fields(dest)
+	if len(f) == 0 {
+		return ""
+	}
+	dest = f[len(f)-1]
 	if i := strings.LastIndex(dest, "@"); i >= 0 {
 		dest = dest[i+1:]
 	}
 	return dest
+}
+
+func loopback(h string) bool {
+	if strings.EqualFold(h, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(strings.Trim(h, "[]"))
+	return ip != nil && ip.IsLoopback()
+}
+
+// hostKeys is what a host name can be matched by: itself, lower case, and
+// for a name that is not an address, its first label ("sds-e.lan" is
+// sds-e) and, for a Lima VM, the instance ("lima-sds-a" is sds-a).
+func hostKeys(name string) []string {
+	n := hostID(name)
+	if n == "" {
+		return nil
+	}
+	out := []string{n}
+	if net.ParseIP(n) == nil {
+		if i := strings.IndexByte(n, '.'); i > 0 {
+			out = append(out, n[:i])
+		}
+		if t := strings.TrimPrefix(n, "lima-"); t != n && t != "" {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+// hostIs says whether name (an ssh destination's machine, an address, a
+// hostname) means x: exactly, when exact is set, else by any of their keys.
+func hostIs(x *Host, name string, exact bool) bool {
+	own := append([]string{x.ID, x.Name, x.Hostname}, x.Addresses...)
+	if exact {
+		n := hostID(name)
+		for _, o := range own {
+			if n != "" && hostID(o) == n {
+				return true
+			}
+		}
+		return false
+	}
+	have := map[string]bool{}
+	for _, o := range own {
+		for _, k := range hostKeys(o) {
+			have[k] = true
+		}
+	}
+	for _, k := range hostKeys(name) {
+		if have[k] {
+			return true
+		}
+	}
+	return false
+}
+
+// findHost is the host in hs that name means: an exact match first, then
+// one by the looser keys.
+func findHost(hs []*Host, name string) *Host {
+	for _, exact := range []bool{true, false} {
+		for _, x := range hs {
+			if hostIs(x, name, exact) {
+				return x
+			}
+		}
+	}
+	return nil
+}
+
+// find is the host already in the book that name means, by name or address.
+func (b *hostBook) find(name string) *Host {
+	hs := make([]*Host, 0, len(b.order))
+	for _, id := range b.order {
+		hs = append(hs, b.byID[id])
+	}
+	return findHost(hs, name)
+}
+
+func (x *Host) addAddress(a string) {
+	for _, e := range x.Addresses {
+		if e == a {
+			return
+		}
+	}
+	x.Addresses = append(x.Addresses, a)
+}
+
+// hasNamed says whether a named agent of this name is on x already, in any
+// state.
+func (x *Host) hasNamed(name string) bool {
+	for _, g := range x.Agents {
+		if g.Kind == hostAgentNamed && g.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+// mergeCLIs folds a coding CLI into the named agent of the same name on x:
+// the process detector reports openclaw (and hermes, pi) as a CLI where a
+// relay serves it as a named agent, and it is one agent. The named agent
+// stays, carrying what the CLI is doing.
+func (x *Host) mergeCLIs() {
+	named := map[string]int{}
+	for i, g := range x.Agents {
+		if g.Kind == hostAgentNamed {
+			named[g.Name] = i
+		}
+	}
+	if len(named) == 0 {
+		return
+	}
+	out := make([]HostAgent, 0, len(x.Agents))
+	for _, g := range x.Agents {
+		if g.Kind == hostAgentCLI {
+			bare := strings.TrimSuffix(g.Name, "."+g.Via)
+			if i, ok := named[bare]; ok {
+				n := &x.Agents[i]
+				if n.State != "standby" && n.State != "standby-unready" {
+					switch g.State {
+					case actWorking, actWaiting, actIdle:
+						n.Activity = g.State
+					}
+				}
+				if n.Via == "" {
+					n.Via = g.Via
+				}
+				continue
+			}
+		}
+		out = append(out, g)
+	}
+	// The named agents were updated in place above, before the copy.
+	for i := range out {
+		if out[i].Kind == hostAgentNamed {
+			out[i] = x.Agents[named[out[i].Name]]
+		}
+	}
+	x.Agents = out
 }
 
 // hostBook builds the list: one Host per box, however many sources name it.
@@ -442,6 +628,7 @@ func (b *hostBook) list() []Host {
 		if x.State == "" {
 			x.State = "configured"
 		}
+		x.mergeCLIs()
 	}
 	depth := func(x *Host) int {
 		d := 0
@@ -532,6 +719,9 @@ func hostsText(hs []Host) string {
 				fmt.Fprintf(&b, " %s", g.Role)
 			}
 			fmt.Fprintf(&b, ", %s", g.State)
+			if g.Activity != "" {
+				fmt.Fprintf(&b, " (%s)", g.Activity)
+			}
 			if len(g.MCP) > 0 {
 				fmt.Fprintf(&b, ", mcp %s", strings.Join(g.MCP, " "))
 			}

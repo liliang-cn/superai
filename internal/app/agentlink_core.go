@@ -261,41 +261,63 @@ func (h *agentHub) serving(name string) *agentConn {
 // not — openclaw follows its HA group from node to node, and the name the
 // phone kept from before a failover must still get an answer.
 func (h *agentHub) servingAs(name string) (*agentConn, string) {
-	has := func(c *agentConn, n string) bool {
-		for _, a := range c.hello.GetAgents() {
-			if a.GetName() == n {
-				return true
-			}
-		}
-		return false
+	if c := h.servingExactly(name); c != nil {
+		return c, name
 	}
-	conns := h.list()
-	for _, c := range conns {
-		if has(c, name) {
-			return c, name
-		}
-	}
-	i := strings.LastIndex(name, ".")
-	if i <= 0 || i == len(name)-1 {
+	bare, machine, ok := splitAddress(name)
+	if !ok {
 		return nil, name
 	}
-	bare, machine := name[:i], name[i+1:]
-	var other *agentConn
-	for _, c := range conns {
-		if !has(c, bare) {
-			continue
-		}
-		if c.name() == machine || c.hello.GetHost() == machine {
+	if c := h.servingOn(bare, machine); c != nil {
+		return c, bare
+	}
+	for _, c := range h.list() {
+		if serves(c, bare) {
 			return c, bare
 		}
-		if other == nil {
-			other = c
-		}
-	}
-	if other != nil {
-		return other, bare
 	}
 	return nil, name
+}
+
+// servingExactly is the connection whose hello lists name as it is.
+func (h *agentHub) servingExactly(name string) *agentConn {
+	for _, c := range h.list() {
+		if serves(c, name) {
+			return c
+		}
+	}
+	return nil
+}
+
+// servingOn is the connection on machine (its link name or its host) that
+// serves the agent bare, and only that one.
+func (h *agentHub) servingOn(bare, machine string) *agentConn {
+	for _, c := range h.list() {
+		if serves(c, bare) && (strings.EqualFold(c.name(), machine) || strings.EqualFold(c.hello.GetHost(), machine)) {
+			return c
+		}
+	}
+	return nil
+}
+
+func serves(c *agentConn, n string) bool {
+	for _, a := range c.hello.GetAgents() {
+		if a.GetName() == n {
+			return true
+		}
+	}
+	return false
+}
+
+// splitAddress reads "openclaw.sds-b" as the agent openclaw on sds-b. The
+// machine is the part after the first dot, so a machine whose name has dots
+// ("pi.192.168.123.212") stays whole.
+func splitAddress(name string) (bare, machine string, ok bool) {
+	i := strings.Index(name, ".")
+	if i <= 0 || i == len(name)-1 {
+		return "", "", false
+	}
+	return name[:i], name[i+1:], true
 }
 
 // What a linked agent is to this core. Every agent on the link can be asked

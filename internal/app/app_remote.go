@@ -173,6 +173,10 @@ func (a *App) addressable(name string) bool {
 	if a.remoteRunner().Config().Has(name) {
 		return true
 	}
+	// "pi.sds-a": an agent the settings reach over ssh, on one of its hosts.
+	if bare, _, ok := splitAddress(name); ok && a.remoteRunner().Config().Has(bare) {
+		return true
+	}
 	for _, c := range a.localAgentNames() {
 		if c.Name == name {
 			return true
@@ -239,9 +243,8 @@ func (a *App) AskRemoteAgent(name, prompt string) backend.RemoteResult {
 // askAgent sends a question to whichever kind of agent the name belongs to.
 func (a *App) askAgent(ctx context.Context, name, prompt string) backend.RemoteResult {
 	name = strings.TrimSpace(name)
-	// An agent connected over the agent link that can reach it goes first:
-	// it is there, and it is where the thing actually runs.
-	if c, as := a.agents().servingAs(name); c != nil {
+	hub := a.agents()
+	viaLink := func(c *agentConn, as string) backend.RemoteResult {
 		var res backend.RemoteResult
 		if err := c.call(ctx, "AskRemoteAgent", []any{as, prompt}, &res); err != nil {
 			return backend.RemoteResult{Agent: name, Host: c.name(), Failed: true, Reason: err.Error()}
@@ -251,8 +254,35 @@ func (a *App) askAgent(ctx context.Context, name, prompt string) backend.RemoteR
 		}
 		return res
 	}
-	// A worker of this hive is on the runner's roster, not in its config.
 	runner := a.remoteRunner()
+	// An agent connected over the agent link that can reach it goes first:
+	// it is there, and it is where the thing actually runs.
+	if c := hub.servingExactly(name); c != nil {
+		return viaLink(c, name)
+	}
+	// One placement of an agent that runs on several hosts, "pi.sds-a": the
+	// SuperAI on that machine when it serves it, else the settings' ssh
+	// destination that is that machine. Only then any host that has it, so
+	// a name kept from before an HA failover still gets an answer.
+	if bare, machine, ok := splitAddress(name); ok {
+		if c := hub.servingOn(bare, machine); c != nil {
+			return viaLink(c, bare)
+		}
+		if dest := a.sshDestOn(bare, machine); dest != "" {
+			res, err := runner.Run(backend.OnRemoteHost(ctx, dest), bare, prompt)
+			if err != nil {
+				return backend.RemoteResult{Agent: name, Failed: true, Reason: err.Error()}
+			}
+			return res
+		}
+		if c, as := hub.servingAs(name); c != nil {
+			return viaLink(c, as)
+		}
+		if runner.Config().Has(bare) && !runner.Config().Has(name) {
+			name = bare
+		}
+	}
+	// A worker of this hive is on the runner's roster, not in its config.
 	if _, onRoster := runner.Workers()[name]; onRoster || runner.Config().Has(name) {
 		res, err := runner.Run(ctx, name, prompt)
 		if err != nil {
@@ -261,6 +291,28 @@ func (a *App) askAgent(ctx context.Context, name, prompt string) backend.RemoteR
 		return res
 	}
 	return a.askLocalCLI(ctx, name, prompt)
+}
+
+// sshDestOn is the ssh destination in the settings for agent that reaches
+// machine (a host's name, hostname or address, as Hosts lists it), or "".
+func (a *App) sshDestOn(agent, machine string) string {
+	ra, ok := a.remoteRunner().Config().Agents[agent]
+	if !ok || ra.URL != "" {
+		return ""
+	}
+	hs := a.Hosts()
+	ptrs := make([]*Host, 0, len(hs))
+	for i := range hs {
+		ptrs = append(ptrs, &hs[i])
+	}
+	target := findHost(ptrs, machine)
+	for _, dest := range ra.Hosts {
+		hn := sshHost(dest)
+		if hostID(hn) == hostID(machine) || (target != nil && findHost(ptrs, hn) == target) {
+			return dest
+		}
+	}
+	return ""
 }
 
 // askLocalCLI forwards to the cli_agent_run tool, which is where the argv

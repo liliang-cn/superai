@@ -41,7 +41,8 @@ func TestHostsPutsAgentsOnTheirHosts(t *testing.T) {
 		Hive:      backend.HiveSettings{Role: backend.HiveRoleQueen, Name: "queen"},
 		AgentLink: backend.AgentLinkSettings{RelayOnly: []string{"sds-e"}},
 		RemoteAgents: backend.RemoteAgents{Enabled: true, Agents: map[string]backend.RemoteAgent{
-			// Served by the relay already: not listed twice.
+			// Served by the relay, and configured on an address nothing
+			// says is the relay's box: on both, each its own placement.
 			"openclaw": {About: "the gateway", Hosts: []string{"sds@192.168.123.212"}, Command: []string{"openclaw", "{prompt}"}},
 			// Known only from the settings.
 			"pi": {About: "pi", Hosts: []string{"sds@192.168.123.99"}, Command: []string{"pi", "{prompt}"}},
@@ -133,8 +134,8 @@ func TestHostsPutsAgentsOnTheirHosts(t *testing.T) {
 	if g := agentNamed(relay, "sds-e"); g == nil || g.Role != agentRoleRelay {
 		t.Fatalf("the relay itself: %+v", g)
 	}
-	if h := hostByName(hs, "192.168.123.212"); h != nil {
-		t.Fatalf("openclaw listed again from the settings: %+v", h)
+	if g := agentNamed(hostByName(hs, "192.168.123.212"), "openclaw"); g == nil || g.State != "configured" {
+		t.Fatalf("openclaw where the settings reach it: %+v", g)
 	}
 	pi := hostByName(hs, "192.168.123.99")
 	if g := agentNamed(pi, "pi"); pi == nil || pi.State != "configured" || g == nil || g.State != "configured" {
@@ -233,5 +234,112 @@ func TestHostsPlaceHAServices(t *testing.T) {
 	}
 	if txt := topologyText(top); !strings.Contains(txt, "openclaw: active, on sds-e, service IP 192.168.123.252, standby sds-b (ready)") {
 		t.Fatalf("the queen's view:\n%s", txt)
+	}
+}
+
+// pi and hermes are installed on several VMs. Each is drawn on every host it
+// is known on: from each linked relay's hello, and on every ssh host the
+// settings give it, matched to a host already drawn by haify's addresses or
+// by name. Each placement answers to name.host; bare @pi still works.
+func TestHostsPutAnAgentOnEveryHostItIsOn(t *testing.T) {
+	haify := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/nodes":
+			w.Write([]byte(`{"nodes":[{"name":"node-b","hostname":"sds-b","address":"192.168.123.213"},
+				{"name":"node-e","hostname":"sds-e","address":"192.168.123.212:3366"}]}`))
+		case "/v1/ha":
+			w.Write([]byte(`{"configs":[{"resource":"openclaw","vip":"192.168.123.252/24","services":["openclaw.service"]}]}`))
+		case "/v1/ha/openclaw/status":
+			w.Write([]byte(`{"promoters":[{"activeNode":"node-e","standbys":[{"node":"node-b","ready":true}]}]}`))
+		}
+	}))
+	defer haify.Close()
+
+	core := NewApp()
+	core.settings = &backend.Settings{
+		AgentLink: backend.AgentLinkSettings{RelayOnly: []string{"sds-e"}},
+		HA:        backend.HASettings{Haify: backend.HaifySource{URL: haify.URL}},
+		RemoteAgents: backend.RemoteAgents{Enabled: true, Agents: map[string]backend.RemoteAgent{
+			"pi": {Hosts: []string{"sds@192.168.123.212", "-F ~/.lima/sds-a/ssh.config lima-sds-a", "sds@192.168.123.213", "-p 52848 me@127.0.0.1"},
+				Probe: "command -v pi", Command: []string{"pi", "{prompt}"}},
+			"hermes": {Hosts: []string{"sds@192.168.123.212", "sds@10.0.0.9"}, Command: []string{"hermes", "{prompt}"}},
+			// HA keeps it: an address that is no host drawn is not a new one.
+			"openclaw": {Hosts: []string{"sds@192.168.123.212", "sds@192.168.123.77"}, Command: []string{"openclaw", "{prompt}"}},
+		}},
+	}
+	addr := startCore(t, core)
+	linkHello(t, core, addr, &agentlinkpb.Hello{Name: "sds-e", Host: "sds-e", Kind: "vm", Clis: []string{"codex", "openclaw"},
+		Agents: []*agentlinkpb.NamedAgent{{Name: "openclaw"}, {Name: "hermes"}, {Name: "pi"}}})
+	linkHello(t, core, addr, &agentlinkpb.Hello{Name: "orange1", Host: "orange1", Kind: "vm",
+		Agents: []*agentlinkpb.NamedAgent{{Name: "pi"}}})
+	linkHello(t, core, addr, &agentlinkpb.Hello{Name: "sds-a", Host: "lima-sds-a", Kind: "vm"})
+	// The process detector sees openclaw at work on sds-e, as a CLI.
+	core.agents().get("sds-e").clis.Store(&cliMap{"openclaw": {CCActivity: CCActivity{Working: 1}, Source: cliSourceProcess}})
+
+	core.haServices()
+	waitFor(t, "the HA services", func() bool { return len(core.haServices()) == 1 })
+	hs := core.HiveTopology().Hosts
+
+	// pi: live on both relays that serve it, configured on the Lima VM (by
+	// its hostname) and on sds-b (by haify's address), never on an address.
+	for host, state := range map[string]string{"sds-e": "live", "orange1": "live", "sds-a": "configured", "sds-b": "configured"} {
+		if g := agentNamed(hostByName(hs, host), "pi"); g == nil || g.State != state {
+			t.Fatalf("pi on %s: %+v", host, g)
+		}
+	}
+	for _, ip := range []string{"192.168.123.212", "192.168.123.213", "192.168.123.77", "127.0.0.1"} {
+		if h := hostByName(hs, ip); h != nil {
+			t.Fatalf("a host for %s: %+v", ip, h)
+		}
+	}
+	// hermes: on the relay, and on the one host nothing else knows.
+	if g := agentNamed(hostByName(hs, "10.0.0.9"), "hermes"); g == nil || g.State != "configured" {
+		t.Fatalf("hermes on its second host: %+v", g)
+	}
+	// openclaw on sds-e is one agent, the named one, doing what the CLI does.
+	e := hostByName(hs, "sds-e")
+	n := 0
+	for _, g := range e.Agents {
+		if strings.HasPrefix(g.Name, "openclaw") {
+			n++
+		}
+	}
+	if g := agentNamed(e, "openclaw"); n != 1 || g == nil || g.Kind != hostAgentNamed || g.Activity != actWorking || g.Service != "openclaw" {
+		t.Fatalf("openclaw on sds-e: %d of them, %+v", n, e.Agents)
+	}
+	if agentNamed(e, "codex.sds-e") == nil {
+		t.Fatalf("codex left out: %+v", e.Agents)
+	}
+	if b := hostByName(hs, "sds-b"); len(b.Addresses) != 1 || b.Addresses[0] != "192.168.123.213" {
+		t.Fatalf("sds-b's address: %+v", b)
+	}
+
+	// Every placement is addressable as name.host.
+	hub := core.agents()
+	if c, as := hub.servingAs("pi.orange1"); c == nil || c.name() != "orange1" || as != "pi" {
+		t.Fatalf("pi.orange1 reached %v as %q", c, as)
+	}
+	if c, _ := hub.servingAs("pi.sds-e"); c == nil || c.name() != "sds-e" {
+		t.Fatalf("pi.sds-e reached %v", c)
+	}
+	if hub.servingOn("pi", "sds-a") != nil {
+		t.Fatal("sds-a's own SuperAI does not serve pi")
+	}
+	for machine, dest := range map[string]string{
+		"sds-a":           "-F ~/.lima/sds-a/ssh.config lima-sds-a",
+		"lima-sds-a":      "-F ~/.lima/sds-a/ssh.config lima-sds-a",
+		"sds-b":           "sds@192.168.123.213",
+		"192.168.123.213": "sds@192.168.123.213",
+		"sds-e":           "sds@192.168.123.212",
+		"orange1":         "",
+	} {
+		if got := core.sshDestOn("pi", machine); got != dest {
+			t.Fatalf("pi on %s goes to %q, want %q", machine, got, dest)
+		}
+	}
+	for _, name := range []string{"pi", "pi.sds-a", "pi.sds-b", "pi.orange1", "hermes.10.0.0.9"} {
+		if !core.addressable(name) {
+			t.Fatalf("%s is not addressable", name)
+		}
 	}
 }

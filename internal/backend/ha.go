@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"sort"
@@ -31,6 +32,10 @@ type HAService struct {
 	Units []string `json:"units"`
 	// State is active, degraded (running, no standby ready) or down.
 	State string `json:"state"`
+	// Addresses is each of its hosts' address as haify knows the node, by
+	// hostname: what an ssh destination like sds@192.168.123.212 is matched
+	// against to find the host it means.
+	Addresses map[string]string `json:"addresses,omitempty"`
 }
 
 // HAStandby is a host an HA service can move to.
@@ -100,6 +105,7 @@ func HaifyServices(ctx context.Context, src HaifySource, client *http.Client) ([
 		return nil, err
 	}
 	hostOf := map[string]string{}
+	addrOf := map[string]string{}
 	for _, n := range objects(nodes["nodes"]) {
 		name, host := field(n, "name"), field(n, "hostname")
 		if host == "" {
@@ -107,6 +113,9 @@ func HaifyServices(ctx context.Context, src HaifySource, client *http.Client) ([
 		}
 		hostOf[name] = host
 		hostOf[host] = host
+		if a := nodeAddress(field(n, "address", "addr", "ip", "nodeAddress", "node_address")); a != "" {
+			addrOf[host] = a
+		}
 	}
 	named := func(n string) string {
 		if h := hostOf[n]; h != "" {
@@ -144,10 +153,36 @@ func HaifyServices(ctx context.Context, src HaifySource, client *http.Client) ([
 			}
 		}
 		s.State = haState(s)
+		for _, h := range append([]string{s.Active}, standbyHosts(s)...) {
+			if a := addrOf[h]; h != "" && a != "" {
+				if s.Addresses == nil {
+					s.Addresses = map[string]string{}
+				}
+				s.Addresses[h] = a
+			}
+		}
 		out = append(out, s)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out, nil
+}
+
+func standbyHosts(s HAService) []string {
+	out := make([]string, 0, len(s.Standbys))
+	for _, sb := range s.Standbys {
+		out = append(out, sb.Host)
+	}
+	return out
+}
+
+// nodeAddress is a node's address without a port or prefix length:
+// "192.168.123.212:3366" and "192.168.123.212/24" are 192.168.123.212.
+func nodeAddress(a string) string {
+	a = strings.TrimSpace(strings.SplitN(a, "/", 2)[0])
+	if h, _, err := net.SplitHostPort(a); err == nil {
+		return h
+	}
+	return strings.Trim(a, "[]")
 }
 
 func haState(s HAService) string {
