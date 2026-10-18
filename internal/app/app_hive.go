@@ -228,10 +228,20 @@ func (a *App) handleHiveJoin(w http.ResponseWriter, r *http.Request) {
 		writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": "unreadable hello: " + err.Error()})
 		return
 	}
+	// Hosts change when a worker comes or comes back, not on every heartbeat.
+	known := false
+	for _, m := range h.Members() {
+		if m.Name == hello.Name && m.State == "live" && m.StartedAt.Equal(hello.StartedAt) {
+			known = true
+		}
+	}
 	welcome, err := h.Join(hello)
 	if err != nil {
 		writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
 		return
+	}
+	if !known {
+		a.emit("hosts:changed", nil)
 	}
 	writeJSONStatus(w, http.StatusOK, welcome)
 }
@@ -263,7 +273,11 @@ func (a *App) handleHiveLeave(w http.ResponseWriter, r *http.Request) {
 		writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": "unreadable goodbye: " + err.Error()})
 		return
 	}
-	writeJSONStatus(w, http.StatusOK, map[string]any{"left": h.Leave(hello.Name, hello.StartedAt)})
+	left := h.Leave(hello.Name, hello.StartedAt)
+	if left {
+		a.emit("hosts:changed", nil)
+	}
+	writeJSONStatus(w, http.StatusOK, map[string]any{"left": left})
 }
 
 // handleHivePulse is POST /api/hive/pulse: one flicker of a peer order, from
@@ -534,6 +548,16 @@ func (a *App) registerHiveTools(svc *backend.Service, cfg *backend.Settings) {
 			b, err := json.Marshal(a.rosterView())
 			return string(b), err
 		},
+		agent.ToolMetadata{ReadOnly: true, ConcurrencySafe: true})
+
+	inner.AddToolWithMetadata("hive_hosts",
+		"Every host in the hive and what runs on each: the box (a pod, a container, a Mac, a VM or bare metal, and the"+
+			" VM a pod sits on), whether it answers, and its agents: SuperAI itself with its role (queen, worker, machine,"+
+			" relay), the coding CLIs installed there (address one as cli.machine, like claude.mac) and named agents such"+
+			" as openclaw, and the HA services (like openclaw kept up by haify): where each runs now, its standbys and the"+
+			" service IP to reach it at. Look here to know where something can run before sending work there.",
+		map[string]any{"type": "object", "properties": map[string]any{}},
+		func(ctx context.Context, _ map[string]any) (any, error) { return topologyText(a.HiveTopology()), nil },
 		agent.ToolMetadata{ReadOnly: true, ConcurrencySafe: true})
 
 	inner.AddToolWithMetadata("hive_command",

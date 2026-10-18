@@ -252,3 +252,33 @@ export function pose(r: THREE.Object3D, t: number, reduced = false) {
     r.position.y = (u.base as number) + j.bob;
   }
 }
+
+/**
+ * Makes a robot a ghost of itself: where an agent would run but does not now
+ * (an HA service's standby host). Every material its own, see-through, so
+ * state colours still apply; `faint` for a standby that is not ready.
+ */
+export function ghost(r: THREE.Object3D, faint = false) {
+  const u = r.userData;
+  if (u.ghost === (faint ? 2 : 1)) return;
+  const done = new Map<THREE.Material, THREE.Material>();
+  const own = (m: THREE.Material) => {
+    let c = done.get(m);
+    if (!c) {
+      c = u.ghost ? m : m.clone();
+      c.transparent = true;
+      c.opacity = faint ? 0.16 : 0.3;
+      c.depthWrite = false;
+      done.set(m, c);
+    }
+    return c;
+  };
+  r.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    mesh.material = Array.isArray(mesh.material) ? mesh.material.map(own) : own(mesh.material);
+    mesh.castShadow = false;
+  });
+  for (const k of ["eyeMat", "antMat", "shell"]) if (u[k] && done.has(u[k])) u[k] = done.get(u[k]);
+  u.ghost = faint ? 2 : 1;
+}

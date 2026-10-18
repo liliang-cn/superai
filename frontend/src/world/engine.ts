@@ -30,6 +30,9 @@ export interface DistrictCtx {
   tick(fn: (dt: number, t: number) => void): void;
   /** A ring off `pos` (world space). */
   spark(pos: THREE.Vector3, color?: number): void;
+  /** Called now and whenever day turns to night or back, for colours the
+   *  lights alone do not change (fine lines on the floor). */
+  night(fn: (on: boolean) => void): void;
   /** Where another district is, for things that travel between them. */
   anchor(key: string): THREE.Vector3;
   reduced: boolean;
@@ -75,6 +78,7 @@ export class WorldEngine<D> {
   private camera: THREE.PerspectiveCamera;
   private controls: OrbitControls;
   private ticks: ((dt: number, t: number) => void)[] = [];
+  private nights: ((on: boolean) => void)[] = [];
   private updates = new Map<string, (d: D) => void>();
   private districts = new Map<string, District<D>>();
   private labelOwners: { el: HTMLElement; obj: CSS2DObject; district: string; on: boolean }[] = [];
@@ -233,6 +237,7 @@ export class WorldEngine<D> {
     l.sun.intensity = on ? 1.6 : 3.2;
     this.scene.environmentIntensity = on ? 0.16 : 0.3;
     this.renderer.toneMappingExposure = on ? 0.9 : 0.84;
+    for (const fn of this.nights) fn(on);
     this.touched = performance.now();
   }
   private swayers: THREE.Object3D[] = [];
@@ -341,6 +346,7 @@ export class WorldEngine<D> {
       },
       tick: (fn) => this.ticks.push(fn),
       spark: (pos, color) => this.spark(pos, color),
+      night: (fn) => { this.nights.push(fn); fn(!!this.look_?.night); },
       anchor: (key) => {
         const o = this.districts.get(key);
         return o ? new THREE.Vector3(o.at[0], 0, o.at[1]) : new THREE.Vector3();

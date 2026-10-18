@@ -9,6 +9,8 @@ import { focusInWorld, isSelected, useWorldSelection } from "../world/bus";
 import type { StageHandle, StagePulse, StageTask } from "../components/HiveStage";
 import { QUEEN, SELF } from "../components/hiveFx";
 import { useHiveMeter } from "../components/HiveMeter";
+import { useHosts, type Host, type HostAgent } from "../canvas/data";
+import { cliName, isCore, isStandby, kindLabel } from "../world/hosts";
 
 const short = (n: string) => n.replace(/^superai-/, "");
 const fmtK = (n: number) => (n >= 1e6 ? (n / 1e6).toFixed(2) + "M" : n >= 1e3 ? (n / 1e3).toFixed(1) + "k" : String(Math.round(n)));
@@ -210,6 +212,7 @@ export default function HiveView() {
   }, [load]);
 
   const members = st?.members ?? [];
+  const topo = useHosts();
   const running = tasks.filter((t) => t.state === "running").length;
   const waiting = useAttention().filter((i) => i.kind === "approval" || i.kind === "bee").length;
   const ordered = [...tasks].sort(
@@ -283,6 +286,9 @@ export default function HiveView() {
                 <div className={waiting > 0 ? "wait" : ""}><b>{waiting}</b><span>waiting for you</span></div>
               </div>
             )}
+
+            {/* The boxes the hive runs on, and what runs on each. */}
+            {topo.hosts && topo.hosts.length > 0 && <HostsCard hosts={topo.hosts} services={topo.services} sel={sel} />}
 
             {/* Who is in the hive, and what each is doing now. */}
             {st.role === "queen" && (
@@ -412,6 +418,73 @@ function TaskRoute({ tasks, now }: { tasks: Task[]; now: number }) {
       <div className="panel-scroll">
         <HiveTaskPage id={id} live={tasks.find((t) => t.id === id)} now={now} />
       </div>
+    </div>
+  );
+}
+
+/** Each host with the hosts inside it (a node's pods) under it, children
+ *  after their parent. */
+function nest(hosts: Host[]): { h: Host; depth: number }[] {
+  const ids = new Set(hosts.map((h) => h.id));
+  const out: { h: Host; depth: number }[] = [];
+  const walk = (h: Host, depth: number) => {
+    out.push({ h, depth });
+    hosts.filter((x) => x.parent === h.id).forEach((x) => walk(x, depth + 1));
+  };
+  hosts.filter((h) => !h.parent || !ids.has(h.parent)).forEach((h) => walk(h, 0));
+  return out;
+}
+
+const agentRole = (a: HostAgent) => a.kind === "cli" ? "cli" : a.kind === "agent" ? (a.service ? `HA ${a.service}` : "agent") : a.role === "machine" ? "machine agent" : a.role || "superai";
+
+/** The hive by host: each host a row, its agents under it, pods under
+ *  their node; HA services after, with where each runs. */
+function HostsCard({ hosts, services, sel }: { hosts: Host[]; services: { name: string; vip?: string; active?: string; standbys: { host: string; ready: boolean }[]; state: string }[]; sel: ReturnType<typeof useWorldSelection> }) {
+  const focusAgent = (h: Host, a: HostAgent) => {
+    if (a.kind === "superai") return isCore(a) ? focusInWorld("hall", "queen") : focusInWorld("worker", a.name);
+    if (a.kind === "cli") return focusInWorld("cli", h.agents.some(isCore) ? cliName(a) : `${cliName(a)}.${a.via}`);
+    if (isStandby(a)) return focusInWorld("service", a.service || a.name);
+    return focusInWorld("agent", `${a.name}.${a.via || h.name}`);
+  };
+  // Green for up, red for gone, the accent's pulse for at work; the rest quiet.
+  const dot = (state: string) => (state === "live" ? "done" : state === "lost" || state === "standby-unready" ? "failed" : state === "working" || state === "waiting" ? "running" : "idle");
+  return (
+    <div className="card">
+      <div className="card-title">Hosts</div>
+      <div className="hive-hosts">
+        {nest(hosts).map(({ h, depth }) => (
+          <div className={`hive-host${h.state !== "live" ? " " + h.state : ""}${isSelected(sel, "host", h.id) ? " on" : ""}`} key={h.id} style={{ marginLeft: depth * 22 }}>
+            <button className="hive-host-h" onClick={() => focusInWorld("host", h.id)}>
+              <span className={`hive-live-dot ${dot(h.state)}`} title={h.state} />
+              <b>{h.name}</b>
+              <span className="hive-host-kind">{kindLabel(h.kind)}</span>
+            </button>
+            {h.agents.map((a) => (
+              <button key={a.kind + a.name} className={`hive-host-agent${isStandby(a) ? " ghost" : ""}`} onClick={() => focusAgent(h, a)} title={[a.about, a.mcp?.length ? `MCP: ${a.mcp.join(", ")}` : ""].filter(Boolean).join("\n") || undefined}>
+                <span className={`hive-live-dot ${dot(a.state)}`} />
+                {a.kind === "cli" ? cliName(a) : a.name.replace(/^superai-/, "")}
+                <small>{agentRole(a)}{a.state !== "live" && a.state !== "installed" ? ` · ${a.state.replace("-unready", ", not ready")}` : ""}</small>
+              </button>
+            ))}
+            <span className="hive-dim hive-host-sys">{h.state === "live" ? [h.os, h.arch].filter(Boolean).join(" ") : h.state === "lost" ? "not answering" : "only in the settings"}</span>
+          </div>
+        ))}
+      </div>
+      {services.length > 0 && (
+        <div className="hive-svcs">
+          {services.map((s) => (
+            <button key={s.name} className={`hive-svc ${s.state}`} onClick={() => focusInWorld("service", s.name)}>
+              <span className={`hive-live-dot ${s.state === "active" ? "done" : s.state === "down" ? "failed" : "cancelled"}`} />
+              <b>{s.name}</b>
+              {s.vip && <span className="hive-host-kind">{s.vip}</span>}
+              <span className="hive-dim">
+                {s.active ? `on ${s.active}` : "running nowhere"}
+                {s.standbys.length > 0 && ` · standby ${s.standbys.map((b) => b.host + (b.ready ? "" : " (not ready)")).join(", ")}`}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

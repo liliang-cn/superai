@@ -29,7 +29,10 @@ type App struct {
 	// where its events go up the link. See agentlink_core.go / _agent.go.
 	agentHubOnce sync.Once
 	agentHubV    *agentHub
-	agentTap     atomic.Pointer[func(string, map[string]any)]
+	// haCache is the HA services last read from haify, refreshed in the
+	// background so listing hosts never waits on it.
+	haCache  haCache
+	agentTap atomic.Pointer[func(string, map[string]any)]
 	// memberPulses is the latest meter summary from each linked agent.
 	memberPulses sync.Map
 	// ccSelfActivity is this machine's own Claude Code sessions when it is

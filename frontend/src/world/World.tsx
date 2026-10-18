@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { ChevronDownIcon, GaugeIcon, HomeIcon, LocateFixedIcon, MinusIcon, PlusIcon, RotateCcwIcon, RotateCwIcon } from "lucide-react";
 import { Dashboards, MCP, NotedToday, Skills } from "../../wailsjs/go/app/App";
 import { EventsOn } from "../../wailsjs/runtime";
-import { useBees, useCodingRuns, useHive, useLinkedAgents } from "../canvas/data";
+import { useBees, useCodingRuns, useHive, useHosts, useLinkedAgents } from "../canvas/data";
 import { useAttentionState } from "../canvas/attention";
 import { useHiveMeter } from "../components/HiveMeter";
 import { useI18n } from "../lib/i18n";
@@ -104,6 +104,8 @@ export default function World({ view }: { view: ViewKey }) {
   const runs = useCodingRuns();
   const bees = useBees();
   const linked = useLinkedAgents();
+  const topo = useHosts();
+  const byHost = !!topo.hosts?.length;
   const { items: attention } = useAttentionState();
   const meter = useHiveMeter();
   const slow = useSlow();
@@ -136,19 +138,26 @@ export default function World({ view }: { view: ViewKey }) {
     hive, runs, bees, linked, attention, agenda: slow.agenda,
     dashboards: slow.dashboards, skills: slow.skills, mcp: slow.mcp,
     knowledge: 0, meter: { total: meter.total, members: meter.members }, busy,
-  }), [hive, runs, bees, linked, attention, slow, meter, busy]);
+    hosts: topo.hosts, services: topo.services,
+  }), [hive, runs, bees, linked, topo, attention, slow, meter, busy]);
   useEffect(() => { engine.current?.update(data); }, [data]);
   const day = useDaylight();
   useEffect(() => { engine.current?.setNight(!day); }, [day]);
 
   // A new page: a new lens, and nothing selected.
   useEffect(() => {
-    const l = lensOf(view);
+    const l = lensOf(view, byHost);
     engine.current?.look(l.x, l.z, l.zoom, "cluster");
     engine.current?.select(null);
     setPicked(null);
     worldBus.publish(null);
   }, [view]);
+  // The hosts arrive after the first look: stand back for them, once.
+  useEffect(() => {
+    if (!byHost) return;
+    const l = lensOf(view, true);
+    engine.current?.look(l.x, l.z, l.zoom, "cluster");
+  }, [byHost]);
 
   // The card follows what it describes; the engine moves it every frame.
   useEffect(() => { engine.current?.setCallout(picked ? card.current : null, picked ? line.current : null); }, [picked]);
@@ -185,7 +194,7 @@ export default function World({ view }: { view: ViewKey }) {
         <span className="wl-cam-sep" />
         <button title="Reset to the default view" onClick={() => {
           // The whole cluster, from the usual corner, nothing selected.
-          const l = lensOf("home");
+          const l = lensOf("home", byHost);
           engine.current?.select(null);
           setPicked(null);
           worldBus.publish(null);

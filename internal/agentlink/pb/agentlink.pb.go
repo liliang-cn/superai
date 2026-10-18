@@ -262,7 +262,12 @@ type Hello struct {
 	Agents []*NamedAgent `protobuf:"bytes,7,rep,name=agents,proto3" json:"agents,omitempty"`
 	// What the process is besides an agent: "worker" for a hive worker, which
 	// core then shows as a worker and never as a machine. Empty is a machine.
-	Role          string `protobuf:"bytes,8,opt,name=role,proto3" json:"role,omitempty"`
+	Role string `protobuf:"bytes,8,opt,name=role,proto3" json:"role,omitempty"`
+	// The host it runs on: "pod", "container", "mac", "vm" or "metal" (host is
+	// that box's name), and the host that one sits inside when known, like a
+	// pod's k3s node. An older agent sends neither.
+	Kind          string `protobuf:"bytes,9,opt,name=kind,proto3" json:"kind,omitempty"`
+	Parent        string `protobuf:"bytes,10,opt,name=parent,proto3" json:"parent,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -349,6 +354,20 @@ func (x *Hello) GetAgents() []*NamedAgent {
 func (x *Hello) GetRole() string {
 	if x != nil {
 		return x.Role
+	}
+	return ""
+}
+
+func (x *Hello) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
+}
+
+func (x *Hello) GetParent() string {
+	if x != nil {
+		return x.Parent
 	}
 	return ""
 }
@@ -732,7 +751,7 @@ const file_agentlink_v1_agentlink_proto_rawDesc = "" +
 	"\awelcome\x18\x01 \x01(\v2\x1d.superai.agentlink.v1.WelcomeH\x00R\awelcome\x120\n" +
 	"\x04call\x18\x02 \x01(\v2\x1a.superai.agentlink.v1.CallH\x00R\x04call\x120\n" +
 	"\x04ping\x18\x03 \x01(\v2\x1a.superai.agentlink.v1.PingH\x00R\x04pingB\x06\n" +
-	"\x04kind\"\xcf\x01\n" +
+	"\x04kind\"\xfb\x01\n" +
 	"\x05Hello\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
 	"\x04host\x18\x02 \x01(\tR\x04host\x12\x0e\n" +
@@ -741,7 +760,10 @@ const file_agentlink_v1_agentlink_proto_rawDesc = "" +
 	"\aversion\x18\x05 \x01(\tR\aversion\x12\x12\n" +
 	"\x04clis\x18\x06 \x03(\tR\x04clis\x128\n" +
 	"\x06agents\x18\a \x03(\v2 .superai.agentlink.v1.NamedAgentR\x06agents\x12\x12\n" +
-	"\x04role\x18\b \x01(\tR\x04role\"6\n" +
+	"\x04role\x18\b \x01(\tR\x04role\x12\x12\n" +
+	"\x04kind\x18\t \x01(\tR\x04kind\x12\x16\n" +
+	"\x06parent\x18\n" +
+	" \x01(\tR\x06parent\"6\n" +
 	"\n" +
 	"NamedAgent\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +

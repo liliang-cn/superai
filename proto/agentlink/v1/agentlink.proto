@@ -54,6 +54,11 @@ message Hello {
   // What the process is besides an agent: "worker" for a hive worker, which
   // core then shows as a worker and never as a machine. Empty is a machine.
   string role = 8;
+  // The host it runs on: "pod", "container", "mac", "vm" or "metal" (host is
+  // that box's name), and the host that one sits inside when known, like a
+  // pod's k3s node. An older agent sends neither.
+  string kind = 9;
+  string parent = 10;
 }
 
 message NamedAgent {

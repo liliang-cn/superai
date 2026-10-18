@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { EventsOn } from "../../wailsjs/runtime";
-import { CLIRuns, HiveStatus, LinkedAgents, StandingAgents, Upcoming } from "../../wailsjs/go/app/App";
+import { CLIRuns, HiveStatus, HiveTopology, Hosts, LinkedAgents, StandingAgents, Upcoming } from "../../wailsjs/go/app/App";
 import type { CodingRun, UpcomingItem } from "./tiles";
 import { setQueenName } from "../lib/queenName";
 
@@ -286,4 +286,96 @@ export function useLinkedAgents(): LinkedAgent[] {
     return () => { alive = false; window.clearInterval(t); [off, offAct, offCli].forEach((o) => typeof o === "function" && o()); };
   }, []);
   return list;
+}
+
+/** What a host is: a pod, a container, a Mac, a VM or a bare machine; empty
+ *  when nothing on it has said. */
+export type HostKind = "pod" | "container" | "mac" | "vm" | "metal" | "";
+
+/** One agent on a host: a SuperAI (queen, worker, machine agent, relay), a
+ *  coding CLI ("claude.mac"), or a named agent a SuperAI serves (openclaw). */
+export interface HostAgent {
+  name: string;
+  kind: "superai" | "cli" | "agent";
+  role?: "queen" | "worker" | "machine" | "relay" | "standalone" | string;
+  about?: string;
+  /** live or lost for a SuperAI; working, waiting, idle or installed for a
+   *  CLI; configured for an agent only the settings know; standby (or
+   *  standby-unready) for an HA service's agent on a host it is not on now. */
+  state: string;
+  version?: string;
+  /** The SuperAI on this host that runs it for core. */
+  via?: string;
+  mcp?: string[];
+  /** The HA service it belongs to, when one keeps it up. */
+  service?: string;
+}
+
+/** A box agents run on, with what runs on it. Parents come before the hosts
+ *  inside them. */
+export interface Host {
+  id: string;
+  name: string;
+  hostname?: string;
+  kind: HostKind;
+  os?: string;
+  arch?: string;
+  /** The id of the host this one runs inside: a pod's k3s node. */
+  parent?: string;
+  state: "live" | "lost" | "configured";
+  lastSeen?: string;
+  agents: HostAgent[];
+}
+
+/** A service kept up by HA (haify's drbd-reactor promoters): it runs on one
+ *  host at a time, reached at its service IP wherever that is. */
+export interface HAService {
+  name: string;
+  provider: string;
+  vip?: string;
+  /** The hostname it runs on now; empty when it runs nowhere. */
+  active?: string;
+  standbys: { host: string; ready: boolean }[];
+  units: string[];
+  state: "active" | "degraded" | "down" | string;
+}
+
+export interface HostsView {
+  /** Null on a core from before hosts: draw the hive the old way. */
+  hosts: Host[] | null;
+  services: HAService[];
+}
+
+/** The hosts and the HA services, kept current: on hosts:changed and the
+ *  events that move an agent, and every half minute. */
+export function useHosts(): HostsView {
+  const [view, setView] = useState<HostsView>({ hosts: null, services: [] });
+  useEffect(() => {
+    let alive = true;
+    let timer = 0;
+    // HiveTopology where the core has it, Hosts where it has only that,
+    // nothing on a core from before either.
+    const read = async (): Promise<HostsView | null> => {
+      try {
+        const t = (await HiveTopology()) as unknown as { hosts?: Host[]; services?: HAService[] };
+        if (t && Array.isArray(t.hosts)) return { hosts: t.hosts, services: Array.isArray(t.services) ? t.services : [] };
+      } catch { /* an older core */ }
+      try {
+        const h = (await Hosts()) as unknown as Host[];
+        if (Array.isArray(h)) return { hosts: h, services: [] };
+      } catch { /* older still */ }
+      return null;
+    };
+    const load = () => read().then((v) => {
+      if (!alive) return;
+      // A failed read after a good one keeps what was there.
+      setView((cur) => (v ? { hosts: v.hosts?.map((h) => ({ ...h, agents: h.agents ?? [] })) ?? null, services: v.services } : cur));
+    });
+    const soon = () => { if (!timer) timer = window.setTimeout(() => { timer = 0; load(); }, 800); };
+    load();
+    const t = window.setInterval(load, 30000);
+    const offs = ["hosts:changed", "agents:changed", "cli:activity"].map((n) => EventsOn(n, soon));
+    return () => { alive = false; window.clearInterval(t); window.clearTimeout(timer); offs.forEach((o) => typeof o === "function" && o()); };
+  }, []);
+  return view;
 }

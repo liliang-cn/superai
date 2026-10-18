@@ -135,6 +135,12 @@ spec:
             - {name: CORTEXDB_LLM_BASE_URL, valueFrom: {secretKeyRef: {name: superai-hive, key: cortexdb_llm_base_url, optional: true}}}
             - {name: CORTEXDB_LLM_MODEL, valueFrom: {secretKeyRef: {name: superai-hive, key: cortexdb_llm_model, optional: true}}}
             - {name: CORTEXDB_LLM_API_KEY, valueFrom: {secretKeyRef: {name: superai-hive, key: cortexdb_llm_key, optional: true}}}
+            # haify keeps openclaw, CortexDB and itself highly available on the
+            # SDS nodes; its REST API says where each runs and what stands by,
+            # for the hive's hosts and HA services. Without the token the
+            # services are simply not shown.
+            - {name: SUPERAI_HAIFY_URL, value: "http://192.168.123.251:3375"}
+            - {name: SUPERAI_HAIFY_TOKEN, valueFrom: {secretKeyRef: {name: superai-hive, key: haify_token, optional: true}}}
           readinessProbe:
             httpGet: {path: /api/session, port: 43117}
           volumeMounts: [{name: data, mountPath: /data}]

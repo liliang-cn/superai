@@ -955,6 +955,117 @@ export namespace app {
 	        this.used = source["used"];
 	    }
 	}
+	export class HostAgent {
+	    name: string;
+	    kind: string;
+	    role?: string;
+	    about?: string;
+	    state: string;
+	    version?: string;
+	    via?: string;
+	    mcp?: string[];
+	    service?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new HostAgent(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.kind = source["kind"];
+	        this.role = source["role"];
+	        this.about = source["about"];
+	        this.state = source["state"];
+	        this.version = source["version"];
+	        this.via = source["via"];
+	        this.mcp = source["mcp"];
+	        this.service = source["service"];
+	    }
+	}
+	export class Host {
+	    id: string;
+	    name: string;
+	    hostname?: string;
+	    kind: string;
+	    os?: string;
+	    arch?: string;
+	    parent?: string;
+	    state: string;
+	    // Go type: time
+	    lastSeen?: any;
+	    agents: HostAgent[];
+	
+	    static createFrom(source: any = {}) {
+	        return new Host(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.hostname = source["hostname"];
+	        this.kind = source["kind"];
+	        this.os = source["os"];
+	        this.arch = source["arch"];
+	        this.parent = source["parent"];
+	        this.state = source["state"];
+	        this.lastSeen = this.convertValues(source["lastSeen"], null);
+	        this.agents = this.convertValues(source["agents"], HostAgent);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class HiveTopology {
+	    hosts: Host[];
+	    services: backend.HAService[];
+	
+	    static createFrom(source: any = {}) {
+	        return new HiveTopology(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.hosts = this.convertValues(source["hosts"], Host);
+	        this.services = this.convertValues(source["services"], backend.HAService);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	
 	export class HostInfo {
 	    name: string;
 	    host: string;
@@ -1535,6 +1646,62 @@ export namespace app {
 
 export namespace backend {
 	
+	export class HAStandby {
+	    host: string;
+	    ready: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new HAStandby(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.host = source["host"];
+	        this.ready = source["ready"];
+	    }
+	}
+	export class HAService {
+	    name: string;
+	    provider: string;
+	    vip?: string;
+	    active?: string;
+	    standbys: HAStandby[];
+	    units: string[];
+	    state: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new HAService(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.provider = source["provider"];
+	        this.vip = source["vip"];
+	        this.active = source["active"];
+	        this.standbys = this.convertValues(source["standbys"], HAStandby);
+	        this.units = source["units"];
+	        this.state = source["state"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class APNsSettings {
 	    key_path?: string;
 	    key_id?: string;

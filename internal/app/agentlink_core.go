@@ -179,13 +179,16 @@ type agentHub struct {
 	// lostRole is the role a lost agent declared in its last Hello, so a hive
 	// worker that dropped is not also reported as a machine gone missing.
 	lostRole map[string]string
+	// lostHello is a lost agent's last Hello, so the host it ran on is still
+	// shown for what it is (a Mac, a VM) while nobody answers there.
+	lostHello map[string]*agentlinkpb.Hello
 
 	pingEvery, silence time.Duration // agentPingEvery and agentSilence, shorter in tests
 }
 
 func (a *App) agents() *agentHub {
 	a.agentHubOnce.Do(func() {
-		a.agentHubV = &agentHub{agents: map[string]*agentConn{}, lost: map[string]time.Time{}, lostRole: map[string]string{},
+		a.agentHubV = &agentHub{agents: map[string]*agentConn{}, lost: map[string]time.Time{}, lostRole: map[string]string{}, lostHello: map[string]*agentlinkpb.Hello{},
 			pingEvery: agentPingEvery, silence: agentSilence}
 	})
 	return a.agentHubV
@@ -201,11 +204,19 @@ func (h *agentHub) lostAgents(now time.Time) map[string]time.Time {
 		if now.Sub(seen) > agentForget {
 			delete(h.lost, name)
 			delete(h.lostRole, name)
+			delete(h.lostHello, name)
 			continue
 		}
 		out[name] = seen
 	}
 	return out
+}
+
+// lastHello is what a lost agent said about itself before it dropped.
+func (h *agentHub) lastHello(name string) *agentlinkpb.Hello {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.lostHello[name]
 }
 
 // declaredRole is the role a lost agent declared before it dropped.
@@ -339,10 +350,14 @@ func (a *App) agentRole(c *agentConn) string {
 
 // LinkedAgent is a connected agent as the screens show it.
 type LinkedAgent struct {
-	Name      string              `json:"name"`
-	Host      string              `json:"host"`
-	OS        string              `json:"os"`
-	Arch      string              `json:"arch"`
+	Name string `json:"name"`
+	Host string `json:"host"`
+	OS   string `json:"os"`
+	Arch string `json:"arch"`
+	// Kind is the host it runs on (pod, container, mac, vm, metal) and
+	// Parent the host that one sits inside; empty from an older agent.
+	Kind      string              `json:"kind,omitempty"`
+	Parent    string              `json:"parent,omitempty"`
 	Version   string              `json:"version"`
 	CLIs      []string            `json:"clis"`
 	Agents    []map[string]string `json:"agents"`
@@ -385,6 +400,7 @@ func (a *App) LinkedAgentsAll() []LinkedAgent {
 	role := a.agentRoles()
 	for _, c := range a.agents().list() {
 		la := LinkedAgent{Name: c.name(), Host: c.hello.GetHost(), OS: c.hello.GetOs(), Arch: c.hello.GetArch(),
+			Kind: c.hello.GetKind(), Parent: c.hello.GetParent(),
 			Version: c.hello.GetVersion(), CLIs: append([]string{}, c.hello.GetClis()...),
 			Connected: c.connected, LastSeen: time.UnixMilli(c.lastSeen.Load())}
 		for _, n := range c.hello.GetAgents() {
@@ -487,6 +503,7 @@ func (s *agentLinkServer) Connect(stream agentlinkpb.AgentLink_ConnectServer) er
 	hub.agents[hello.GetName()] = c
 	delete(hub.lost, hello.GetName())
 	delete(hub.lostRole, hello.GetName())
+	delete(hub.lostHello, hello.GetName())
 	hub.mu.Unlock()
 	s.app.agentsChanged()
 	log.Printf("agent %s connected from %s (%s/%s), clis %v, role %s", hello.GetName(), hello.GetHost(), hello.GetOs(), hello.GetArch(), hello.GetClis(), s.app.agentRole(c))
@@ -502,6 +519,9 @@ func (s *agentLinkServer) Connect(stream agentlinkpb.AgentLink_ConnectServer) er
 				hub.lost[hello.GetName()] = time.UnixMilli(c.lastSeen.Load())
 				c.mu.Lock()
 				hub.lostRole[hello.GetName()] = c.hello.GetRole()
+				if hub.lostHello != nil {
+					hub.lostHello[hello.GetName()] = c.hello
+				}
 				c.mu.Unlock()
 			}
 		}
@@ -656,4 +676,5 @@ func (a *App) agentsChanged() {
 	a.remoteCLI.names = nil
 	a.remoteCLI.mu.Unlock()
 	a.emit("agents:changed", map[string]any{"count": len(a.agents().list())})
+	a.emit("hosts:changed", nil)
 }
