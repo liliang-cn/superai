@@ -343,6 +343,26 @@ func (a *App) agentRoles() func(name, declared string) string {
 	}
 }
 
+// machineToo says whether an agent in role is also a machine to look after:
+// a machine agent, or a hive worker that runs on a real box (a Mac, a VM)
+// rather than in a pod. The Mac can take the hive's work and still be the
+// Mac whose disks and services are watched.
+func machineToo(role string, h *agentlinkpb.Hello) bool {
+	if role == agentRoleMachine {
+		return true
+	}
+	if role != agentRoleWorker {
+		return false
+	}
+	switch h.GetKind() {
+	case backend.HostKindMac, backend.HostKindVM, backend.HostKindMetal:
+		return true
+	case "":
+		return h.GetOs() == "darwin"
+	}
+	return false
+}
+
 // agentRole is what the connected agent c is to this core.
 func (a *App) agentRole(c *agentConn) string {
 	return a.agentRoles()(c.name(), c.hello.GetRole())
@@ -411,7 +431,7 @@ func (a *App) LinkedAgentsAll() []LinkedAgent {
 			la.CLIActivity = m
 		}
 		la.Role = role(la.Name, c.hello.GetRole())
-		la.Machine = la.Role == agentRoleMachine
+		la.Machine = machineToo(la.Role, c.hello)
 		out = append(out, la)
 	}
 	return out
