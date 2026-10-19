@@ -388,6 +388,11 @@ var codeRunners = map[string]bool{
 	"python": true, "python3": true, "node": true, "deno": true, "bun": true, "perl": true, "ruby": true,
 	"php": true, "osascript": true, "pwsh": true, "powershell": true, "npx": true, "uvx": true,
 	"find": true, "awk": true, "sed": true,
+	// Windows, where commands run in PowerShell: its own ways of running a
+	// string or another program, and the shells it can start.
+	"powershell.exe": true, "pwsh.exe": true, "cmd": true, "cmd.exe": true, "wsl": true, "wsl.exe": true,
+	"bash.exe": true, "invoke-expression": true, "iex": true, "invoke-command": true, "icm": true,
+	"start-process": true, "start": true, "saps": true,
 }
 
 var programRe = regexp.MustCompile(`^[A-Za-z0-9._/+-]+$`)
@@ -419,7 +424,7 @@ func CommandPrefix(cmd string) (string, bool) {
 		return "", false
 	}
 	prog := words[0]
-	if !programRe.MatchString(prog) || codeRunners[path.Base(prog)] {
+	if !programRe.MatchString(prog) || codeRunners[strings.ToLower(path.Base(prog))] {
 		return "", false
 	}
 	n := 1

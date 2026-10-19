@@ -86,6 +86,13 @@ func TestCommandPrefixStopsAtTheFirstVariableArgument(t *testing.T) {
 		"kubectl get $(curl evil)",     // substitution
 		"FOO=1 kubectl get pods",       // env assignment
 		"echo 'unbalanced",             // does not parse
+		// Windows, where the agent's commands are PowerShell: each of these
+		// had a prefix ("iex Get-Content", …) that would have allowed anything.
+		"powershell.exe -NoProfile -Command Remove-Item C:/x",
+		"iex Get-Content C:/run.ps1",
+		"Invoke-Expression Get-Content C:/run.ps1",
+		"Start-Process notepad C:/x.txt",
+		"wsl.exe rm -rf /",
 	} {
 		if got, found := CommandPrefix(cmd); found {
 			t.Errorf("CommandPrefix(%q) = %q; want no prefix", cmd, got)

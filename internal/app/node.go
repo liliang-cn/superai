@@ -197,6 +197,16 @@ func copyExecutable(src, dst string) error {
 func loginEnv() map[string]string {
 	keys := []string{"PATH", "HTTPS_PROXY", "HTTP_PROXY", "ALL_PROXY", "NO_PROXY", "https_proxy", "http_proxy", "all_proxy", "no_proxy"}
 	out := map[string]string{}
+	// Windows has no login shell to ask: a program started from Explorer
+	// already has the PATH and proxy the user set.
+	if runtime.GOOS == "windows" {
+		for _, k := range keys {
+			if v := os.Getenv(k); v != "" {
+				out[k] = v
+			}
+		}
+		return out
+	}
 	shell := os.Getenv("SHELL")
 	if shell == "" {
 		shell = "/bin/sh"
