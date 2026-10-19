@@ -300,7 +300,7 @@ func (a *App) sshDestOn(agent, machine string) string {
 	if !ok || ra.URL != "" {
 		return ""
 	}
-	hs := a.Hosts()
+	hs := a.hostsWith(a.haServices())
 	ptrs := make([]*Host, 0, len(hs))
 	for i := range hs {
 		ptrs = append(ptrs, &hs[i])

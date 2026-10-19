@@ -212,7 +212,7 @@ func TestHostsPlaceHAServices(t *testing.T) {
 
 	core.haServices() // starts the first read
 	waitFor(t, "the HA services", func() bool { return len(core.haServices()) == 2 })
-	top := core.HiveTopology()
+	top := core.fullTopology()
 
 	active := hostByName(top.Hosts, "sds-e")
 	if g := agentNamed(active, "openclaw"); g == nil || g.State != "live" || g.Service != "openclaw" || g.Via != "sds-e" {
@@ -234,6 +234,30 @@ func TestHostsPlaceHAServices(t *testing.T) {
 	}
 	if txt := topologyText(top); !strings.Contains(txt, "openclaw: active, on sds-e, service IP 192.168.123.252, standby sds-b (ready)") {
 		t.Fatalf("the queen's view:\n%s", txt)
+	}
+
+	// The apps see no HA: openclaw stands at its service IP, not on the node
+	// that runs it now; the standby and its node are gone, and cortexdb,
+	// which no agent belongs to, is not shown.
+	apps := core.HiveTopology()
+	vip := hostByName(apps.Hosts, "192.168.123.252")
+	if vip == nil || vip.Kind != hostKindService || vip.State != "live" || len(vip.Agents) != 1 {
+		t.Fatalf("the service IP as a host: %+v", vip)
+	}
+	if g := agentNamed(vip, "openclaw"); g == nil || g.Via != "sds-e" || g.State != "live" {
+		t.Fatalf("openclaw at its service IP: %+v", g)
+	}
+	if g := agentNamed(hostByName(apps.Hosts, "sds-e"), "openclaw"); g != nil {
+		t.Fatalf("openclaw still on its node: %+v", g)
+	}
+	if h := hostByName(apps.Hosts, "sds-b"); h != nil {
+		t.Fatalf("an HA node with nothing on it: %+v", h)
+	}
+	if h := hostByName(apps.Hosts, "192.168.123.253"); h != nil {
+		t.Fatalf("a service no agent belongs to: %+v", h)
+	}
+	if len(apps.Services) != 0 {
+		t.Fatalf("services in the apps' view: %+v", apps.Services)
 	}
 }
 
@@ -278,7 +302,7 @@ func TestHostsPutAnAgentOnEveryHostItIsOn(t *testing.T) {
 
 	core.haServices()
 	waitFor(t, "the HA services", func() bool { return len(core.haServices()) == 1 })
-	hs := core.HiveTopology().Hosts
+	hs := core.fullTopology().Hosts
 
 	// pi: live on both relays that serve it, configured on the Lima VM (by
 	// its hostname) and on sds-b (by haify's address), never on an address.
