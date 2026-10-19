@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"os/exec"
 	"strings"
 
@@ -56,4 +57,38 @@ func AppMenu(a *App) *menu.Menu {
 	})
 	m.Append(menu.WindowMenu())
 	return m
+}
+
+// DomReady is the window's first full page. The window opens at the size
+// main.go asks for, 1280×860, which is taller than many a laptop's screen
+// (1366×768, or a VM's 1280×800): its title bar then starts above the top
+// edge, where it can be neither seen nor dragged. So on a smaller screen it
+// shrinks to fit and moves to the middle.
+func (a *App) DomReady(ctx context.Context) {
+	screens, err := runtime.ScreenGetAll(ctx)
+	if err != nil {
+		return
+	}
+	for _, s := range screens {
+		if !s.IsCurrent {
+			continue
+		}
+		w, h := runtime.WindowGetSize(ctx)
+		if fw, fh, smaller := fitToScreen(w, h, s.Size.Width, s.Size.Height); smaller {
+			runtime.WindowSetSize(ctx, fw, fh)
+			runtime.WindowCenter(ctx)
+		}
+		return
+	}
+}
+
+// fitToScreen is the window's size on a screen of sw×sh: unchanged when it
+// fits, else at most nine tenths of the screen each way, leaving the menu
+// bar, the Dock or the taskbar their room.
+func fitToScreen(w, h, sw, sh int) (int, int, bool) {
+	if sw <= 0 || sh <= 0 {
+		return w, h, false
+	}
+	fw, fh := min(w, sw*9/10), min(h, sh*9/10)
+	return fw, fh, fw != w || fh != h
 }

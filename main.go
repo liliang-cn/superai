@@ -103,6 +103,7 @@ func main() {
 			},
 		},
 		OnStartup:  a.Startup,
+		OnDomReady: a.DomReady,
 		OnShutdown: a.Shutdown,
 		DragAndDrop: &options.DragAndDrop{
 			EnableFileDrop: true, // native OS file drop -> runtime.OnFileDrop (host paths)

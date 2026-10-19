@@ -26,6 +26,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/liliang-cn/agent-go/v3/pkg/sandbox"
 )
 
 // HostInfo is how a machine is doing right now.
@@ -512,7 +514,8 @@ func (a *App) HostExec(command string, timeoutSeconds int) (HostExecResult, erro
 	start := time.Now()
 	ctx, cancel := context.WithTimeout(context.Background(), d)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "/bin/sh", "-c", command)
+	name, argv := sandbox.HostShellCommand(command) // sh, or PowerShell on Windows
+	cmd := exec.CommandContext(ctx, name, argv...)
 	if home, err := os.UserHomeDir(); err == nil {
 		cmd.Dir = home
 	}

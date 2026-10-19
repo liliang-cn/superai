@@ -17,8 +17,8 @@ Your own AI assistant. Talk to it from your phone, your computer or a browser. I
 
 ## How to use it
 
-1. **Download** `SuperAI.dmg` from [Releases](https://github.com/liliang-cn/superai/releases), open it, and drag SuperAI into Applications.
-2. **Open SuperAI.** It asks whether it may look for the AI agents on your Mac. If Claude Code is signed in, say yes to use it: no key to paste, no model to pick. If not, sign in with your Claude, Codex or Gemini account in Settings, or enter an API key.
+1. **Download** from [Releases](https://github.com/liliang-cn/superai/releases): `SuperAI.dmg` for a Mac (open it and drag SuperAI into Applications), or `SuperAI-Setup.exe` for Windows (run it; Windows may warn first, as the installer is not signed yet).
+2. **Open SuperAI.** It asks whether it may look for the AI agents on your computer. If Claude Code is signed in, say yes to use it: no key to paste, no model to pick. If not, sign in with your Claude, Codex or Gemini account in Settings, or enter an API key.
 3. **Talk to it.** Ask questions, give it to-dos, set reminders and alarms, or ask it to get something done on one of your machines.
 
 The iPhone app is coming to the App Store.

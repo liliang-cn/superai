@@ -5,6 +5,7 @@ import { EventsOn } from "../../wailsjs/runtime";
 import { HiveLinkEntry, HiveLinkInfo, setAlone } from "../lib/hivelink";
 import LinkHive from "../components/LinkHive";
 import { noDrag } from "./DeskShell";
+import { machine } from "../lib/machine";
 
 const served = Boolean((window as unknown as Record<string, unknown>).superaiServed);
 
@@ -71,7 +72,7 @@ export default function BackendSwitcher() {
 
   return (
     <>
-      <button title={onMac ? "This Mac" : `Backend: ${status.name || status.url}`} style={noDrag} className="dk-app dk-a-backend"
+      <button title={onMac ? `This ${machine}` : `Backend: ${status.name || status.url}`} style={noDrag} className="dk-app dk-a-backend"
         onClick={() => { load(); setOpen((o) => !o); }}>
         {onMac ? <LaptopIcon size={19} /> : <ServerIcon size={19} />}
         <i className={onMac ? "dk-be-dot" : status.live ? "dk-be-dot on" : "dk-be-dot off"} />
@@ -104,12 +105,12 @@ export default function BackendSwitcher() {
             <div className={onMac ? "dk-be-row on" : "dk-be-row"}>
               <button className="dk-be-pick" onClick={() => !onMac && use("")}>
                 <LaptopIcon size={16} />
-                <span>This Mac<small>On its own, no hive</small></span>
+                <span>This {machine}<small>On its own, no hive</small></span>
                 {onMac && <CheckIcon size={16} className="dk-be-check" />}
               </button>
             </div>
             <button className="dk-be-add" onClick={() => { setOpen(false); setAdding(true); }}><PlusIcon size={15} />Add a hive…</button>
-            {forgetting && <p className="dk-be-note">Forgetting also unpairs this Mac on that hive.</p>}
+            {forgetting && <p className="dk-be-note">Forgetting also unpairs this {machine} on that hive.</p>}
             {err && <p className="dk-be-err">{err}</p>}
           </div>
         </>

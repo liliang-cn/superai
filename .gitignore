@@ -14,6 +14,8 @@ frontend/dist-world-embed
 # scratch from driving the app under Playwright
 /.playwright-mcp/
 build/linux/
+# makensis scratch
+/build/windows/installer/tmp/
 
 # screenshots and scratch from driving the app under a browser
 *.png
