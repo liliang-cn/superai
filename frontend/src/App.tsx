@@ -166,9 +166,7 @@ export default function App() {
   useEffect(() => {
     refreshStatus();
     const t = setInterval(refreshStatus, 15000);
-    // The first start chose who answers: ready now, not at the next poll.
-    const off = EventsOn("setup:engine", () => { void refreshStatus(); });
-    return () => { clearInterval(t); if (typeof off === "function") off(); };
+    return () => clearInterval(t);
   }, [refreshStatus]);
 
   // Home is the canvas: the whole window, no sidebar and no status bar; the
