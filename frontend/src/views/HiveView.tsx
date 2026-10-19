@@ -438,7 +438,7 @@ function nest(hosts: Host[]): { h: Host; depth: number }[] {
   return out;
 }
 
-const agentRole = (a: HostAgent) => a.kind === "cli" ? "cli" : a.kind === "agent" ? (a.service ? `HA ${a.service}` : "agent") : a.role === "machine" ? "machine agent" : a.role || "superai";
+const agentRole = (a: HostAgent) => a.kind === "cli" ? "cli" : a.kind === "agent" ? "agent" : a.role === "machine" ? "machine agent" : a.role || "superai";
 
 /** The hive by host: each host a row, its agents under it, pods under
  *  their node; HA services after, with where each runs. */

@@ -662,7 +662,7 @@ function HostCard({ host, data, withControls, onRun, busy }: { host: Host; data:
       </>}
       {named.length > 0 && <>
         <p className="wi-cap">{t("Agents")}</p>
-        <ul className="wi-list">{named.map((a) => row(a, a.name, [a.service ? `HA ${a.service}` : "", a.via ? t("via {name}", { name: a.via }) : "", a.activity ? t(a.activity) : stateWord(a)].filter(Boolean).join(" · ")))}</ul>
+        <ul className="wi-list">{named.map((a) => row(a, a.name, [a.via ? t("via {name}", { name: a.via }) : "", a.activity ? t(a.activity) : stateWord(a)].filter(Boolean).join(" · ")))}</ul>
       </>}
       {inside.length > 0 && <>
         <p className="wi-cap">{t("Inside")}</p>
