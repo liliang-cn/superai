@@ -31,6 +31,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -144,8 +146,10 @@ func sockets() []string {
 	return out
 }
 
-// send posts the event to the first socket that takes it, by hand: an HTTP
-// client would cost more to start than the whole exchange takes.
+// send posts the event to every socket that is there, all at once — the
+// desktop app and the Mac's node can both be serving, each for its own core —
+// and is true when any took it. By hand: an HTTP client would cost more to
+// start than the whole exchange takes.
 func send(socks []string, ev event, deadline time.Time) bool {
 	body, err := json.Marshal(ev)
 	if err != nil {
@@ -153,29 +157,40 @@ func send(socks []string, ev event, deadline time.Time) bool {
 	}
 	req := "POST " + hookPath + " HTTP/1.1\r\nHost: superai\r\nContent-Type: application/json\r\nContent-Length: " +
 		strconv.Itoa(len(body)) + "\r\nConnection: close\r\n\r\n" + string(body)
+	var wg sync.WaitGroup
+	var took atomic.Bool
 	for _, s := range socks {
-		if time.Now().After(deadline) {
-			return false
-		}
-		c, err := net.DialTimeout("unix", s, time.Until(deadline))
-		if err != nil {
-			continue // no such socket, or one left by a process that is gone
-		}
-		_ = c.SetDeadline(deadline)
-		_, err = io.WriteString(c, req)
-		if err == nil {
-			// Wait for the status line: the node has the event once it answers.
-			buf := make([]byte, 64)
-			n, _ := c.Read(buf)
-			err = nil
-			if n < 12 || !strings.HasPrefix(string(buf[:n]), "HTTP/1.1 200") {
-				err = io.ErrUnexpectedEOF
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if post(s, req, deadline) {
+				took.Store(true)
 			}
-		}
-		c.Close()
-		return err == nil
+		}()
 	}
-	return false
+	wg.Wait()
+	return took.Load()
+}
+
+// post sends one request on one socket and waits for the status line: the
+// node has the event once it answers. False for no such socket, or one left
+// by a process that is gone.
+func post(sock, req string, deadline time.Time) bool {
+	if time.Now().After(deadline) {
+		return false
+	}
+	c, err := net.DialTimeout("unix", sock, time.Until(deadline))
+	if err != nil {
+		return false
+	}
+	defer c.Close()
+	_ = c.SetDeadline(deadline)
+	if _, err := io.WriteString(c, req); err != nil {
+		return false
+	}
+	buf := make([]byte, 64)
+	n, _ := c.Read(buf)
+	return n >= 12 && strings.HasPrefix(string(buf[:n]), "HTTP/1.1 200")
 }
 
 // run is the whole hook; main only supplies the process.

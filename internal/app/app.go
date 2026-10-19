@@ -262,6 +262,10 @@ func (a *App) Startup(ctx context.Context) {
 	a.ctx = ctx
 	a.startHiveLink()
 	a.boot()
+	// Terminal Claude Code and the coding CLIs report here too, as they do to
+	// serve: without it a core on this Mac alone never sees them work. The
+	// CLI plugins stay pointed at whoever installed them (the node).
+	go a.serveCCHookSocket(ctx)
 }
 
 // startupHeadless boots the same backend with no Wails context: events go
