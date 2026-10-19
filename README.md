@@ -2,6 +2,12 @@
 
 Your own AI assistant. Talk to it from your phone, your computer or a browser. It remembers what you tell it, keeps your schedule and reminds you, and can put the coding tools on your machines to work for you.
 
+![Ask the queen in the 3D view; the answer streams into her speech bubble](docs/media/world.gif)
+
+| Chat | iPhone |
+|---|---|
+| ![Answers stream in with tables and lists](docs/media/chat.gif) | ![Today, the schedule and the 3D view on the phone](docs/media/iphone.gif) |
+
 ## What's in it
 
 - **Core** — the assistant itself. It runs on one machine you leave on, and everything else talks to it.
