@@ -14,7 +14,7 @@
     !define INFO_PRODUCTNAME "SuperAI"
 !endif
 !ifndef INFO_PRODUCTVERSION
-    !define INFO_PRODUCTVERSION "0.21.1"
+    !define INFO_PRODUCTVERSION "0.22.0"
 !endif
 !ifndef INFO_COPYRIGHT
     !define INFO_COPYRIGHT "© 2026 Liang Li"
