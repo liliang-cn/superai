@@ -344,6 +344,8 @@ export function TitleBarDoubleClick():Promise<void>;
 
 export function ToolApprovalInfo(arg1:number):Promise<Record<string, any>>;
 
+export function TraceCall(arg1:string,arg2:string):Promise<string>;
+
 export function TraceLines(arg1:string,arg2:number):Promise<Array<string>>;
 
 export function UnlinkHive():Promise<void>;

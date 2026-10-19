@@ -4,6 +4,7 @@ import {
   HashIcon,
   HistoryIcon,
   PlusIcon,
+  ScrollTextIcon,
   Trash2Icon,
 } from "lucide-react";
 import { ChatSessions, DeleteChatSession } from "../../wailsjs/go/app/App";
@@ -62,11 +63,14 @@ export function HistoryBar({
   history,
   onNew,
   sessionId,
+  onTrace,
 }: {
   history: HistoryController;
   onNew: () => void;
   /** The conversation on screen. Shown so it can be named elsewhere. */
   sessionId?: string;
+  /** Opens what this conversation's runs sent the model and what tools did. */
+  onTrace?: () => void;
 }) {
   const [copied, setCopied] = useState(false);
   return (
@@ -88,6 +92,15 @@ export function HistoryBar({
       >
         <PlusIcon className="size-3.5" /> New chat
       </button>
+      {onTrace && sessionId && (
+        <button
+          className="btn ghost sm"
+          onClick={onTrace}
+          title="Every model call and tool call in this conversation"
+        >
+          <ScrollTextIcon className="size-3.5" /> Trace
+        </button>
+      )}
       {/* The id is what identifies a conversation to everything outside this
           window — a schedule appends its runs to one, the daemon logs by it —
           so it has to be readable and copyable, not only inferable from a

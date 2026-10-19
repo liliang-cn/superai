@@ -45,6 +45,7 @@ func newTestLongRunService(t *testing.T) *Service {
 	agentSvc, err := agent.New("SuperAI-test").
 		WithConfig(cfg).
 		WithLLM(scriptedLLM{}).
+		WithObserverPayloads(). // as service.go builds it
 		Build()
 	if err != nil {
 		t.Fatalf("build agent service: %v", err)

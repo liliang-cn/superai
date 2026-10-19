@@ -678,6 +678,10 @@ export function ToolApprovalInfo(arg1) {
   return window['go']['app']['App']['ToolApprovalInfo'](arg1);
 }
 
+export function TraceCall(arg1, arg2) {
+  return window['go']['app']['App']['TraceCall'](arg1, arg2);
+}
+
 export function TraceLines(arg1, arg2) {
   return window['go']['app']['App']['TraceLines'](arg1, arg2);
 }

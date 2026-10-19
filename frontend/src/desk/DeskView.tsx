@@ -3,8 +3,9 @@ import { useNavigate } from "react-router-dom";
 import {
   ArrowUpIcon, HexagonIcon, 
   PlusIcon, SquareIcon, SquarePenIcon, CalendarIcon, AlarmClockIcon, TerminalIcon, TriangleAlertIcon, XIcon, ChevronRightIcon,
-  LayoutDashboardIcon, ActivityIcon, GaugeIcon,
+  LayoutDashboardIcon, ActivityIcon, GaugeIcon, ScrollTextIcon,
 } from "lucide-react";
+import RunTracePanel from "../components/RunTracePanel";
 import { useI18n } from "../lib/i18n";
 import { getQueenName, queenNamed, queenRef, queenTitle, useQueenName } from "../lib/queenName";
 import { useChat } from "../lib/useChat";
@@ -180,6 +181,7 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
   const runs = useCodingRuns();
   const linked = useLinkedAgents();
   const chat = useChat();
+  const [traceOpen, setTraceOpen] = useState(false);
   const queenId = useQueenSession();
   const pulse = usePulse();
   const recents = useRecents(chat.sending);
@@ -463,7 +465,11 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
         <header className="dk-chead">
           <span className="dk-qhex big">Q</span>
           <div><b title={title}>{title}</b><small><i className={hive.role ? "dk-ok" : "dk-off"} />{status}</small></div>
+          {/* What this conversation's runs sent the model, and what each tool
+              did: kept by SuperAI itself, on the machine the conversation is on. */}
+          <button className="dk-icon" title={t("Trace")} aria-label={t("Trace")} onClick={() => setTraceOpen(true)}><ScrollTextIcon size={17} /></button>
         </header>
+        {traceOpen && <RunTracePanel taskId={chat.sessionId} live={chat.sending} onClose={() => setTraceOpen(false)} />}
         <div className="dk-msgs" ref={msgsRef}>
           {msgs.length === 0 && (
             <div className="dk-empty">{t("Ask {name} anything, or give the hive an order: “check disk on every worker and tell me the fullest”.", { name: queenRef(queen) })}</div>

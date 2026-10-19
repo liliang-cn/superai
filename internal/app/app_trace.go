@@ -4,7 +4,8 @@ import (
 	"github.com/liliang-cn/superai/internal/backend"
 )
 
-// TraceLines returns the tail of a task's JSONL trace, oldest line first.
+// TraceLines returns the tail of a task's or a conversation's JSONL trace,
+// oldest line first. id is a long task's id or a chat's session id.
 //
 // Each line is one event as agent-go's TraceWriter wrote it — model turns with
 // their token split, tool calls with their durations, lints, retries,
@@ -15,6 +16,14 @@ import (
 // It reads the directory rather than going through a.svc, so a trace is still
 // readable after a settings save has rebuilt the service — and after the run
 // that wrote it is long over.
+//
+// A model call's request comes back as its size only; TraceCall has it whole.
 func (a *App) TraceLines(taskID string, limit int) []string {
 	return backend.TraceLines(backend.TracesDir(), taskID, limit)
+}
+
+// TraceCall returns one model call in full, what it was sent included: the
+// model_end line with that span id in the trace id names, as raw JSON.
+func (a *App) TraceCall(id, spanID string) string {
+	return backend.TraceCall(backend.TracesDir(), id, spanID)
 }

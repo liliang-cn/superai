@@ -5,6 +5,7 @@ import { useAttachments } from "../lib/useAttachments";
 import { AppStatus, ChatMessage } from "../lib/types";
 import { copyText, withoutCallNotes } from "../lib/format";
 import AttachmentChips from "../components/AttachmentChips";
+import RunTracePanel from "../components/RunTracePanel";
 import { AgentMenu, AddressedBanner } from "../components/AgentMenu";
 import { useAgentMentions } from "../lib/useAgentMentions";
 import {
@@ -78,6 +79,7 @@ export default function ChatView({
   onSessionOpened?: () => void;
 }) {
   const chat = useChat();
+  const [traceOpen, setTraceOpen] = useState(false);
   const attach = useAttachments();
   const notReady = status !== null && !status.ready;
   const messages = chat.messages;
@@ -222,7 +224,15 @@ export default function ChatView({
             history={history}
             onNew={chat.newSession}
             sessionId={chat.sessionId}
+            onTrace={() => setTraceOpen(true)}
           />
+          {traceOpen && (
+            <RunTracePanel
+              taskId={chat.sessionId}
+              live={chat.sending}
+              onClose={() => setTraceOpen(false)}
+            />
+          )}
 
           {history.sessions ? (
             <HistoryList

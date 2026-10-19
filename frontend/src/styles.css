@@ -1678,7 +1678,7 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
    The wall is prose; this is the ledger. Fixed columns and tabular numerals
    because the questions asked of it — which tool took eleven seconds, where
    the cache stopped hitting — are all comparisons down a column. */
-.cr-trace-overlay { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 32px; background: rgba(0,0,0,.55); backdrop-filter: blur(3px); }
+.cr-trace-overlay { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 32px; background: rgba(14,26,34,.22); backdrop-filter: blur(3px); }
 .cr-trace { width: 100%; max-width: 1180px; max-height: 86vh; display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; background: linear-gradient(180deg, var(--cr-panel-2), var(--cr-panel)); border: 1px solid var(--cr-line-2); border-radius: 10px; box-shadow: 0 20px 60px rgba(0,0,0,.45); }
 .cr-trace .cr-panel-h { margin-bottom: 0; }
 .cr-trace-x { background: none; border: none; color: var(--cr-dim); cursor: pointer; padding: 2px 4px; border-radius: 5px; display: inline-flex; }
@@ -1699,6 +1699,19 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
 .cr-trace-row .x { color: var(--cr-mute); }
 .cr-trace-row.bad .x { color: var(--cr-rose); }
 .cr-trace-rows .cr-note { padding: 14px 12px; }
+.cr-trace-row.opens { cursor: pointer; }
+.cr-trace-row .e svg { display: inline; vertical-align: -1px; margin-right: 2px; }
+.cr-trace-detail { margin: 2px 10px 8px 74px; padding: 8px 10px; border: 1px solid var(--cr-line); border-radius: 7px; background: var(--cr-panel); font-family: var(--cr-mono); font-size: 11px; line-height: 1.55; color: var(--cr-text); white-space: pre-wrap; word-break: break-word; max-height: 60vh; overflow: auto; }
+pre.cr-trace-detail { margin-top: 2px; }
+.cr-trace-meta { color: var(--cr-dim); margin-bottom: 6px; }
+.cr-msg { padding: 6px 0; border-top: 1px solid var(--cr-line); }
+.cr-msg:first-of-type { border-top: none; }
+.cr-msg pre { margin: 2px 0 0; white-space: pre-wrap; word-break: break-word; font: inherit; }
+.cr-role { font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--cr-mute); }
+.cr-msg.user .cr-role { color: var(--cr-cyan); }
+.cr-msg.assistant .cr-role { color: var(--cr-lime); }
+.cr-msg.tool .cr-role { color: var(--cr-amber); }
+.cr-call { color: var(--cr-dim); }
 
 /* ---------------------------------------------------------------------------
    AIGUI `ui` blocks (@ai-gui/plugin-ui).

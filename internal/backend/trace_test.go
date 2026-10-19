@@ -82,26 +82,56 @@ func TestTraceStoreRecordsASegmentedRun(t *testing.T) {
 
 // A chat turn is not a task worth a file. The observer sees every run the
 // service makes; only a long run goes through Begin.
-func TestTraceStoreIgnoresRunsItWasNotToldAbout(t *testing.T) {
+func TestAChatIsTracedIntoItsConversationWithWhatTheModelWasSent(t *testing.T) {
 	svc := newTestLongRunService(t)
 	defer svc.Close()
 
 	dir := t.TempDir()
 	svc.traces = NewTraceStore(dir)
 	svc.Agent().RegisterObserver(svc.traces)
+	defer svc.traces.Close()
 
-	if _, err := svc.Stream(context.Background(), "chat-session", "Say hello.", nil, nil); err != nil {
-		t.Fatalf("Stream: %v", err)
+	for _, prompt := range []string{"Say hello.", "Say goodbye."} {
+		if _, err := svc.Stream(context.Background(), "chat-session", prompt, nil, nil); err != nil {
+			t.Fatalf("Stream: %v", err)
+		}
 	}
 
+	// One file for the conversation, both turns in it.
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		t.Fatalf("ReadDir: %v", err)
 	}
-	for _, e := range entries {
-		if strings.HasSuffix(e.Name(), ".jsonl") {
-			t.Fatalf("a chat turn wrote a trace file: %s", e.Name())
+	if len(entries) != 1 || entries[0].Name() != "chat-session.jsonl" {
+		t.Fatalf("trace files = %v, want only chat-session.jsonl", entries)
+	}
+
+	// The list carries each request's size, not the conversation itself.
+	var span string
+	for _, l := range TraceLines(dir, "chat-session", 0) {
+		var row struct {
+			Event   string         `json:"event"`
+			SpanID  string         `json:"span_id"`
+			Request map[string]int `json:"request"`
 		}
+		if json.Unmarshal([]byte(l), &row) != nil || row.Event != "model_end" || row.Request == nil {
+			continue
+		}
+		if strings.Contains(l, "Say goodbye.") {
+			t.Fatalf("a listed line carries the request: %s", l)
+		}
+		if row.Request["messages"] > 0 {
+			span = row.SpanID
+		}
+	}
+	if span == "" {
+		t.Fatal("no model call in the list says how many messages it was sent")
+	}
+
+	// One call fetched whole has what the model was sent, in its words.
+	call := TraceCall(dir, "chat-session", span)
+	if !strings.Contains(call, "Say goodbye.") {
+		t.Fatalf("the last call's request does not have the last prompt: %.400s", call)
 	}
 }
 

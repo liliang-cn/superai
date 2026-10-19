@@ -408,6 +408,10 @@ func NewService(s *Settings) (*Service, error) {
 		mcpOpts = append(mcpOpts, agent.WithMCPConfigPaths(mcpPaths...))
 	}
 	b = b.WithMCP(mcpOpts...)
+	// Each model call's request, the messages and the tools, reaches the
+	// observers, so the trace store (trace.go) records what the model was
+	// actually sent. It stays in this machine's own data directory.
+	b = b.WithObserverPayloads()
 
 	svc, err := b.Build()
 	if err != nil {

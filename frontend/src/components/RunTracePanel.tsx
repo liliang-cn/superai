@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { TraceLines } from "../../wailsjs/go/app/App";
+import { TraceCall, TraceLines } from "../../wailsjs/go/app/App";
 import { useImeGuard } from "@/lib/ime";
-import { RotateCw, ScrollText, X } from "lucide-react";
+import { ChevronDown, ChevronRight, RotateCw, ScrollText, X } from "lucide-react";
 
 /**
- * One task's JSONL trace, a row per event.
+ * One task's or one conversation's JSONL trace, a row per event.
  *
  * The run wall narrates a task in prose — enough to see it is alive and going
  * well. This is the other half: what exactly happened in round 34, which tool
@@ -15,6 +15,10 @@ import { RotateCw, ScrollText, X } from "lucide-react";
  * Parsing happens here rather than in Go on purpose: the framework adds fields
  * to a trace line as it grows new seams, and a panel that reads the JSON it is
  * given picks them up without a backend release.
+ *
+ * A row opens. A model call shows what the model was sent, every message and
+ * the tools offered, fetched whole only then (the list carries its size); a
+ * tool call shows its arguments or its result.
  */
 
 interface TraceRow {
@@ -41,6 +45,20 @@ interface TraceRow {
   checkpoint_reason?: string;
   segment_index?: number;
   segment_total?: number;
+  span_id?: string;
+  model?: string;
+  purpose?: string;
+  args?: Record<string, unknown>;
+  text?: string;
+  /** In the list, the request's size; whole from TraceCall. */
+  request?: { messages?: number | TraceMessage[]; tools?: number | string[]; bytes?: number; prompt?: string };
+}
+
+interface TraceMessage {
+  role: string;
+  content?: string;
+  tool_call_id?: string;
+  tool_calls?: { id?: string; name: string; args?: Record<string, unknown> }[];
 }
 
 const PAGES = [200, 600, 2000];
@@ -56,7 +74,17 @@ const tok = (n?: number) => (n === undefined ? "" : n >= 1000 ? `${(n / 1000).to
 // what names the row: whichever of tool / sub-agent / lint / marker this event
 // is about. One column, because no event has two of them.
 const subject = (r: TraceRow) =>
-  r.tool ?? r.subagent ?? r.lint ?? r.marker ?? r.trigger ?? r.kind ?? r.checkpoint_reason ?? r.stop_reason ?? "";
+  r.tool ?? r.subagent ?? r.lint ?? r.marker ?? r.trigger ?? r.kind ?? r.checkpoint_reason ?? r.stop_reason ??
+  (r.event === "model_end" ? [r.purpose, r.model].filter(Boolean).join(" · ") : "");
+
+// whether a row has more to show than its one line
+const opens = (r: TraceRow) =>
+  (r.event === "model_end" && !!r.request && !!r.span_id) ||
+  (r.event === "tool_start" && !!r.args) ||
+  (r.event === "tool_end" && !!r.result);
+
+const sent = (r: TraceRow) =>
+  r.request && typeof r.request.messages === "number" ? `${r.request.messages} msgs` : "";
 
 // what the row says, if anything: an error beats a reason beats a result.
 const detail = (r: TraceRow) => r.error ?? r.reason ?? r.message ?? r.result ?? "";
@@ -74,6 +102,7 @@ export default function RunTracePanel({
   const [limit, setLimit] = useState(PAGES[0]);
   const [filter, setFilter] = useState("");
   const [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState<string>("");
   const ime = useImeGuard();
 
   const load = useCallback(async () => {
@@ -114,7 +143,7 @@ export default function RunTracePanel({
   }, [lines, filter]);
 
   return (
-    <div className="cr-trace-overlay" onClick={onClose}>
+    <div className="cr-trace-overlay cr-scope" onClick={onClose}>
       <div className="cr-trace" onClick={(e) => e.stopPropagation()}>
         <div className="cr-panel-h">
           <ScrollText size={13} />
@@ -169,14 +198,25 @@ export default function RunTracePanel({
           {rows.length === 0 && (
             <div className="cr-note">
               {lines.length === 0
-                ? "No trace for this task. Traces are kept for tasks launched from here; a chat turn writes none."
+                ? "No trace yet. Every model call and tool call is written here as the run goes."
                 : "Nothing matches that filter."}
             </div>
           )}
-          {rows.map((r, i) => (
-            <div key={i} className={`cr-trace-row ${r.event ?? ""}${r.error ? " bad" : ""}`}>
+          {rows.map((r, i) => {
+            const key = `${i}:${r.span_id ?? ""}:${r.ts ?? ""}`;
+            const can = opens(r);
+            const isOpen = open === key;
+            return (
+            <div key={key} className="cr-trace-item">
+            <div
+              className={`cr-trace-row ${r.event ?? ""}${r.error ? " bad" : ""}${can ? " opens" : ""}`}
+              onClick={can ? () => setOpen(isOpen ? "" : key) : undefined}
+            >
               <span className="t">{hms(r.ts)}</span>
-              <span className="e">{r.event ?? "?"}</span>
+              <span className="e">
+                {can ? (isOpen ? <ChevronDown size={10} /> : <ChevronRight size={10} />) : null}
+                {r.event ?? "?"}
+              </span>
               <span className="r">{r.round ?? ""}</span>
               <span className="s" title={subject(r)}>{subject(r)}</span>
               <span className="d">{dur(r.duration_ms)}</span>
@@ -184,11 +224,86 @@ export default function RunTracePanel({
                 {tok(r.tokens?.total)}
                 {r.tokens?.cached ? <i> ·{tok(r.tokens.cached)}c</i> : null}
               </span>
-              <span className="x" title={detail(r)}>{detail(r)}</span>
+              <span className="x" title={detail(r)}>{detail(r) || sent(r)}</span>
             </div>
-          ))}
+            {isOpen && <TraceDetail id={taskId} row={r} />}
+            </div>
+            );
+          })}
         </div>
       </div>
+    </div>
+  );
+}
+
+/** What one row holds beyond its line: a model call's request, a tool's
+ *  arguments or result. */
+function TraceDetail({ id, row }: { id: string; row: TraceRow }) {
+  const [call, setCall] = useState<TraceRow | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    if (row.event !== "model_end" || !row.span_id) return;
+    let alive = true;
+    TraceCall(id, row.span_id)
+      .then((l) => {
+        if (!alive) return;
+        if (!l) return setFailed(true);
+        try {
+          setCall(JSON.parse(l) as TraceRow);
+        } catch {
+          setFailed(true);
+        }
+      })
+      .catch(() => alive && setFailed(true));
+    return () => {
+      alive = false;
+    };
+  }, [id, row.event, row.span_id]);
+
+  if (row.event === "tool_start") {
+    return <pre className="cr-trace-detail">{JSON.stringify(row.args, null, 2)}</pre>;
+  }
+  if (row.event === "tool_end") {
+    return <pre className="cr-trace-detail">{row.result}</pre>;
+  }
+  if (failed) return <div className="cr-trace-detail cr-note">This call is no longer in the trace.</div>;
+  if (!call) return <div className="cr-trace-detail cr-note">Loading…</div>;
+
+  const req = call.request;
+  const msgs = Array.isArray(req?.messages) ? req.messages : [];
+  const tools = Array.isArray(req?.tools) ? req.tools : [];
+  return (
+    <div className="cr-trace-detail">
+      <div className="cr-trace-meta">
+        {[call.purpose, call.model, call.duration_ms !== undefined ? dur(call.duration_ms) : "",
+          call.tokens?.prompt !== undefined ? `${tok(call.tokens.prompt)} in · ${tok(call.tokens.completion)} out` : ""]
+          .filter(Boolean)
+          .join("  ·  ")}
+      </div>
+      {req?.prompt && (
+        <div className="cr-msg">
+          <span className="cr-role">prompt</span>
+          <pre>{req.prompt}</pre>
+        </div>
+      )}
+      {msgs.map((m, i) => (
+        <div key={i} className={`cr-msg ${m.role}`}>
+          <span className="cr-role">{m.role}{m.tool_call_id ? ` · ${m.tool_call_id}` : ""}</span>
+          {m.content ? <pre>{m.content}</pre> : null}
+          {m.tool_calls?.map((c, j) => (
+            <pre key={j} className="cr-call">
+              {c.name}({c.args ? JSON.stringify(c.args) : ""})
+            </pre>
+          ))}
+        </div>
+      ))}
+      {tools.length > 0 && (
+        <div className="cr-msg">
+          <span className="cr-role">tools offered · {tools.length}</span>
+          <pre>{tools.join("  ")}</pre>
+        </div>
+      )}
     </div>
   );
 }
