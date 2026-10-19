@@ -236,25 +236,21 @@ func TestHostsPlaceHAServices(t *testing.T) {
 		t.Fatalf("the queen's view:\n%s", txt)
 	}
 
-	// The apps see no HA: openclaw stands at its service IP, not on the node
-	// that runs it now; the standby and its node are gone, and cortexdb,
-	// which no agent belongs to, is not shown.
+	// The apps see no HA: openclaw stands on the node it is active on, its
+	// standby and the node known only for that are gone.
 	apps := core.HiveTopology()
-	vip := hostByName(apps.Hosts, "192.168.123.252")
-	if vip == nil || vip.Kind != hostKindService || vip.State != "live" || len(vip.Agents) != 1 {
-		t.Fatalf("the service IP as a host: %+v", vip)
-	}
-	if g := agentNamed(vip, "openclaw"); g == nil || g.Via != "sds-e" || g.State != "live" {
-		t.Fatalf("openclaw at its service IP: %+v", g)
-	}
-	if g := agentNamed(hostByName(apps.Hosts, "sds-e"), "openclaw"); g != nil {
-		t.Fatalf("openclaw still on its node: %+v", g)
+	if g := agentNamed(hostByName(apps.Hosts, "sds-e"), "openclaw"); g == nil || g.State != "live" || g.Via != "sds-e" {
+		t.Fatalf("openclaw on its active node: %+v", g)
 	}
 	if h := hostByName(apps.Hosts, "sds-b"); h != nil {
 		t.Fatalf("an HA node with nothing on it: %+v", h)
 	}
-	if h := hostByName(apps.Hosts, "192.168.123.253"); h != nil {
-		t.Fatalf("a service no agent belongs to: %+v", h)
+	for _, h := range apps.Hosts {
+		for _, g := range h.Agents {
+			if g.State == "standby" || g.State == "standby-unready" {
+				t.Fatalf("a standby on %s: %+v", h.Name, g)
+			}
+		}
 	}
 	if len(apps.Services) != 0 {
 		t.Fatalf("services in the apps' view: %+v", apps.Services)
