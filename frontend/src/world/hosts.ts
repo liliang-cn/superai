@@ -11,7 +11,7 @@ import { contact, ownMat, rbox } from "./kit";
 // agent, if it has one, stands as a ghost). This file plans where things go
 // and makes the parts; cluster.ts puts the agents on them.
 
-const KIND: Record<string, string> = { pod: "Pod", container: "Container", mac: "Mac", vm: "VM", metal: "Bare metal", service: "Service IP" };
+const KIND: Record<string, string> = { pod: "Pod", container: "Container", mac: "Mac", vm: "VM", metal: "Bare metal" };
 /** What a host is, as a label says it: "VM", "Pod", "Host" when it has not
  *  said; "HA node" for one known only as an HA service's node, whose kind
  *  nothing has said either. */

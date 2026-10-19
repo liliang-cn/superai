@@ -289,9 +289,8 @@ export function useLinkedAgents(): LinkedAgent[] {
 }
 
 /** What a host is: a pod, a container, a Mac, a VM or a bare machine; empty
- *  when nothing on it has said. "service" is an HA service's IP, standing as
- *  a host with the agents reached at it — which node runs it is not shown. */
-export type HostKind = "pod" | "container" | "mac" | "vm" | "metal" | "service" | "";
+ *  when nothing on it has said. */
+export type HostKind = "pod" | "container" | "mac" | "vm" | "metal" | "";
 
 /** One agent on a host: a SuperAI (queen, worker, machine agent, relay), a
  *  coding CLI ("claude.mac"), or a named agent a SuperAI serves (openclaw). */

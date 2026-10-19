@@ -92,10 +92,10 @@ type HiveTopology struct {
 }
 
 // HiveTopology is the hive as the apps draw it: every host with what runs on
-// it, and each HA service as its service IP with the agents reached there.
-// How HA keeps a service up — which node runs it, its standbys — is left
-// out; the queen's hive_hosts and the hosts tool read fullTopology.
-func (a *App) HiveTopology() HiveTopology { return byServiceIP(a.fullTopology()) }
+// it. An agent an HA service keeps up stands on the node it is active on, and
+// moves with it; how HA does that — standbys, service IPs — is left out. The
+// queen's hive_hosts and the hosts tool read fullTopology.
+func (a *App) HiveTopology() HiveTopology { return withoutHA(a.fullTopology()) }
 
 // fullTopology lists the hosts and the HA services together, read at the
 // same moment, with every HA detail.
@@ -108,18 +108,9 @@ func (a *App) fullTopology() HiveTopology {
 // parents before the hosts inside them.
 func (a *App) Hosts() []Host { return a.HiveTopology().Hosts }
 
-// hostKindService is the kind of the host byServiceIP makes for a service IP.
-const hostKindService = "service"
-
-// byServiceIP takes HA out of a topology: an agent an HA service runs moves
-// off the node it runs on now onto a host of its own, the service IP, and
-// its standbys are dropped, as is a host known only as an HA node that is
-// left with nothing on it. A service no agent belongs to (cortexdb,
-// haify-meta) is not shown. Services is empty.
-func byServiceIP(t HiveTopology) HiveTopology {
-	hosts := make([]Host, 0, len(t.Hosts)+len(t.Services))
-	onService := map[string][]HostAgent{}
-	seen := map[string]time.Time{}
+// withoutHA drops what only HA knows: an agent's standby copies, a host known
+// only as an HA node that is left with nothing on it, and the services.
+func withoutHA(t HiveTopology) HiveTopology {
 	haNode := map[string]bool{}
 	for _, s := range t.Services {
 		haNode[hostID(s.Active)] = true
@@ -127,17 +118,11 @@ func byServiceIP(t HiveTopology) HiveTopology {
 			haNode[hostID(b.Host)] = true
 		}
 	}
+	hosts := make([]Host, 0, len(t.Hosts))
 	for _, h := range t.Hosts {
 		kept := make([]HostAgent, 0, len(h.Agents))
 		for _, ag := range h.Agents {
-			switch {
-			case ag.State == "standby" || ag.State == "standby-unready":
-			case ag.Service != "":
-				onService[ag.Service] = append(onService[ag.Service], ag)
-				if h.LastSeen.After(seen[ag.Service]) {
-					seen[ag.Service] = h.LastSeen
-				}
-			default:
+			if ag.State != "standby" && ag.State != "standby-unready" {
 				kept = append(kept, ag)
 			}
 		}
@@ -145,25 +130,6 @@ func byServiceIP(t HiveTopology) HiveTopology {
 			continue
 		}
 		h.Agents = kept
-		hosts = append(hosts, h)
-	}
-	for _, s := range t.Services {
-		agents := onService[s.Name]
-		if len(agents) == 0 {
-			continue
-		}
-		name := s.VIP
-		if name == "" {
-			name = s.Name
-		}
-		state := "live"
-		if s.State == "down" {
-			state = "lost"
-		}
-		h := Host{ID: hostKindService + ":" + hostID(s.Name), Name: name, Kind: hostKindService, State: state, LastSeen: seen[s.Name], Agents: agents}
-		if s.VIP != "" {
-			h.Addresses = []string{s.VIP}
-		}
 		hosts = append(hosts, h)
 	}
 	return HiveTopology{Hosts: hosts, Services: []backend.HAService{}}
