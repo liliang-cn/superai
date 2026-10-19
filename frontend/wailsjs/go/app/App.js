@@ -242,6 +242,10 @@ export function HiveTopology() {
   return window['go']['app']['App']['HiveTopology']();
 }
 
+export function HiveWorkers() {
+  return window['go']['app']['App']['HiveWorkers']();
+}
+
 export function HomeLayout() {
   return window['go']['app']['App']['HomeLayout']();
 }

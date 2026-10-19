@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { ChevronDownIcon, GaugeIcon, HomeIcon, LocateFixedIcon, MinusIcon, PlusIcon, RotateCcwIcon, RotateCwIcon } from "lucide-react";
 import { Dashboards, MCP, NotedToday, Skills } from "../../wailsjs/go/app/App";
 import { EventsOn } from "../../wailsjs/runtime";
-import { useBees, useCodingRuns, useHive, useHosts, useLinkedAgents } from "../canvas/data";
+import { useBees, useCodingRuns, useHive, useHosts, useLinkedAgents, useWorkers } from "../canvas/data";
 import { useAttentionState } from "../canvas/attention";
 import { useHiveMeter } from "../components/HiveMeter";
 import { useI18n } from "../lib/i18n";
@@ -236,8 +236,8 @@ function Hud({ data, on }: { view: ViewKey; data: WorldData; on: boolean }) {
   }, [tt.tokens]);
   const run = data.hive.tasks.filter((x) => x.state === "running");
   const fmt = (n: number) => (n >= 1e6 ? (n / 1e6).toFixed(2) + "M" : n >= 1e3 ? (n / 1e3).toFixed(1) + "k" : String(Math.round(n)));
-  const workers = data.hive.members.filter((m) => !/queen/.test(m.name));
-  const live = workers.filter((m) => m.state === "live").length;
+  const workers = useWorkers();
+  const live = workers.up;
   const needs = data.attention.filter((a) => a.level === "needs").length;
   const pts = hist.current;
   const max = Math.max(1, ...pts);
@@ -257,7 +257,7 @@ function Hud({ data, on }: { view: ViewKey; data: WorldData; on: boolean }) {
       </button>
       <div className="wh-row">
         <div className="wh-fig"><b>{Math.round(tt.tokPerSec)}</b><span>tok/s</span></div>
-        <div className={`wh-fig${live < workers.length ? " bad" : ""}`}><b>{live}/{workers.length}</b><span>{t("workers")}</span></div>
+        <div className={`wh-fig${live < workers.list.length ? " bad" : ""}`}><b>{live}/{workers.list.length}</b><span>{t("workers")}</span></div>
         {needs > 0 && <div className="wh-fig bad"><b>{needs}</b><span>{t("need you")}</span></div>}
       </div>
       {open && (

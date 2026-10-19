@@ -1086,6 +1086,26 @@ export namespace app {
 		    return a;
 		}
 	}
+	export class HiveWorker {
+	    name: string;
+	    kind: string;
+	    host: string;
+	    state: string;
+	    up: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new HiveWorker(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.kind = source["kind"];
+	        this.host = source["host"];
+	        this.state = source["state"];
+	        this.up = source["up"];
+	    }
+	}
 	
 	
 	export class HostDisk {

@@ -126,6 +126,8 @@ export function HiveTaskDetail(arg1:string):Promise<Record<string, any>>;
 
 export function HiveTopology():Promise<app.HiveTopology>;
 
+export function HiveWorkers():Promise<Array<app.HiveWorker>>;
+
 export function HomeLayout():Promise<Record<string, any>>;
 
 export function HostExec(arg1:string,arg2:number):Promise<app.HostExecResult>;

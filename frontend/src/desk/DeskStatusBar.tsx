@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { BotIcon, CpuIcon, HexagonIcon } from "lucide-react";
 import { Dashboard, HiveLinkStatus } from "../../wailsjs/go/app/App";
 import { EventsOn } from "../../wailsjs/runtime";
-import { useHive } from "../canvas/data";
+import { useHive, useWorkers } from "../canvas/data";
 import { useI18n } from "../lib/i18n";
 import { openSwitcher } from "../lib/hivelink";
 import type { AppStatus } from "../lib/types";
@@ -40,8 +40,7 @@ export default function DeskStatusBar({ status, loading, codingRuns }: { status:
   const disconnected = runtime.error || (link?.linked && !link.live);
   const state = loading ? "Connecting…" : disconnected ? "Disconnected" : status?.ready ? "Ready" : "Not ready";
   const error = disconnected ? t("Backend connection is unavailable.") : status?.error;
-  const workers = hive.members.filter(member => !/queen/.test(member.name));
-  const live = workers.filter(member=>member.state==="live").length;
+  const workers = useWorkers();
   return <footer className="dk-statusbar" aria-label={t("Status bar")}>
     <button className="dk-status-connection" onClick={openSwitcher} title={error || t("Switch backend")}>
       <i className={`dk-status-dot${disconnected || !loading && !status?.ready ? " bad" : loading ? " pending" : ""}`}/>
@@ -49,7 +48,7 @@ export default function DeskStatusBar({ status, loading, codingRuns }: { status:
     </button>
     {runtime.model && <span className="dk-status-model" title={runtime.model}><CpuIcon size={12}/>{runtime.model}</span>}
     <span className="dk-status-spacer"/>
-    {hive.loaded && hive.role && <span className="dk-status-workers"><HexagonIcon size={12}/>{t("{live}/{total} workers online",{live,total:workers.length})}</span>}
+    {workers.list.length > 0 && <span className="dk-status-workers" title={workers.list.map((w) => `${w.name} · ${w.host}`).join("\n")}><HexagonIcon size={12}/>{t("{live}/{total} workers online",{live:workers.up,total:workers.list.length})}</span>}
     <span className="dk-status-runs"><BotIcon size={12}/>{runtime.active + codingRuns > 0 ? t("{count} running",{count:runtime.active+codingRuns}) : t("Idle")}</span>
     <span className="dk-status-tools" title={t("Connected MCP tools")}>MCP {status?.mcp ?? 0} · {t("{count} tools",{count:status?.mcpTools ?? 0})}</span>
   </footer>;

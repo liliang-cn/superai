@@ -155,7 +155,10 @@ func (a *App) localAgentNames() []agentexec.Installed {
 	}
 	var out []agentexec.Installed
 	for _, c := range installedCLIs(s.ExternalAgents.Binaries) {
-		if !off[strings.ToLower(c.Name)] {
+		// Signed out, it cannot take work: not offered, not drawn, not a
+		// worker (workers.go). The first-start guide still lists it, from
+		// installedCLIs, so the person is told to sign in.
+		if !off[strings.ToLower(c.Name)] && !cliSignIn.signedOut(c.Name, c.Binary) {
 			out = append(out, c)
 		}
 	}

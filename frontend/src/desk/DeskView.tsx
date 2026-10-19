@@ -20,7 +20,7 @@ import type { ToolApproval } from "../lib/useToolApprovals";
 import { PATHS } from "../lib/routes";
 import { withoutCallNotes } from "../lib/format";
 import { Response } from "@/components/ai-elements/response";
-import { Bee, elapsed, short, useBees, useLinkedAgents, useCodingRuns, useHive, useUpcoming } from "../canvas/data";
+import { Bee, elapsed, short, useBees, useLinkedAgents, useCodingRuns, useHive, useUpcoming, useWorkers } from "../canvas/data";
 import type { CodingRun, UpcomingItem } from "../canvas/tiles";
 import NameDashboardModal from "../components/NameDashboardModal";
 import { dashboards, hasRenderableBlock, suggestName, Dashboard } from "../lib/dashboards";
@@ -181,6 +181,7 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
   const runs = useCodingRuns();
   const linked = useLinkedAgents();
   const chat = useChat();
+  const workerList = useWorkers();
   const [traceOpen, setTraceOpen] = useState(false);
   const queenId = useQueenSession();
   const pulse = usePulse();
@@ -366,9 +367,7 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
   ]).size;
   useEffect(() => { setBusy(busyWorkers > 0); }, [busyWorkers, setBusy]);
   useEffect(() => () => setBusy(false), [setBusy]);
-  const live = hive.members.filter((m) => m.state === "live" && !/queen/.test(m.name)).length;
-  const workers = hive.members.filter((m) => !/queen/.test(m.name)).length;
-  const status = !hive.loaded ? t("Finding the hive…") : !hive.role ? t("This {machine} on its own", { machine: t(machine) }) : `${live} of ${workers} workers up, ${busyWorkers} busy`;
+  const status = !hive.loaded ? t("Finding the hive…") : !hive.role ? t("This {machine} on its own", { machine: t(machine) }) : `${workerList.up} of ${workerList.list.length} workers up, ${busyWorkers} busy`;
   const title = onQueen ? queenTitle(queen) : recents.find((s) => s.id === chat.sessionId)?.title || t("Conversation");
 
   return (

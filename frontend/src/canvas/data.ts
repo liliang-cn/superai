@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { EventsOn } from "../../wailsjs/runtime";
-import { CLIRuns, HiveStatus, HiveTopology, Hosts, LinkedAgents, StandingAgents, Upcoming } from "../../wailsjs/go/app/App";
+import { CLIRuns, HiveStatus, HiveTopology, Hosts, LinkedAgents, StandingAgents, Upcoming, HiveWorkers } from "../../wailsjs/go/app/App";
 import type { CodingRun, UpcomingItem } from "./tiles";
 import { setQueenName } from "../lib/queenName";
 
@@ -54,6 +54,24 @@ export function withCLI(m: Record<string, CLIActivity> | undefined, cli: string,
   if (act && act.sessions?.length) next[cli] = act;
   else delete next[cli];
   return next;
+}
+
+/** One agent that can work: a SuperAI with a model, a signed-in coding CLI,
+ *  a named agent. Peers; host is where it runs. */
+export interface Worker { name: string; kind: string; host: string; state: string; up: boolean }
+
+/** Every agent that can work (HiveWorkers): counted the same on a laptop on
+ *  its own and in a hive of machines. */
+export function useWorkers(): { list: Worker[]; up: number; loaded: boolean } {
+  const [list, setList] = useState<Worker[] | null>(null);
+  useEffect(() => {
+    let alive = true;
+    const load = () => HiveWorkers().then((w) => alive && setList((w ?? []) as Worker[])).catch(() => alive && setList((cur) => cur ?? []));
+    load();
+    const t = window.setInterval(load, 10000);
+    return () => { alive = false; window.clearInterval(t); };
+  }, []);
+  return { list: list ?? [], up: (list ?? []).filter((w) => w.up).length, loaded: list !== null };
 }
 
 /** The hive as this SuperAI sees it: polled for the roster, kept current by
