@@ -170,7 +170,7 @@ func personalSession(id string) bool {
 }
 
 // routeToEngine answers a turn with the queen engine.
-func (a *App) routeToEngine(requestID, sessionID, engine, message string) {
+func (a *App) routeToEngine(requestID, sessionID, engine, message string, fresh bool) {
 	a.mu.Lock()
 	var s backend.Settings
 	if a.settings != nil {
@@ -223,7 +223,9 @@ func (a *App) routeToEngine(requestID, sessionID, engine, message string) {
 		return
 	}
 	o := cliStart{Agent: engine, Prompt: message, Ask: !s.ExternalAgents.Unattended, Chat: sessionID, Queen: kit}
-	if prev := a.lastChatRun(sessionID, engine, true); prev != nil {
+	// fresh: the conversation's own session is still answering, so this
+	// turn starts one of its own and is handed the conversation instead.
+	if prev := a.lastChatRun(sessionID, engine, true); prev != nil && !fresh {
 		o.Thread, o.Session, o.Cwd, o.Model, o.Prev = prev.Thread, prev.Session, prev.Cwd, prev.Model, prev
 	}
 	// What was said here that the engine's session did not hear goes in

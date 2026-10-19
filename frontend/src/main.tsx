@@ -10,9 +10,10 @@ import '@fontsource-variable/geist-mono'
 import './styles.css'
 import App from './App'
 import Gate from './components/Gate'
-import LinkHive from './components/LinkHive'
-import {HiveLinkStatus, HiveLinks, TitleBarDoubleClick} from '../wailsjs/go/app/App'
-import {installHiveBridge, installTitleBarDoubleClick, setAlone, wantsAlone} from './lib/hivelink'
+import {HiveLinkStatus, TitleBarDoubleClick} from '../wailsjs/go/app/App'
+import {installHiveBridge, installTitleBarDoubleClick} from './lib/hivelink'
+import {EventsOn} from '../wailsjs/runtime'
+import {toast} from './lib/toasts'
 
 /**
  * The password box, and only then the app.
@@ -48,30 +49,31 @@ function Root() {
             .catch(() => setAuthed(false))
     }, [served])
 
-    // The desktop window: onto the hive it is linked to, or asking which one.
-    // null = still finding out.
-    const [link, setLink] = useState<'linked' | 'alone' | 'ask' | null>(served ? 'alone' : null)
+    // The desktop window: onto the hive it is linked to, else this Mac on its
+    // own — a first start opens straight onto the app, and a hive is linked
+    // from the backend switcher. null = still finding out.
+    const [link, setLink] = useState<'linked' | 'alone' | null>(served ? 'alone' : null)
     useEffect(() => {
         if (served) return
-        // Linked: onto that hive. Not linked but with hives saved, or told
-        // once to stay on its own: this Mac. Otherwise ask.
-        Promise.all([HiveLinkStatus(), HiveLinks().catch(() => [])])
-            .then(([s, saved]) => {
+        HiveLinkStatus()
+            .then((s) => {
                 if (s?.linked) {
                     installHiveBridge()
                     setLink('linked')
-                } else setLink(wantsAlone() || (saved ?? []).length > 0 ? 'alone' : 'ask')
+                } else setLink('alone')
             })
             .catch(() => setLink('alone'))
+    }, [served])
+    // The first start found Claude Code signed in on this Mac and lets it
+    // answer: say so, once.
+    useEffect(() => {
+        if (served) return
+        const off = EventsOn('setup:engine', (p: any) => toast.success(`${p?.label || 'Claude Code'} on this Mac will answer you`))
+        return () => { if (typeof off === 'function') off() }
     }, [served])
 
     if (authed === null || link === null) return null
     if (!authed) return <Gate onEnter={() => setAuthed(true)}/>
-    if (link === 'ask') {
-        return <LinkHive
-            onLinked={() => { installHiveBridge(); setLink('linked') }}
-            onAlone={() => { setAlone(true); setLink('alone') }}/>
-    }
     return (
         <HashRouter>
             <App/>

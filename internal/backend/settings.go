@@ -243,6 +243,10 @@ type Settings struct {
 	// settings.json — and so nothing here can be reached by a settings key the
 	// agent is allowed to write (see settingsWritable in selftools.go).
 	ExternalAgents ExternalAgents `json:"external_agents"`
+	// Onboarded is set once the desktop app's first start has looked for a
+	// signed-in coding CLI to think with (app/first_run.go), so it looks once
+	// and what the person sets afterwards stands.
+	Onboarded bool `json:"onboarded,omitempty"`
 
 	// Hive makes this instance a queen or a worker in one — see hive.go.
 	// The zero value is a standalone install.

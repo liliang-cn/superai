@@ -266,6 +266,7 @@ func (a *App) Startup(ctx context.Context) {
 	// serve: without it a core on this Mac alone never sees them work. The
 	// CLI plugins stay pointed at whoever installed them (the node).
 	go a.serveCCHookSocket(ctx)
+	go a.firstRun()
 }
 
 // startupHeadless boots the same backend with no Wails context: events go
@@ -774,7 +775,7 @@ func (a *App) emitLogin(status, provider, message string) {
 func (a *App) GetStatus() map[string]any {
 	a.mu.Lock()
 	st := map[string]any{
-		"ready":          a.svc != nil,
+		"ready":          a.svc != nil || engineThinks(a.settings),
 		"error":          a.buildErr,
 		"skills":         []string{},
 		"memoryMode":     "",
@@ -827,10 +828,14 @@ func (a *App) Dashboard() map[string]any {
 	s := a.settings
 	a.mu.Unlock()
 
-	out := map[string]any{"ready": svc != nil}
+	out := map[string]any{"ready": svc != nil || engineThinks(s)}
 	if s != nil {
+		model := s.LLMModel
+		if model == "" && engineThinks(s) {
+			model = engineLabel(s.Hive.QueenEngine)
+		}
 		out["llm"] = map[string]any{
-			"model":      s.LLMModel,
+			"model":      model,
 			"baseURL":    s.LLMBaseURL,
 			"embedModel": s.EmbedModel,
 			"maxRounds":  s.MaxRounds,
@@ -938,15 +943,27 @@ func (a *App) sendChat(sessionID, message string, imagePaths []string, own bool)
 func (a *App) startTurn(requestID, sessionID, message string, imagePaths []string, own bool) {
 	if !own {
 		if engine := a.queenEngineFor(sessionID, imagePaths); engine != "" {
-			if a.sessionBusy(sessionID) {
+			busy := a.sessionBusy(sessionID)
+			if busy && a.hasModel() {
 				a.ownTurn(requestID, sessionID, message, imagePaths, engine)
 				return
 			}
-			a.routeToEngine(requestID, sessionID, engine, message)
+			// Free, or busy with no model of its own to stand in: the
+			// engine, in a session of its own when the conversation's is
+			// still answering.
+			a.routeToEngine(requestID, sessionID, engine, message, busy)
 			return
 		}
 	}
 	a.ownTurn(requestID, sessionID, message, imagePaths, "")
+}
+
+// hasModel is whether this app has a model of its own to answer with (a
+// test's ownTurnFn stands for one).
+func (a *App) hasModel() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.svc != nil || a.ownTurnFn != nil
 }
 
 // ownTurn runs a turn with this app's model. standIn names the queen engine
