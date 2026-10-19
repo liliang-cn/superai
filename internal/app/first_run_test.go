@@ -6,30 +6,65 @@ import (
 	"github.com/liliang-cn/superai/internal/backend"
 )
 
-// firstRunApp is a desktop app on its first start, with signedInClaude
-// answering bin (or "" for no signed-in claude).
-func firstRunApp(t *testing.T, s backend.Settings, bin string) (*App, *engineEvents) {
+// onboardingApp is a desktop app on its first start, with the login shell's
+// PATH already taken (a test keeps its own) and the sign-in checks answering
+// signedIn.
+func onboardingApp(t *testing.T, s backend.Settings, signedIn bool) *App {
 	t.Helper()
 	t.Setenv("SUPERAI_HOME", t.TempDir())
-	was := signedInClaude
-	signedInClaude = func() string { return bin }
-	t.Cleanup(func() { signedInClaude = was })
-	ev := &engineEvents{}
-	a := &App{settings: &s, emitFn: ev.add}
-	return a, ev
+	loginPath.Do(func() {})
+	was := signedInChecks
+	signedInChecks = map[string]func(string) bool{"claude": func(string) bool { return signedIn }}
+	t.Cleanup(func() { signedInChecks = was })
+	return &App{settings: &s}
 }
 
-// A Mac with Claude Code signed in: the first start lets it think for the
-// queen, so the person can type at once with no key and no model.
-func TestTheFirstStartThinksWithASignedInClaudeCode(t *testing.T) {
-	bin, _ := fakeClaude(t, fakeClaudeTurn, 0)
-	a, ev := firstRunApp(t, backend.Settings{WorkspaceDir: t.TempDir()}, bin)
-	a.firstRun()
+// The questions are asked on a first start with nothing to think with, and
+// not once they are answered or a model is set up.
+func TestOnboardingIsAskedOnceAndOnlyWhenNothingThinks(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		s    backend.Settings
+		want bool
+	}{
+		{"first start", backend.Settings{}, true},
+		{"answered", backend.Settings{Onboarded: true}, false},
+		{"a model set up", backend.Settings{LLMModel: "m"}, false},
+		{"an engine set up", backend.Settings{Hive: backend.HiveSettings{QueenEngine: "claude"}}, false},
+	} {
+		if got := onboardingApp(t, c.s, true).OnboardingNeeded(); got != c.want {
+			t.Errorf("%s: asked %v, want %v", c.name, got, c.want)
+		}
+	}
+}
 
+// Looking finds Claude Code, says it is signed in and that SuperAI can think
+// with it, and lists it first.
+func TestLookingFindsASignedInClaudeCodeFirst(t *testing.T) {
+	bin, _ := fakeClaude(t, fakeClaudeTurn, 0)
+	a := onboardingApp(t, backend.Settings{ExternalAgents: backend.ExternalAgents{Binaries: map[string]string{"claude": bin}}}, true)
+	got := a.DetectAgents()
+	if len(got) == 0 || got[0].Name != "claude" || got[0].Label != "Claude Code" || got[0].Path != bin ||
+		got[0].SignedIn == nil || !*got[0].SignedIn || !got[0].CanBeDefault {
+		t.Fatalf("found %+v", got)
+	}
+}
+
+// "Use Claude Code": it thinks for the queen, and the app is ready with no
+// model of its own.
+func TestChoosingClaudeCodeMakesItTheOneThatThinks(t *testing.T) {
+	bin, _ := fakeClaude(t, fakeClaudeTurn, 0)
+	a := onboardingApp(t, backend.Settings{WorkspaceDir: t.TempDir(),
+		ExternalAgents: backend.ExternalAgents{Binaries: map[string]string{"claude": bin}}}, true)
+	if err := a.FinishOnboarding("claude", true); err != nil {
+		t.Fatal(err)
+	}
 	s := a.settings
 	if !s.Onboarded || s.Hive.QueenEngine != "claude" || !s.ExternalAgents.Enabled || s.ExternalAgents.Binaries["claude"] != bin {
-		t.Fatalf("settings after the first start: onboarded %v, engine %q, external %v, binaries %v",
-			s.Onboarded, s.Hive.QueenEngine, s.ExternalAgents.Enabled, s.ExternalAgents.Binaries)
+		t.Fatalf("onboarded %v, engine %q, external %v, binaries %v", s.Onboarded, s.Hive.QueenEngine, s.ExternalAgents.Enabled, s.ExternalAgents.Binaries)
+	}
+	if a.OnboardingNeeded() {
+		t.Fatal("asked again")
 	}
 	if st := a.GetStatus(); st["ready"] != true {
 		t.Fatalf("not ready with Claude Code thinking: %v", st)
@@ -37,34 +72,20 @@ func TestTheFirstStartThinksWithASignedInClaudeCode(t *testing.T) {
 	if got := a.Dashboard()["llm"].(map[string]any)["model"]; got != "Claude Code" {
 		t.Fatalf("status bar says %v", got)
 	}
-	told := false
-	ev.mu.Lock()
-	for _, g := range ev.got {
-		told = told || (g.name == "setup:engine" && g.p["engine"] == "claude")
-	}
-	ev.mu.Unlock()
-	if !told {
-		t.Fatal("the app was not told")
-	}
 }
 
-// Someone who set a model up keeps it; the first start only marks itself done.
-func TestTheFirstStartLeavesAModelThatIsSetUp(t *testing.T) {
-	bin, _ := fakeClaude(t, fakeClaudeTurn, 0)
-	a, _ := firstRunApp(t, backend.Settings{LLMModel: "some-model", WorkspaceDir: t.TempDir()}, bin)
-	a.firstRun()
+// "Not now": nothing is chosen and no agent is let in, and it is not asked
+// again.
+func TestNotNowChoosesNothing(t *testing.T) {
+	a := onboardingApp(t, backend.Settings{WorkspaceDir: t.TempDir()}, true)
+	if err := a.FinishOnboarding("", false); err != nil {
+		t.Fatal(err)
+	}
 	if s := a.settings; !s.Onboarded || s.Hive.QueenEngine != "" || s.ExternalAgents.Enabled {
-		t.Fatalf("a configured app was changed: engine %q, external %v", s.Hive.QueenEngine, s.ExternalAgents.Enabled)
+		t.Fatalf("engine %q, external %v", s.Hive.QueenEngine, s.ExternalAgents.Enabled)
 	}
-}
-
-// It looks once: turning the engine off afterwards stands.
-func TestTheFirstStartLooksOnce(t *testing.T) {
-	bin, _ := fakeClaude(t, fakeClaudeTurn, 0)
-	a, _ := firstRunApp(t, backend.Settings{Onboarded: true, WorkspaceDir: t.TempDir()}, bin)
-	a.firstRun()
-	if a.settings.Hive.QueenEngine != "" {
-		t.Fatal("a later start chose the engine again")
+	if a.OnboardingNeeded() {
+		t.Fatal("asked again")
 	}
 }
 

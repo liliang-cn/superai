@@ -236,6 +236,16 @@
 .gate2-alt:hover { color: var(--ink); }
 .gate2-over { z-index: 200; }
 .gate2-drag { position: absolute; left: 0; right: 0; top: 0; height: 44px; z-index: 2; }
+.gate2-agents { list-style: none; margin: 0 0 20px; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.gate2-agents li { display: flex; align-items: center; gap: 10px; padding: 8px 4px; font-size: 15px; border-bottom: 1px solid var(--line); }
+.gate2-agents li:last-child { border-bottom: 0; }
+.gate2-agents i { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-3, #b8c2cf); flex: none; }
+.gate2-agents i.on { background: #2f9e5c; }
+.gate2-agents i.off { background: #c98a00; }
+.gate2-agents span { flex: 1; font-weight: 600; color: var(--ink); }
+.gate2-agents em { font-style: normal; font-size: 13px; color: var(--ink-2); }
+.gate2-agents li.more { display: block; font-size: 13px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gate2-alt:disabled { opacity: 0.5; cursor: default; }
 
 /* the theme panel, shadcn's way: each choice a labelled button, applied as it
    is picked, the canvas behind it the preview */

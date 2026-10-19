@@ -154,6 +154,10 @@ export function Deliverables(arg1) {
   return window['go']['app']['App']['Deliverables'](arg1);
 }
 
+export function DetectAgents() {
+  return window['go']['app']['App']['DetectAgents']();
+}
+
 export function Doctor() {
   return window['go']['app']['App']['Doctor']();
 }
@@ -168,6 +172,10 @@ export function ExportWorkspaceFile(arg1) {
 
 export function ExternalAgentsStatus() {
   return window['go']['app']['App']['ExternalAgentsStatus']();
+}
+
+export function FinishOnboarding(arg1, arg2) {
+  return window['go']['app']['App']['FinishOnboarding'](arg1, arg2);
 }
 
 export function FollowUpCLIRun(arg1, arg2) {
@@ -408,6 +416,10 @@ export function Notifications() {
 
 export function Notify(arg1, arg2, arg3) {
   return window['go']['app']['App']['Notify'](arg1, arg2, arg3);
+}
+
+export function OnboardingNeeded() {
+  return window['go']['app']['App']['OnboardingNeeded']();
 }
 
 export function OpenInBrowser() {

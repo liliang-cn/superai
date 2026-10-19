@@ -10,10 +10,9 @@ import '@fontsource-variable/geist-mono'
 import './styles.css'
 import App from './App'
 import Gate from './components/Gate'
-import {HiveLinkStatus, TitleBarDoubleClick} from '../wailsjs/go/app/App'
+import {HiveLinkStatus, OnboardingNeeded, TitleBarDoubleClick} from '../wailsjs/go/app/App'
 import {installHiveBridge, installTitleBarDoubleClick} from './lib/hivelink'
-import {EventsOn} from '../wailsjs/runtime'
-import {toast} from './lib/toasts'
+import Onboarding from './components/Onboarding'
 
 /**
  * The password box, and only then the app.
@@ -53,27 +52,26 @@ function Root() {
     // own — a first start opens straight onto the app, and a hive is linked
     // from the backend switcher. null = still finding out.
     const [link, setLink] = useState<'linked' | 'alone' | null>(served ? 'alone' : null)
+    // On this Mac with the first start's questions not asked yet: those first.
+    const [onboard, setOnboard] = useState(false)
     useEffect(() => {
         if (served) return
         HiveLinkStatus()
-            .then((s) => {
+            .then(async (s) => {
                 if (s?.linked) {
                     installHiveBridge()
                     setLink('linked')
-                } else setLink('alone')
+                    return
+                }
+                setOnboard(await OnboardingNeeded().catch(() => false))
+                setLink('alone')
             })
             .catch(() => setLink('alone'))
-    }, [served])
-    // The first start found Claude Code signed in on this Mac and lets it
-    // answer: say so, once.
-    useEffect(() => {
-        if (served) return
-        const off = EventsOn('setup:engine', (p: any) => toast.success(`${p?.label || 'Claude Code'} on this Mac will answer you`))
-        return () => { if (typeof off === 'function') off() }
     }, [served])
 
     if (authed === null || link === null) return null
     if (!authed) return <Gate onEnter={() => setAuthed(true)}/>
+    if (onboard) return <Onboarding onDone={() => setOnboard(false)}/>
     return (
         <HashRouter>
             <App/>

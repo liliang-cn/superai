@@ -82,6 +82,8 @@ export function DeleteStandingAgent(arg1:string):Promise<void>;
 
 export function Deliverables(arg1:string):Promise<Array<agent.Deliverable>>;
 
+export function DetectAgents():Promise<Array<app.DetectedAgent>>;
+
 export function Doctor():Promise<backend.DoctorReport>;
 
 export function EmitAvatarTest(arg1:string):Promise<void>;
@@ -89,6 +91,8 @@ export function EmitAvatarTest(arg1:string):Promise<void>;
 export function ExportWorkspaceFile(arg1:string):Promise<string>;
 
 export function ExternalAgentsStatus():Promise<Array<backend.ExternalAgentStatus>>;
+
+export function FinishOnboarding(arg1:string,arg2:boolean):Promise<void>;
 
 export function FollowUpCLIRun(arg1:string,arg2:string):Promise<app.CLIRun>;
 
@@ -209,6 +213,8 @@ export function NotedUpcoming(arg1:number):Promise<any>;
 export function Notifications():Promise<Array<backend.Notification>>;
 
 export function Notify(arg1:string,arg2:string,arg3:string):Promise<string>;
+
+export function OnboardingNeeded():Promise<boolean>;
 
 export function OpenInBrowser():Promise<string>;
 

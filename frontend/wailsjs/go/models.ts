@@ -477,6 +477,95 @@ export namespace app {
 		    return a;
 		}
 	}
+	export class CCActivitySession {
+	    id: string;
+	    project?: string;
+	    state: string;
+	    wait?: string;
+	    tool?: string;
+	    tools: number;
+	    // Go type: time
+	    since: any;
+	    // Go type: time
+	    started: any;
+	    // Go type: time
+	    last: any;
+	
+	    static createFrom(source: any = {}) {
+	        return new CCActivitySession(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.project = source["project"];
+	        this.state = source["state"];
+	        this.wait = source["wait"];
+	        this.tool = source["tool"];
+	        this.tools = source["tools"];
+	        this.since = this.convertValues(source["since"], null);
+	        this.started = this.convertValues(source["started"], null);
+	        this.last = this.convertValues(source["last"], null);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class CCActivity {
+	    working: number;
+	    waiting: number;
+	    idle: number;
+	    sessions: CCActivitySession[];
+	    // Go type: time
+	    at: any;
+	
+	    static createFrom(source: any = {}) {
+	        return new CCActivity(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.working = source["working"];
+	        this.waiting = source["waiting"];
+	        this.idle = source["idle"];
+	        this.sessions = this.convertValues(source["sessions"], CCActivitySession);
+	        this.at = this.convertValues(source["at"], null);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
 	export class CCDelivery {
 	    via: string;
 	    immediate: boolean;
@@ -523,94 +612,6 @@ export namespace app {
 	        this.text = source["text"];
 	    }
 	}
-	export class CCActivitySession {
-	    id: string;
-	    project?: string;
-	    state: string;
-	    wait?: string;
-	    tool?: string;
-	    tools: number;
-	    // Go type: time
-	    since: any;
-	    // Go type: time
-	    started: any;
-	    // Go type: time
-	    last: any;
-	
-	    static createFrom(source: any = {}) {
-	        return new CCActivitySession(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.id = source["id"];
-	        this.project = source["project"];
-	        this.state = source["state"];
-	        this.wait = source["wait"];
-	        this.tool = source["tool"];
-	        this.tools = source["tools"];
-	        this.since = this.convertValues(source["since"], null);
-	        this.started = this.convertValues(source["started"], null);
-	        this.last = this.convertValues(source["last"], null);
-	    }
-	
-	convertValues(a: any, classs: any, asMap: boolean = false): any {
-	    if (!a) {
-	        return a;
-	    }
-	    if (a.slice && a.map) {
-	        return (a as any[]).map(elem => this.convertValues(elem, classs));
-	    } else if ("object" === typeof a) {
-	        if (asMap) {
-	            for (const key of Object.keys(a)) {
-	                a[key] = new classs(a[key]);
-	            }
-	            return a;
-	        }
-	        return new classs(a);
-	    }
-	    return a;
-	}
-	}
-	export class CCActivity {
-	    working: number;
-	    waiting: number;
-	    idle: number;
-	    sessions: CCActivitySession[];
-	    // Go type: time
-	    at: any;
-	
-	    static createFrom(source: any = {}) {
-	        return new CCActivity(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.working = source["working"];
-	        this.waiting = source["waiting"];
-	        this.idle = source["idle"];
-	        this.sessions = this.convertValues(source["sessions"], CCActivitySession);
-	        this.at = this.convertValues(source["at"], null);
-	    }
-	
-	convertValues(a: any, classs: any, asMap: boolean = false): any {
-	    if (!a) {
-	        return a;
-	    }
-	    if (a.slice && a.map) {
-	        return (a as any[]).map(elem => this.convertValues(elem, classs));
-	    } else if ("object" === typeof a) {
-	        if (asMap) {
-	            for (const key of Object.keys(a)) {
-	                a[key] = new classs(a[key]);
-	            }
-	            return a;
-	        }
-	        return new classs(a);
-	    }
-	    return a;
-	}
-	}
 	export class CCSession {
 	    agent: string;
 	    session: string;
@@ -636,6 +637,47 @@ export namespace app {
 	        this.state = source["state"];
 	        this.text = source["text"];
 	        this.at = this.convertValues(source["at"], null);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class CLIActivity {
+	    working: number;
+	    waiting: number;
+	    idle: number;
+	    sessions: CCActivitySession[];
+	    // Go type: time
+	    at: any;
+	    source: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new CLIActivity(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.working = source["working"];
+	        this.waiting = source["waiting"];
+	        this.idle = source["idle"];
+	        this.sessions = this.convertValues(source["sessions"], CCActivitySession);
+	        this.at = this.convertValues(source["at"], null);
+	        this.source = source["source"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -778,6 +820,26 @@ export namespace app {
 		}
 	}
 	
+	export class DetectedAgent {
+	    name: string;
+	    label: string;
+	    path: string;
+	    signedIn?: boolean;
+	    canBeDefault: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new DetectedAgent(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.label = source["label"];
+	        this.path = source["path"];
+	        this.signedIn = source["signedIn"];
+	        this.canBeDefault = source["canBeDefault"];
+	    }
+	}
 	export class HiveLinkEntry {
 	    id: string;
 	    name: string;
@@ -852,6 +914,8 @@ export namespace app {
 	    doing?: string;
 	    round?: number;
 	    at: string;
+	    ccWorking?: number;
+	    ccWaiting?: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new MemberPulse(source);
@@ -873,6 +937,8 @@ export namespace app {
 	        this.doing = source["doing"];
 	        this.round = source["round"];
 	        this.at = source["at"];
+	        this.ccWorking = source["ccWorking"];
+	        this.ccWaiting = source["ccWaiting"];
 	    }
 	}
 	export class HivePulse {
@@ -907,60 +973,13 @@ export namespace app {
 		    return a;
 		}
 	}
-	export class HostDisk {
-	    mount: string;
-	    total: number;
-	    used: number;
-	
-	    static createFrom(source: any = {}) {
-	        return new HostDisk(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.mount = source["mount"];
-	        this.total = source["total"];
-	        this.used = source["used"];
-	    }
-	}
-	export class HostExecResult {
-	    exit: number;
-	    output: string;
-	    truncated?: boolean;
-	    ms: number;
-	
-	    static createFrom(source: any = {}) {
-	        return new HostExecResult(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.exit = source["exit"];
-	        this.output = source["output"];
-	        this.truncated = source["truncated"];
-	        this.ms = source["ms"];
-	    }
-	}
-	export class HostMemory {
-	    total: number;
-	    used: number;
-	
-	    static createFrom(source: any = {}) {
-	        return new HostMemory(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.total = source["total"];
-	        this.used = source["used"];
-	    }
-	}
 	export class HostAgent {
 	    name: string;
 	    kind: string;
 	    role?: string;
 	    about?: string;
 	    state: string;
+	    activity?: string;
 	    version?: string;
 	    via?: string;
 	    mcp?: string[];
@@ -977,6 +996,7 @@ export namespace app {
 	        this.role = source["role"];
 	        this.about = source["about"];
 	        this.state = source["state"];
+	        this.activity = source["activity"];
 	        this.version = source["version"];
 	        this.via = source["via"];
 	        this.mcp = source["mcp"];
@@ -994,6 +1014,7 @@ export namespace app {
 	    state: string;
 	    // Go type: time
 	    lastSeen?: any;
+	    addresses?: string[];
 	    agents: HostAgent[];
 	
 	    static createFrom(source: any = {}) {
@@ -1011,6 +1032,7 @@ export namespace app {
 	        this.parent = source["parent"];
 	        this.state = source["state"];
 	        this.lastSeen = this.convertValues(source["lastSeen"], null);
+	        this.addresses = source["addresses"];
 	        this.agents = this.convertValues(source["agents"], HostAgent);
 	    }
 	
@@ -1066,6 +1088,54 @@ export namespace app {
 	}
 	
 	
+	export class HostDisk {
+	    mount: string;
+	    total: number;
+	    used: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new HostDisk(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.mount = source["mount"];
+	        this.total = source["total"];
+	        this.used = source["used"];
+	    }
+	}
+	export class HostExecResult {
+	    exit: number;
+	    output: string;
+	    truncated?: boolean;
+	    ms: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new HostExecResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.exit = source["exit"];
+	        this.output = source["output"];
+	        this.truncated = source["truncated"];
+	        this.ms = source["ms"];
+	    }
+	}
+	export class HostMemory {
+	    total: number;
+	    used: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new HostMemory(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.total = source["total"];
+	        this.used = source["used"];
+	    }
+	}
 	export class HostInfo {
 	    name: string;
 	    host: string;
@@ -1080,7 +1150,7 @@ export namespace app {
 	    version?: string;
 	    control: boolean;
 	    claude?: CCActivity;
-	    cliActivity?: Record<string, any>;
+	    cliActivity?: Record<string, CLIActivity>;
 	
 	    static createFrom(source: any = {}) {
 	        return new HostInfo(source);
@@ -1101,7 +1171,7 @@ export namespace app {
 	        this.version = source["version"];
 	        this.control = source["control"];
 	        this.claude = this.convertValues(source["claude"], CCActivity);
-	        this.cliActivity = source["cliActivity"];
+	        this.cliActivity = this.convertValues(source["cliActivity"], CLIActivity, true);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -1188,6 +1258,8 @@ export namespace app {
 	    host: string;
 	    os: string;
 	    arch: string;
+	    kind?: string;
+	    parent?: string;
 	    version: string;
 	    clis: string[];
 	    agents: any[];
@@ -1198,7 +1270,7 @@ export namespace app {
 	    machine: boolean;
 	    role: string;
 	    activity?: CCActivity;
-	    cliActivity?: Record<string, any>;
+	    cliActivity?: Record<string, CLIActivity>;
 	
 	    static createFrom(source: any = {}) {
 	        return new LinkedAgent(source);
@@ -1210,6 +1282,8 @@ export namespace app {
 	        this.host = source["host"];
 	        this.os = source["os"];
 	        this.arch = source["arch"];
+	        this.kind = source["kind"];
+	        this.parent = source["parent"];
 	        this.version = source["version"];
 	        this.clis = source["clis"];
 	        this.agents = source["agents"];
@@ -1218,7 +1292,7 @@ export namespace app {
 	        this.machine = source["machine"];
 	        this.role = source["role"];
 	        this.activity = this.convertValues(source["activity"], CCActivity);
-	        this.cliActivity = source["cliActivity"];
+	        this.cliActivity = this.convertValues(source["cliActivity"], CLIActivity, true);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -1517,6 +1591,42 @@ export namespace app {
 		    return a;
 		}
 	}
+	export class RelayAgent {
+	    name: string;
+	    host: string;
+	    agents: any[];
+	    cliActivity: Record<string, CLIActivity>;
+	
+	    static createFrom(source: any = {}) {
+	        return new RelayAgent(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.host = source["host"];
+	        this.agents = source["agents"];
+	        this.cliActivity = this.convertValues(source["cliActivity"], CLIActivity, true);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class RemoteAgentStatus {
 	    name: string;
 	    about: string;
@@ -1646,62 +1756,6 @@ export namespace app {
 
 export namespace backend {
 	
-	export class HAStandby {
-	    host: string;
-	    ready: boolean;
-	
-	    static createFrom(source: any = {}) {
-	        return new HAStandby(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.host = source["host"];
-	        this.ready = source["ready"];
-	    }
-	}
-	export class HAService {
-	    name: string;
-	    provider: string;
-	    vip?: string;
-	    active?: string;
-	    standbys: HAStandby[];
-	    units: string[];
-	    state: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new HAService(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.name = source["name"];
-	        this.provider = source["provider"];
-	        this.vip = source["vip"];
-	        this.active = source["active"];
-	        this.standbys = this.convertValues(source["standbys"], HAStandby);
-	        this.units = source["units"];
-	        this.state = source["state"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
 	export class APNsSettings {
 	    key_path?: string;
 	    key_id?: string;
@@ -2022,6 +2076,7 @@ export namespace backend {
 	    roots?: string[];
 	    unattended: boolean;
 	    binaries?: Record<string, string>;
+	    disabled?: string[];
 	    models?: Record<string, string>;
 	    timeout_seconds?: number;
 	
@@ -2035,10 +2090,117 @@ export namespace backend {
 	        this.roots = source["roots"];
 	        this.unattended = source["unattended"];
 	        this.binaries = source["binaries"];
+	        this.disabled = source["disabled"];
 	        this.models = source["models"];
 	        this.timeout_seconds = source["timeout_seconds"];
 	    }
 	}
+	export class HAStandby {
+	    host: string;
+	    ready: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new HAStandby(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.host = source["host"];
+	        this.ready = source["ready"];
+	    }
+	}
+	export class HAService {
+	    name: string;
+	    provider: string;
+	    vip?: string;
+	    active?: string;
+	    standbys: HAStandby[];
+	    units: string[];
+	    state: string;
+	    addresses?: Record<string, string>;
+	
+	    static createFrom(source: any = {}) {
+	        return new HAService(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.provider = source["provider"];
+	        this.vip = source["vip"];
+	        this.active = source["active"];
+	        this.standbys = this.convertValues(source["standbys"], HAStandby);
+	        this.units = source["units"];
+	        this.state = source["state"];
+	        this.addresses = source["addresses"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class HaifySource {
+	    url?: string;
+	    token?: string;
+	    token_file?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new HaifySource(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.url = source["url"];
+	        this.token = source["token"];
+	        this.token_file = source["token_file"];
+	    }
+	}
+	export class HASettings {
+	    haify?: HaifySource;
+	
+	    static createFrom(source: any = {}) {
+	        return new HASettings(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.haify = this.convertValues(source["haify"], HaifySource);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	
 	export class HiveMember {
 	    name: string;
 	    role: string;
@@ -2052,7 +2214,10 @@ export namespace backend {
 	    started_at: any;
 	    engine?: string;
 	    node?: string;
+	    kind?: string;
+	    host?: string;
 	    mcp: string[];
+	    clis?: string[];
 	    state: string;
 	
 	    static createFrom(source: any = {}) {
@@ -2070,7 +2235,10 @@ export namespace backend {
 	        this.started_at = this.convertValues(source["started_at"], null);
 	        this.engine = source["engine"];
 	        this.node = source["node"];
+	        this.kind = source["kind"];
+	        this.host = source["host"];
 	        this.mcp = source["mcp"];
+	        this.clis = source["clis"];
 	        this.state = source["state"];
 	    }
 	
@@ -2785,6 +2953,7 @@ export namespace backend {
 	    telegram_bot_token: string;
 	    telegram_allowed_chats: number[];
 	    external_agents: ExternalAgents;
+	    onboarded?: boolean;
 	    hive: HiveSettings;
 	    remote_agents: RemoteAgents;
 	    action_mcp_servers?: string[];
@@ -2792,6 +2961,7 @@ export namespace backend {
 	    queen_name?: string;
 	    queen_aliases?: string[];
 	    agent_link: AgentLinkSettings;
+	    ha: HASettings;
 	
 	    static createFrom(source: any = {}) {
 	        return new Settings(source);
@@ -2841,6 +3011,7 @@ export namespace backend {
 	        this.telegram_bot_token = source["telegram_bot_token"];
 	        this.telegram_allowed_chats = source["telegram_allowed_chats"];
 	        this.external_agents = this.convertValues(source["external_agents"], ExternalAgents);
+	        this.onboarded = source["onboarded"];
 	        this.hive = this.convertValues(source["hive"], HiveSettings);
 	        this.remote_agents = this.convertValues(source["remote_agents"], RemoteAgents);
 	        this.action_mcp_servers = source["action_mcp_servers"];
@@ -2848,6 +3019,7 @@ export namespace backend {
 	        this.queen_name = source["queen_name"];
 	        this.queen_aliases = source["queen_aliases"];
 	        this.agent_link = this.convertValues(source["agent_link"], AgentLinkSettings);
+	        this.ha = this.convertValues(source["ha"], HASettings);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
