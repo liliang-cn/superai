@@ -167,3 +167,24 @@ func TestSocketsAreTriedInTheNodesOrder(t *testing.T) {
 		t.Fatalf("sockets %v", s)
 	}
 }
+
+// The desktop app and the Mac's node can both be serving here, each for its
+// own core: both hear the terminal, not only the first one found.
+func TestEverySuperAIServingHereHearsTheEvent(t *testing.T) {
+	node1, got1 := node(t, true)
+	node2, got2 := node(t, true)
+	t.Setenv("SUPERAI_HOOK_SOCKET", node1)
+	t.Setenv("SUPERAI_HOME", filepath.Dir(node2))
+	t.Setenv("SUPERAI_CLI_RUN", "")
+	runWith(t, []string{"UserPromptSubmit"}, `{"session_id":"s1","cwd":"/x/superai"}`)
+	for i, got := range []chan string{got1, got2} {
+		select {
+		case b := <-got:
+			if !strings.Contains(b, `"event":"UserPromptSubmit"`) {
+				t.Fatalf("SuperAI %d got %s", i+1, b)
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatalf("SuperAI %d heard nothing", i+1)
+		}
+	}
+}

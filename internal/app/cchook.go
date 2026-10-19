@@ -33,6 +33,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/liliang-cn/agentexec/hooks"
@@ -288,8 +289,7 @@ func cliHook(cli string, argv []string) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), ccActivityBudget)
 	defer cancel()
-	var out struct{}
-	postCCHook(ctx, ccHookSockets(), ccHookPath, ev, &out)
+	tellCCHook(ctx, ccHookSockets(), ev)
 }
 
 // activityHook is a prompt or a tool call: hand the local SuperAI the
@@ -308,8 +308,7 @@ func activityHook(name string, hev hooks.HookEvent) {
 		ev.TTY = controllingTTY(ctx)
 		ev.Pane = os.Getenv("TMUX_PANE")
 	}
-	var out struct{}
-	postCCHook(ctx, ccHookSockets(), ccHookPath, ev, &out)
+	tellCCHook(ctx, ccHookSockets(), ev)
 }
 
 // transcriptTurn reads the turn's text, but not past the hook's budget: a
@@ -376,14 +375,51 @@ func ccHookSockets() []string {
 	return out
 }
 
-// sendCCHook hands the event to the first socket that answers and returns
-// the reply parked for this session, if any.
+// sendCCHook hands the event to every SuperAI listening on this machine and
+// returns the reply parked for this session in any of them.
 func sendCCHook(ctx context.Context, sockets []string, ev ccHookEvent) string {
-	var out struct {
-		Reply string `json:"reply"`
+	var mu sync.Mutex
+	reply := ""
+	broadcastCCHook(sockets, func(sock string) {
+		var out struct {
+			Reply string `json:"reply"`
+		}
+		if postCCHook(ctx, []string{sock}, ccHookPath, ev, &out) && strings.TrimSpace(out.Reply) != "" {
+			mu.Lock()
+			if reply == "" {
+				reply = out.Reply
+			}
+			mu.Unlock()
+		}
+	})
+	return reply
+}
+
+// broadcastCCHook runs post once for each socket that is there, all at once,
+// and returns when they are done: the desktop app and the Mac's node can both
+// be serving, each for its own core, and both are told what the terminal is
+// doing. post must be safe to run concurrently with itself.
+func broadcastCCHook(sockets []string, post func(sock string)) {
+	var wg sync.WaitGroup
+	for _, sock := range sockets {
+		if _, err := os.Stat(sock); err != nil {
+			continue
+		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			post(sock)
+		}()
 	}
-	postCCHook(ctx, sockets, ccHookPath, ev, &out)
-	return out.Reply
+	wg.Wait()
+}
+
+// tellCCHook hands an activity event to every SuperAI listening here.
+func tellCCHook(ctx context.Context, sockets []string, ev ccHookEvent) {
+	broadcastCCHook(sockets, func(sock string) {
+		var out struct{}
+		postCCHook(ctx, []string{sock}, ccHookPath, ev, &out)
+	})
 }
 
 // postCCHook posts the event to path on the first socket that answers and
