@@ -8,6 +8,7 @@ import "../canvas/canvas.css";
 import { loadTheme, themeVars } from "../canvas/theme";
 import { DetectAgents, FinishOnboarding } from "../../wailsjs/go/app/App";
 import { useI18n } from "../lib/i18n";
+import { machine } from "../lib/machine";
 
 const IDLE = [
   { key: "a", busy: 0.2, rgb: [242, 165, 22] as [number, number, number] },
@@ -66,7 +67,7 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
       <div className="cv-glass gate2-card">
         {step === "ask" && <>
           <h1>{t("Find your AI agents")}</h1>
-          <p>{t("SuperAI can work with Claude Code, Codex and the other AI agents you already use. May it look for them on this Mac? It only checks what is installed here.")}</p>
+          <p>{t("SuperAI can work with Claude Code, Codex and the other AI agents you already use. May it look for them on this {machine}? It only checks what is installed here.", { machine: t(machine) })}</p>
           <button className="cv-pill ink gate2-go" onClick={look}>{t("Look for agents")}</button>
           <button className="gate2-alt" disabled={busy} onClick={() => finish("", false)}>{t("Not now")}</button>
         </>}

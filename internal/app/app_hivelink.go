@@ -374,7 +374,7 @@ func callQueen(l hiveLink, method string, args []any) (any, error) {
 	if resp.StatusCode != http.StatusOK {
 		msg := strings.TrimSpace(string(raw))
 		if resp.StatusCode == http.StatusUnauthorized {
-			msg = "the hive no longer accepts this Mac: link it again"
+			msg = "the hive no longer accepts this computer: link it again"
 		}
 		if msg == "" {
 			msg = resp.Status

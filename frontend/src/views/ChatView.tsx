@@ -43,6 +43,7 @@ import ContextBlock from "../components/ContextBlock";
 import NameDashboardModal from "../components/NameDashboardModal";
 import { dashboards, hasRenderableBlock, suggestName } from "../lib/dashboards";
 import AgentProgress from "../components/AgentProgress";
+import { machine } from "../lib/machine";
 
 /**
  * What a finished answer cost, for the line under its name: "34s · 6 tools".
@@ -239,7 +240,7 @@ export default function ChatView({
                 >
                   {notReady && (
                     <div className="empty-hint">
-                      Sign in to Claude Code on this Mac, or choose a model in Settings, to begin.
+                      Sign in to Claude Code on this {machine}, or choose a model in Settings, to begin.
                     </div>
                   )}
                 </ConversationEmptyState>

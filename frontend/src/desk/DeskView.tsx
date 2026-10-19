@@ -38,6 +38,7 @@ import { notifyOf, ringSummary, upcomingWhen, type ScheduleItem } from "../lib/s
 import { ModeChip } from "../components/ModeChip";
 import { isPersonalConversation, loadQueenSession, queenSession, useQueenSession, withConsoleTitles } from "../lib/queenConsole";
 import { useDeskPane, useDeskTheme, useDeskWorld } from "./DeskShell";
+import { machine } from "../lib/machine";
 
 type TabKey = string; // "hive" | "run:<id>" | "dash:<id>"
 
@@ -365,7 +366,7 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
   useEffect(() => () => setBusy(false), [setBusy]);
   const live = hive.members.filter((m) => m.state === "live" && !/queen/.test(m.name)).length;
   const workers = hive.members.filter((m) => !/queen/.test(m.name)).length;
-  const status = !hive.loaded ? t("Finding the hive…") : !hive.role ? t("This Mac on its own") : `${live} of ${workers} workers up, ${busyWorkers} busy`;
+  const status = !hive.loaded ? t("Finding the hive…") : !hive.role ? t("This {machine} on its own", { machine: t(machine) }) : `${live} of ${workers} workers up, ${busyWorkers} busy`;
   const title = onQueen ? queenTitle(queen) : recents.find((s) => s.id === chat.sessionId)?.title || t("Conversation");
 
   return (
@@ -432,7 +433,7 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
           <button className="dk-link" onClick={() => openSwitcher()} title={t("Switch backend")}>
             <span className="dk-qhex small">{link.linked ? "Q" : "M"}</span>
             <span>
-              {link.linked ? (link.url || "").replace(/^https?:\/\//, "") : t("This Mac only")}
+              {link.linked ? (link.url || "").replace(/^https?:\/\//, "") : t("This {machine} only", { machine: t(machine) })}
               <small><i className={link.live ? "dk-ok" : "dk-off"} />{link.linked ? (link.live ? t("Linked") : t("Reconnecting")) : t("Not in a hive")}</small>
             </span>
           </button>
@@ -608,7 +609,7 @@ function Controls({ current, run, dash, busy, onOpenHive, onOpenStats }: { curre
   }
   if (run) {
     const going = run.state === "running";
-    const where = !run.remote ? "this Mac" : /mac/i.test(run.remote) ? "the Mac" : run.remote;
+    const where = !run.remote ? `this ${machine}` : /mac/i.test(run.remote) ? "the Mac" : run.remote;
     return (
       <div className="dk-ctl">
         <span>{going ? `${agentName(run.agent)} is working on ${where}` : `${agentName(run.agent)} ${run.state === "done" ? "finished" : run.state}`}</span>

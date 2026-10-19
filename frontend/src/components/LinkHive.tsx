@@ -10,6 +10,7 @@ import Sky from "../canvas/Sky";
 import "../canvas/canvas.css";
 import { loadTheme, themeVars } from "../canvas/theme";
 import { LinkHive as Link } from "../../wailsjs/go/app/App";
+import { machine } from "../lib/machine";
 
 const IDLE = [
   { key: "a", busy: 0.2, rgb: [242, 165, 22] as [number, number, number] },
@@ -52,7 +53,7 @@ export default function LinkHive({ onLinked, onAlone, onCancel }: { onLinked: ()
       {/* The window has no title bar of its own: this strip moves it. */}
       <div className="gate2-drag" style={{ "--wails-draggable": "drag" } as React.CSSProperties} />
       <form className="cv-glass gate2-card" onSubmit={submit}>
-        <h1>{onCancel ? "Add a hive" : "Link this Mac to your hive"}</h1>
+        <h1>{onCancel ? "Add a hive" : `Link this ${machine} to your hive`}</h1>
         <p>On your hive's web page, open Settings and pair a device. Enter its address and the code it shows.</p>
         <div className="gate2-field">
           <input ref={field} value={address} placeholder="Address, like ai.example.com" autoCapitalize="off" spellCheck={false}
@@ -69,7 +70,7 @@ export default function LinkHive({ onLinked, onAlone, onCancel }: { onLinked: ()
         {onCancel ? (
           <button type="button" className="gate2-alt" onClick={onCancel}>Cancel</button>
         ) : onAlone && (
-          <button type="button" className="gate2-alt" onClick={onAlone}>Use this Mac on its own</button>
+          <button type="button" className="gate2-alt" onClick={onAlone}>Use this {machine} on its own</button>
         )}
       </form>
     </div>

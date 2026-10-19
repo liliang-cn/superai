@@ -6,6 +6,7 @@ import { useHive } from "../canvas/data";
 import { useI18n } from "../lib/i18n";
 import { openSwitcher } from "../lib/hivelink";
 import type { AppStatus } from "../lib/types";
+import { machine } from "../lib/machine";
 
 /** Runtime status belongs to every desktop page, below its working area. */
 const served = Boolean((window as unknown as Record<string, unknown>).superaiServed);
@@ -44,7 +45,7 @@ export default function DeskStatusBar({ status, loading, codingRuns }: { status:
   return <footer className="dk-statusbar" aria-label={t("Status bar")}>
     <button className="dk-status-connection" onClick={openSwitcher} title={error || t("Switch backend")}>
       <i className={`dk-status-dot${disconnected || !loading && !status?.ready ? " bad" : loading ? " pending" : ""}`}/>
-      <span>{t(state)}</span><span className="dk-status-backend">{link?.linked ? link.url?.replace(/^https?:\/\//,"") : t("This Mac only")}</span>
+      <span>{t(state)}</span><span className="dk-status-backend">{link?.linked ? link.url?.replace(/^https?:\/\//,"") : t("This {machine} only", { machine: t(machine) })}</span>
     </button>
     {runtime.model && <span className="dk-status-model" title={runtime.model}><CpuIcon size={12}/>{runtime.model}</span>}
     <span className="dk-status-spacer"/>

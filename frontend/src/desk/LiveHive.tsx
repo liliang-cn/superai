@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import type { CanvasTheme } from "../canvas/theme";
 import type { CodingRun } from "../canvas/tiles";
 import { Hive, HiveTask, LinkedAgent, oneLine, short } from "../canvas/data";
+import { machine } from "../lib/machine";
 
 const R = 34; // a cell's radius
 const SQ3 = Math.sqrt(3);
@@ -58,7 +59,7 @@ export default function LiveHive({ hive, runs, agents, now }: { hive: Hive; runs
   const machines = useMemo(() => {
     if (agents.length) return agents.map((a) => a.name).slice(0, 8);
     const names = new Set<string>();
-    runs.forEach((r) => names.add(r.remote || "this Mac"));
+    runs.forEach((r) => names.add(r.remote || `this ${machine}`));
     return [...names].slice(0, 3);
   }, [runs, agents]);
   // Busy: a coding run there, or an order out to one of its agents —
@@ -66,7 +67,7 @@ export default function LiveHive({ hive, runs, agents, now }: { hive: Hive; runs
   // What a busy machine is doing, in a few words under its name: the agent
   // and how long it has been at it — "codex · 3m".
   const machineDoing = (m: string): string => {
-    const r = runs.find((x) => (x.remote || "this Mac") === m && x.state === "running");
+    const r = runs.find((x) => (x.remote || `this ${machine}`) === m && x.state === "running");
     const t = running.find((x) => x.dir === "out" && (x.worker.endsWith("." + m) ||
       agents.some((a) => a.name === m && (a.agents ?? []).some((n) => n.name === x.worker))));
     const what = r ? r.agent.split(".")[0] : t ? t.worker.split(".")[0] : "";
@@ -76,7 +77,7 @@ export default function LiveHive({ hive, runs, agents, now }: { hive: Hive; runs
     return `${what} · ${mins < 1 ? "working" : `${mins}m`}`;
   };
   const machineBusy = (m: string) =>
-    runs.some((r) => (r.remote || "this Mac") === m && r.state === "running") ||
+    runs.some((r) => (r.remote || `this ${machine}`) === m && r.state === "running") ||
     running.some((t) => t.dir === "out" && (t.worker.endsWith("." + m) ||
       agents.some((a) => a.name === m && (a.agents ?? []).some((n) => n.name === t.worker))));
 
@@ -93,7 +94,7 @@ export default function LiveHive({ hive, runs, agents, now }: { hive: Hive; runs
     return (
       <div className="dk-live-empty">
         <b>No hive here</b>
-        <span>This Mac is on its own. Link it to your hive in Settings to watch the queen and her workers here.</span>
+        <span>This {machine} is on its own. Link it to your hive in Settings to watch the queen and her workers here.</span>
       </div>
     );
   }
