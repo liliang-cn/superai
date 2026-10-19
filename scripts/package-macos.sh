@@ -13,6 +13,7 @@
 # offline, not only the image it came in.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+. scripts/version.sh
 
 echo "==> wails build (darwin/universal)"
 wails build -clean -platform darwin/universal
