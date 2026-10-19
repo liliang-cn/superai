@@ -4,8 +4,13 @@
 #
 # Optional code signing + notarization (needs an Apple Developer account):
 #   SIGN_ID="Developer ID Application: Your Name (TEAMID)" \
-#   AC_APPLE_ID="you@example.com" AC_TEAM_ID="TEAMID" AC_PASSWORD="app-specific-pw" \
+#   NOTARY_PROFILE=<keychain profile from `xcrun notarytool store-credentials`> \
 #   ./scripts/package-macos.sh
+# or, instead of the profile, AC_APPLE_ID, AC_TEAM_ID and AC_PASSWORD.
+#
+# The app is notarized and stapled before it goes into the .dmg, and the .dmg
+# after: the app copied out to Applications then opens with no warning even
+# offline, not only the image it came in.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -15,10 +20,33 @@ wails build -clean -platform darwin/universal
 APP="build/bin/SuperAI.app"
 DMG="build/bin/SuperAI.dmg"
 
+# notarize submits a file and waits for Apple's answer; false when no
+# credentials are set.
+notarize() {
+  if [[ -n "${NOTARY_PROFILE:-}" ]]; then
+    xcrun notarytool submit "$1" --keychain-profile "$NOTARY_PROFILE" --wait
+  elif [[ -n "${AC_APPLE_ID:-}" && -n "${AC_TEAM_ID:-}" && -n "${AC_PASSWORD:-}" ]]; then
+    xcrun notarytool submit "$1" --apple-id "$AC_APPLE_ID" --team-id "$AC_TEAM_ID" --password "$AC_PASSWORD" --wait
+  else
+    return 1
+  fi
+}
+can_notarize() {
+  [[ -n "${NOTARY_PROFILE:-}" || ( -n "${AC_APPLE_ID:-}" && -n "${AC_TEAM_ID:-}" && -n "${AC_PASSWORD:-}" ) ]]
+}
+
 if [[ -n "${SIGN_ID:-}" ]]; then
   echo "==> codesign (hardened runtime): $SIGN_ID"
   codesign --deep --force --options runtime --timestamp --sign "$SIGN_ID" "$APP"
   codesign --verify --strict --verbose=2 "$APP"
+  if can_notarize; then
+    echo "==> notarize + staple the app"
+    ZIP="$(mktemp -d)/SuperAI.zip"
+    ditto -c -k --keepParent "$APP" "$ZIP"
+    notarize "$ZIP"
+    rm -f "$ZIP"
+    xcrun stapler staple "$APP"
+  fi
 fi
 
 echo "==> create .dmg"
@@ -30,19 +58,12 @@ hdiutil create -volname "SuperAI" -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/
 rm -rf "$STAGE"
 
 if [[ -n "${SIGN_ID:-}" ]]; then
-  codesign --force --sign "$SIGN_ID" "$DMG"
-fi
-
-if [[ -n "${NOTARY_PROFILE:-}" ]]; then
-  echo "==> notarize + staple (keychain profile: $NOTARY_PROFILE)"
-  xcrun notarytool submit "$DMG" --keychain-profile "$NOTARY_PROFILE" --wait
-  xcrun stapler staple "$DMG"
-  xcrun stapler staple "$APP"
-elif [[ -n "${AC_APPLE_ID:-}" && -n "${AC_TEAM_ID:-}" && -n "${AC_PASSWORD:-}" ]]; then
-  echo "==> notarize + staple (apple-id)"
-  xcrun notarytool submit "$DMG" --apple-id "$AC_APPLE_ID" --team-id "$AC_TEAM_ID" --password "$AC_PASSWORD" --wait
-  xcrun stapler staple "$DMG"
-  xcrun stapler staple "$APP"
+  codesign --force --timestamp --sign "$SIGN_ID" "$DMG"
+  if can_notarize; then
+    echo "==> notarize + staple the .dmg"
+    notarize "$DMG"
+    xcrun stapler staple "$DMG"
+  fi
 fi
 
 echo "==> done: $DMG"

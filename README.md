@@ -17,8 +17,8 @@ Your own AI assistant. Talk to it from your phone, your computer or a browser. I
 
 ## How to use it
 
-1. **Start the core.** Download SuperAI from [Releases](https://github.com/liliang-cn/superai/releases) and run `superai serve`, or open the desktop app.
-2. **Sign in.** Open the web page and log in with the password it printed the first time it started.
-3. **Choose a model.** In Settings, sign in with your Claude, Codex or Gemini account, or enter an API key.
-4. **Add your phone.** In Settings, make a pairing code and enter it in the iPhone app.
-5. **Talk to it.** Ask questions, give it to-dos, set reminders and alarms, or ask it to get something done on one of your machines.
+1. **Download** `SuperAI.dmg` from [Releases](https://github.com/liliang-cn/superai/releases), open it, and drag SuperAI into Applications.
+2. **Open SuperAI.** If Claude Code is signed in on your Mac, SuperAI uses it and you can start talking right away. If not, sign in with your Claude, Codex or Gemini account in Settings, or enter an API key.
+3. **Talk to it.** Ask questions, give it to-dos, set reminders and alarms, or ask it to get something done on one of your machines.
+
+The iPhone app is coming to the App Store.
