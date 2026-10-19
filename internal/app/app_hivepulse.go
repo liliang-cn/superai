@@ -104,8 +104,9 @@ func (a *App) notePulse(agent string, payloadJSON string) {
 	a.emit("hive:meter", map[string]any{"member": m})
 }
 
-// HivePulse is the whole hive's meter: this process and every linked agent
-// that has reported in the last ten seconds, busiest first.
+// HivePulse is the whole hive's meter: this process and every linked worker
+// that has reported in the last ten seconds, busiest first. A machine or
+// relay agent has no model of its own and spends no tokens: it is not a row.
 func (a *App) HivePulse() HivePulse {
 	self := pulseSummary("queen", a.livePulse().Snapshot())
 	if h := a.hiveSelfName(); h != "" {
@@ -117,7 +118,11 @@ func (a *App) HivePulse() HivePulse {
 	out := HivePulse{Members: []MemberPulse{self}}
 	linked := map[string]bool{}
 	act := map[string]*CCActivity{}
+	roles := a.agentRoles()
 	for _, c := range a.agents().list() {
+		if roles(c.name(), c.hello.GetRole()) != agentRoleWorker {
+			continue
+		}
 		linked[c.name()] = true
 		act[c.name()] = c.activity.Load()
 	}

@@ -95,7 +95,7 @@ type HiveTopology struct {
 // it. An agent an HA service keeps up stands on the node it is active on, and
 // moves with it; how HA does that — standbys, service IPs — is left out. The
 // queen's hive_hosts and the hosts tool read fullTopology.
-func (a *App) HiveTopology() HiveTopology { return withoutHA(a.fullTopology()) }
+func (a *App) HiveTopology() HiveTopology { return onlyWhatWorks(withoutHA(a.fullTopology())) }
 
 // fullTopology lists the hosts and the HA services together, read at the
 // same moment, with every HA detail.
@@ -133,6 +133,46 @@ func withoutHA(t HiveTopology) HiveTopology {
 		hosts = append(hosts, h)
 	}
 	return HiveTopology{Hosts: hosts, Services: []backend.HAService{}}
+}
+
+// onlyWhatWorks keeps the agents that can do work, and the hosts only as the
+// places they are. A SuperAI with no model of its own (a machine or relay
+// agent) thinks nothing: it is how the queen reaches that machine, to look at
+// it or run what is installed there, not a member. So it is not drawn, and a
+// host with nothing left on it, nor inside it, is not either. The CLIs and
+// named agents it runs stay: claude on that box works on its own account.
+// The queen's tools read fullTopology and still see everything.
+func onlyWhatWorks(t HiveTopology) HiveTopology {
+	parent := map[string]string{}
+	for _, h := range t.Hosts {
+		parent[h.ID] = h.Parent
+	}
+	keep := map[string]bool{}
+	hosts := make([]Host, 0, len(t.Hosts))
+	for _, h := range t.Hosts {
+		kept := make([]HostAgent, 0, len(h.Agents))
+		for _, ag := range h.Agents {
+			if ag.Kind == "superai" && (ag.Role == agentRoleMachine || ag.Role == agentRoleRelay) {
+				continue
+			}
+			kept = append(kept, ag)
+		}
+		h.Agents = kept
+		if len(kept) > 0 {
+			for id := h.ID; id != "" && !keep[id]; id = parent[id] {
+				keep[id] = true
+			}
+		}
+		hosts = append(hosts, h)
+	}
+	out := hosts[:0]
+	for _, h := range hosts {
+		if keep[h.ID] {
+			out = append(out, h)
+		}
+	}
+	t.Hosts = out
+	return t
 }
 
 func (a *App) hostsWith(services []backend.HAService) []Host {

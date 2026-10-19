@@ -239,14 +239,24 @@ func TestALocalAgentIsOfferedOnlyWhileItIsHere(t *testing.T) {
 func TestALinkedAgentCountsInTheHiveMeter(t *testing.T) {
 	core := NewApp()
 	addr := startCore(t, core)
+	// A worker: it has a model and spends tokens.
 	agent := NewApp()
+	agent.settings = &backend.Settings{Hive: backend.HiveSettings{Role: backend.HiveRoleWorker}}
+	// A machine agent: no model, so nothing to meter; it never becomes a row.
+	machine := NewApp()
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
 	go func() {
 		agent.RunAgentLink(ctx, AgentLinkOptions{Core: addr, Token: "tok", Name: "w1", Version: "test"})
 		close(done)
 	}()
-	t.Cleanup(func() { cancel(); <-done })
+	mdone := make(chan struct{})
+	go func() {
+		machine.RunAgentLink(ctx, AgentLinkOptions{Core: addr, Token: "tok", Name: "orange1", Version: "test"})
+		close(mdone)
+	}()
+	t.Cleanup(func() { cancel(); <-done; <-mdone })
+	waitFor(t, "the machine to link", func() bool { return core.agents().get("orange1") != nil })
 
 	waitFor(t, "the agent's meter", func() bool {
 		for _, m := range core.HivePulse().Members {

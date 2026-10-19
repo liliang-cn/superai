@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -68,7 +69,7 @@ func TestHostsPutsAgentsOnTheirHosts(t *testing.T) {
 	linkHello(t, core, addr, &agentlinkpb.Hello{Name: "sds-e", Host: "node-e", Os: "linux", Kind: "vm",
 		Agents: []*agentlinkpb.NamedAgent{{Name: "openclaw", About: "the gateway"}, {Name: "hermes"}}})
 
-	hs := core.Hosts()
+	hs := core.fullTopology().Hosts
 	seen := map[string]bool{}
 	for _, h := range hs {
 		if seen[h.ID] {
@@ -170,7 +171,7 @@ func TestHostsKeepALostMachinesKind(t *testing.T) {
 	hub.lostHello["mac"] = c.hello
 	hub.mu.Unlock()
 
-	mac := hostByName(core.Hosts(), "mac")
+	mac := hostByName(core.fullTopology().Hosts, "mac")
 	if mac == nil || mac.State != "lost" || mac.Kind != "mac" {
 		t.Fatalf("lost mac: %+v", mac)
 	}
@@ -361,5 +362,43 @@ func TestHostsPutAnAgentOnEveryHostItIsOn(t *testing.T) {
 		if !core.addressable(name) {
 			t.Fatalf("%s is not addressable", name)
 		}
+	}
+}
+
+// A SuperAI with no model of its own is how the queen reaches a machine, not
+// a member: it is not drawn, and a machine with nothing else working on it is
+// not either. What it runs that works on its own (a signed-in claude, a named
+// agent) stays, and so does a pod's node that carries a worker.
+func TestOnlyWhatWorksIsDrawn(t *testing.T) {
+	in := HiveTopology{Hosts: []Host{
+		{ID: "orange1", Name: "orange1", Agents: []HostAgent{{Name: "orange1", Kind: "superai", Role: agentRoleMachine}}},
+		{ID: "superai-worker-1", Name: "superai-worker-1", Parent: "orange1", Agents: []HostAgent{{Name: "superai-worker-1", Kind: "superai", Role: "worker"}}},
+		{ID: "win11", Name: "win11", Agents: []HostAgent{{Name: "win11", Kind: "superai", Role: agentRoleMachine}}},
+		{ID: "sds-e", Name: "sds-e", Agents: []HostAgent{
+			{Name: "sds-e", Kind: "superai", Role: agentRoleRelay},
+			{Name: "openclaw", Kind: "agent", Via: "sds-e"},
+		}},
+		{ID: "pro.local", Name: "mac", Agents: []HostAgent{
+			{Name: "mac", Kind: "superai", Role: "worker"},
+			{Name: "claude.mac", Kind: "cli", Via: "mac"},
+		}},
+	}}
+	got := map[string][]string{}
+	for _, h := range onlyWhatWorks(in).Hosts {
+		for _, a := range h.Agents {
+			got[h.ID] = append(got[h.ID], a.Name)
+		}
+		if got[h.ID] == nil {
+			got[h.ID] = []string{}
+		}
+	}
+	want := map[string][]string{
+		"orange1":          {}, // kept as the place its worker's pod is
+		"superai-worker-1": {"superai-worker-1"},
+		"sds-e":            {"openclaw"},
+		"pro.local":        {"mac", "claude.mac"},
+	}
+	if fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Fatalf("drawn = %v\nwant    %v", got, want)
 	}
 }
