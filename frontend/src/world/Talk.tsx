@@ -5,6 +5,8 @@ import { EventsOn } from "../../wailsjs/runtime";
 import { loadQueenSession, queenSession } from "../lib/queenConsole";
 import { useI18n } from "../lib/i18n";
 import { useImeGuard } from "../lib/ime";
+import { visibleAnswer } from "../lib/format";
+import { Response } from "@/components/ai-elements/response";
 import { say, sayDone } from "./bubbles";
 
 /** Who a robot is, for talking to it. */
@@ -60,6 +62,9 @@ export default function Talk({ who, placeholder }: { who: Talker; placeholder: s
   const [lines, setLines] = useState<Line[]>(() => threads.get(key)?.lines ?? []);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState("");
+  // The queen's answer so far, as it streams.
+  const [streamed, setStreamed] = useState("");
+  const raw = useRef("");
   const live = useRef("");
   // What this card just sent, until SendChat names its request.
   const mine = useRef("");
@@ -67,18 +72,18 @@ export default function Talk({ who, placeholder }: { who: Talker; placeholder: s
   const alive = useRef(true);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
 
-  useEffect(() => { setLines(threads.get(key)?.lines ?? []); setBusy(""); }, [key]);
+  useEffect(() => { setLines(threads.get(key)?.lines ?? []); setBusy(""); setStreamed(""); raw.current = ""; }, [key]);
   // The queen's card opens on where the conversation with her is.
   useEffect(() => {
     if (who.kind !== "queen" || threads.get(key)?.lines.length) return;
     loadQueenSession().then((id) => ChatHistory(id)).then((turns: any[]) => {
       const last = (turns ?? []).filter((x) => (x.role === "user" || x.role === "assistant") && x.kind !== "context" && x.content).slice(-6);
-      const th = { lines: last.map((x) => ({ who: x.role === "user" ? "you" : "it", text: String(x.content).slice(0, 600) }) as Line) };
+      const th = { lines: last.map((x) => ({ who: x.role === "user" ? "you" : "it", text: String(x.content).slice(0, 4000) }) as Line) };
       threads.set(key, th);
       setLines(th.lines);
     }).catch(() => {});
   }, [key]);
-  useEffect(() => { end.current?.scrollIntoView({ block: "end" }); }, [lines, busy]);
+  useEffect(() => { end.current?.scrollIntoView({ block: "end" }); }, [lines, busy, streamed]);
 
   const push = (l: Line) => {
     if (l.who === "it") sayDone(actorOf(who), l.text);
@@ -89,17 +94,18 @@ export default function Talk({ who, placeholder }: { who: Talker; placeholder: s
     setLines(th.lines);
   };
 
-  // The queen's answer streams in on the chat events of this request. A turn
-  // another device takes in the same conversation shows here too: its words
-  // when it starts, its answer when it ends.
+  // The queen's answer streams in on the chat events of this request, word by
+  // word. A turn another device takes in the same conversation shows here
+  // too: its words when it starts, its answer when it ends.
   useEffect(() => {
     if (who.kind !== "queen") return;
     const others = new Set<string>();
+    const settle = () => { live.current = ""; raw.current = ""; setStreamed(""); setBusy(""); };
     const offs = [
       EventsOn("chat:turn", (p: any) => {
         if (!p?.requestId || p.sessionId !== queenSession() || p.requestId === live.current) return;
-        // Ours, before SendChat answered with its id.
-        if (mine.current && mine.current === p.message) { mine.current = ""; return; }
+        // Ours, before SendChat answered with its id: its words stream from now.
+        if (mine.current && mine.current === p.message) { mine.current = ""; live.current = p.requestId; return; }
         others.add(p.requestId);
         push({ who: "you", text: String(p.message ?? "") });
       }),
@@ -109,9 +115,25 @@ export default function Talk({ who, placeholder }: { who: Talker; placeholder: s
       EventsOn("chat:event", (p: any) => {
         if (!live.current || p?.requestId !== live.current) return;
         if (p.type === "tool_call" && p.tool) setBusy(t("Using {tool}…", { tool: p.tool }));
+        else if (p.type === "partial" && p.content) {
+          raw.current += p.content;
+          const v = visibleAnswer(raw.current);
+          setStreamed(v);
+          setBusy(t("Thinking…"));
+          if (v) say("queen", v, "say", 60);
+        }
+        // A draft the output lint turned down, or a retried attempt: the next
+        // answer is written from scratch.
+        else if (p.type === "tombstone" && p.debugType === "retry") { raw.current = ""; setStreamed(""); }
       }),
-      EventsOn("chat:done", (p: any) => { if (live.current && p?.requestId === live.current) { live.current = ""; setBusy(""); push({ who: "it", text: String(p.final ?? "") }); } }),
-      EventsOn("chat:error", (p: any) => { if (live.current && p?.requestId === live.current) { live.current = ""; setBusy(""); push({ who: "it", text: String(p.error ?? ""), bad: true }); } }),
+      EventsOn("chat:done", (p: any) => {
+        if (!live.current || p?.requestId !== live.current) return;
+        const text = String(p.final ?? visibleAnswer(raw.current));
+        settle();
+        push({ who: "it", text });
+      }),
+      EventsOn("chat:error", (p: any) => { if (live.current && p?.requestId === live.current) { settle(); push({ who: "it", text: String(p.error ?? ""), bad: true }); } }),
+      EventsOn("chat:cancelled", (p: any) => { if (live.current && p?.requestId === live.current) settle(); }),
     ];
     return () => offs.forEach((f) => typeof f === "function" && f());
   }, [key]);
@@ -138,6 +160,8 @@ export default function Talk({ who, placeholder }: { who: Talker; placeholder: s
       switch (who.kind) {
         case "queen":
           mine.current = s;
+          raw.current = "";
+          setStreamed("");
           live.current = await SendChat(queenSession(), s, []);
           mine.current = "";
           break;
@@ -182,8 +206,11 @@ export default function Talk({ who, placeholder }: { who: Talker; placeholder: s
     <div className="wt">
       {(lines.length > 0 || busy) && (
         <div className="wt-lines">
-          {lines.map((l, i) => <p key={i} className={`wt-${l.who}${l.bad ? " bad" : ""}`}>{l.text}</p>)}
-          {busy && <p className="wt-it wt-busy">{busy} <Waited remote={who.kind === "agent" || who.kind === "worker"} /></p>}
+          {lines.map((l, i) => l.who === "it" && !l.bad
+            ? <div key={i} className="wt-line wt-it"><Response>{l.text}</Response></div>
+            : <p key={i} className={`wt-line wt-${l.who}${l.bad ? " bad" : ""}`}>{l.text}</p>)}
+          {streamed && <div className="wt-line wt-it"><Response>{streamed}</Response></div>}
+          {busy && (!streamed || busy !== t("Thinking…")) && <p className="wt-line wt-it wt-busy">{busy} <Waited remote={who.kind === "agent" || who.kind === "worker"} /></p>}
           <div ref={end} />
         </div>
       )}

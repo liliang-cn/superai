@@ -202,7 +202,11 @@
 /* Talking to a robot, in its card. */
 .wt { display: flex; flex-direction: column; gap: 8px; }
 .wt-lines { max-height: 230px; overflow: auto; display: flex; flex-direction: column; gap: 6px; padding: 2px; }
-.wt-lines p { margin: 0; padding: 7px 10px; border-radius: 10px; font-size: 12.5px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; max-width: 92%; }
+.wt-lines .wt-line { margin: 0; padding: 7px 10px; border-radius: 10px; font-size: 12.5px; line-height: 1.5; overflow-wrap: anywhere; max-width: 92%; }
+.wt-lines p.wt-line { white-space: pre-wrap; }
+.wt-line .ai-response { font-size: 12.5px; line-height: 1.5; }
+.wt-line .ai-response p { margin: 0 0 6px; } .wt-line .ai-response p:last-child { margin: 0; }
+.wt-line .ai-response table { font-size: 12px; }
 .wt-you { align-self: flex-end; background: #16202b; color: #fff; border-bottom-right-radius: 3px; }
 .wt-it { align-self: flex-start; background: #f2f4f7; color: #16202b; border-bottom-left-radius: 3px; }
 .wt-it.bad { background: #fdecea; color: #a1232f; }
@@ -267,6 +271,13 @@
 .wl-say[data-mode="say"] .wl-say-in::after { content: ""; position: absolute; left: calc(50% - 9px); bottom: -13px; width: 18px; height: 14px; background: #fff;
   border-right: 2px solid #16202b; border-bottom: 2px solid #16202b; transform: skewX(-35deg) rotate(12deg); border-bottom-right-radius: 4px; }
 .wl-say.more .wl-say-in { padding-bottom: 20px; }
+.wl-say-md { max-height: 132px; overflow: hidden; }
+.wl-say.more .wl-say-md { -webkit-mask-image: linear-gradient(#000 75%, transparent); mask-image: linear-gradient(#000 75%, transparent); }
+.wl-say-md .ai-response { font-size: 13px; line-height: 1.45; }
+.wl-say-md .ai-response :is(p, ul, ol, table, pre, blockquote) { margin: 0 0 4px; }
+.wl-say-md .ai-response :is(h1, h2, h3, h4) { font-size: 13.5px; margin: 0 0 3px; }
+.wl-say-md .ai-response :is(ul, ol) { padding-left: 16px; }
+.wl-say-md .ai-response table { font-size: 12px; }
 .wl-say.more .wl-say-in::before { content: "⋯ more"; position: absolute; right: 12px; bottom: 3px; font-size: 11px; color: #c98a00; font-weight: 700; }
 /* Thinking: a cloud, with little puffs trailing down to the head. */
 .wl-say[data-mode="think"] .wl-say-in { border-radius: 26px; padding: 8px 14px; display: flex; align-items: center; gap: 8px; }
