@@ -554,6 +554,11 @@ func (a *App) cliCwd(raw string, roots []string) (string, error) {
 	}
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
+		// The workspace is the app's own: made when it is not there yet (a
+		// fresh install, a folder someone cleared) rather than failing the run.
+		if err := os.MkdirAll(allowed[0], 0o755); err != nil {
+			return "", err
+		}
 		return allowed[0], nil
 	}
 	dir, err := filepath.Abs(cliExpandHome(raw))

@@ -239,7 +239,7 @@ export default function ChatView({
                 >
                   {notReady && (
                     <div className="empty-hint">
-                      No model is set up yet. Choose one in Settings to begin.
+                      Sign in to Claude Code on this Mac, or choose a model in Settings, to begin.
                     </div>
                   )}
                 </ConversationEmptyState>

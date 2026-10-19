@@ -33,7 +33,7 @@ export default function DeskStatusBar({ status, loading, codingRuns }: { status:
     const refresh = () => { window.clearTimeout(timer); timer = window.setTimeout(read,250); };
     void read();
     const interval = window.setInterval(read,15000);
-    const off = ["hivelink:state","chat:event","chat:done","chat:error","chat:cancelled","cli:run"].map(name=>EventsOn(name,refresh));
+    const off = ["hivelink:state","setup:engine","chat:event","chat:done","chat:error","chat:cancelled","cli:run"].map(name=>EventsOn(name,refresh));
     return () => {alive=false;window.clearInterval(interval);window.clearTimeout(timer);off.forEach(stop=>typeof stop==="function"&&stop());};
   }, []);
   const disconnected = runtime.error || (link?.linked && !link.live);
