@@ -32,10 +32,10 @@ type HiveWorker struct {
 }
 
 // HiveWorkers is every agent that can work, the queen's own SuperAI aside:
-// she hands work out, she is not handed it. Read without the HA services, so
-// a status bar can ask often.
+// she hands work out, she is not handed it. The same topology the world is
+// drawn from, so a count and a picture never disagree.
 func (a *App) HiveWorkers() []HiveWorker {
-	t := onlyWhatWorks(withoutHA(HiveTopology{Hosts: a.hostsWith(nil)}))
+	t := a.HiveTopology()
 	out := []HiveWorker{}
 	seen := map[string]bool{}
 	for _, h := range t.Hosts {

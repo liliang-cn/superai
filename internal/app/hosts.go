@@ -144,15 +144,21 @@ func withoutHA(t HiveTopology) HiveTopology {
 // The queen's tools read fullTopology and still see everything.
 func onlyWhatWorks(t HiveTopology) HiveTopology {
 	parent := map[string]string{}
+	running := map[string]bool{} // named agents seen running somewhere
 	for _, h := range t.Hosts {
 		parent[h.ID] = h.Parent
+		for _, ag := range h.Agents {
+			if ag.Kind == hostAgentNamed && ag.State != "configured" {
+				running[ag.Name] = true
+			}
+		}
 	}
 	keep := map[string]bool{}
 	hosts := make([]Host, 0, len(t.Hosts))
 	for _, h := range t.Hosts {
 		kept := make([]HostAgent, 0, len(h.Agents))
 		for _, ag := range h.Agents {
-			if ag.Kind == "superai" && (ag.Role == agentRoleMachine || ag.Role == agentRoleRelay) {
+			if !canWork(ag, running) {
 				continue
 			}
 			kept = append(kept, ag)
@@ -173,6 +179,37 @@ func onlyWhatWorks(t HiveTopology) HiveTopology {
 	}
 	t.Hosts = out
 	return t
+}
+
+// canWork is whether an agent on a host is one that can take work.
+//   - A SuperAI that is a machine or a relay agent has no model: no.
+//   - A coding CLI that is only installed counts when it is one that can say
+//     it is signed in (claude, codex): a signed-out one is never reported
+//     (localAgentNames). One that cannot say counts once it is seen in use.
+//   - A named agent only the settings know of, on a host where it is not
+//     running, is a spare address for one running elsewhere: no.
+func canWork(ag HostAgent, running map[string]bool) bool {
+	switch ag.Kind {
+	case hostAgentSuperAI:
+		return ag.Role != agentRoleMachine && ag.Role != agentRoleRelay
+	case hostAgentCLI:
+		if ag.State != "installed" {
+			return true
+		}
+		return signedInChecks[agentCLIName(ag)] != nil
+	case hostAgentNamed:
+		return !(ag.State == "configured" && running[ag.Name])
+	}
+	return true
+}
+
+// agentCLIName is a CLI agent's own name: "claude.mac" is claude.
+func agentCLIName(ag HostAgent) string {
+	if ag.Via != "" && strings.HasSuffix(ag.Name, "."+ag.Via) {
+		return strings.TrimSuffix(ag.Name, "."+ag.Via)
+	}
+	name, _, _ := strings.Cut(ag.Name, ".")
+	return name
 }
 
 func (a *App) hostsWith(services []backend.HAService) []Host {

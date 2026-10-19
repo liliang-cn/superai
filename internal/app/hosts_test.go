@@ -376,11 +376,18 @@ func TestOnlyWhatWorksIsDrawn(t *testing.T) {
 		{ID: "win11", Name: "win11", Agents: []HostAgent{{Name: "win11", Kind: "superai", Role: agentRoleMachine}}},
 		{ID: "sds-e", Name: "sds-e", Agents: []HostAgent{
 			{Name: "sds-e", Kind: "superai", Role: agentRoleRelay},
-			{Name: "openclaw", Kind: "agent", Via: "sds-e"},
+			{Name: "openclaw", Kind: "agent", Via: "sds-e", State: "live"},
+		}},
+		// Only the settings know openclaw here, and it runs on sds-e.
+		{ID: "lima-sds-a", Name: "lima-sds-a", State: "configured", Agents: []HostAgent{
+			{Name: "openclaw", Kind: "agent", State: "configured"},
 		}},
 		{ID: "pro.local", Name: "mac", Agents: []HostAgent{
 			{Name: "mac", Kind: "superai", Role: "worker"},
 			{Name: "claude.mac", Kind: "cli", Via: "mac"},
+			{Name: "codex.mac", Kind: "cli", Via: "mac", State: "installed"},  // can say it is signed in
+			{Name: "goose.mac", Kind: "cli", Via: "mac", State: "installed"},  // cannot, and is not in use
+			{Name: "opencode.mac", Kind: "cli", Via: "mac", State: "working"}, // cannot say, but is in use
 		}},
 	}}
 	got := map[string][]string{}
@@ -396,7 +403,7 @@ func TestOnlyWhatWorksIsDrawn(t *testing.T) {
 		"orange1":          {}, // kept as the place its worker's pod is
 		"superai-worker-1": {"superai-worker-1"},
 		"sds-e":            {"openclaw"},
-		"pro.local":        {"mac", "claude.mac"},
+		"pro.local":        {"mac", "claude.mac", "codex.mac", "opencode.mac"},
 	}
 	if fmt.Sprint(got) != fmt.Sprint(want) {
 		t.Fatalf("drawn = %v\nwant    %v", got, want)
