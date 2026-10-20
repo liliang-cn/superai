@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -74,6 +75,9 @@ func (a *App) delegateCandidates(needs []string) []string {
 		name  string
 		load  int
 		known bool
+		// rank orders peers at the same load: a SuperAI, then a named agent,
+		// then a coding CLI; one a piece names among its needs comes first.
+		rank int
 	}
 	var cs []cand
 	roster := map[string]bool{}
@@ -84,18 +88,48 @@ func (a *App) delegateCandidates(needs []string) []string {
 			have = append(append([]string{}, m.MCP...), m.CLIs...)
 		}
 		if backend.HasAll(have, needs) {
-			cs = append(cs, cand{m.Name, running[m.Name], m.MCP != nil})
+			cs = append(cs, cand{name: m.Name, load: running[m.Name], known: m.MCP != nil})
 		}
 	}
 	// A linked machine whose agent thinks is a worker too, over its link.
 	for n, t := range a.linkedThinkers(roster) {
 		if backend.HasAll(t.have, needs) {
-			cs = append(cs, cand{n, running[n], true})
+			cs = append(cs, cand{name: n, load: running[n], known: true})
 		}
 	}
-	sort.Slice(cs, func(i, j int) bool {
+	// And every other agent that can work, a peer of theirs: a named agent
+	// has itself, a coding CLI its own name ("codex"), and no MCP servers.
+	for _, w := range a.agentWorkers() {
+		own := w.Name
+		if w.Kind == hostAgentCLI {
+			own = agentCLIName(HostAgent{Name: w.Name, Via: w.Host})
+		}
+		if !backend.HasAll([]string{own}, needs) {
+			continue
+		}
+		load := running[w.Name]
+		if w.Kind == hostAgentCLI {
+			// One piece at a time: a CLI's subscription is the person's too,
+			// and their own terminal sessions draw on it.
+			if load+a.cliRunsGoing(w.Name) >= 1 {
+				continue
+			}
+		}
+		rank := 1
+		if w.Kind == hostAgentCLI {
+			rank = 2
+		}
+		if slices.Contains(needs, own) {
+			rank = -1
+		}
+		cs = append(cs, cand{name: w.Name, load: load, known: true, rank: rank})
+	}
+	sort.SliceStable(cs, func(i, j int) bool {
 		if cs[i].load != cs[j].load {
 			return cs[i].load < cs[j].load
+		}
+		if cs[i].rank != cs[j].rank {
+			return cs[i].rank < cs[j].rank
 		}
 		if cs[i].known != cs[j].known {
 			return cs[i].known
@@ -155,9 +189,11 @@ func (a *App) registerDelegateTool(inner *agent.Service, mode string) {
 			"\n\nEach task stands alone — the worker sees nothing of this conversation — so put in it everything needed:"+
 			" what to do, absolute dates and times, ids, what to report. Several independent tasks in one call run at the"+
 			" same time on different workers, idle ones first; split a request that has independent parts. Set needs to"+
-			" the MCP servers a task's tools come from (\"noted\") so it goes to a worker that has them, and name a coding"+
-			" CLI (\"codex\", \"claude\", \"opencode\") for coding work: it goes to a worker where that CLI is installed,"+
-			" like the Mac, which runs it there."+
+			" the MCP servers a task's tools come from (\"noted\") so it goes to a worker that has them."+
+			"\n\nEvery agent that can work is a worker, and they are peers: a SuperAI worker, a named agent (\"openclaw\","+
+			" \"hermes\", \"pi\"), and a signed-in coding CLI on a machine (\"claude.mac\", \"codex.sds-e\"). Name a coding"+
+			" CLI in needs (\"codex\") for coding work and it does the task itself; set worker to hand a task to one of them"+
+			" by name. A coding CLI takes one task at a time. hive_members lists who there is."+
 			"\n\nA worker that fails or times out is replaced by another; when no worker can do a task the queen does it"+
 			" herself. The report says who did each task and which tools they called; tell the person in a few words.",
 		map[string]any{
@@ -173,7 +209,7 @@ func (a *App) registerDelegateTool(inner *agent.Service, mode string) {
 								"type": "array", "items": map[string]any{"type": "string"},
 								"description": "MCP servers the task's tools come from, e.g. [\"noted\"], and coding CLIs it needs, e.g. [\"codex\"].",
 							},
-							"worker": map[string]any{"type": "string", "description": "Only to pin the task to one worker; usually omit."},
+							"worker": map[string]any{"type": "string", "description": "To hand the task to one worker by name (\"openclaw\", \"claude.mac\", \"superai-worker-1\"); omit to let the hive choose."},
 						},
 						"required": []string{"task"},
 					},
@@ -281,6 +317,9 @@ func (a *App) delegate(ctx context.Context, tasks []backend.DelegateTask, onAssi
 		Run: func(ctx context.Context, worker, prompt string) (backend.RemoteResult, error) {
 			a.markWorker(worker, +1)
 			defer a.markWorker(worker, -1)
+			if w, ok := a.agentWorker(worker); ok {
+				return a.runOnAgent(ctx, w, prompt), nil
+			}
 			return a.remoteRunner().Run(ctx, worker, prompt)
 		},
 		Self:     a.queenSelf,

@@ -203,6 +203,22 @@ func canWork(ag HostAgent, running map[string]bool) bool {
 	return true
 }
 
+// selfAgentName is what this process is called among the hosts' agents, and
+// what its own CLIs are addressed by ("claude.<it>"): its hive name, the host
+// it runs on when it is in a hive under none, "core" alone.
+func selfAgentName(s *backend.Settings, self backend.HostIdentity) string {
+	if s == nil {
+		return "core"
+	}
+	if n := strings.TrimSpace(s.Hive.Name); n != "" {
+		return n
+	}
+	if s.Hive.Role != "" {
+		return self.Name
+	}
+	return "core"
+}
+
 // agentCLIName is a CLI agent's own name: "claude.mac" is claude.
 func agentCLIName(ag HostAgent) string {
 	if ag.Via != "" && strings.HasSuffix(ag.Name, "."+ag.Via) {
@@ -220,16 +236,9 @@ func (a *App) hostsWith(services []backend.HAService) []Host {
 
 	// This process, where it runs.
 	self := backend.DetectHost()
-	selfName, selfRole := "core", "standalone"
-	if s != nil {
-		if s.Hive.Role != "" {
-			selfRole = s.Hive.Role
-		}
-		if n := strings.TrimSpace(s.Hive.Name); n != "" {
-			selfName = n
-		} else if s.Hive.Role != "" {
-			selfName = self.Name
-		}
+	selfName, selfRole := selfAgentName(s, self), "standalone"
+	if s != nil && s.Hive.Role != "" {
+		selfRole = s.Hive.Role
 	}
 	me := b.host(self.Name, "", self.Kind, self.OS, self.Arch, self.Parent)
 	me.live(time.Now())

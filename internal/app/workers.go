@@ -34,6 +34,8 @@ type HiveWorker struct {
 	State string `json:"state"`
 	// Up is whether it can take work now.
 	Up bool `json:"up"`
+	// Via is the SuperAI that runs a CLI or a named agent for core.
+	Via string `json:"via,omitempty"`
 }
 
 // HiveWorkers is every agent that can work, the queen's own SuperAI aside:
@@ -52,7 +54,7 @@ func (a *App) HiveWorkers() []HiveWorker {
 				continue
 			}
 			seen[ag.Name] = true
-			out = append(out, HiveWorker{Name: ag.Name, Kind: ag.Kind, Host: h.Name, State: ag.State, Up: workerUp(ag.State)})
+			out = append(out, HiveWorker{Name: ag.Name, Kind: ag.Kind, Host: h.Name, State: ag.State, Up: workerUp(ag.State), Via: ag.Via})
 		}
 	}
 	return out
@@ -116,6 +118,122 @@ func (a *App) withLinkedThinkers(roster map[string]backend.RemoteAgent) map[stri
 		out[n] = backend.RemoteAgent{About: "SuperAI on " + t.conn.hello.GetHost(), Wire: linkWire{t.conn}}
 	}
 	return out
+}
+
+// agentWorkers are the workers that are not SuperAIs and can take work now:
+// the named agents and the signed-in coding CLIs.
+func (a *App) agentWorkers() []HiveWorker {
+	var out []HiveWorker
+	for _, w := range a.HiveWorkers() {
+		if w.Kind != hostAgentSuperAI && w.Up {
+			out = append(out, w)
+		}
+	}
+	return out
+}
+
+// agentWorker is the named agent or coding CLI called name, if it is one.
+func (a *App) agentWorker(name string) (HiveWorker, bool) {
+	for _, w := range a.agentWorkers() {
+		if w.Name == name {
+			return w, true
+		}
+	}
+	return HiveWorker{}, false
+}
+
+// selfName is what this process's own CLIs are addressed by.
+func (a *App) selfName() string {
+	a.mu.Lock()
+	s := a.settings
+	a.mu.Unlock()
+	return selfAgentName(s, backend.DetectHost())
+}
+
+// cliRunsGoing is how many coding runs the CLI worker called name has going,
+// whoever started them.
+func (a *App) cliRunsGoing(name string) int {
+	self := a.selfName()
+	n := 0
+	for _, r := range a.CLIRuns() {
+		if r.State != "running" {
+			continue
+		}
+		full := r.Agent
+		if r.Remote == "" {
+			full = r.Agent + "." + self
+		}
+		if full == name {
+			n++
+		}
+	}
+	return n
+}
+
+// runOnAgent gives one piece of delegated work to a named agent or a coding
+// CLI and waits for its answer, on the task board like a SuperAI's order so
+// the screens show it going out. A named agent is asked; a CLI does it as a
+// coding run, its permission prompts going to the person.
+func (a *App) runOnAgent(ctx context.Context, w HiveWorker, prompt string) backend.RemoteResult {
+	board := a.tasks()
+	id := backend.NewTaskID()
+	board.StartAs(id, w.Name, "", backend.TaskOut, prompt)
+	board.InSession(id, backend.ChatSessionFrom(ctx))
+	var res backend.RemoteResult
+	if w.Kind == hostAgentCLI {
+		res = a.runCLIPiece(ctx, w, prompt)
+	} else {
+		res = a.askAgent(ctx, w.Name, prompt)
+	}
+	res.Agent, res.TaskID = w.Name, id
+	switch {
+	case ctx.Err() != nil:
+		board.Finish(id, backend.TaskCancelled, res.Text, res.Reason)
+	case res.Failed:
+		board.Finish(id, backend.TaskFailed, res.Text, res.Reason)
+	default:
+		board.Finish(id, backend.TaskDone, res.Text, "")
+	}
+	return res
+}
+
+// runCLIPiece runs prompt as a coding run of the CLI worker w and waits for it.
+func (a *App) runCLIPiece(ctx context.Context, w HiveWorker, prompt string) backend.RemoteResult {
+	started := time.Now()
+	res := backend.RemoteResult{Agent: w.Name, Host: w.Host}
+	agent := w.Name
+	if w.Via == a.selfName() {
+		agent = agentCLIName(HostAgent{Name: w.Name, Via: w.Via}) // one of this machine's own
+	}
+	done := make(chan CLIRun, 1)
+	run, err := a.startCLIRun(cliStart{Agent: agent, Prompt: prompt, Ask: true, Done: func(r CLIRun) {
+		select {
+		case done <- r:
+		default:
+		}
+	}})
+	if err != nil {
+		res.Failed, res.Reason = true, err.Error()
+		return res
+	}
+	select {
+	case r := <-done:
+		run = r
+	case <-ctx.Done():
+		a.CancelCLIRun(run.ID)
+		res.Failed, res.Reason = true, "stopped: "+ctx.Err().Error()
+		res.MS = time.Since(started).Milliseconds()
+		return res
+	}
+	res.Text, res.MS = strings.TrimSpace(run.Summary), time.Since(started).Milliseconds()
+	if run.State != "done" || res.Text == "" {
+		res.Failed = true
+		res.Reason = run.Error
+		if res.Reason == "" {
+			res.Reason = w.Name + " ended " + run.State + " without an answer"
+		}
+	}
+	return res
 }
 
 // workerUp is whether an agent in this state can take work now.

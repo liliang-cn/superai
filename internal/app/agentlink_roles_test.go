@@ -210,7 +210,7 @@ func TestRelayOnlyRoundTripsThroughTheSettingsRPC(t *testing.T) {
 
 // A Mac that joins the hive as a worker is still the Mac: listed and looked
 // after as a machine, while a worker pod is not. And work that needs a
-// coding CLI goes to the worker where it is installed.
+// coding CLI goes to that CLI, or to the worker where it is installed.
 func TestAMacWorkerIsStillAMachine(t *testing.T) {
 	core := NewApp()
 	core.settings = &backend.Settings{Hive: backend.HiveSettings{Role: backend.HiveRoleQueen, Name: "q"}}
@@ -236,7 +236,9 @@ func TestAMacWorkerIsStillAMachine(t *testing.T) {
 			t.Fatalf("the mac: %+v", la)
 		}
 	}
-	if got := core.delegateCandidates([]string{"codex"}); len(got) != 1 || got[0] != "mac" {
+	// Codex itself first, a worker of its own; the Mac's SuperAI, which can
+	// run it, next.
+	if got := core.delegateCandidates([]string{"codex"}); strings.Join(got, " ") != "codex.mac mac" {
 		t.Fatalf("codex work goes to %v", got)
 	}
 	if got := core.delegateCandidates([]string{"noted"}); len(got) != 2 {

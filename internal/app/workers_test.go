@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"slices"
 	"sort"
 	"strings"
@@ -105,5 +106,80 @@ func TestAnAgentWithAModelTakesWorkOverItsLink(t *testing.T) {
 	// Asked to think, the one with no model says it cannot.
 	if err := core.agents().get("orange1").call(context.Background(), "SendChat", []any{"s", "hi", []string{}}, nil); err == nil || !strings.Contains(err.Error(), "no model") {
 		t.Fatalf("a keyless agent asked to work: %v", err)
+	}
+}
+
+// Every kind of worker takes a piece of work the same way: the queen pins
+// one to openclaw, which a linked machine runs, and one to this machine's
+// Claude Code, which does it as a coding run. Both come back as reports and
+// go on the task board; a CLI takes one piece at a time.
+func TestEveryKindOfWorkerTakesAPiece(t *testing.T) {
+	bin, _ := fakeClaude(t, fakeClaudeTurn, 0)
+	core := NewApp()
+	core.settings = &backend.Settings{WorkspaceDir: t.TempDir(), Hive: backend.HiveSettings{Role: backend.HiveRoleQueen, Name: "q"},
+		ExternalAgents: backend.ExternalAgents{Enabled: true, Unattended: true, Binaries: map[string]string{"claude": bin}}}
+	addr := startCore(t, core)
+	stream := dialAs(t, addr, "tok")
+	hello := &agentlinkpb.Hello{Name: "box", Agents: []*agentlinkpb.NamedAgent{{Name: "openclaw", About: "the gateway"}}}
+	if err := stream.Send(&agentlinkpb.AgentFrame{Kind: &agentlinkpb.AgentFrame_Hello{Hello: hello}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := stream.Recv(); err != nil {
+		t.Fatal(err)
+	}
+	go func() {
+		for {
+			f, err := stream.Recv()
+			if err != nil {
+				return
+			}
+			c := f.GetCall()
+			if c == nil {
+				continue
+			}
+			out := `{"ok":true}`
+			if c.GetMethod() == "AskRemoteAgent" {
+				var args []string
+				_ = json.Unmarshal([]byte(c.GetArgsJson()), &args)
+				b, _ := json.Marshal(map[string]any{"agent": args[0], "text": "openclaw did: " + args[1]})
+				out = string(b)
+			}
+			_ = stream.Send(&agentlinkpb.AgentFrame{Kind: &agentlinkpb.AgentFrame_Reply{Reply: &agentlinkpb.Reply{Id: c.GetId(), ResultJson: out}}})
+		}
+	}()
+	waitFor(t, "box to link", func() bool { return core.agents().get("box") != nil })
+
+	cands := core.delegateCandidates(nil)
+	if !slices.Contains(cands, "openclaw") || !slices.Contains(cands, "claude.q") {
+		t.Fatalf("workers the queen can hand work to: %v", cands)
+	}
+	results, err := core.delegate(context.Background(), []backend.DelegateTask{
+		{Task: "check the gateway", Worker: "openclaw"},
+		{Task: "count the members", Worker: "claude.q"},
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r := results[0]; r.Worker != "openclaw" || r.Fallback || r.Failed || !strings.Contains(r.Text, "openclaw did:") {
+		t.Fatalf("openclaw's piece: %+v", r)
+	}
+	if r := results[1]; r.Worker != "claude.q" || r.Fallback || r.Failed || !strings.Contains(r.Text, "两个成员") {
+		t.Fatalf("Claude Code's piece: %+v", r)
+	}
+	done := map[string]string{}
+	for _, task := range core.tasks().Recent() {
+		done[task.Worker] = task.State
+	}
+	if done["openclaw"] != backend.TaskDone || done["claude.q"] != backend.TaskDone {
+		t.Fatalf("on the board: %v", done)
+	}
+
+	// With a run of its own going, Claude Code takes no more.
+	st := core.cliStore()
+	st.mu.Lock()
+	st.runs["busy"] = &CLIRun{ID: "busy", Agent: "claude", State: "running"}
+	st.mu.Unlock()
+	if c := core.delegateCandidates(nil); slices.Contains(c, "claude.q") || !slices.Contains(c, "openclaw") {
+		t.Fatalf("a busy CLI is offered: %v", c)
 	}
 }

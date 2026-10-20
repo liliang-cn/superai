@@ -544,11 +544,13 @@ func (a *App) registerHiveTools(svc *backend.Service, cfg *backend.Settings) {
 	}
 
 	inner.AddToolWithMetadata("hive_members",
-		"Who is in the hive right now: every worker that has joined, whether it is live or lost, and where it is."+
-			" Look here before commanding, because a worker that is lost will not answer.",
+		"Who can take work right now. members: the SuperAI workers that joined the hive, live or lost, and where each is."+
+			" workers: every agent that can work, peers of each other: SuperAI workers, named agents (openclaw, hermes, pi)"+
+			" and signed-in coding CLIs by machine (claude.mac), each with its host and whether it is up."+
+			" Look here before commanding or delegating, because a worker that is lost will not answer.",
 		map[string]any{"type": "object", "properties": map[string]any{}},
 		func(ctx context.Context, _ map[string]any) (any, error) {
-			b, err := json.Marshal(a.rosterView())
+			b, err := json.Marshal(map[string]any{"members": a.rosterView(), "workers": a.HiveWorkers()})
 			return string(b), err
 		},
 		agent.ToolMetadata{ReadOnly: true, ConcurrencySafe: true})
