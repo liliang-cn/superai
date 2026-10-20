@@ -1712,6 +1712,8 @@ pre.cr-trace-detail { margin-top: 2px; }
 .cr-msg.assistant .cr-role { color: var(--cr-lime); }
 .cr-msg.tool .cr-role { color: var(--cr-amber); }
 .cr-call { color: var(--cr-dim); }
+.cr-msg.answer .cr-role { color: var(--cr-lime); font-weight: 600; }
+.cr-reasoning { color: var(--cr-mute); font-style: italic; }
 
 /* ---------------------------------------------------------------------------
    AIGUI `ui` blocks (@ai-gui/plugin-ui).

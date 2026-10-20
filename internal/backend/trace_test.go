@@ -82,7 +82,7 @@ func TestTraceStoreRecordsASegmentedRun(t *testing.T) {
 
 // A chat turn is not a task worth a file. The observer sees every run the
 // service makes; only a long run goes through Begin.
-func TestAChatIsTracedIntoItsConversationWithWhatTheModelWasSent(t *testing.T) {
+func TestAChatIsTracedIntoItsConversationWithWhatTheModelWasSentAndAnswered(t *testing.T) {
 	svc := newTestLongRunService(t)
 	defer svc.Close()
 
@@ -132,6 +132,16 @@ func TestAChatIsTracedIntoItsConversationWithWhatTheModelWasSent(t *testing.T) {
 	call := TraceCall(dir, "chat-session", span)
 	if !strings.Contains(call, "Say goodbye.") {
 		t.Fatalf("the last call's request does not have the last prompt: %.400s", call)
+	}
+	// And what it answered, beside it.
+	var whole struct {
+		Response struct {
+			Content string `json:"content"`
+			Finish  string `json:"finish_reason"`
+		} `json:"response"`
+	}
+	if json.Unmarshal([]byte(call), &whole) != nil || whole.Response.Content != "All done." || whole.Response.Finish != "stop" {
+		t.Fatalf("the call does not say what the model answered: %.600s", call)
 	}
 }
 

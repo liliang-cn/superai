@@ -52,6 +52,14 @@ interface TraceRow {
   text?: string;
   /** In the list, the request's size; whole from TraceCall. */
   request?: { messages?: number | TraceMessage[]; tools?: number | string[]; bytes?: number; prompt?: string };
+  /** What the model answered on a model_end: its text, reasoning, the calls
+   *  it asked for and why it stopped. */
+  response?: {
+    content?: string;
+    reasoning?: string;
+    tool_calls?: { id?: string; name: string; args?: Record<string, unknown> }[];
+    finish_reason?: string;
+  };
 }
 
 interface TraceMessage {
@@ -79,15 +87,19 @@ const subject = (r: TraceRow) =>
 
 // whether a row has more to show than its one line
 const opens = (r: TraceRow) =>
-  (r.event === "model_end" && !!r.request && !!r.span_id) ||
+  (r.event === "model_end" && (!!r.request || !!r.response) && !!r.span_id) ||
   (r.event === "tool_start" && !!r.args) ||
   (r.event === "tool_end" && !!r.result);
 
 const sent = (r: TraceRow) =>
   r.request && typeof r.request.messages === "number" ? `${r.request.messages} msgs` : "";
 
+// what a model call answered, in one line: the calls it asked for, else its text.
+const answered = (r: TraceRow) =>
+  r.response?.tool_calls?.length ? "→ " + r.response.tool_calls.map((c) => c.name).join(", ") : r.response?.content ?? "";
+
 // what the row says, if anything: an error beats a reason beats a result.
-const detail = (r: TraceRow) => r.error ?? r.reason ?? r.message ?? r.result ?? "";
+const detail = (r: TraceRow) => r.error ?? r.reason ?? r.message ?? r.result ?? answered(r);
 
 export default function RunTracePanel({
   taskId,
@@ -298,6 +310,18 @@ function TraceDetail({ id, row }: { id: string; row: TraceRow }) {
           ))}
         </div>
       ))}
+      {call.response && (
+        <div className="cr-msg answer">
+          <span className="cr-role">answered{call.response.finish_reason ? ` · ${call.response.finish_reason}` : ""}</span>
+          {call.response.reasoning ? <pre className="cr-reasoning">{call.response.reasoning}</pre> : null}
+          {call.response.content ? <pre>{call.response.content}</pre> : null}
+          {call.response.tool_calls?.map((c, j) => (
+            <pre key={j} className="cr-call">
+              {c.name}({c.args ? JSON.stringify(c.args) : ""})
+            </pre>
+          ))}
+        </div>
+      )}
       {tools.length > 0 && (
         <div className="cr-msg">
           <span className="cr-role">tools offered · {tools.length}</span>
