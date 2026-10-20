@@ -220,6 +220,8 @@ export function pose(r: THREE.Object3D, t: number, reduced = false) {
     hx = 0.35;
   }
   if (s !== "think") (u.antMat as THREE.MeshStandardMaterial).emissiveIntensity = s === "work" ? 0.6 : 0;
+  // On its way to another host: arms swinging in step, head up.
+  if (u.walking && !still) { la = Math.sin(k * 9) * 0.55; ra = -la; lz = 0.08; rz = -0.08; hx = 0; hy = 0; bob = 0; }
   if (gesture) { ra = -2.9; rz = -0.35; }
   // Eating a coin: a quick chomp.
   if (!reduced && (u.chompUntil ?? 0) > t) hx = 0.25 * Math.abs(Math.sin(t * 28));

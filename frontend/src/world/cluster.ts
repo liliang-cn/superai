@@ -12,6 +12,7 @@ import type { AttentionItem } from "../canvas/attention";
 import type { Member } from "../components/HiveMeter";
 import { translate } from "../lib/i18n";
 import { boardLine, touchesNoted, type AgendaEntry } from "./agenda";
+import { along, movesOf, tripTime, turn, type Stand } from "./travel";
 import { getQueenName, queenTitle } from "../lib/queenName";
 import { engineLabel } from "../lib/format";
 
@@ -625,6 +626,31 @@ export const cluster: District<WorldData> = {
     const extras = new Map<string, { r: THREE.Group; label: Label; a: HostAgent; host: Host }>();
     const plotViews = new Map<string, { p: Plot; label: Label; cable: ReturnType<typeof cable>; dev?: THREE.Group; crew: Map<string, HostAgent> }>();
     const serviceViews = new Map<string, { m: THREE.Group; label: Label; svc: HAService }>();
+    // Every agent standing on a host in this plan, by what it is and where:
+    // what a new plan is held against to see who moved.
+    let placed: { key: string; host: string; r: THREE.Group }[] = [];
+    const stands = (): Stand[] => placed.map(({ key, host, r }) => {
+      const w = r.getWorldPosition(new THREE.Vector3());
+      return { key, host, x: w.x, y: w.y, z: w.z };
+    });
+    // Robots on their way from the host they were on to the one they are on
+    // now, in their plot's own coordinates.
+    const trips = new Map<THREE.Group, { from: THREE.Vector3; to: THREE.Vector3; yaw: number; heading: number; t: number; dur: number }>();
+    /** Sets each robot that moved off at its old spot, bound for its new one. */
+    const travel = (before: Stand[]) => {
+      if (ctx.reduced || !before.length) return;
+      for (const mv of movesOf(before, stands())) {
+        const r = placed.find((x) => x.key === mv.key)?.r;
+        if (!r?.parent) continue;
+        const from = r.parent.worldToLocal(new THREE.Vector3(mv.from.x, mv.from.y, mv.from.z));
+        const to = new THREE.Vector3(r.position.x, (r.userData.base as number | undefined) ?? r.position.y, r.position.z);
+        trips.set(r, { from, to, yaw: r.rotation.y, heading: Math.atan2(to.x - from.x, to.z - from.z), t: 0, dur: tripTime(mv.from, mv.to) });
+        r.position.set(from.x, from.y, from.z);
+        r.userData.base = from.y;
+        r.rotation.y = Math.atan2(to.x - from.x, to.z - from.z);
+        r.userData.walking = true;
+      }
+    };
 
     const coreAt = new THREE.Vector3(0, 0, -2.2);
     const cables = new THREE.Group();
@@ -705,6 +731,22 @@ export const cluster: District<WorldData> = {
     const bitPool: THREE.Object3D[] = [];
     const bitMat = new THREE.MeshBasicMaterial({ color: accentColor, transparent: true, opacity: 0.9, toneMapped: false });
     let bitAt = 0;
+    ctx.tick((dt) => {
+      for (const [r, x] of trips) {
+        x.t = Math.min(1, x.t + dt / x.dur);
+        const p = along(x.from, x.to, x.t);
+        r.position.x = p.x; r.position.z = p.z;
+        r.userData.base = p.y;
+        // Facing the way it goes, turning to its post over the last steps.
+        r.rotation.y = turn(x.heading, x.yaw, (x.t - 0.82) / 0.18);
+        if (x.t >= 1) {
+          trips.delete(r);
+          r.userData.walking = false;
+          // Arrived: a ring on the floor where it lands.
+          ctx.spark(r.getWorldPosition(new THREE.Vector3()).setY(0.2), ROUTE);
+        }
+      }
+    });
     ctx.tick((dt, t) => {
       clock = t;
       flowRoutes(dt, t, ctx.reduced);
@@ -824,6 +866,8 @@ export const cluster: District<WorldData> = {
       forgetLines(hostLayer);
       hostLayer.clear();
       plan = null;
+      placed = [];
+      trips.clear();
     };
     /** Where the line from a plot's centre toward `to` leaves it. */
     const edgeOf = (p: Plot, to: THREE.Vector3, pad = 0.3) => {
@@ -909,6 +953,7 @@ export const cluster: District<WorldData> = {
             r.rotation.y = Math.atan2(face.x - pos.x, face.z - pos.z);
             clis.set(n, { r, label: ctx.label(r, n, "", k % 2 ? 2.9 : 2.1) });
             crew.set(n, a);
+            placed.push({ key: `${a.kind}:${n}`, host: p.host.id, r });
             actor((a.kind === "cli" ? "cli:" : "agent:") + `${n}.${via}`, r);
             if (a.kind !== "cli") actor("agent:" + n, r);
           });
@@ -927,6 +972,7 @@ export const cluster: District<WorldData> = {
             grp.add(r);
             ctx.pickable(r, { kind: "worker", id: a.name, title: a.name });
             workers.set(a.name, { r, label: ctx.label(r, short(a.name), "", 2.4), node: p.host.id });
+            placed.push({ key: `superai:${a.name}`, host: p.host.id, r });
             actor("worker:" + a.name, r);
           });
         });
@@ -941,6 +987,7 @@ export const cluster: District<WorldData> = {
             grp.add(r);
             ctx.pickable(r, { kind: "worker", id: a.name, title: a.name });
             workers.set(a.name, { r, label: ctx.label(r, short(a.name), "", 2.4), node: p.host.id });
+            placed.push({ key: `superai:${a.name}`, host: p.host.id, r });
             actor("worker:" + a.name, r);
             return;
           }
@@ -960,6 +1007,7 @@ export const cluster: District<WorldData> = {
           ctx.pickable(r, { kind: a.kind === "cli" ? "cli" : "agent", id: `${n}.${via}`, title: `${n} · ${p.host.name}` });
           clis.set(n, { r, label: ctx.label(r, n, "", k % 2 ? 2.9 : 2.1) });
           crew.set(n, a);
+          placed.push({ key: `${a.kind}:${n}`, host: p.host.id, r });
           actor((a.kind === "cli" ? "cli:" : "agent:") + `${n}.${via}`, r);
           if (a.kind !== "cli") actor("agent:" + n, r);
         });
@@ -989,6 +1037,7 @@ export const cluster: District<WorldData> = {
           hostLayer.add(r);
           ctx.pickable(r, { kind: a.kind === "cli" ? "cli" : "agent", id: n, title: n });
           extras.set(`${a.name}@core`, { r, label: ctx.label(r, n, "", k % 2 ? 2.9 : 2.1), a, host: pl.core! });
+          placed.push({ key: `${a.kind}:${n}`, host: pl.core!.id, r });
           actor((a.kind === "cli" ? "cli:" : "agent:") + n, r);
         });
       }
@@ -1027,7 +1076,12 @@ export const cluster: District<WorldData> = {
         hosts.map((h) => [h.id, h.name, h.kind, h.parent, h.state, h.os, h.agents.map((a) => [a.name, a.kind, a.role, a.via, isStandby(a) ? a.state : ""])]),
         svcs.map((s) => [s.name, s.active, s.standbys]),
       ]);
-      if (sig !== hostSig || !plan) { hostSig = sig; clearCrew(); buildHosts(planHosts(hosts, svcs)); }
+      if (sig !== hostSig || !plan) {
+        // Where everyone stood, so whoever is on another host now walks there.
+        const before = plan ? stands() : [];
+        hostSig = sig; clearCrew(); buildHosts(planHosts(hosts, svcs));
+        travel(before);
+      }
       const agentOf = new Map<string, HostAgent>();
       for (const h of hosts) for (const a of h.agents) if (a.kind === "superai") agentOf.set(a.name, a);
 
