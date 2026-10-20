@@ -292,7 +292,7 @@ func NewService(s *Settings) (*Service, error) {
 	_, vitaMissing, _, vitaConfigured := findMCPServer(MCPConfigSources(), VitaServer, os.LookupEnv)
 	vitaConfigured = vitaConfigured && len(vitaMissing) == 0
 	b := agent.New("SuperAI").
-		WithPrompt(buildPersona(time.Now(), !s.DisableSelfInstall, s.ExternalAgents.Enabled) + hiveSection(s.Hive) + queenNameSection(s) + homeLayoutSection(s.Hive) + notedSection(notedConfigured) + vitaSection(vitaConfigured) + uiRulesSection()).
+		WithPrompt(buildPersona(time.Now(), !s.DisableSelfInstall, s.ExternalAgents.Enabled) + hiveSection(s.Hive) + queenNameSection(s) + homeLayoutSection(s.Hive) + notedSectionFor(notedConfigured, s.Hive.Role) + vitaSection(vitaConfigured) + uiRulesSection()).
 		WithConfig(cfg).
 		WithLLM(brain).
 		WithSandbox(sb).

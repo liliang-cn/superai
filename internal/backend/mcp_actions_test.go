@@ -295,6 +295,21 @@ func TestNotedSectionOnlyWhenConfigured(t *testing.T) {
 	}
 }
 
+func TestAWorkerWithoutNotedSaysItCannotSeeTheSchedule(t *testing.T) {
+	if notedSectionFor(false, "") != "" || notedSectionFor(false, HiveRoleQueen) != "" {
+		t.Error("a SuperAI of its own, or a queen, without noted is told about noted")
+	}
+	s := notedSectionFor(false, HiveRoleWorker)
+	for _, want := range []string{"not connected on this worker", "never say there is nothing", "the queen"} {
+		if !strings.Contains(s, want) {
+			t.Errorf("the worker's note lacks %q", want)
+		}
+	}
+	if notedSectionFor(true, HiveRoleWorker) != notedSection(true) {
+		t.Error("a worker with noted is not told what anyone with noted is")
+	}
+}
+
 func TestVitaSectionOnlyWhenConfigured(t *testing.T) {
 	if vitaSection(false) != "" {
 		t.Error("vita guidance without vita")
