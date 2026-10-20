@@ -53,9 +53,14 @@ type agentJoinConf struct {
 
 const agentTokenFile = "core-token"
 
-// joinedOptions is how to link from what a join kept, if one was made here.
+// joinedOptions is how to link from what a join kept, if one was made here:
+// in SUPERAI_HOME, which the service a join installs is given, else in the
+// default home (a Windows task is given no environment).
 func joinedOptions() (AgentLinkOptions, bool) {
-	home := agentHome()
+	home := strings.TrimSpace(os.Getenv("SUPERAI_HOME"))
+	if home == "" {
+		home = agentHome()
+	}
 	raw, err := os.ReadFile(filepath.Join(home, "agent.json"))
 	if err != nil {
 		return AgentLinkOptions{}, false
