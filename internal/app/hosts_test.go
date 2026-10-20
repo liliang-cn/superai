@@ -385,9 +385,10 @@ func TestOnlyWhatWorksIsDrawn(t *testing.T) {
 		{ID: "pro.local", Name: "mac", Agents: []HostAgent{
 			{Name: "mac", Kind: "superai", Role: "worker"},
 			{Name: "claude.mac", Kind: "cli", Via: "mac"},
-			{Name: "codex.mac", Kind: "cli", Via: "mac", State: "installed"},  // can say it is signed in
-			{Name: "goose.mac", Kind: "cli", Via: "mac", State: "installed"},  // cannot, and is not in use
-			{Name: "opencode.mac", Kind: "cli", Via: "mac", State: "working"}, // cannot say, but is in use
+			{Name: "codex.mac", Kind: "cli", Via: "mac", State: "installed"},                  // can say it is signed in
+			{Name: "goose.mac", Kind: "cli", Via: "mac", State: "installed"},                  // cannot, and is not in use
+			{Name: "opencode.mac", Kind: "cli", Via: "mac", State: "working"},                 // cannot say, but is in use
+			{Name: "gemini.mac", Kind: "cli", Via: "mac", State: "working", Unrunnable: true}, // in use, but not one SuperAI can start
 		}},
 	}}
 	got := map[string][]string{}

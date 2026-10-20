@@ -82,6 +82,10 @@ type HostAgent struct {
 	// it runs on the service's active host and stands by on the others
 	// (state standby), and is reached at the service's IP.
 	Service string `json:"service,omitempty"`
+	// Unrunnable is a coding CLI seen running on its host that the SuperAI
+	// there cannot start: not installed for it, or its CLIs switched off.
+	// Someone is using it; core cannot hand it work.
+	Unrunnable bool `json:"unrunnable,omitempty"`
 }
 
 // HiveTopology is the hive in one answer: the hosts with what runs on each,
@@ -183,6 +187,8 @@ func onlyWhatWorks(t HiveTopology) HiveTopology {
 
 // canWork is whether an agent on a host is one that can take work.
 //   - A SuperAI that is a machine or a relay agent has no model: no.
+//   - A coding CLI the SuperAI on its host cannot start is no worker, however
+//     busy someone keeps it there.
 //   - A coding CLI that is only installed counts when it is one that can say
 //     it is signed in (claude, codex): a signed-out one is never reported
 //     (localAgentNames). One that cannot say counts once it is seen in use.
@@ -193,6 +199,9 @@ func canWork(ag HostAgent, running map[string]bool) bool {
 	case hostAgentSuperAI:
 		return ag.Role != agentRoleMachine && ag.Role != agentRoleRelay
 	case hostAgentCLI:
+		if ag.Unrunnable {
+			return false
+		}
 		if ag.State != "installed" {
 			return true
 		}
@@ -608,7 +617,7 @@ func (b *hostBook) agent(x *Host, g HostAgent) {
 // each is doing.
 func (b *hostBook) clis(x *Host, via string, names []string, act cliMap) {
 	seen := map[string]bool{}
-	add := func(cli string) {
+	add := func(cli string, runnable bool) {
 		if seen[cli] {
 			return
 		}
@@ -624,10 +633,10 @@ func (b *hostBook) clis(x *Host, via string, names []string, act cliMap) {
 				st = actIdle
 			}
 		}
-		b.agent(x, HostAgent{Name: cli + "." + via, Kind: hostAgentCLI, State: st, Via: via})
+		b.agent(x, HostAgent{Name: cli + "." + via, Kind: hostAgentCLI, State: st, Via: via, Unrunnable: !runnable})
 	}
 	for _, n := range names {
-		add(n)
+		add(n, true)
 	}
 	// Running but not found on PATH (a CLI started from elsewhere) is still here.
 	extra := make([]string, 0, len(act))
@@ -636,7 +645,7 @@ func (b *hostBook) clis(x *Host, via string, names []string, act cliMap) {
 	}
 	sort.Strings(extra)
 	for _, n := range extra {
-		add(n)
+		add(n, false)
 	}
 }
 
