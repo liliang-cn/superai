@@ -113,7 +113,7 @@ spec:
             # search). Its endpoint is written in the entry so SuperAI sees it is
             # the store its memory already uses and withholds the duplicate memory
             # tools; the token comes from CORTEXDB_GRPC_TOKEN above.
-            - {name: SUPERAI_MCP_JSON, value: '{"mcpServers":{"cortexdb":{"type":"stdio","command":"cortexdb-mcp-stdio","env":{"CORTEXDB_REMOTE":"192.168.123.253:47821"}},"noted":{"type":"http","url":"http://192.168.123.65:43638/mcp","headers":{"Authorization":"Bearer ${NOTED_TOKEN}"}},"vita":{"type":"http","url":"http://192.168.123.65:43671/mcp","headers":{"Authorization":"Bearer ${VITA_TOKEN}"}}}}'}
+            - {name: SUPERAI_MCP_JSON, value: '{"mcpServers":{"cortexdb":{"type":"stdio","command":"cortexdb-mcp-stdio","env":{"CORTEXDB_REMOTE":"192.168.123.253:47821"}},"noted":{"type":"http","url":"http://192.168.123.65:43638/mcp","headers":{"Authorization":"Bearer ${NOTED_TOKEN}"}},"vita":{"type":"http","url":"http://192.168.123.65:43671/mcp","headers":{"Authorization":"Bearer ${VITA_TOKEN}"}},"haify":{"type":"http","url":"http://192.168.123.251:43871/mcp","headers":{"Authorization":"Bearer ${HAIFY_MCP_TOKEN}"}}}}'}
             # noted (to-dos, calendar, notes, goals, time, holdings): the queen's
             # data layer, also what the app's cards and tiles read through.
             - {name: NOTED_TOKEN, valueFrom: {secretKeyRef: {name: superai-hive, key: noted_token, optional: true}}}
@@ -121,6 +121,10 @@ spec:
             # beside noted). Optional like noted: without vita_token the
             # server is left out and SuperAI knows nothing of health.
             - {name: VITA_TOKEN, valueFrom: {secretKeyRef: {name: superai-hive, key: vita_token, optional: true}}}
+            # haify's MCP, read-only (a token of role read): the queen sees HA,
+            # storage and nodes. Moving a service goes through hive_ha_move,
+            # which asks first; haify's delete tools never reach her.
+            - {name: HAIFY_MCP_TOKEN, valueFrom: {secretKeyRef: {name: superai-hive, key: haify_mcp_token, optional: true}}}
             # How much work the queen hands to workers: max (default), auto or
             # off. Overrides hive.delegation in settings-queen.json; uncomment
             # to turn it down without touching the Secret.
