@@ -230,3 +230,38 @@ func field(m map[string]any, keys ...string) string {
 	}
 	return ""
 }
+
+// HaifyEvict moves an HA service off the node it runs on: haify stops it
+// there and starts it on a standby, and answers once another node has taken
+// over (or that none did). Which standby is haify's choice.
+func HaifyEvict(ctx context.Context, src HaifySource, resource string, client *http.Client) (string, error) {
+	if client == nil {
+		client = &http.Client{Timeout: 5 * time.Minute}
+	}
+	body, _ := json.Marshal(map[string]string{"resource": resource})
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(src.URL, "/")+"/v1/resources/"+resource+"/ha/evict", strings.NewReader(string(body)))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if t := src.token(); t != "" {
+		req.Header.Set("Authorization", "Bearer "+t)
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
+	var out struct {
+		Success bool   `json:"success"`
+		Message string `json:"message"`
+		Error   string `json:"error"`
+	}
+	_ = json.Unmarshal(raw, &out)
+	if resp.StatusCode != http.StatusOK || !out.Success {
+		why := firstNonEmpty(out.Message, out.Error, strings.TrimSpace(string(raw)), resp.Status)
+		return "", fmt.Errorf("haify would not move %s: %s", resource, why)
+	}
+	return out.Message, nil
+}

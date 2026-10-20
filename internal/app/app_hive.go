@@ -565,6 +565,24 @@ func (a *App) registerHiveTools(svc *backend.Service, cfg *backend.Settings) {
 		func(ctx context.Context, _ map[string]any) (any, error) { return topologyText(a.fullTopology()), nil },
 		agent.ToolMetadata{ReadOnly: true, ConcurrencySafe: true})
 
+	inner.AddToolWithMetadata("hive_ha_move",
+		"Move an HA service (like openclaw, kept up by haify) off the host it runs on to one of its standbys: haify stops"+
+			" it there and starts it on another, and this answers where it went. Name the service or the agent it keeps up."+
+			" It is down for the switchover, seconds to a minute or two, and anyone talking to it then loses that reply,"+
+			" so only do it when the person asks for it. haify picks which standby; hive_hosts shows the standbys first.",
+		map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"service": map[string]any{"type": "string", "description": "The HA service or the agent it keeps up, e.g. openclaw."},
+			},
+			"required": []string{"service"},
+		},
+		func(ctx context.Context, args map[string]any) (any, error) {
+			name, _ := args["service"].(string)
+			return a.moveHA(ctx, name)
+		},
+		agent.ToolMetadata{Destructive: true})
+
 	inner.AddToolWithMetadata("hive_command",
 		"Command the other workers — SuperAI instances in this hive — to work in parallel and collect what each reports back."+
 			" A `commands` entry may also name an agent outside the hive — a coding agent on a linked machine (\"codex.mac\","+
