@@ -295,4 +295,16 @@ func TestNotedSectionOnlyWhenConfigured(t *testing.T) {
 	}
 }
 
+func TestVitaSectionOnlyWhenConfigured(t *testing.T) {
+	if vitaSection(false) != "" {
+		t.Error("vita guidance without vita")
+	}
+	s := vitaSection(true)
+	for _, want := range []string{"mcp_vita_", "health_today", "health_days", "health_trend", "not a zero", "not medical advice"} {
+		if !strings.Contains(s, want) {
+			t.Errorf("vita section lacks %q", want)
+		}
+	}
+}
+
 func mustJSON(v any) string { b, _ := json.Marshal(v); return string(b) }
