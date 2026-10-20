@@ -104,6 +104,9 @@ spec:
             - {name: SUPERAI_PUBLIC_URL, value: "https://ai.superleo.cn"}
             # Core: agents dial in here over gRPC (proto/agentlink/v1).
             - {name: SUPERAI_AGENT_PORT, value: "43120"}
+            # Where agents outside reach it (the NodePort below): a machine
+            # that joins with a pairing code learns it from the claim.
+            - {name: SUPERAI_AGENT_ADVERTISE, value: "192.168.123.214:31744,192.168.123.215:31744,192.168.123.216:31744"}
             - {name: CORTEXDB_GRPC_TOKEN, valueFrom: {secretKeyRef: {name: superai-hive, key: cortexdb_token}}}
             - {name: SUPERAI_SETTINGS_JSON, valueFrom: {secretKeyRef: {name: superai-hive, key: settings-queen.json}}}
             # The shared brain's MCP server (knowledge graph, ontologies, graph

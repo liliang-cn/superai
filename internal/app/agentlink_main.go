@@ -67,12 +67,29 @@ func (f agentLinkFlags) options() (AgentLinkOptions, bool) {
 // AgentMain is `superai agent`: this machine as an agent of a core, with no
 // web surface of its own — it dials core and does what core asks of it.
 func AgentMain(argv []string) {
+	if len(argv) > 0 && (argv[0] == "join" || argv[0] == "leave") {
+		var err error
+		if argv[0] == "join" {
+			err = agentJoin(argv[1:])
+		} else {
+			err = agentLeave()
+		}
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "error:", err)
+			os.Exit(1)
+		}
+		return
+	}
 	fl := flag.NewFlagSet("agent", flag.ExitOnError)
 	lf := addAgentLinkFlags(fl)
 	_ = fl.Parse(argv)
 	o, ok := lf.options()
 	if !ok {
-		fmt.Fprintln(os.Stderr, "superai agent: -core host:port is required (or SUPERAI_CORE)")
+		// As the service a join installed runs it: from what the join kept.
+		o, ok = joinedOptions()
+	}
+	if !ok {
+		fmt.Fprintln(os.Stderr, "superai agent: -core host:port is required (or SUPERAI_CORE), or join first: superai agent join <core address> <code>")
 		os.Exit(2)
 	}
 	if o.Token == "" {

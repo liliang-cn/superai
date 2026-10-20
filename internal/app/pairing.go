@@ -375,7 +375,13 @@ func pairRoutes(mux *http.ServeMux, c *credentials) {
 			writeJSONStatus(w, http.StatusUnauthorized, map[string]any{"error": "配对码不对或已过期"})
 			return
 		}
-		writeJSON(w, map[string]any{"token": tok, "device_id": d.ID, "name": d.Name})
+		out := map[string]any{"token": tok, "device_id": d.ID, "name": d.Name}
+		// Where an agent joining with this code reaches the link, when this
+		// core was told (agent_join.go).
+		if l := strings.TrimSpace(os.Getenv(agentAdvertiseEnv)); l != "" {
+			out["agent_link"] = l
+		}
+		writeJSON(w, out)
 	})
 }
 

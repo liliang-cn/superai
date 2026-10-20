@@ -36,6 +36,17 @@ const (
 	nodeDefaultPort = 43779
 )
 
+// loginService is a process kept running for this login: a launchd agent on
+// macOS, a systemd user unit on Linux, a scheduled task on Windows.
+type loginService struct {
+	label string // launchd label, and the Windows task's name
+	unit  string // systemd unit
+	about string
+	log   string // file in the home it writes to
+}
+
+var nodeService = loginService{label: nodeLabel, unit: "superai-node.service", about: "SuperAI node", log: "serve.log"}
+
 // NodeMain is `superai node …`.
 func NodeMain(argv []string) {
 	if len(argv) == 0 {
@@ -143,9 +154,9 @@ func nodeInstall(argv []string) error {
 	args := []string{bin, "serve", "-port", fmt.Sprint(*port), "-bind", "0.0.0.0"}
 	switch runtime.GOOS {
 	case "darwin":
-		err = installLaunchd(home, args, env)
+		err = nodeService.installLaunchd(home, args, env)
 	case "linux":
-		err = installSystemd(home, args, env)
+		err = nodeService.installSystemd(home, args, env)
 	default:
 		err = fmt.Errorf("%s is not supported; run %s by hand", runtime.GOOS, strings.Join(args, " "))
 	}
@@ -235,19 +246,19 @@ func loginEnv() map[string]string {
 	return out
 }
 
-func launchdPlist() string {
+func (sv loginService) launchdPlist() string {
 	h, _ := os.UserHomeDir()
-	return filepath.Join(h, "Library", "LaunchAgents", nodeLabel+".plist")
+	return filepath.Join(h, "Library", "LaunchAgents", sv.label+".plist")
 }
 
-func installLaunchd(home string, args []string, env map[string]string) error {
+func (sv loginService) installLaunchd(home string, args []string, env map[string]string) error {
 	env["SUPERAI_HOME"] = home
 	var b strings.Builder
 	b.WriteString(`<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>Label</key><string>` + nodeLabel + `</string>
+  <key>Label</key><string>` + sv.label + `</string>
   <key>ProgramArguments</key>
   <array>
 `)
@@ -258,7 +269,7 @@ func installLaunchd(home string, args []string, env map[string]string) error {
 	for k, v := range env {
 		fmt.Fprintf(&b, "    <key>%s</key><string>%s</string>\n", xmlEscape(k), xmlEscape(v))
 	}
-	log := filepath.Join(home, "serve.log")
+	log := filepath.Join(home, sv.log)
 	fmt.Fprintf(&b, `  </dict>
   <key>WorkingDirectory</key><string>%s</string>
   <key>RunAtLoad</key><true/>
@@ -270,7 +281,7 @@ func installLaunchd(home string, args []string, env map[string]string) error {
 </plist>
 `, xmlEscape(home), xmlEscape(log), xmlEscape(log))
 
-	p := launchdPlist()
+	p := sv.launchdPlist()
 	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 		return err
 	}
@@ -278,7 +289,7 @@ func installLaunchd(home string, args []string, env map[string]string) error {
 		return err
 	}
 	domain := fmt.Sprintf("gui/%d", os.Getuid())
-	_ = exec.Command("launchctl", "bootout", domain+"/"+nodeLabel).Run() // a previous install
+	_ = exec.Command("launchctl", "bootout", domain+"/"+sv.label).Run() // a previous install
 	time.Sleep(time.Second)
 	if out, err := exec.Command("launchctl", "bootstrap", domain, p).CombinedOutput(); err != nil {
 		return fmt.Errorf("launchctl bootstrap: %v: %s", err, strings.TrimSpace(string(out)))
@@ -291,36 +302,36 @@ func xmlEscape(s string) string {
 	return r.Replace(s)
 }
 
-func systemdUnit() string {
+func (sv loginService) systemdUnit() string {
 	h, _ := os.UserHomeDir()
-	return filepath.Join(h, ".config", "systemd", "user", "superai-node.service")
+	return filepath.Join(h, ".config", "systemd", "user", sv.unit)
 }
 
-func installSystemd(home string, args []string, env map[string]string) error {
+func (sv loginService) installSystemd(home string, args []string, env map[string]string) error {
 	if _, err := exec.LookPath("systemctl"); err != nil {
 		return fmt.Errorf("no systemd here (a container?): start it with your own supervisor:\n  SUPERAI_HOME=%s %s", home, strings.Join(args, " "))
 	}
 	var b strings.Builder
-	b.WriteString("[Unit]\nDescription=SuperAI node\nAfter=network-online.target\n\n[Service]\n")
+	fmt.Fprintf(&b, "[Unit]\nDescription=%s\nAfter=network-online.target\n\n[Service]\n", sv.about)
 	fmt.Fprintf(&b, "Environment=SUPERAI_HOME=%s\n", home)
 	for k, v := range env {
 		fmt.Fprintf(&b, "Environment=%q\n", k+"="+v)
 	}
 	fmt.Fprintf(&b, "WorkingDirectory=%s\nExecStart=%s\nRestart=always\nRestartSec=3\n\n[Install]\nWantedBy=default.target\n",
 		home, strings.Join(args, " "))
-	p := systemdUnit()
+	p := sv.systemdUnit()
 	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 		return err
 	}
 	if err := os.WriteFile(p, []byte(b.String()), 0o600); err != nil {
 		return err
 	}
-	for _, c := range [][]string{{"daemon-reload"}, {"enable", "--now", "superai-node.service"}, {"restart", "superai-node.service"}} {
+	for _, c := range [][]string{{"daemon-reload"}, {"enable", "--now", sv.unit}, {"restart", sv.unit}} {
 		if out, err := exec.Command("systemctl", append([]string{"--user"}, c...)...).CombinedOutput(); err != nil {
 			return fmt.Errorf("systemctl --user %s: %v: %s", strings.Join(c, " "), err, strings.TrimSpace(string(out)))
 		}
 	}
-	// Without lingering, a user unit stops at logout: wrong for a node.
+	// Without lingering, a user unit stops at logout: wrong for a service.
 	if u := os.Getenv("USER"); u != "" {
 		_ = exec.Command("loginctl", "enable-linger", u).Run()
 	}
@@ -436,10 +447,10 @@ func nodeUninstall(argv []string) error {
 	switch runtime.GOOS {
 	case "darwin":
 		_ = exec.Command("launchctl", "bootout", fmt.Sprintf("gui/%d/%s", os.Getuid(), nodeLabel)).Run()
-		_ = os.Remove(launchdPlist())
+		_ = os.Remove(nodeService.launchdPlist())
 	case "linux":
-		_ = exec.Command("systemctl", "--user", "disable", "--now", "superai-node.service").Run()
-		_ = os.Remove(systemdUnit())
+		_ = exec.Command("systemctl", "--user", "disable", "--now", nodeService.unit).Run()
+		_ = os.Remove(nodeService.systemdUnit())
 		_ = exec.Command("systemctl", "--user", "daemon-reload").Run()
 	}
 	if *purge {
