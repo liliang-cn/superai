@@ -518,7 +518,7 @@ func (a *App) Relays() []RelayAgent {
 	out := []RelayAgent{}
 	role := a.agentRoles()
 	for _, c := range a.agents().list() {
-		if role(c.name(), c.hello.GetRole()) != agentRoleRelay {
+		if role(c.name(), helloRole(c.hello)) != agentRoleRelay {
 			continue
 		}
 		r := RelayAgent{Name: c.name(), Host: c.hello.GetHost(), Agents: []map[string]string{}, CLIActivity: c.cliActivity()}

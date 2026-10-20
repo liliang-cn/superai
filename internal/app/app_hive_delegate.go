@@ -47,8 +47,8 @@ func (a *App) delegationMode() string {
 	return s.Hive.DelegationMode()
 }
 
-// liveWorkers is the hive's own workers that are live. Agents reached some
-// other way (a laptop's node) are not the hive's to hand its work to.
+// liveWorkers is the hive's own workers that are live. A linked machine
+// whose agent thinks is a worker too (linkedThinkers), reached over its link.
 func (a *App) liveWorkers() []backend.HiveMember {
 	var out []backend.HiveMember
 	for _, m := range a.HiveMembers() {
@@ -76,13 +76,21 @@ func (a *App) delegateCandidates(needs []string) []string {
 		known bool
 	}
 	var cs []cand
+	roster := map[string]bool{}
 	for _, m := range a.liveWorkers() {
+		roster[m.Name] = true
 		have := m.MCP
 		if have != nil {
 			have = append(append([]string{}, m.MCP...), m.CLIs...)
 		}
 		if backend.HasAll(have, needs) {
 			cs = append(cs, cand{m.Name, running[m.Name], m.MCP != nil})
+		}
+	}
+	// A linked machine whose agent thinks is a worker too, over its link.
+	for n, t := range a.linkedThinkers(roster) {
+		if backend.HasAll(t.have, needs) {
+			cs = append(cs, cand{n, running[n], true})
 		}
 	}
 	sort.Slice(cs, func(i, j int) bool {

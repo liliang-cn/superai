@@ -325,19 +325,30 @@ func splitAddress(name string) (bare, machine string, ok bool) {
 const (
 	// agentRoleMachine is a computer someone owns: the Mac, the orange boxes.
 	agentRoleMachine = "machine"
-	// agentRoleWorker is a hive worker's pod, which also dials the link. It is
-	// on the roster and drawn as a worker; as a machine it would be twice.
+	// agentRoleWorker is an agent that can take a piece of work: a hive
+	// worker's pod, which also dials the link, or a machine whose agent has
+	// a model of its own. Drawn as a worker; a pod as a machine would be twice.
 	agentRoleWorker = "worker"
 	// agentRoleRelay is an agent kept for the named agents it serves
 	// (openclaw, hermes, ...): agent_link.relay_only in the settings.
 	agentRoleRelay = "relay"
 )
 
+// helloRole is the role an agent declares: a worker when it says it is a hive
+// worker or that it has a model of its own, since an agent that can think can
+// take a piece of work, whatever machine it is on.
+func helloRole(h *agentlinkpb.Hello) string {
+	if h.GetRole() == agentRoleWorker || h.GetThinks() {
+		return agentRoleWorker
+	}
+	return h.GetRole()
+}
+
 // agentRoles is a classifier for the agents connected right now, built once
 // from the hive roster and the settings so a list does not take a.mu per row.
 //
-// A worker is known by what it says (Hello.role, sent by a build that knows
-// it is one) or, for a worker from before that, by being on the roster under
+// A worker is known by what it says (helloRole: a hive worker, or an agent
+// with a model of its own) or, for a worker from before that, by being on the roster under
 // the name it links with: a worker pod links as $(POD_NAME), the name it
 // joins the hive by.
 func (a *App) agentRoles() func(name, declared string) string {
@@ -387,7 +398,7 @@ func machineToo(role string, h *agentlinkpb.Hello) bool {
 
 // agentRole is what the connected agent c is to this core.
 func (a *App) agentRole(c *agentConn) string {
-	return a.agentRoles()(c.name(), c.hello.GetRole())
+	return a.agentRoles()(c.name(), helloRole(c.hello))
 }
 
 // LinkedAgent is a connected agent as the screens show it.
@@ -452,7 +463,7 @@ func (a *App) LinkedAgentsAll() []LinkedAgent {
 		if m := c.cliActivity(); len(m) > 0 {
 			la.CLIActivity = m
 		}
-		la.Role = role(la.Name, c.hello.GetRole())
+		la.Role = role(la.Name, helloRole(c.hello))
 		la.Machine = machineToo(la.Role, c.hello)
 		out = append(out, la)
 	}
@@ -560,7 +571,7 @@ func (s *agentLinkServer) Connect(stream agentlinkpb.AgentLink_ConnectServer) er
 			if !bye {
 				hub.lost[hello.GetName()] = time.UnixMilli(c.lastSeen.Load())
 				c.mu.Lock()
-				hub.lostRole[hello.GetName()] = c.hello.GetRole()
+				hub.lostRole[hello.GetName()] = helloRole(c.hello)
 				if hub.lostHello != nil {
 					hub.lostHello[hello.GetName()] = c.hello
 				}

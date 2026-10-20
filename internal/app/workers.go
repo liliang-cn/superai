@@ -1,9 +1,14 @@
 package app
 
 import (
+	"context"
+	"encoding/json"
+	"io"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/liliang-cn/superai/internal/backend"
 )
 
 // Who can work.
@@ -49,6 +54,66 @@ func (a *App) HiveWorkers() []HiveWorker {
 			seen[ag.Name] = true
 			out = append(out, HiveWorker{Name: ag.Name, Kind: ag.Kind, Host: h.Name, State: ag.State, Up: workerUp(ag.State)})
 		}
+	}
+	return out
+}
+
+// linkWire reaches the model of a linked agent that has one, over the agent
+// link: the same SendChat and event stream a hive worker serves over HTTP,
+// on the line the agent holds open to core.
+type linkWire struct{ c *agentConn }
+
+func (w linkWire) Where() string { return "agent link · " + w.c.name() }
+
+func (w linkWire) Events(ctx context.Context, _ string) (io.ReadCloser, error) {
+	return w.c.eventStream(ctx), nil
+}
+
+func (w linkWire) Call(ctx context.Context, method string, args []any) (json.RawMessage, error) {
+	var raw json.RawMessage
+	err := w.c.call(ctx, method, args, &raw)
+	return raw, err
+}
+
+// linkedThinker is a linked agent with a model of its own that is not on the
+// hive's roster: a worker reached over the link alone.
+type linkedThinker struct {
+	conn *agentConn
+	// have is the MCP servers and CLIs it said it has, for routing.
+	have []string
+}
+
+// linkedThinkers are the linked agents that think and are not already on
+// roster, by name.
+func (a *App) linkedThinkers(roster map[string]bool) map[string]linkedThinker {
+	out := map[string]linkedThinker{}
+	for _, c := range a.agents().list() {
+		if !c.hello.GetThinks() || roster[c.name()] {
+			continue
+		}
+		have := append(append([]string{}, c.hello.GetMcp()...), c.hello.GetClis()...)
+		out[c.name()] = linkedThinker{conn: c, have: have}
+	}
+	return out
+}
+
+// withLinkedThinkers adds the linked agents that think to a roster as the
+// runner sees it, each reached over its link.
+func (a *App) withLinkedThinkers(roster map[string]backend.RemoteAgent) map[string]backend.RemoteAgent {
+	on := map[string]bool{}
+	for n := range roster {
+		on[n] = true
+	}
+	thinkers := a.linkedThinkers(on)
+	if len(thinkers) == 0 {
+		return roster
+	}
+	out := make(map[string]backend.RemoteAgent, len(roster)+len(thinkers))
+	for n, ag := range roster {
+		out[n] = ag
+	}
+	for n, t := range thinkers {
+		out[n] = backend.RemoteAgent{About: "SuperAI on " + t.conn.hello.GetHost(), Wire: linkWire{t.conn}}
 	}
 	return out
 }

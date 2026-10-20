@@ -266,8 +266,14 @@ type Hello struct {
 	// The host it runs on: "pod", "container", "mac", "vm" or "metal" (host is
 	// that box's name), and the host that one sits inside when known, like a
 	// pod's k3s node. An older agent sends neither.
-	Kind          string `protobuf:"bytes,9,opt,name=kind,proto3" json:"kind,omitempty"`
-	Parent        string `protobuf:"bytes,10,opt,name=parent,proto3" json:"parent,omitempty"`
+	Kind   string `protobuf:"bytes,9,opt,name=kind,proto3" json:"kind,omitempty"`
+	Parent string `protobuf:"bytes,10,opt,name=parent,proto3" json:"parent,omitempty"`
+	// Whether it has a model of its own to think with. One that does is a
+	// worker core can hand a piece of work to; one that does not is only
+	// core's hands on that machine. Unset from an agent too old to say.
+	Thinks *bool `protobuf:"varint,11,opt,name=thinks,proto3,oneof" json:"thinks,omitempty"`
+	// The MCP servers it can call, when it thinks: what core routes by.
+	Mcp           []string `protobuf:"bytes,12,rep,name=mcp,proto3" json:"mcp,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -370,6 +376,20 @@ func (x *Hello) GetParent() string {
 		return x.Parent
 	}
 	return ""
+}
+
+func (x *Hello) GetThinks() bool {
+	if x != nil && x.Thinks != nil {
+		return *x.Thinks
+	}
+	return false
+}
+
+func (x *Hello) GetMcp() []string {
+	if x != nil {
+		return x.Mcp
+	}
+	return nil
 }
 
 type NamedAgent struct {
@@ -751,7 +771,7 @@ const file_agentlink_v1_agentlink_proto_rawDesc = "" +
 	"\awelcome\x18\x01 \x01(\v2\x1d.superai.agentlink.v1.WelcomeH\x00R\awelcome\x120\n" +
 	"\x04call\x18\x02 \x01(\v2\x1a.superai.agentlink.v1.CallH\x00R\x04call\x120\n" +
 	"\x04ping\x18\x03 \x01(\v2\x1a.superai.agentlink.v1.PingH\x00R\x04pingB\x06\n" +
-	"\x04kind\"\xfb\x01\n" +
+	"\x04kind\"\xb5\x02\n" +
 	"\x05Hello\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
 	"\x04host\x18\x02 \x01(\tR\x04host\x12\x0e\n" +
@@ -763,7 +783,10 @@ const file_agentlink_v1_agentlink_proto_rawDesc = "" +
 	"\x04role\x18\b \x01(\tR\x04role\x12\x12\n" +
 	"\x04kind\x18\t \x01(\tR\x04kind\x12\x16\n" +
 	"\x06parent\x18\n" +
-	" \x01(\tR\x06parent\"6\n" +
+	" \x01(\tR\x06parent\x12\x1b\n" +
+	"\x06thinks\x18\v \x01(\bH\x00R\x06thinks\x88\x01\x01\x12\x10\n" +
+	"\x03mcp\x18\f \x03(\tR\x03mcpB\t\n" +
+	"\a_thinks\"6\n" +
 	"\n" +
 	"NamedAgent\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
@@ -850,6 +873,7 @@ func file_agentlink_v1_agentlink_proto_init() {
 		(*CoreFrame_Call)(nil),
 		(*CoreFrame_Ping)(nil),
 	}
+	file_agentlink_v1_agentlink_proto_msgTypes[2].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

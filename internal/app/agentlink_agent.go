@@ -58,6 +58,9 @@ var agentCallable = map[string]bool{
 	// Core's away switch, pushed when it changes and on connect, so a
 	// permission prompt is passed on the spot when somebody is at this machine.
 	"CCAwayHint": true,
+	// A piece of work for this machine's own model, when it has one: core's
+	// queen hands it out as she would to a hive worker (backend/hive_call.go).
+	"SendChat": true, "CancelChat": true,
 	// The machine itself (host.go): how it is, its services and logs, and —
 	// unless its owner turned it off — service actions and commands.
 	"HostStatus": true, "HostServices": true, "HostLogs": true, "HostService": true, "HostExec": true,
@@ -117,7 +120,14 @@ func (a *App) agentHello(o AgentLinkOptions) *agentlinkpb.Hello {
 	if a.settings != nil && a.settings.Hive.Role == backend.HiveRoleWorker {
 		h.Role = agentRoleWorker
 	}
+	svc := a.svc
+	thinks := svc != nil || a.ownTurnFn != nil // hasModel, under the lock held
 	a.mu.Unlock()
+	// With a model of its own it is a worker, and says what it can call.
+	h.Thinks = &thinks
+	if svc != nil {
+		h.Mcp = svc.MCPServersWithTools()
+	}
 	for _, c := range a.localAgentNames() {
 		h.Clis = append(h.Clis, c.Name)
 	}
@@ -237,12 +247,12 @@ func (a *App) agentLinkOnce(ctx context.Context, o AgentLinkOptions) error {
 	go func() {
 		t := time.NewTicker(time.Minute)
 		defer t.Stop()
-		last := fmt.Sprint(hello.GetClis(), hello.GetAgents(), hello.GetRole())
+		last := fmt.Sprint(hello.GetClis(), hello.GetAgents(), hello.GetRole(), hello.GetThinks(), hello.GetMcp())
 		for {
 			select {
 			case <-t.C:
 				h := a.agentHello(o)
-				if now := fmt.Sprint(h.GetClis(), h.GetAgents(), h.GetRole()); now != last {
+				if now := fmt.Sprint(h.GetClis(), h.GetAgents(), h.GetRole(), h.GetThinks(), h.GetMcp()); now != last {
 					last = now
 					send(&agentlinkpb.AgentFrame{Kind: &agentlinkpb.AgentFrame_Hello{Hello: h}})
 				}
@@ -291,6 +301,10 @@ func (a *App) answerCall(c *agentlinkpb.Call) *agentlinkpb.Reply {
 	r := &agentlinkpb.Reply{Id: c.GetId()}
 	if !agentCallable[c.GetMethod()] {
 		r.Error = c.GetMethod() + " is not something core can ask an agent to do"
+		return r
+	}
+	if c.GetMethod() == "SendChat" && !a.hasModel() {
+		r.Error = "this agent has no model of its own to do work with"
 		return r
 	}
 	var raw []json.RawMessage

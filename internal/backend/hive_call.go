@@ -38,9 +38,70 @@ import (
 // not share is a transcript, because two commands to one worker at once
 // interleaved in one conversation would be one confused turn.
 
+// WorkerWire is how a worker is reached: its event stream, as the SSE lines
+// /api/events writes, and its methods, as /api/rpc takes them. Over HTTP for
+// a hive worker; over the agent link for a machine whose agent has a model of
+// its own, which core cannot dial but which holds a line open to core.
+type WorkerWire interface {
+	// Events opens the stream of the events whose names start with one of
+	// only's comma-separated prefixes (a wire may send more).
+	Events(ctx context.Context, only string) (io.ReadCloser, error)
+	// Call runs method with args and returns its JSON result.
+	Call(ctx context.Context, method string, args []any) (json.RawMessage, error)
+	// Where says where it is, for the result's Host.
+	Where() string
+}
+
+// httpWire is a worker serving over HTTP, with the bearer it accepts.
+type httpWire struct{ base, token string }
+
+func (w httpWire) Where() string { return w.base }
+
+func (w httpWire) auth(r *http.Request) {
+	if w.token != "" {
+		r.Header.Set("Authorization", "Bearer "+w.token)
+	}
+}
+
+func (w httpWire) Events(ctx context.Context, only string) (io.ReadCloser, error) {
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, w.base+"/api/events?only="+only, nil)
+	w.auth(req)
+	resp, err := workerHTTP.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("cannot reach the worker: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		resp.Body.Close()
+		return nil, fmt.Errorf("the worker refused the event stream: %s", resp.Status)
+	}
+	return resp.Body, nil
+}
+
+func (w httpWire) Call(ctx context.Context, method string, args []any) (json.RawMessage, error) {
+	body, _ := json.Marshal(args)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, w.base+"/api/rpc/"+method, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	w.auth(req)
+	resp, err := workerHTTP.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("%s %s", resp.Status, strings.TrimSpace(string(raw)))
+	}
+	return raw, nil
+}
+
 // workerTarget is what askWorker needs from a worker entry.
 type workerTarget struct {
-	name  string
+	name string
+	// wire reaches it; nil is url and token over HTTP.
+	wire  WorkerWire
 	url   string
 	token string
 	// taskID is the order's UUID; it becomes the worker's session name, so the
@@ -79,25 +140,23 @@ type workerEvent struct {
 
 // askWorker sends one command to a worker and waits for its answer.
 func askWorker(ctx context.Context, t workerTarget, prompt string, progress func(phase, tool string)) RemoteResult {
-	res := RemoteResult{Agent: t.name, Host: t.url}
+	wire := t.wire
+	if wire == nil {
+		base, err := url.Parse(strings.TrimRight(t.url, "/"))
+		if err != nil || base.Scheme == "" || base.Host == "" {
+			return RemoteResult{Agent: t.name, Host: t.url, Failed: true, Reason: fmt.Sprintf("worker %q has no usable url: %q", t.name, t.url)}
+		}
+		wire = httpWire{base: base.String(), token: t.token}
+	}
+	res := RemoteResult{Agent: t.name, Host: wire.Where()}
 	fail := func(format string, a ...any) RemoteResult {
 		res.Failed, res.Reason = true, fmt.Sprintf(format, a...)
 		return res
-	}
-
-	base, err := url.Parse(strings.TrimRight(t.url, "/"))
-	if err != nil || base.Scheme == "" || base.Host == "" {
-		return fail("worker %q has no usable url: %q", t.name, t.url)
 	}
 	if t.timeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, t.timeout)
 		defer cancel()
-	}
-	auth := func(r *http.Request) {
-		if t.token != "" {
-			r.Header.Set("Authorization", "Bearer "+t.token)
-		}
 	}
 
 	// The stream is opened before the command is sent. The other order loses
@@ -113,16 +172,11 @@ func askWorker(ctx context.Context, t workerTarget, prompt string, progress func
 	if t.approve != nil {
 		only = "chat:,tool:approval"
 	}
-	req, _ := http.NewRequestWithContext(sseCtx, http.MethodGet, base.String()+"/api/events?only="+only, nil)
-	auth(req)
-	resp, err := workerHTTP.Do(req)
+	stream, err := wire.Events(sseCtx, only)
 	if err != nil {
-		return fail("cannot reach the worker: %v", err)
+		return fail("%v", err)
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return fail("the worker refused the event stream: %s", resp.Status)
-	}
+	defer stream.Close()
 
 	if t.taskID == "" {
 		t.taskID = uuid.NewString()
@@ -140,7 +194,7 @@ func askWorker(ctx context.Context, t workerTarget, prompt string, progress func
 	streamErr := make(chan error, 1)
 	go func() {
 		defer close(events)
-		sc := newEventLines(resp.Body, 8<<20)
+		sc := newEventLines(stream, 8<<20)
 		for sc.Scan() {
 			line := sc.Text()
 			if !strings.HasPrefix(line, "data: ") {
@@ -224,18 +278,9 @@ func askWorker(ctx context.Context, t workerTarget, prompt string, progress func
 		streamErr <- sc.Err()
 	}()
 
-	body, _ := json.Marshal([]any{session, prompt, []string{}})
-	post, _ := http.NewRequestWithContext(ctx, http.MethodPost, base.String()+"/api/rpc/SendChat", bytes.NewReader(body))
-	post.Header.Set("Content-Type", "application/json")
-	auth(post)
-	pr, err := workerHTTP.Do(post)
+	raw, err := wire.Call(ctx, "SendChat", []any{session, prompt, []string{}})
 	if err != nil {
-		return fail("cannot send the command: %v", err)
-	}
-	raw, _ := io.ReadAll(io.LimitReader(pr.Body, 1<<20))
-	pr.Body.Close()
-	if pr.StatusCode != http.StatusOK {
-		return fail("the worker refused the command: %s %s", pr.Status, strings.TrimSpace(string(raw)))
+		return fail("the worker refused the command: %v", err)
 	}
 	var id string
 	if json.Unmarshal(raw, &id) != nil || id == "" {
@@ -252,7 +297,7 @@ func askWorker(ctx context.Context, t workerTarget, prompt string, progress func
 			go func() {
 				allow := t.approve(ctx, p)
 				id, _ := p["id"].(string)
-				resolveWorkerApproval(base.String(), t.token, id, allow)
+				resolveWorkerApproval(wire, id, allow)
 			}()
 		case ev, ok := <-events:
 			if !ok {
@@ -313,7 +358,7 @@ func askWorker(ctx context.Context, t workerTarget, prompt string, progress func
 		case <-ctx.Done():
 			// Stopping the commander must stop the work, or a cancelled
 			// command keeps spending the worker's budget with nobody reading.
-			cancelWorker(base.String(), t.token, id)
+			cancelWorker(wire, id)
 			return fail("stopped: %v", ctx.Err())
 		}
 	}
@@ -321,44 +366,22 @@ func askWorker(ctx context.Context, t workerTarget, prompt string, progress func
 
 // cancelWorker is best effort, on its own short context: the caller's is already
 // cancelled, which is why it is being called.
-func cancelWorker(base, token, requestID string) {
+func cancelWorker(w WorkerWire, requestID string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	body, _ := json.Marshal([]any{requestID})
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, base+"/api/rpc/CancelChat", bytes.NewReader(body))
-	if err != nil {
-		return
-	}
-	req.Header.Set("Content-Type", "application/json")
-	if token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
-	if resp, err := workerHTTP.Do(req); err == nil {
-		resp.Body.Close()
-	}
+	_, _ = w.Call(ctx, "CancelChat", []any{requestID})
 }
 
 // resolveWorkerApproval answers a worker's held tool call. Best effort, on its
 // own short context: the order may already be over, and then the call it was
 // about is gone and the worker says so.
-func resolveWorkerApproval(base, token, id string, allow bool) {
+func resolveWorkerApproval(w WorkerWire, id string, allow bool) {
 	if id == "" {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	body, _ := json.Marshal([]any{id, allow})
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, base+"/api/rpc/ResolveToolApproval", bytes.NewReader(body))
-	if err != nil {
-		return
-	}
-	req.Header.Set("Content-Type", "application/json")
-	if token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
-	if resp, err := workerHTTP.Do(req); err == nil {
-		resp.Body.Close()
-	}
+	_, _ = w.Call(ctx, "ResolveToolApproval", []any{id, allow})
 }
 
 // readTurnUsage takes what a worker reported about its turn's tokens out of a

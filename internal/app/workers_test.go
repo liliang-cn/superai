@@ -1,6 +1,8 @@
 package app
 
 import (
+	"context"
+	"slices"
 	"sort"
 	"strings"
 	"sync/atomic"
@@ -51,5 +53,57 @@ func TestASignedOutCLIIsKnownAfterItsAnswer(t *testing.T) {
 	c.signedOut("claude", "/bin/claude")
 	if n := asked.Load(); n != 1 {
 		t.Fatalf("asked %d times within the hour, want 1", n)
+	}
+}
+
+// A machine whose agent has a model of its own is a worker: core counts it,
+// and the queen hands it a piece of work over the link, as she would a hive
+// worker over HTTP. The same agent without a model is only her hands there.
+func TestAnAgentWithAModelTakesWorkOverItsLink(t *testing.T) {
+	core := NewApp()
+	core.settings = &backend.Settings{Hive: backend.HiveSettings{Role: backend.HiveRoleQueen, Name: "q"}}
+	addr := startCore(t, core)
+	box := NewApp()
+	box.ownTurnFn = func(requestID, session, message, standIn string) {
+		box.emit("chat:done", map[string]any{"requestId": requestID, "final": "did: " + message})
+	}
+	keyless := NewApp()
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{}, 2)
+	go func() {
+		box.RunAgentLink(ctx, AgentLinkOptions{Core: addr, Token: "tok", Name: "box", Version: "test"})
+		done <- struct{}{}
+	}()
+	go func() {
+		keyless.RunAgentLink(ctx, AgentLinkOptions{Core: addr, Token: "tok", Name: "orange1", Version: "test"})
+		done <- struct{}{}
+	}()
+	t.Cleanup(func() { cancel(); <-done; <-done })
+	waitFor(t, "both to link", func() bool { return core.agents().get("box") != nil && core.agents().get("orange1") != nil })
+
+	if r := core.agentRole(core.agents().get("box")); r != agentRoleWorker {
+		t.Fatalf("an agent with a model is a %s", r)
+	}
+	if r := core.agentRole(core.agents().get("orange1")); r != agentRoleMachine {
+		t.Fatalf("an agent with no model is a %s", r)
+	}
+	if c := core.delegateCandidates(nil); !slices.Contains(c, "box") || slices.Contains(c, "orange1") {
+		t.Fatalf("who the queen can hand work to: %v", c)
+	}
+	var names []string
+	for _, w := range core.HiveWorkers() {
+		names = append(names, w.Name)
+	}
+	if !slices.Contains(names, "box") || slices.Contains(names, "orange1") {
+		t.Fatalf("workers: %v", names)
+	}
+
+	res, err := core.remoteRunner().Run(context.Background(), "box", "count the disks")
+	if err != nil || res.Failed || res.Text != "did: count the disks" {
+		t.Fatalf("work over the link: %+v %v", res, err)
+	}
+	// Asked to think, the one with no model says it cannot.
+	if err := core.agents().get("orange1").call(context.Background(), "SendChat", []any{"s", "hi", []string{}}, nil); err == nil || !strings.Contains(err.Error(), "no model") {
+		t.Fatalf("a keyless agent asked to work: %v", err)
 	}
 }

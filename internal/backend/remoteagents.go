@@ -77,6 +77,9 @@ type RemoteAgent struct {
 	// it accepts. See hive_call.go. Hosts and Command are ignored for a worker.
 	URL   string `json:"url,omitempty"`
 	Token string `json:"token,omitempty"`
+	// Wire, when set, reaches a worker some other way than URL: a machine
+	// whose agent has a model of its own, over the agent link. Never saved.
+	Wire WorkerWire `json:"-"`
 
 	// Hosts it may be running on, tried in order. More than one because a
 	// clustered agent moves between nodes.
@@ -314,7 +317,7 @@ func (r *RemoteRunner) lookup(name string) (RemoteAgent, bool, bool) {
 }
 
 // Workers is every reachable worker — those named in the settings and those that
-// have joined — by name. A worker is any agent with a URL.
+// have joined — by name. A worker is any agent with a URL, or a wire.
 func (r *RemoteRunner) Workers() map[string]RemoteAgent {
 	out := map[string]RemoteAgent{}
 	for n, a := range r.cfg.Agents {
@@ -324,7 +327,7 @@ func (r *RemoteRunner) Workers() map[string]RemoteAgent {
 	}
 	if r.roster != nil {
 		for n, a := range r.roster() {
-			if a.URL != "" {
+			if a.URL != "" || a.Wire != nil {
 				out[n] = a // the live worker, as in lookup
 			}
 		}
@@ -402,7 +405,7 @@ func (r *RemoteRunner) Run(ctx context.Context, name, prompt string) (res Remote
 		defer func() { end(res, err) }()
 	}
 
-	if agent.URL != "" {
+	if agent.URL != "" || agent.Wire != nil {
 		// An explicit TimeoutSeconds bounds a worker; otherwise nothing does.
 		var limit time.Duration
 		if r.cfg.TimeoutSeconds > 0 {
@@ -421,7 +424,7 @@ func (r *RemoteRunner) Run(ctx context.Context, name, prompt string) (res Remote
 		runCtx, stop := context.WithCancelCause(ctx)
 		defer stop(nil)
 		r.board.OnStop(id, func() { stop(ErrTaskStopped) })
-		target := workerTarget{name: name, url: agent.URL, token: agent.Token, timeout: limit, taskID: id,
+		target := workerTarget{name: name, wire: agent.Wire, url: agent.URL, token: agent.Token, timeout: limit, taskID: id,
 			pulse: func(kind, tool string, n int) { r.board.Pulse(id, kind, tool, n) },
 			tools: WorkerTraceFrom(ctx)}
 		if r.approve != nil {

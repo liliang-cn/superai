@@ -59,6 +59,12 @@ message Hello {
   // pod's k3s node. An older agent sends neither.
   string kind = 9;
   string parent = 10;
+  // Whether it has a model of its own to think with. One that does is a
+  // worker core can hand a piece of work to; one that does not is only
+  // core's hands on that machine. Unset from an agent too old to say.
+  optional bool thinks = 11;
+  // The MCP servers it can call, when it thinks: what core routes by.
+  repeated string mcp = 12;
 }
 
 message NamedAgent {

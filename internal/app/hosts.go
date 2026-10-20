@@ -268,7 +268,7 @@ func (a *App) hostsWith(services []backend.HAService) []Host {
 	role := a.agentRoles()
 	for _, c := range a.agents().list() {
 		hello := c.hello
-		r := role(c.name(), hello.GetRole())
+		r := role(c.name(), helloRole(hello))
 		x := b.linked(c.name(), hello, r)
 		x.live(time.UnixMilli(c.lastSeen.Load()))
 		b.agent(x, HostAgent{Name: c.name(), Kind: hostAgentSuperAI, Role: r, State: "live", Version: hello.GetVersion()})

@@ -120,7 +120,7 @@ func (a *App) HivePulse() HivePulse {
 	act := map[string]*CCActivity{}
 	roles := a.agentRoles()
 	for _, c := range a.agents().list() {
-		if roles(c.name(), c.hello.GetRole()) != agentRoleWorker {
+		if roles(c.name(), helloRole(c.hello)) != agentRoleWorker {
 			continue
 		}
 		linked[c.name()] = true

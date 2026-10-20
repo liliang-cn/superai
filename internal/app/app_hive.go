@@ -118,7 +118,7 @@ func (a *App) hiveAgents() map[string]backend.RemoteAgent {
 	h, ann := a.hive, a.hiveAnn
 	a.mu.Unlock()
 	if h != nil {
-		return h.Agents()
+		return a.withLinkedThinkers(h.Agents())
 	}
 	// A worker's roster is its peers, as the queen lists them.
 	if ann != nil {
@@ -126,7 +126,8 @@ func (a *App) hiveAgents() map[string]backend.RemoteAgent {
 		defer cancel()
 		return ann.Peers(ctx)
 	}
-	return nil
+	// A core in no hive: its workers are the linked agents that think.
+	return a.withLinkedThinkers(nil)
 }
 
 // HiveTaskDetail is one order by its UUID, whole: the full prompt, the full
