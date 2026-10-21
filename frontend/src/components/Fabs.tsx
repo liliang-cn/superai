@@ -1,5 +1,5 @@
 import type React from "react";
-import { BoxIcon, ListIcon, MessageSquareIcon } from "lucide-react";
+import { BoxIcon, ListIcon, MessageSquareIcon, SlidersHorizontalIcon } from "lucide-react";
 import { useI18n } from "../lib/i18n";
 import { queenRef, useQueenName } from "../lib/queenName";
 import "./fabs.css";
@@ -31,6 +31,16 @@ export function ModeFab({ world, onClick }: { world: boolean; onClick: () => voi
   return (
     <button type="button" className="fab fab-mode" onClick={onClick} aria-label={label} title={label}>
       {world ? <ListIcon size={17} /> : <BoxIcon size={17} />}
+    </button>
+  );
+}
+
+/** Settings, in 3D where the rail that holds it is not drawn. */
+export function SettingsFab({ onClick }: { onClick: () => void }) {
+  const { t } = useI18n();
+  return (
+    <button type="button" className="fab fab-mode" onClick={onClick} aria-label={t("Settings")} title={t("Settings")}>
+      <SlidersHorizontalIcon size={17} />
     </button>
   );
 }

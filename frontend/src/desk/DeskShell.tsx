@@ -17,7 +17,7 @@ import { queenTitle, useQueenName } from "../lib/queenName";
 import NotificationCenter from "../components/NotificationCenter";
 import BackendSwitcher from "./BackendSwitcher";
 import ThemePanel from "../canvas/ThemePanel";
-import { ChatFab, FabStack, ModeFab } from "../components/Fabs";
+import { ChatFab, FabStack, ModeFab, SettingsFab } from "../components/Fabs";
 import { askToCompose } from "../lib/compose";
 import "../canvas/canvas.css";
 import "./desk.css";
@@ -252,6 +252,7 @@ export default function DeskShell({ view, badges, children, onOpenConversation, 
           <button className="dk-win-x" style={noDrag} title={t("Back to the world")} onClick={() => setMode("world")}><XIcon size={18} /></button>
         )}
         <FabStack style={noDrag}>
+          {world && <SettingsFab onClick={() => window.dispatchEvent(new CustomEvent("superai:window", { detail: PATHS.settings }))} />}
           <ModeFab world={world} onClick={toggleMode} />
           <ChatFab onClick={openChat} />
         </FabStack>
