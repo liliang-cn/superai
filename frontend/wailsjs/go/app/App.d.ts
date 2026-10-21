@@ -234,6 +234,8 @@ export function PendingToolApprovals():Promise<Array<Record<string, any>>>;
 
 export function PetStage(arg1:string,arg2:Array<Record<string, string>>):Promise<void>;
 
+export function PhoneLinks():Promise<app.PhoneLinkInfo>;
+
 export function PickFiles():Promise<Array<string>>;
 
 export function PostNotification(arg1:app.PostNotificationRequest):Promise<app.PostedNotification>;

@@ -133,3 +133,43 @@ func TestInstallMCPServerValidates(t *testing.T) {
 		t.Error("the config should have been written")
 	}
 }
+
+// A server can be in either file this SuperAI reads; it goes from both, and
+// the rest of each file stays as it was.
+func TestRemoveMCPServerFromEveryConfig(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("SUPERAI_HOME", home)
+	data := filepath.Join(home, "data", "mcpServers.json")
+	if err := os.MkdirAll(filepath.Dir(data), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(data, []byte(`{"mcpServers":{"cortexdb":{"command":"x"}},"note":"kept"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := RemoveMCPServer("cortexdb"); err != nil {
+		t.Fatal(err)
+	}
+	raw, _ := os.ReadFile(data)
+	var top map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &top); err != nil {
+		t.Fatal(err)
+	}
+	if string(top["note"]) != `"kept"` || string(top["mcpServers"]) != "{}" {
+		t.Fatalf("file now %s", raw)
+	}
+	if fi, _ := os.Stat(data); fi.Mode().Perm() != 0o600 {
+		t.Fatalf("mode changed to %v", fi.Mode().Perm())
+	}
+}
+
+// One the queen hands out is not this SuperAI's to remove, and it says so.
+func TestAServerFromTheQueenIsNotRemovedHere(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("SUPERAI_HOME", home)
+	if err := os.WriteFile(HiveMCPFile(), []byte(`{"mcpServers":{"noted":{"type":"http","url":"http://x"}}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := RemoveMCPServer("noted"); err == nil {
+		t.Fatal("a queen's server was reported removed")
+	}
+}

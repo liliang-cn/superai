@@ -57,7 +57,10 @@ type Service struct {
 	// or the background daemon), because a cron loop outlives a chat turn. Tools
 	// that create schedules — set_reminder — go through it. Guarded by schedMu
 	// because injection races tool calls already in flight.
-	schedMu         sync.Mutex
+	schedMu sync.Mutex
+	// removedMCP holds the servers uninstalled while this service runs:
+	// agent-go lists a loaded server until it is built again.
+	removedMCP      sync.Map
 	promptScheduler *agent.PromptScheduler
 	// claims stops two schedule-writing tools from both answering one request.
 	// See schedule_once.go.

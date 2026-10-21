@@ -52,7 +52,13 @@ func (s *Service) MCPServers() []mcp.ServerStatus {
 	if s == nil || s.svc == nil || s.svc.MCP == nil {
 		return nil
 	}
-	return s.svc.MCP.ListServers()
+	out := []mcp.ServerStatus{}
+	for _, st := range s.svc.MCP.ListServers() {
+		if _, gone := s.removedMCP.Load(st.Name); !gone {
+			out = append(out, st)
+		}
+	}
+	return out
 }
 
 // LifeData is the snapshot the Life panel renders (schedules / records / persons

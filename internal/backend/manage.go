@@ -37,36 +37,84 @@ func (s *Service) InstallMCPServer(ctx context.Context, name, command string, ar
 	return nil
 }
 
-// RemoveMCPServer drops a server from the persisted config. The running process
-// stays until the next launch — MCP has no detach — which the caller should say.
+// RemoveMCPServer drops a server from every config this SuperAI keeps. One
+// that only the hive's queen hands out (hive_abilities.go) cannot be removed
+// here, and says so. The running process is UninstallMCPServer's.
 func RemoveMCPServer(name string) error {
 	name = sanitizeName(name)
 	if name == "" {
 		return fmt.Errorf("name is required")
 	}
-	path := mcpConfigPath()
+	found := false
+	for _, path := range []string{mcpConfigPath(), filepath.Join(DataDir(), "data", "mcpServers.json")} {
+		ok, err := removeMCPServerFrom(path, name)
+		if err != nil {
+			return err
+		}
+		found = found || ok
+	}
+	if !found {
+		if ok, _ := hasMCPServer(HiveMCPFile(), name); ok {
+			return fmt.Errorf("%s comes from the hive's queen; remove it there", name)
+		}
+	}
+	return nil
+}
+
+func readMCPConfig(path string) (map[string]json.RawMessage, map[string]json.RawMessage, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
+		return nil, nil, err
+	}
+	var top map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &top); err != nil {
+		return nil, nil, fmt.Errorf("parse %s: %w", filepath.Base(path), err)
+	}
+	servers := map[string]json.RawMessage{}
+	if s, ok := top["mcpServers"]; ok {
+		if err := json.Unmarshal(s, &servers); err != nil {
+			return nil, nil, fmt.Errorf("parse %s: %w", filepath.Base(path), err)
 		}
-		return err
 	}
-	var cfg struct {
-		Servers map[string]json.RawMessage `json:"mcpServers"`
-	}
-	if err := json.Unmarshal(raw, &cfg); err != nil {
-		return fmt.Errorf("parse %s: %w", filepath.Base(path), err)
-	}
-	if _, ok := cfg.Servers[name]; !ok {
-		return nil
-	}
-	delete(cfg.Servers, name)
-	out, err := json.MarshalIndent(cfg, "", "  ")
+	return top, servers, nil
+}
+
+func hasMCPServer(path, name string) (bool, error) {
+	_, servers, err := readMCPConfig(path)
 	if err != nil {
-		return err
+		return false, err
 	}
-	return os.WriteFile(path, out, 0o644)
+	_, ok := servers[name]
+	return ok, nil
+}
+
+// removeMCPServerFrom deletes one entry and keeps everything else in the file.
+func removeMCPServerFrom(path, name string) (bool, error) {
+	top, servers, err := readMCPConfig(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	if _, ok := servers[name]; !ok {
+		return false, nil
+	}
+	delete(servers, name)
+	b, err := json.Marshal(servers)
+	if err != nil {
+		return false, err
+	}
+	top["mcpServers"] = b
+	out, err := json.MarshalIndent(top, "", "  ")
+	if err != nil {
+		return false, err
+	}
+	mode := os.FileMode(0o644)
+	if fi, err := os.Stat(path); err == nil {
+		mode = fi.Mode().Perm()
+	}
+	return true, os.WriteFile(path, out, mode)
 }
 
 // InstallSkillFromPath copies a skill directory found on this machine into
@@ -143,6 +191,9 @@ func (s *Service) UninstallMCPServer(name string) error {
 	if s == nil || s.svc == nil {
 		return nil
 	}
+	// agent-go keeps a loaded server in its list until the next build; this
+	// service leaves it out from now on (MCPServers).
+	s.removedMCP.Store(sanitizeName(name), true)
 	if s.svc.MCP != nil {
 		_ = s.svc.MCP.StopServer(sanitizeName(name))
 	}

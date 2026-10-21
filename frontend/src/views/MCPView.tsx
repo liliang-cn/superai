@@ -213,7 +213,7 @@ export default function MCPView() {
                           }
                           setConfirmRemove("");
                           RemoveMCPServer(s.name).then((res) => {
-                            if (res === "ok") toast.success(`Removed ${s.name}. It stops on the next launch.`);
+                            if (res === "ok") toast.success(`Removed ${s.name}.`);
                             else toast.error(res);
                             load();
                           });

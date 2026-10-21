@@ -1388,11 +1388,16 @@ func (a *App) InstallMCPServer(name, command string, args []string, env map[stri
 	return "ok"
 }
 
-// RemoveMCPServer forgets a server, so it is gone on the next launch too.
+// RemoveMCPServer forgets a server: stopped now, and gone on the next launch too.
 func (a *App) RemoveMCPServer(name string) string {
-	if err := backend.RemoveMCPServer(name); err != nil {
+	a.mu.Lock()
+	svc := a.svc
+	a.mu.Unlock()
+	// Stopped and its tools withdrawn now, not on the next launch.
+	if err := svc.UninstallMCPServer(name); err != nil {
 		return err.Error()
 	}
+	a.emit("mcp:changed", map[string]any{"name": name})
 	return "ok"
 }
 

@@ -458,6 +458,10 @@ export function PetStage(arg1, arg2) {
   return window['go']['app']['App']['PetStage'](arg1, arg2);
 }
 
+export function PhoneLinks() {
+  return window['go']['app']['App']['PhoneLinks']();
+}
+
 export function PickFiles() {
   return window['go']['app']['App']['PickFiles']();
 }

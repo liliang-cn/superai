@@ -1511,6 +1511,22 @@ export namespace app {
 		    return a;
 		}
 	}
+	export class PhoneLinkInfo {
+	    urls: string[];
+	    fp?: string;
+	    relayed: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new PhoneLinkInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.urls = source["urls"];
+	        this.fp = source["fp"];
+	        this.relayed = source["relayed"];
+	    }
+	}
 	export class PostNotificationRequest {
 	    title: string;
 	    body: string;

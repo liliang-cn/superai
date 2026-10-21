@@ -53,10 +53,12 @@ export default function Inspector({ picked, data, onClose, open, openDash }: {
   /** Runs an action, says how it went, and keeps the button busy meanwhile. */
   const act = async (key: string, fn: () => Promise<unknown>, ok: string) => {
     setBusy(key);
-    try { await fn(); toast.success(t(ok)); }
-    catch (e) { toast.error(String(e instanceof Error ? e.message : e)); }
+    try { await fn(); toast.success(t(ok)); return true; }
+    catch (e) { toast.error(String(e instanceof Error ? e.message : e)); return false; }
     finally { setBusy(""); }
   };
+  /** For the bindings that answer "ok" or what went wrong. */
+  const must = (r: unknown) => { if (typeof r === "string" && r !== "ok") throw new Error(r); };
   /** A destructive action asks once more, on the same button. */
   const twice = (key: string, fn: () => void) => () => { if (confirm === key) { setConfirm(""); fn(); } else setConfirm(key); };
 
@@ -234,7 +236,7 @@ export default function Inspector({ picked, data, onClose, open, openDash }: {
       kind = "Skill";
       body = (
         <div className="wi-acts">
-          <button className="danger" onClick={twice("del", () => act("del", () => RemoveSkill(picked.id), "Removed").then(onClose))}><Trash2Icon size={14} />{t(confirm === "del" ? "Remove it?" : "Remove")}</button>
+          <button className="danger" onClick={twice("del", () => act("del", () => RemoveSkill(picked.id).then(must), "Removed").then((done) => { if (done) onClose(); }))}><Trash2Icon size={14} />{t(confirm === "del" ? "Remove it?" : "Remove")}</button>
         </div>
       );
       break;
@@ -244,7 +246,7 @@ export default function Inspector({ picked, data, onClose, open, openDash }: {
       if (m) rows.push(["State", m.ok ? "Connected" : "Not connected"], ["Tools", String(m.tools)]);
       body = (
         <div className="wi-acts">
-          <button className="danger" onClick={twice("del", () => act("del", () => RemoveMCPServer(picked.id), "Removed").then(onClose))}><Trash2Icon size={14} />{t(confirm === "del" ? "Remove it?" : "Remove")}</button>
+          <button className="danger" onClick={twice("del", () => act("del", () => RemoveMCPServer(picked.id).then(must), "Removed").then((done) => { if (done) onClose(); }))}><Trash2Icon size={14} />{t(confirm === "del" ? "Remove it?" : "Remove")}</button>
         </div>
       );
       break;
