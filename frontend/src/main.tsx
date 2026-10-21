@@ -13,6 +13,7 @@ import Gate from './components/Gate'
 import {HiveLinkStatus, OnboardingNeeded, TitleBarDoubleClick} from '../wailsjs/go/app/App'
 import {installHiveBridge, installTitleBarDoubleClick} from './lib/hivelink'
 import Onboarding from './components/Onboarding'
+import {SETUP_EVENT} from './lib/ready'
 
 /**
  * The password box, and only then the app.
@@ -52,8 +53,20 @@ function Root() {
     // own — a first start opens straight onto the app, and a hive is linked
     // from the backend switcher. null = still finding out.
     const [link, setLink] = useState<'linked' | 'alone' | null>(served ? 'alone' : null)
-    // On this Mac with the first start's questions not asked yet: those first.
+    // The first start's questions not asked yet: those first, the same in a
+    // browser (the agents are those on the machine SuperAI runs on).
     const [onboard, setOnboard] = useState(false)
+    const [onboardAt, setOnboardAt] = useState<'ask' | 'model'>('ask')
+    useEffect(() => {
+        if (!served || !authed) return
+        OnboardingNeeded().then(setOnboard).catch(() => setOnboard(false))
+    }, [served, authed])
+    // The setup banner, or a message sent with nothing to think with.
+    useEffect(() => {
+        const open = () => { setOnboardAt('ask'); setOnboard(true) }
+        window.addEventListener(SETUP_EVENT, open)
+        return () => window.removeEventListener(SETUP_EVENT, open)
+    }, [])
     useEffect(() => {
         if (served) return
         HiveLinkStatus()
@@ -71,7 +84,7 @@ function Root() {
 
     if (authed === null || link === null) return null
     if (!authed) return <Gate onEnter={() => setAuthed(true)}/>
-    if (onboard) return <Onboarding onDone={() => setOnboard(false)}/>
+    if (onboard) return <Onboarding web={served} start={onboardAt} onDone={() => setOnboard(false)}/>
     return (
         <HashRouter>
             <App/>

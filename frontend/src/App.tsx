@@ -27,6 +27,8 @@ import DeskShell from "./desk/DeskShell";
 import { clientKind } from "./lib/hivelink";
 import { ScheduleRunToasts } from "./components/ScheduleRuns";
 import { Toaster } from "./components/Toaster";
+import SetupBanner from "./components/SetupBanner";
+import { setReady } from "./lib/ready";
 import { useBackendToasts } from "./lib/toasts";
 import { EventsOff, EventsOn } from "../wailsjs/runtime/runtime";
 import ToolApprovals from "./components/ToolApprovals";
@@ -155,7 +157,9 @@ export default function App() {
   const refreshStatus = useCallback(async () => {
     try {
       const raw = await GetStatus();
-      setStatus(normalizeStatus(raw));
+      const st = normalizeStatus(raw);
+      setStatus(st);
+      setReady(st.ready);
     } catch (e: any) {
       setStatus(normalizeStatus({ ready: false, error: String(e?.message || e) }));
     } finally {
@@ -218,6 +222,7 @@ export default function App() {
         </DeskShell>
         {view !== "records" && <ScheduleRunToasts log={runs} onOpenConversation={openConversation} />}
         <Toaster onOpenConversation={openConversation} />
+        <SetupBanner status={status} loading={loading} />
         <ToolApprovals
           pending={view === "home" || view === "chat" || view === "tasks" ? [] : approvals.pending}
           note={approvals.note}
@@ -234,6 +239,7 @@ export default function App() {
         <CanvasView approvals={approvals} />
         <ScheduleRunToasts log={runs} onOpenConversation={openConversation} />
         <Toaster onOpenConversation={openConversation} />
+        <SetupBanner status={status} loading={loading} />
       </>
     );
   }
@@ -287,6 +293,7 @@ export default function App() {
       {view !== "chat" && <FabStack lifted><ChatFab onClick={() => setView("chat")} /></FabStack>}
       {/* Everything the backend publishes, whatever raised it. */}
       <Toaster onOpenConversation={openConversation} />
+      <SetupBanner status={status} loading={loading} />
       <ToolApprovals
         pending={approvals.pending}
         note={approvals.note}

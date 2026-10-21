@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowUpIcon, MessageSquareIcon, PlusIcon, MinusIcon, ChevronDownIcon } from "lucide-react";
 import { ChatHistory, HiveRetire, HiveSpawn, SendChat } from "../../wailsjs/go/app/App";
+import { earlyError, requestSetup, useReady } from "../lib/ready";
 import { visibleAnswer } from "../lib/format";
 import { Response } from "@/components/ai-elements/response";
 import { onBubbleClick, say, sayDone } from "./bubbles";
@@ -44,6 +45,7 @@ export default function Command({ view, onConversation, onTyping }: {
   const queen = useQueenName();
   const ime = useImeGuard();
   const [text, setText] = useState("");
+  const ready = useReady();
   const [req, setReq] = useState("");
   const [step, setStep] = useState("");
   const [busy, setBusy] = useState("");
@@ -126,6 +128,8 @@ export default function Command({ view, onConversation, onTyping }: {
   const send = async () => {
     const s = text.trim();
     if (!s || req) return;
+    // Nothing to think with: say so and open the setup, keeping the words.
+    if (ready === false) { requestSetup(); return; }
     setText("");
     say("queen", "", "think", 120);
     setLines((l) => [...l, { who: "you" as const, text: s }].slice(-12));
@@ -136,6 +140,14 @@ export default function Command({ view, onConversation, onTyping }: {
       const id = await SendChat(queenSession(), s, []);
       reqRef.current = id;
       mine.current = "";
+      // Failed before its id came back: no event will follow.
+      const failed = earlyError(id);
+      if (failed !== undefined) {
+        sayDone("queen", failed);
+        setLines((l) => [...l, { who: "queen" as const, text: failed }].slice(-12));
+        reqRef.current = "";
+        return;
+      }
       setReq(id);
     }
     catch (e) { toast.error(String(e instanceof Error ? e.message : e)); }
