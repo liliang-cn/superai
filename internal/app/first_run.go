@@ -142,7 +142,7 @@ func (a *App) FinishOnboarding(engine string, agents bool) error {
 
 // agentLabels are the names people know the agents by.
 var agentLabels = map[string]string{
-	"claude": "Claude Code", "codex": "Codex", "gemini": "Gemini CLI", "opencode": "opencode", "pi": "pi",
+	"claude": "Claude Code", "codex": "Codex", "opencode": "opencode", "pi": "pi",
 	"goose": "Goose", "copilot": "GitHub Copilot", "cursor-agent": "Cursor", "kimi": "Kimi", "agy": "Antigravity",
 	"hermes": "Hermes", "openclaw": "OpenClaw",
 }

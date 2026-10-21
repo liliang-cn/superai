@@ -100,7 +100,7 @@ export interface HostPlan {
   services: ServiceSpot[];
 }
 
-const FIRST = ["claude", "codex", "pi", "openclaw", "gemini", "opencode", "hermes"];
+const FIRST = ["claude", "codex", "pi", "openclaw", "opencode", "hermes"];
 const rank = (n: string) => { const i = FIRST.indexOf(n); return i < 0 ? 99 : i; };
 /** The best known first, at most `n`: which ones stand there does not move
  *  as their sessions come and go. */

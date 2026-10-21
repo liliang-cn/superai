@@ -19,8 +19,19 @@ import (
 // handed out at once and refreshed behind it. Changed overrides (a settings
 // save) are the one case that waits for a fresh look.
 func installedCLIs(overrides map[string]string) []agentexec.Installed {
-	return clis.get(overrides)
+	all := clis.get(overrides)
+	out := make([]agentexec.Installed, 0, len(all))
+	for _, c := range all {
+		if !retiredCLIs[c.Name] {
+			out = append(out, c)
+		}
+	}
+	return out
 }
+
+// retiredCLIs are coding CLIs SuperAI no longer offers, installed or not:
+// the Gemini CLI went with Gemini (Antigravity is Google's sign-in now).
+var retiredCLIs = map[string]bool{"gemini": true}
 
 var clis = &cliDiscovery{discover: agentexec.Discover}
 

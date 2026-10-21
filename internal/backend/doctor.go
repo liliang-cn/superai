@@ -195,7 +195,7 @@ const externalAgentProbeTimeout = 2 * time.Second
 
 // externalAgentCLIs are the agent CLIs SuperAI knows how to delegate to, in
 // the order the settings page lists them.
-var externalAgentCLIs = []string{"claude", "codex", "gemini", "cursor-agent"}
+var externalAgentCLIs = []string{"claude", "codex", "cursor-agent"}
 
 // ExternalAgentStatus is one agent CLI as seen from outside: on this machine
 // or not, and if so where and which version. It says nothing about whether

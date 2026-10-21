@@ -1291,7 +1291,7 @@ export const cluster: District<WorldData> = {
             }
             // The best-known agents first, so a machine with a dozen CLIs shows
             // the ones people look for.
-            const FIRST = ["claude", "codex", "pi", "openclaw", "gemini", "opencode", "hermes"];
+            const FIRST = ["claude", "codex", "pi", "openclaw", "opencode", "hermes"];
             const rank = (n: string) => { const i = FIRST.indexOf(n); return i < 0 ? 99 : i; };
             // The terminal sessions people run on it, every coding CLI's: work
             // that is not SuperAI's, done by the same CLIs.

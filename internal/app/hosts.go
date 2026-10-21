@@ -743,7 +743,8 @@ func (b *hostBook) agent(x *Host, g HostAgent) {
 func (b *hostBook) clis(x *Host, via string, names []string, act cliMap) {
 	seen := map[string]bool{}
 	add := func(cli string, runnable bool) {
-		if seen[cli] {
+		// An older agent still reports what SuperAI no longer offers.
+		if seen[cli] || retiredCLIs[cli] {
 			return
 		}
 		seen[cli] = true

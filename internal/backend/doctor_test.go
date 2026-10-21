@@ -154,8 +154,8 @@ func TestDoctorHonoursTheBinaryOverride(t *testing.T) {
 	path := stubCLI(t, elsewhere, "codex-x", "codex-cli 1.2.3")
 
 	got := ExternalAgentStatuses(context.Background(), map[string]string{
-		"codex":  path,
-		"gemini": filepath.Join(elsewhere, "does-not-exist"),
+		"codex":        path,
+		"cursor-agent": filepath.Join(elsewhere, "does-not-exist"),
 	})
 	byName := map[string]ExternalAgentStatus{}
 	for _, st := range got {
@@ -164,10 +164,10 @@ func TestDoctorHonoursTheBinaryOverride(t *testing.T) {
 	if st := byName["codex"]; !st.Installed || !st.Overridden || st.Version != "codex-cli 1.2.3" {
 		t.Fatalf("codex = %+v, want the overridden path probed", st)
 	}
-	if st := byName["gemini"]; st.Installed {
-		t.Fatalf("gemini = %+v, want an override pointing at nothing to read as not installed", st)
+	if st := byName["cursor-agent"]; st.Installed {
+		t.Fatalf("cursor-agent = %+v, want an override pointing at nothing to read as not installed", st)
 	}
-	if len(got) != 4 {
+	if len(got) != len(externalAgentCLIs) {
 		t.Fatalf("got %d statuses, want one per known CLI so the settings page can list them all", len(got))
 	}
 }
