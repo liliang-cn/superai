@@ -1018,6 +1018,7 @@ export namespace app {
 	    lastSeen?: any;
 	    addresses?: string[];
 	    agents: HostAgent[];
+	    on?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Host(source);
@@ -1036,6 +1037,7 @@ export namespace app {
 	        this.lastSeen = this.convertValues(source["lastSeen"], null);
 	        this.addresses = source["addresses"];
 	        this.agents = this.convertValues(source["agents"], HostAgent);
+	        this.on = source["on"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
