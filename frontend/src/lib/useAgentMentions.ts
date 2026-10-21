@@ -43,7 +43,7 @@ export interface AgentMentions {
   update: (value: string, caret: number) => void;
   /** Arrow keys, Enter, Tab and Escape while the menu is open. Returns true
    *  when it handled the key, so the composer knows not to also send. */
-  onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => boolean;
+  onKeyDown: (e: React.KeyboardEvent<HTMLElement>) => boolean;
   /** Accept a match, returning the text and caret the composer should take. */
   accept: (agent: AgentInfo) => { value: string; caret: number } | null;
   /** Shut the menu without choosing. */
@@ -153,7 +153,7 @@ export function useAgentMentions(
   );
 
   const onKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    (e: React.KeyboardEvent<HTMLElement>) => {
       if (matches.length === 0) return false;
       switch (e.key) {
         case "ArrowDown":

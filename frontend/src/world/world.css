@@ -197,6 +197,15 @@
 .wc-say input { flex: 1; min-width: 0; height: 34px; border: 0; background: transparent; outline: none; font: 13.5px Geist, system-ui, sans-serif; color: #16202b; }
 .wc-say button { width: 28px; height: 28px; border: 0; border-radius: 8px; background: #16202b; color: #fff; display: grid; place-items: center; cursor: pointer; }
 .wc-say button:disabled { opacity: 0.3; cursor: default; }
+/* The @ menu, above the line: who the queen can hand work to. */
+.wc-say { position: relative; }
+.wc-say .agent-menu { left: -6px; right: -6px; bottom: calc(100% + 14px); max-width: none; margin: 0; max-height: 300px; border-radius: 12px;
+  background: #fff; border: 1px solid rgba(22, 32, 43, 0.14); box-shadow: 0 14px 36px rgba(22, 32, 43, 0.16); }
+.wc-say .agent-opt { width: 100%; height: auto; padding: 7px 10px; border-radius: 8px; background: transparent; color: #16202b; display: grid; place-items: initial; }
+.wc-say .agent-opt.active, .wc-say .agent-opt:hover { background: #eef2f7; }
+.wc-say .agent-name { color: #16202b; font-size: 13px; }
+.wc-say .agent-about { color: #5f6d77; font-size: 12px; }
+.wc-say .agent-hint { color: #5f6d77; border-top-color: rgba(22, 32, 43, 0.1); }
 .wl-pill.hint { box-shadow: 0 0 0 2px #f2b416, 0 4px 14px rgba(201, 138, 0, 0.35); }
 
 /* Talking to a robot, in its card. */
@@ -436,6 +445,11 @@
 :root[data-theme="dark"] .wc-act { color: #c5cfd8; }
 :root[data-theme="dark"] .wc-sep { background: rgba(232, 237, 242, 0.12); }
 :root[data-theme="dark"] .wc-say input { color: #e8edf2; }
+:root[data-theme="dark"] .wc-say .agent-menu { background: #18212b; border-color: rgba(232, 237, 242, 0.12); box-shadow: 0 14px 36px rgba(0, 0, 0, 0.45); }
+:root[data-theme="dark"] .wc-say .agent-opt { background: transparent; color: #e8edf2; border-color: transparent; }
+:root[data-theme="dark"] .wc-say .agent-opt.active, :root[data-theme="dark"] .wc-say .agent-opt:hover { background: #26313d; }
+:root[data-theme="dark"] .wc-say .agent-name { color: #e8edf2; }
+:root[data-theme="dark"] .wc-say .agent-about, :root[data-theme="dark"] .wc-say .agent-hint { color: #9aa8b4; border-color: rgba(232, 237, 242, 0.1); }
 :root[data-theme="dark"] .wc-prompt { color: #f2b416; }
 :root[data-theme="dark"] .wt-it.bad { background: rgba(226, 85, 63, 0.18); color: #ff9a8c; }
 :root[data-theme="dark"] .wl-stats-who .bar { background: #26313d; }

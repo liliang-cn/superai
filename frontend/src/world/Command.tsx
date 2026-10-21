@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowUpIcon, MessageSquareIcon, PlusIcon, MinusIcon, ChevronDownIcon } from "lucide-react";
 import { ChatHistory, HiveRetire, HiveSpawn, SendChat } from "../../wailsjs/go/app/App";
 import { earlyError, requestSetup, useReady } from "../lib/ready";
@@ -14,6 +14,10 @@ import { toast } from "../lib/toasts";
 import { useImeGuard } from "../lib/ime";
 import type { ViewKey } from "../lib/types";
 import PodConfirm, { type PodChange } from "../components/PodConfirm";
+import { AgentMenu } from "../components/AgentMenu";
+import { useAgentMentions } from "../lib/useAgentMentions";
+import type { Host } from "../canvas/data";
+import { mentionsOf } from "./mentions";
 
 
 /** A district's own actions: the things a person does there that are not
@@ -36,8 +40,10 @@ const ACTIONS: Record<string, { label: string; say?: string; run?: () => Promise
  * The bar along the bottom of the world: the district's actions, a line to
  * the queen from anywhere, and her answer above it while it is fresh.
  */
-export default function Command({ view, onConversation, onTyping }: {
+export default function Command({ view, onConversation, onTyping, hosts }: {
   view: ViewKey; onConversation: () => void;
+  /** The world's machines and what runs on them: whom @ offers. */
+  hosts?: Host[] | null;
   /** Called with the thing an @name points at, so the world can light it. */
   onTyping?: (kind: string, id: string) => void;
 }) {
@@ -60,6 +66,11 @@ export default function Command({ view, onConversation, onTyping }: {
   const box = useRef<HTMLInputElement>(null);
   const end = useRef<HTMLDivElement>(null);
   const district = view === "chat" ? "home" : view === "mcp" ? "skills" : view;
+  // @ offers every agent the queen can hand work to: the core's own list
+  // (remote agents, signed-in CLIs) and every worker the world draws.
+  const workers = useMemo(() => mentionsOf(hosts), [hosts]);
+  const mentions = useAgentMentions(text, setText, workers);
+  const type = (v: string, caret: number) => { setText(v); mentions.update(v, caret); };
   useEffect(() => {
     loadQueenSession().then((id) => ChatHistory(id)).then((turns: any[]) => {
       setLines((turns ?? []).filter((x) => (x.role === "user" || x.role === "assistant") && x.kind !== "context" && x.content)
@@ -131,6 +142,7 @@ export default function Command({ view, onConversation, onTyping }: {
     // Nothing to think with: say so and open the setup, keeping the words.
     if (ready === false) { requestSetup(); return; }
     setText("");
+    mentions.close();
     say("queen", "", "think", 120);
     setLines((l) => [...l, { who: "you" as const, text: s }].slice(-12));
     setStep("");
@@ -192,18 +204,31 @@ export default function Command({ view, onConversation, onTyping }: {
               const go = () => { if (a.run) void run(a.label + i, a.run, a.ok ?? "Done"); };
               if (a.run && a.pod) setPod({ change: a.pod, go });
               else if (a.run) go();
-              else { setText(t(a.say ?? "")); window.setTimeout(() => box.current?.focus(), 0); }
+              else { const v = t(a.say ?? ""); type(v, v.length); window.setTimeout(() => box.current?.focus(), 0); }
             }}>
             {a.icon === "minus" ? <MinusIcon size={14} /> : <PlusIcon size={14} />}{t(a.label)}
           </button>
         ))}
         <button className={`wc-act${open ? " on" : ""}`} title={t("The conversation")} onClick={() => setOpen((v) => !v)}><MessageSquareIcon size={14} /></button>
         <form className="wc-say" onSubmit={(e) => { e.preventDefault(); void send(); }}>
+          <AgentMenu
+            matches={mentions.matches}
+            active={mentions.active}
+            onPick={(a) => {
+              const next = mentions.accept(a);
+              if (next) requestAnimationFrame(() => { box.current?.focus(); box.current?.setSelectionRange(next.caret, next.caret); });
+            }}
+          />
           <span className="wc-prompt">›</span>
-          <input ref={box} value={text} onChange={(e) => setText(e.target.value)} 
+          <input ref={box} value={text} onChange={(e) => type(e.target.value, e.target.selectionStart ?? e.target.value.length)}
+            onBlur={mentions.close}
             placeholder={t(lines.length ? "Reply to {name}… @ for a worker or an agent" : "Tell {name}, from anywhere. @ for a worker or an agent", { name: queenRef(queen) })}
             onCompositionStart={ime.handlers.onCompositionStart} onCompositionEnd={ime.handlers.onCompositionEnd}
-            onKeyDown={(e) => { if (e.key === "Enter" && ime.composing(e)) e.preventDefault(); }} />
+            onKeyDown={(e) => {
+              if (ime.composing(e)) { if (e.key === "Enter") e.preventDefault(); return; }
+              // Picking a name with Enter must never also send.
+              mentions.onKeyDown(e);
+            }} />
           <button type="submit" disabled={!text.trim() || !!req} title={t("Send")}><ArrowUpIcon size={16} /></button>
         </form>
       </div>

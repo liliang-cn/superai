@@ -212,7 +212,7 @@ export default function World({ view }: { view: ViewKey }) {
         {picked && <Inspector key={picked.kind + ":" + picked.id} picked={picked} data={data} onClose={close} openDash={setDash} open={(to, full) => { if (full) window.dispatchEvent(new CustomEvent("superai:window", { detail: to })); else navigate(to); }} />}
       </div>
       {dash && <DashScreen id={dash} onClose={() => setDash("")} />}
-      <Command view={view} onConversation={() => window.dispatchEvent(new CustomEvent("superai:window", { detail: "/" }))} onTyping={(kind, id) => engine.current?.hint(kind, id)} />
+      <Command view={view} onConversation={() => window.dispatchEvent(new CustomEvent("superai:window", { detail: "/" }))} onTyping={(kind, id) => engine.current?.hint(kind, id)} hosts={topo.hosts} />
     </div>
   );
 }
