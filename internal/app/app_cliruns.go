@@ -313,41 +313,29 @@ func (a *App) startCLIRun(o cliStart) (CLIRun, error) {
 		// and stays out of it (cchook.go).
 		Env: map[string]string{"SUPERAI_CLI_RUN": id},
 	}
-	// Claude's MCP servers go on the command line as JSON, never as a file:
-	// agentexec writes its config into the working directory, where the agent
-	// lists it among the user's files and could read the approval URL.
-	// Strict, so the user's own servers stay out of a delegated run.
-	if agent == "claude" {
-		servers := map[string]any{}
-		if o.Queen != nil {
-			for name, entry := range o.Queen.Servers {
-				servers[name] = entry
-			}
+	// A run thinking for the queen is handed her kit the way its CLI takes
+	// it (queen_engine_cli.go).
+	approve := ""
+	if q := o.Queen; q != nil {
+		eng, ok := queenCLIs[agent]
+		if !ok {
+			return CLIRun{}, fmt.Errorf("%s cannot think for the queen", agent)
 		}
-		if ask {
-			url, err := a.cliApproveURL(id)
-			if err != nil {
+		if ask && eng.Asks {
+			if approve, err = a.cliApproveURL(id); err != nil {
 				return CLIRun{}, fmt.Errorf("could not open the approval channel: %w", err)
 			}
-			servers["superai"] = map[string]any{"type": "http", "url": url}
 		}
-		cfg, _ := json.Marshal(map[string]any{"mcpServers": servers})
-		req.ExtraArgs = []string{"--mcp-config", string(cfg), "--strict-mcp-config"}
-		if q := o.Queen; q != nil {
-			req.SystemPrompt = q.SystemPrompt
-			req.ExtraArgs = append(req.ExtraArgs, q.Args...)
-			// --allowedTools takes every word after it, so a flag follows it
-			// and the prompt is not read as a tool.
-			if len(q.Allowed) > 0 {
-				req.ExtraArgs = append(req.ExtraArgs, "--allowedTools", strings.Join(q.Allowed, ","))
-			}
-			// The answer goes into the chat as it is written, not a message
-			// at a time.
-			req.ExtraArgs = append(req.ExtraArgs, "--include-partial-messages")
-			for k, v := range q.Env {
-				req.Env[k] = v
+		if err := eng.apply(&req, q, ask, approve); err != nil {
+			return CLIRun{}, err
+		}
+	} else if agent == "claude" {
+		if ask {
+			if approve, err = a.cliApproveURL(id); err != nil {
+				return CLIRun{}, fmt.Errorf("could not open the approval channel: %w", err)
 			}
 		}
+		req.ExtraArgs = append(req.ExtraArgs, claudeMCPArgs(nil, approve)...)
 	}
 	if ask {
 		switch agent {
@@ -358,9 +346,6 @@ func (a *App) startCLIRun(o cliStart) (CLIRun, error) {
 			// operation timed out": a person reaching for their phone took
 			// longer than that, and Claude gave up on the command. The call
 			// is allowed as long as the approval card waits, and a little more.
-			if req.Env == nil {
-				req.Env = map[string]string{}
-			}
 			req.Env["MCP_TOOL_TIMEOUT"] = fmt.Sprint((cliApproveWait + time.Minute).Milliseconds())
 		case "codex":
 			// Codex has no prompt to forward in exec mode; ask means its own
@@ -371,8 +356,8 @@ func (a *App) startCLIRun(o cliStart) (CLIRun, error) {
 			req.PermissionMode = agentexec.PermissionDefault
 			req.Sandbox = true
 			// -c rather than --sandbox: `codex exec resume` takes no --sandbox.
-			req.ExtraArgs = []string{"--skip-git-repo-check", "-c", `sandbox_mode="workspace-write"`,
-				"-c", "sandbox_workspace_write.network_access=true"}
+			req.ExtraArgs = append(req.ExtraArgs, "--skip-git-repo-check", "-c", `sandbox_mode="workspace-write"`,
+				"-c", "sandbox_workspace_write.network_access=true")
 		}
 	}
 	sess := provider.NewSession()
@@ -621,6 +606,14 @@ func normaliseCLIEvent(e agentexec.Event, calls map[string]string) []CLIRunEvent
 	case agentexec.EventAgentMessage:
 		switch p["role"] {
 		case "assistant":
+			// pi: a piece of a message as it is written; the whole message
+			// follows when it ends.
+			if d, _ := p["delta"].(bool); d {
+				if t, _ := p["text"].(string); t != "" {
+					return []CLIRunEvent{{Kind: "delta", Text: t}}
+				}
+				return nil
+			}
 			if t, _ := p["text"].(string); strings.TrimSpace(t) != "" {
 				return []CLIRunEvent{{Kind: "text", Text: cliClip(t, cliRunTextMax)}}
 			}
@@ -628,6 +621,28 @@ func normaliseCLIEvent(e agentexec.Event, calls map[string]string) []CLIRunEvent
 			if t, _ := p["text"].(string); t != "" {
 				return []CLIRunEvent{{Kind: "error", Text: cliClip(t, cliRunTextMax)}}
 			}
+		case "mcp_tool_call":
+			// Codex reports an MCP call once, finished, with what came back.
+			item, _ := p["raw"].(map[string]any)
+			if item == nil {
+				return nil
+			}
+			name, detail, id := toolCallParts(item)
+			calls[id] = name
+			text := resultText(item["result"])
+			if text == "" {
+				if e, ok := item["error"].(map[string]any); ok {
+					text = pickStr(e, "message")
+				}
+			}
+			failed := pickStr(item, "status") == "failed" || item["error"] != nil
+			if r, ok := item["result"].(map[string]any); ok {
+				if isErr, _ := r["is_error"].(bool); isErr {
+					failed = true
+				}
+			}
+			return []CLIRunEvent{{Kind: "tool", Tool: name, Detail: detail, CallID: id},
+				{Kind: "result", Tool: name, CallID: id, Text: cliClip(text, cliRunTextMax), Failed: failed}}
 		case "stream_event":
 			// --include-partial-messages: a message's text as it is written.
 			raw, _ := p["raw"].(map[string]any)
@@ -685,7 +700,13 @@ func toolCallParts(p map[string]any) (name, detail, id string) {
 		}
 		return "edit", strings.Join(paths, ", "), id
 	case "mcp_tool_call":
-		return pickStr(p, "server") + "." + pickStr(p, "tool"), "", id
+		// Named as Claude and pi name an MCP tool, so the trace shows it bare.
+		detail = ""
+		if args, ok := p["arguments"].(map[string]any); ok && len(args) > 0 {
+			raw, _ := json.Marshal(args)
+			detail = cliClip(string(raw), 600)
+		}
+		return "mcp__" + pickStr(p, "server") + "__" + pickStr(p, "tool"), detail, id
 	case "web_search":
 		return "web_search", pickStr(p, "query"), id
 	}
@@ -715,6 +736,16 @@ func toolResults(p map[string]any, calls map[string]string) []CLIRunEvent {
 		id := pickStr(p, "id")
 		return []CLIRunEvent{{Kind: "result", Tool: calls[id], CallID: id, Text: cliClip(out, cliRunTextMax), Failed: failed}}
 	}
+	// pi: the end of one call, with its output.
+	if _, ok := p["is_error"]; ok && p["message"] == nil {
+		failed, _ := p["is_error"].(bool)
+		id := pickStr(p, "id")
+		tool := calls[id]
+		if tool == "" {
+			tool = pickStr(p, "name")
+		}
+		return []CLIRunEvent{{Kind: "result", Tool: tool, CallID: id, Text: cliClip(resultText(p["output"]), cliRunTextMax), Failed: failed}}
+	}
 	// Claude: a user message whose content holds tool_result blocks.
 	msg, _ := p["message"].(map[string]any)
 	content, _ := msg["content"].([]any)
@@ -735,6 +766,9 @@ func resultText(v any) string {
 	switch t := v.(type) {
 	case string:
 		return t
+	case map[string]any:
+		// An MCP result, or pi's: {"content":[{"type":"text","text":…}]}.
+		return resultText(t["content"])
 	case []any:
 		var parts []string
 		for _, x := range t {

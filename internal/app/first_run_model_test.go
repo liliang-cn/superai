@@ -2,6 +2,7 @@ package app
 
 import (
 	"encoding/json"
+	"github.com/liliang-cn/superai/internal/backend"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -51,5 +52,23 @@ func TestCheckingAModelListsModelsAndAsksTheChosenOne(t *testing.T) {
 	}
 	if got := a.CheckModel("", "good", "model-a"); got.OK || got.Error == "" {
 		t.Fatalf("no address: %+v", got)
+	}
+}
+
+// A fresh SuperAI leaves the coding CLIs' configs alone until it is allowed
+// to use the agents here; a hive member, set up without a first start, may.
+func TestTheCLIHooksWaitUntilTheAgentsAreAllowed(t *testing.T) {
+	a := NewApp()
+	a.settings = &backend.Settings{}
+	if a.mayInstallCLIHooks() {
+		t.Fatal("a first start installs hooks before it is allowed")
+	}
+	a.settings = &backend.Settings{ExternalAgents: backend.ExternalAgents{Enabled: true}}
+	if !a.mayInstallCLIHooks() {
+		t.Fatal("allowed agents, no hooks")
+	}
+	a.settings = &backend.Settings{Hive: backend.HiveSettings{Role: backend.HiveRoleWorker}}
+	if !a.mayInstallCLIHooks() {
+		t.Fatal("a hive member gets no hooks")
 	}
 }

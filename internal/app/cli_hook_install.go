@@ -34,7 +34,7 @@ import (
 	"github.com/liliang-cn/superai/internal/backend"
 )
 
-//go:embed cliplugins/opencode.js cliplugins/pi.js
+//go:embed cliplugins/opencode.js cliplugins/pi.js cliplugins/pi_queen.js
 var cliPluginFS embed.FS
 
 // cliPluginFile is the file name SuperAI's plugin goes by in a CLI's

@@ -67,6 +67,10 @@ func (a *App) cliApproveURL(runID string) (string, error) {
 				http.Error(w, "unknown run", http.StatusForbidden)
 				return
 			}
+			if len(parts) > 2 && parts[2] == "decide" {
+				a.cliDecide(w, r, run)
+				return
+			}
 			a.cliApproveHandler(run).ServeHTTP(w, r)
 		})
 		go func() { _ = http.Serve(ln, mux) }()
@@ -94,6 +98,30 @@ func (a *App) cliApproveHandler(runID string) http.Handler {
 		return a.cliApprove1(ctx, runID, in), nil, nil
 	})
 	return mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return s }, &mcp.StreamableHTTPOptions{Stateless: true})
+}
+
+// cliDecide is the approval channel without MCP, for a CLI whose own hook
+// asks it (pi's, cliplugins/pi_queen.js): {tool_name, input} posted, the
+// approve tool's answer back as it is.
+func (a *App) cliDecide(w http.ResponseWriter, r *http.Request, runID string) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST {tool_name, input}", http.StatusMethodNotAllowed)
+		return
+	}
+	var in cliApproveIn
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&in); err != nil || in.ToolName == "" {
+		http.Error(w, "POST {tool_name, input}", http.StatusBadRequest)
+		return
+	}
+	res := a.cliApprove1(r.Context(), runID, in)
+	text := `{"behavior":"deny","message":"no answer"}`
+	if len(res.Content) > 0 {
+		if t, ok := res.Content[0].(*mcp.TextContent); ok {
+			text = t.Text
+		}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = w.Write([]byte(text))
 }
 
 func (a *App) cliApprove1(ctx context.Context, runID string, in cliApproveIn) *mcp.CallToolResult {

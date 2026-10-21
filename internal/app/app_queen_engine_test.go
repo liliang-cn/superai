@@ -482,7 +482,7 @@ func TestTheQueenTokenIsMintedOnceAndAgainWhenRevoked(t *testing.T) {
 	}
 }
 
-func TestOnlyClaudeCodeThatIsThereCanBeTheEngine(t *testing.T) {
+func TestAnEngineThatIsThereCanBeTheEngine(t *testing.T) {
 	t.Setenv("SUPERAI_HOME", t.TempDir())
 	bin, _ := fakeClaude(t, "", 0)
 	a := &App{settings: &backend.Settings{}}
@@ -503,7 +503,7 @@ func TestOnlyClaudeCodeThatIsThereCanBeTheEngine(t *testing.T) {
 		t.Fatal("a claude that is not installed passed")
 	}
 	if err := check("codex", on, ""); err == nil {
-		t.Fatal("codex passed")
+		t.Fatal("a codex that is not installed passed")
 	}
 	if err := check("claude.nowhere", on, ""); err == nil {
 		t.Fatal("a machine that is not linked passed")

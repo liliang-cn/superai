@@ -3,6 +3,7 @@ module github.com/liliang-cn/superai
 go 1.26.0
 
 require (
+	github.com/BurntSushi/toml v1.6.0
 	github.com/JohannesKaufmann/html-to-markdown/v2 v2.5.2
 	github.com/google/uuid v1.6.0
 	github.com/liliang-cn/agent-go/v3 v3.69.0
@@ -24,7 +25,6 @@ require (
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
 	filippo.io/edwards25519 v1.2.0 // indirect
 	git.sr.ht/~jackmordaunt/go-toast/v2 v2.0.3 // indirect
-	github.com/BurntSushi/toml v1.6.0 // indirect
 	github.com/JohannesKaufmann/dom v0.3.1 // indirect
 	github.com/PuerkitoBio/goquery v1.13.0 // indirect
 	github.com/RoaringBitmap/roaring/v2 v2.14.5 // indirect

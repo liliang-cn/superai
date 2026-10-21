@@ -428,7 +428,12 @@ func ServeMain(argv []string) {
 	// Claude Code's hooks on this machine (cchook.go) report here.
 	go app.serveCCHookSocket(ctx)
 	go autoUpgradeCCHooks()
-	go autoInstallCLIHooks()
+	// The coding CLIs' activity hooks: not on a first start that has not yet
+	// been told it may use the agents here (FinishOnboarding installs them
+	// then), so a fresh SuperAI never rewrites another one's plugins.
+	if app.mayInstallCLIHooks() {
+		go autoInstallCLIHooks()
+	}
 	// Agent: this instance also dials a core (a node that keeps its own web
 	// surface, like the Mac's).
 	if o, ok := lf.options(); ok {

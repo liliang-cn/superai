@@ -3,8 +3,9 @@ package app
 // The desktop app's first start. Someone who downloads it should be talking
 // to it in a minute, so the window asks two things and SuperAI does the
 // rest: may it look for the AI agents on this Mac (OnboardingNeeded,
-// DetectAgents), and should one of them — Claude Code, signed in on the
-// person's own subscription — be the one it thinks with (FinishOnboarding).
+// DetectAgents), and should one of them — Claude Code, Codex, pi or Hermes,
+// signed in on the person's own account — be the one it thinks with
+// (FinishOnboarding).
 // Nothing is looked for, and nothing chosen, before the person says so; the
 // question is asked once, and what is set afterwards in Settings stands.
 
@@ -54,7 +55,8 @@ type DetectedAgent struct {
 	Path  string `json:"path"`
 	// SignedIn is whether it says it is signed in; nil when it cannot say.
 	SignedIn *bool `json:"signedIn,omitempty"`
-	// CanBeDefault is whether SuperAI can think with it: Claude Code, so far.
+	// CanBeDefault is whether SuperAI can think with it: Claude Code, Codex,
+	// pi or Hermes (queenCLIs).
 	CanBeDefault bool `json:"canBeDefault"`
 }
 
@@ -73,7 +75,7 @@ func (a *App) DetectAgents() []DetectedAgent {
 	out := make([]DetectedAgent, len(found))
 	var wg sync.WaitGroup
 	for i, c := range found {
-		out[i] = DetectedAgent{Name: c.Name, Label: agentLabel(c.Name), Path: c.Binary, CanBeDefault: c.Name == "claude"}
+		out[i] = DetectedAgent{Name: c.Name, Label: agentLabel(c.Name), Path: c.Binary, CanBeDefault: canThinkForQueen(c.Name)}
 		if check := signedInChecks[c.Name]; check != nil {
 			wg.Add(1)
 			go func() {
@@ -98,7 +100,7 @@ func (a *App) DetectAgents() []DetectedAgent {
 }
 
 // FinishOnboarding records the person's answers: engine is the agent to
-// think with ("claude", or "" for none), and agents whether SuperAI may hand
+// think with ("claude", "codex", "pi", "hermes", or "" for none), and agents whether SuperAI may hand
 // work to the agents it found. The questions are not asked again.
 func (a *App) FinishOnboarding(engine string, agents bool) error {
 	a.mu.Lock()
@@ -127,7 +129,15 @@ func (a *App) FinishOnboarding(engine string, agents bool) error {
 		fallback := true
 		next.Hive.QueenFallback = &fallback
 	}
-	return a.SaveSettings(next)
+	if err := a.SaveSettings(next); err != nil {
+		return err
+	}
+	// The coding CLIs' activity hooks go in once the person has said
+	// SuperAI may use the agents here, not before (server.go).
+	if next.ExternalAgents.Enabled {
+		go autoInstallCLIHooks()
+	}
+	return nil
 }
 
 // agentLabels are the names people know the agents by.
@@ -301,4 +311,14 @@ func (a *App) CheckModel(baseURL, key, model string) ModelCheck {
 	}
 	out.OK = true
 	return out
+}
+
+// mayInstallCLIHooks is whether this SuperAI may put its activity hooks into
+// the coding CLIs on this machine at start: once a first start has allowed
+// the agents here, or for one set up without a first start (a hive member).
+func (a *App) mayInstallCLIHooks() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	s := a.settings
+	return s != nil && (s.ExternalAgents.Enabled || s.Hive.Role != "")
 }

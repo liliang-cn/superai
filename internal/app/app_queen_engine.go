@@ -3,8 +3,9 @@ package app
 // The queen's engine: who thinks for her when a person talks to her.
 //
 // By default that is this app's own model. Settings → Hive → Queen engine can
-// hand it to an agent CLI instead — Claude Code here ("claude") or on a linked
-// machine ("claude.mac") — and SuperAI keeps everything around the thinking:
+// hand it to an agent CLI instead — Claude Code, Codex, pi or Hermes, here
+// ("codex") or on a linked machine ("codex.mac") — and SuperAI keeps
+// everything around the thinking:
 // the conversation and its history, the stream to every client, approvals,
 // notices, alarms and schedules. Clients see the same chat:event / chat:done
 // they always did, with "engine" on them naming who answered.
@@ -18,8 +19,9 @@ package app
 // (backend.ExternalQueenPrompt, the same text her own agent reads), the
 // cluster-command tools on this app's /mcp under a queen-scoped token
 // (mcp_scope.go), noted and the shared brain when this app has them, and the
-// approval channel for its own permission prompts. The conversation's next
-// turn resumes the same CLI session.
+// approval channel for its own permission prompts, each the way its CLI takes
+// them (queen_engine_cli.go). The conversation's next turn resumes the same
+// CLI session, for a CLI that keeps one.
 //
 // An engine that cannot take a turn — switched off, not installed, its
 // machine asleep, failed before it said or did anything — is stood in for by
@@ -45,7 +47,7 @@ const (
 	// mcp__hive__superai_hive_members and so on.
 	queenHiveServer = "hive"
 	// queenTokenEnv carries the queen token to the CLI. The MCP config names
-	// it and Claude fills it in, so the token is never on a command line.
+	// it and the CLI fills it in, so the token is never on a command line.
 	queenTokenEnv = "SUPERAI_QUEEN_TOKEN"
 	// queenEngineTokenName is the queen token this app mints for its engine.
 	queenEngineTokenName = "queen engine (automatic)"
@@ -64,7 +66,8 @@ type QueenKit struct {
 	// Env is set for the CLI alone: the tokens its servers' entries name,
 	// and what keeps the run lean.
 	Env map[string]string `json:"env,omitempty"`
-	// Args go on the command line as they are: queenLeanArgs.
+	// Args go on Claude's command line as they are: queenLeanArgs. Every
+	// other CLI's flags are its adapter's, on the machine it runs on.
 	Args []string `json:"args,omitempty"`
 }
 
@@ -120,6 +123,9 @@ func (a *App) StartQueenCLIRun(r QueenRunRequest) (CLIRun, error) {
 		if _, lean := queenLeanEnv[k]; !lean && !named[k] {
 			return CLIRun{}, fmt.Errorf("%s is not a variable the queen's servers use", k)
 		}
+	}
+	if !canThinkForQueen(r.Agent) {
+		return CLIRun{}, fmt.Errorf("%s cannot think for the queen", r.Agent)
 	}
 	kit := r.Kit
 	return a.startCLIRun(cliStart{Agent: r.Agent, Prompt: r.Prompt, Cwd: r.Cwd, Model: r.Model, Ask: r.Ask,
@@ -225,7 +231,8 @@ func (a *App) routeToEngine(requestID, sessionID, engine, message string, fresh 
 	o := cliStart{Agent: engine, Prompt: message, Ask: !s.ExternalAgents.Unattended, Chat: sessionID, Queen: kit}
 	// fresh: the conversation's own session is still answering, so this
 	// turn starts one of its own and is handed the conversation instead.
-	if prev := a.lastChatRun(sessionID, engine, true); prev != nil && !fresh {
+	// A CLI that keeps no session (hermes) is new to every turn.
+	if prev := a.lastChatRun(sessionID, engine, true); prev != nil && !fresh && queenCLIs[engineCLI(engine)].Resumes {
 		o.Thread, o.Session, o.Cwd, o.Model, o.Prev = prev.Thread, prev.Session, prev.Cwd, prev.Model, prev
 	}
 	// What was said here that the engine's session did not hear goes in
@@ -235,9 +242,9 @@ func (a *App) routeToEngine(requestID, sessionID, engine, message string, fresh 
 		o.Prompt = earlier + message
 	}
 
-	// The answer as it is written. Claude sends a message's text twice, as
-	// deltas while it writes and whole once it has; a message whose deltas
-	// came is not written again.
+	// The answer as it is written. Claude and pi send a message's text twice,
+	// as deltas while they write and whole once they have; a message whose
+	// deltas came is not written again.
 	var said strings.Builder
 	last, fresh := "", true
 	write := func(chunk string) {
@@ -247,6 +254,9 @@ func (a *App) routeToEngine(requestID, sessionID, engine, message string, fresh 
 		said.WriteString(chunk)
 		a.emit("chat:event", tag(map[string]any{"type": "partial", "content": chunk}))
 	}
+	// A CLI that prints only its last word (hermes) prints its failure the
+	// same way: what it says is held until it is known to be an answer.
+	holds := !queenCLIs[engineCLI(engine)].Streams
 	o.Watch = func(e CLIRunEvent) {
 		switch e.Kind {
 		case "delta":
@@ -254,7 +264,7 @@ func (a *App) routeToEngine(requestID, sessionID, engine, message string, fresh 
 			fresh = false
 		case "text":
 			last = e.Text
-			if fresh {
+			if fresh && !holds {
 				write(e.Text)
 			}
 			fresh = true
@@ -300,13 +310,16 @@ func (a *App) routeToEngine(requestID, sessionID, engine, message string, fresh 
 		if answer == "" {
 			answer = strings.TrimSpace(said.String())
 		}
+		if holds && said.Len() == 0 && answer != "" {
+			write(answer)
+		}
 		if err := a.appendExchange(sessionID, message, answer); err != nil {
 			log.Printf("superai: could not record the queen engine's answer in %s: %v", sessionID, err)
 		}
 		// Claude reports what the whole session has cost so far; this turn's
-		// share is what it added.
+		// share is what it added. The others report the turn's own.
 		cost := r.CostUSD
-		if o.Prev != nil && r.Session == o.Prev.Session && cost >= o.Prev.CostUSD {
+		if engineCLI(engine) == "claude" && o.Prev != nil && r.Session == o.Prev.Session && cost >= o.Prev.CostUSD {
 			cost -= o.Prev.CostUSD
 		}
 		recordTurnTimeBy(sessionID, message, started, time.Since(started), turnBy{Engine: engine, CostUSD: cost})
@@ -361,10 +374,14 @@ func (a *App) queenKitFor(engine string, s *backend.Settings) (*QueenKit, error)
 		}},
 		Allowed: []string{"mcp__" + queenHiveServer},
 		Env:     map[string]string{queenTokenEnv: tok},
-		Args:    append([]string(nil), queenLeanArgs...),
 	}
-	for k, v := range queenLeanEnv {
-		kit.Env[k] = v
+	// Claude's lean flags travel with the kit, as they always have, so a
+	// machine on an older SuperAI still runs its Claude lean.
+	if engineCLI(engine) == "claude" {
+		kit.Args = append([]string(nil), queenLeanArgs...)
+		for k, v := range queenLeanEnv {
+			kit.Env[k] = v
+		}
 	}
 	for _, name := range backend.QueenEngineServers {
 		if entry, env, ok := backend.EngineMCPServer(name, remote); ok {
@@ -379,7 +396,7 @@ func (a *App) queenKitFor(engine string, s *backend.Settings) (*QueenKit, error)
 
 // queenMayCall reports whether a queen run may call an MCP tool without the
 // person being asked: whenever the queen's own call of it would not be. The
-// tool arrives as Claude names it, mcp__<server>__<tool>.
+// tool arrives as Claude and pi name it, mcp__<server>__<tool>.
 func (a *App) queenMayCall(tool string, args map[string]any) bool {
 	rest, ok := strings.CutPrefix(tool, "mcp__")
 	if !ok {
@@ -419,10 +436,7 @@ func engineLabel(engine string) string {
 	if !ok {
 		agent = engine
 	}
-	name := agent
-	if agent == "claude" {
-		name = "Claude Code"
-	}
+	name := agentLabel(agent)
 	if ok {
 		name += " · " + host
 	}
@@ -497,9 +511,13 @@ func (a *App) QueenEngines() map[string]any {
 	}
 	a.mu.Unlock()
 	choices := []QueenEngineChoice{{Name: "", Label: "SuperAI", Online: true}}
+	here := map[string]bool{}
 	for _, c := range a.localAgentNames() {
-		if c.Name == "claude" {
-			choices = append(choices, QueenEngineChoice{Name: "claude", Label: engineLabel("claude"), Online: true})
+		here[c.Name] = true
+	}
+	for _, name := range queenEngineNames {
+		if here[name] {
+			choices = append(choices, QueenEngineChoice{Name: name, Label: engineLabel(name), Online: true})
 		}
 	}
 	remote := a.remoteCLIs()
@@ -509,8 +527,10 @@ func (a *App) QueenEngines() map[string]any {
 	}
 	slices.Sort(hosts)
 	for _, h := range hosts {
-		if slices.Contains(remote[h], "claude") {
-			choices = append(choices, QueenEngineChoice{Name: "claude." + h, Label: engineLabel("claude." + h), Online: true})
+		for _, name := range queenEngineNames {
+			if slices.Contains(remote[h], name) {
+				choices = append(choices, QueenEngineChoice{Name: name + "." + h, Label: engineLabel(name + "." + h), Online: true})
+			}
 		}
 	}
 	cur := strings.TrimSpace(s.Hive.QueenEngine)
@@ -540,9 +560,10 @@ func (a *App) SetQueenEngine(engine string, fallback bool) (map[string]any, erro
 	return a.QueenEngines(), nil
 }
 
-// validQueenEngine checks an engine before it is saved: Claude Code, here
-// with External agents on, or on a machine linked now. The engine already
-// saved passes as it is, since its machine may only be asleep.
+// validQueenEngine checks an engine before it is saved: a CLI that can think
+// for the queen (queenCLIs), here with External agents on, or on a machine
+// linked now. The engine already saved passes as it is, since its machine may
+// only be asleep.
 func (a *App) validQueenEngine(next *backend.Settings, prev string) error {
 	engine := strings.TrimSpace(next.Hive.QueenEngine)
 	if engine == "" || engine == strings.TrimSpace(prev) {
@@ -552,24 +573,25 @@ func (a *App) validQueenEngine(next *backend.Settings, prev string) error {
 	if !remote {
 		agentName = engine
 	}
-	if agentName != "claude" {
-		return fmt.Errorf("only Claude Code can think for the queen so far, not %s", engine)
+	if !canThinkForQueen(agentName) {
+		return fmt.Errorf("%s cannot think for the queen: Claude Code, Codex, pi and Hermes can", engine)
 	}
+	label := agentLabel(agentName)
 	if remote {
 		if !a.isRemoteCLI(engine) {
-			return fmt.Errorf("no linked machine called %s has Claude Code right now", host)
+			return fmt.Errorf("no linked machine called %s has %s right now", host, label)
 		}
 		return nil
 	}
 	if !next.ExternalAgents.Enabled {
-		return errors.New("the queen engine is Claude Code on this machine, so External agents has to be on")
+		return fmt.Errorf("the queen engine is %s on this machine, so External agents has to be on", label)
 	}
 	for _, c := range installedCLIs(next.ExternalAgents.Binaries) {
-		if c.Name == "claude" {
+		if c.Name == agentName {
 			return nil
 		}
 	}
-	return errors.New("Claude Code is not installed on this machine")
+	return fmt.Errorf("%s is not installed on this machine", label)
 }
 
 // How much of the earlier conversation an engine is handed: the last few
@@ -601,6 +623,9 @@ func (a *App) sessionTurns(sessionID string) []backend.ChatTurn {
 // was compacted) is handed nothing rather than a guess.
 func (a *App) unseenTurns(sessionID, engine string, resumed bool) []backend.ChatTurn {
 	turns := a.sessionTurns(sessionID)
+	if len(turns) == 0 && !resumed {
+		turns = a.engineRunTurns(sessionID, engine)
+	}
 	from := 0
 	if resumed {
 		from = -1
@@ -619,6 +644,36 @@ func (a *App) unseenTurns(sessionID, engine string, resumed bool) []backend.Chat
 		if t.Kind == "" && (t.Role == "user" || t.Role == "assistant") && strings.TrimSpace(t.Content) != "" {
 			out = append(out, t)
 		}
+	}
+	return out
+}
+
+// handoffEnd closes the earlier conversation in front of a question.
+const handoffEnd = "[End of the earlier conversation. The person now says:]\n\n"
+
+// engineRunTurns is a conversation as the engine's own finished runs in it
+// tell it, for an app with no history of its own to keep it in (no model
+// set up): each run's question, without what it was handed in front of it,
+// and its answer. A CLI that keeps no session of its own then still hears
+// what was said.
+func (a *App) engineRunTurns(sessionID, engine string) []backend.ChatTurn {
+	s := a.cliStore()
+	s.mu.Lock()
+	var runs []CLIRun
+	for _, r := range s.runs {
+		if r.Chat == sessionID && r.Agent == engine && r.Queen && r.State == "done" && strings.TrimSpace(r.Summary) != "" {
+			runs = append(runs, summaryOf(r))
+		}
+	}
+	s.mu.Unlock()
+	slices.SortFunc(runs, func(x, y CLIRun) int { return x.Started.Compare(y.Started) })
+	var out []backend.ChatTurn
+	for _, r := range runs {
+		q := r.Prompt
+		if i := strings.LastIndex(q, handoffEnd); i >= 0 {
+			q = q[i+len(handoffEnd):]
+		}
+		out = append(out, backend.ChatTurn{Role: "user", Content: q}, backend.ChatTurn{Role: "assistant", Content: r.Summary, Engine: engine})
 	}
 	return out
 }
@@ -647,5 +702,5 @@ func handoffText(turns []backend.ChatTurn) string {
 		return ""
 	}
 	return "[Earlier in this conversation, oldest first. You did not see these turns; they are context, not requests.]\n" +
-		strings.Join(lines, "\n\n") + "\n[End of the earlier conversation. The person now says:]\n\n"
+		strings.Join(lines, "\n\n") + "\n" + handoffEnd
 }

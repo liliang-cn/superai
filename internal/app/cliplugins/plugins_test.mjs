@@ -112,3 +112,48 @@ test("no socket, a SuperAI run: nothing sent, nothing thrown", async () => {
   assert.deepEqual(handlers, {})
   delete process.env.SUPERAI_CLI_RUN
 })
+
+const queen = (await import("./pi_queen.js")).default
+
+test("pi as the queen: her servers with their tokens filled in, and a change asked about", async () => {
+  const asked = []
+  let answer = { behavior: "allow" }
+  const approver = http.createServer((req, res) => {
+    let b = ""
+    req.on("data", (c) => (b += c))
+    req.on("end", () => { asked.push({ url: req.url, body: JSON.parse(b) }); res.setHeader("Content-Type", "application/json"); res.end(JSON.stringify(answer)) })
+  })
+  await new Promise((r) => approver.listen(0, "127.0.0.1", r))
+  const url = `http://127.0.0.1:${approver.address().port}/approve/run/secret`
+  process.env.SUPERAI_QUEEN_SERVERS = JSON.stringify({ hive: { type: "http", url: "http://core/mcp",
+    headers: { Authorization: "Bearer ${SUPERAI_QUEEN_TOKEN}" }, exposure: "direct" } })
+  process.env.SUPERAI_QUEEN_TOKEN = "tok"
+  process.env.SUPERAI_QUEEN_ALLOWED = "mcp__hive"
+  process.env.SUPERAI_APPROVE_URL = url
+  const registered = {}
+  const handlers = {}
+  queen({ registerMcpServer: (name, cfg) => { registered[name] = cfg }, on: (name, fn) => { handlers[name] = fn } })
+  assert.equal(registered.hive.headers.Authorization, "Bearer tok")
+  assert.equal(registered.hive.exposure, "direct")
+
+  // Reads and the hive's own tools are not asked about.
+  assert.equal(await handlers.tool_call({ toolName: "read", input: { path: "a" } }), undefined)
+  assert.equal(await handlers.tool_call({ toolName: "mcp__hive__superai_hive_members", input: {} }), undefined)
+  assert.equal(asked.length, 0)
+  // A shell command is, and runs when the person says yes.
+  assert.equal(await handlers.tool_call({ toolName: "bash", input: { command: "ls" } }), undefined)
+  assert.deepEqual(asked[0], { url: "/approve/run/secret/decide", body: { tool_name: "bash", input: { command: "ls" } } })
+  answer = { behavior: "deny", message: "no" }
+  assert.deepEqual(await handlers.tool_call({ toolName: "mcp__noted__delete_task", input: { id: "1" } }), { block: true, reason: "no" })
+  approver.close()
+  // SuperAI gone: the call is blocked, not run unasked.
+  const gone = await handlers.tool_call({ toolName: "write", input: { path: "x" } })
+  assert.equal(gone.block, true)
+
+  // Unattended: servers only, nothing in the way.
+  delete process.env.SUPERAI_APPROVE_URL
+  const none = {}
+  queen({ registerMcpServer: () => {}, on: (name, fn) => { none[name] = fn } })
+  assert.deepEqual(none, {})
+  for (const k of ["SUPERAI_QUEEN_SERVERS", "SUPERAI_QUEEN_TOKEN", "SUPERAI_QUEEN_ALLOWED"]) delete process.env[k]
+})
