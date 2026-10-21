@@ -414,3 +414,34 @@ func TestOnlyWhatWorksIsDrawn(t *testing.T) {
 		t.Fatalf("drawn = %v\nwant    %v", got, want)
 	}
 }
+
+// On the hive every worker says it reaches openclaw, and hermes and pi are
+// only known from the settings. HA's word decides: the cluster runs on the
+// service's active node, and every agent in it runs there.
+func TestTheHAServiceSaysWhereItsClusterRuns(t *testing.T) {
+	top := withoutHA(HiveTopology{
+		Hosts: []Host{
+			{ID: "superai-worker-2", Name: "superai-worker-2", State: "live", Agents: []HostAgent{
+				{Name: "superai-worker-2", Kind: hostAgentSuperAI, Role: "worker", State: "live"},
+				{Name: "openclaw", Kind: hostAgentNamed, State: "live", Via: "superai-worker-2", Service: "openclaw"},
+			}},
+			{ID: "sds-e", Name: "sds-e", State: "live", Agents: []HostAgent{
+				{Name: "hermes", Kind: hostAgentNamed, State: "configured", Service: "openclaw"},
+				{Name: "pi", Kind: hostAgentNamed, State: "configured", Service: "openclaw"},
+			}},
+		},
+		Services: []backend.HAService{{Name: "openclaw", Active: "sds-b", State: "active"}},
+	})
+	c := hostByName(top.Hosts, "openclaw")
+	if c == nil || c.On != "sds-b" || c.State != "live" || len(c.Agents) != 3 {
+		t.Fatalf("the cluster: %+v", c)
+	}
+	for _, g := range c.Agents {
+		if g.State != "live" {
+			t.Fatalf("%s is %s on a running cluster", g.Name, g.State)
+		}
+	}
+	if w := hostByName(top.Hosts, "superai-worker-2"); w == nil || agentNamed(w, "openclaw") != nil {
+		t.Fatalf("the worker keeps its SuperAI and loses the copy: %+v", w)
+	}
+}

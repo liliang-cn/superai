@@ -175,7 +175,18 @@ func withoutHA(t HiveTopology) HiveTopology {
 	}
 	sort.Strings(order)
 	for _, n := range order {
-		hosts = append(hosts, *clouds[n])
+		c := clouds[n]
+		// What HA says outranks who reported the agent: the service runs on
+		// its active node, and so does every agent in it.
+		for _, sv := range t.Services {
+			if sv.Name == n && sv.Active != "" && sv.State != "down" {
+				c.State, c.On = "live", sv.Active
+				for i := range c.Agents {
+					c.Agents[i].State = "live"
+				}
+			}
+		}
+		hosts = append(hosts, *c)
 	}
 	return HiveTopology{Hosts: hosts, Services: []backend.HAService{}}
 }
