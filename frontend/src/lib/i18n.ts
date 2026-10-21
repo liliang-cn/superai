@@ -1,5 +1,20 @@
 import { useSyncExternalStore } from "react";
-export type Language = "en" | "zh-CN";
+import de from "./locales/de.json";
+import es from "./locales/es.json";
+import fr from "./locales/fr.json";
+import ja from "./locales/ja.json";
+import ko from "./locales/ko.json";
+export type Language = "en" | "zh-CN" | "de" | "fr" | "es" | "ja" | "ko";
+/** Every interface language, in its own words, for the picker. */
+export const LANGUAGES: { id: Language; name: string }[] = [
+  { id: "en", name: "English" },
+  { id: "zh-CN", name: "简体中文" },
+  { id: "de", name: "Deutsch" },
+  { id: "fr", name: "Français" },
+  { id: "es", name: "Español" },
+  { id: "ja", name: "\u65e5\u672c\u8a9e" },
+  { id: "ko", name: "\ud55c\uad6d\uc5b4" },
+];
 const KEY = "superai-language";
 // English is the default; Chinese is a choice in Settings (the core's case
 // in the world, or the Settings page). A choice made before English became
@@ -7,7 +22,7 @@ const KEY = "superai-language";
 function initial(): Language {
   try {
     if (!localStorage.getItem(KEY + "-v2")) { localStorage.setItem(KEY + "-v2", "1"); localStorage.setItem(KEY, "en"); }
-    const saved = localStorage.getItem(KEY); if (saved === "en" || saved === "zh-CN") return saved;
+    const saved = localStorage.getItem(KEY); if (LANGUAGES.some((l) => l.id === saved)) return saved as Language;
   } catch { /* private browser */ }
   return "en";
 }
@@ -157,8 +172,11 @@ const zh: Record<string,string> = { "Sign in with your AI account":"用你的 AI
   "This host is no longer listed.":"这台主机已不在列表中。", "Hostname":"主机名", "Inside":"所在", "State":"状态", "Last seen":"最后在线", "HA services":"高可用服务", "HA service":"高可用服务", "This service is no longer listed.":"这个服务已不在列表中。", "Service IP":"服务 IP", "Runs on":"运行于", "Kept up by":"保障方", "Units":"单元", "Live":"在线", "Not answering":"没有响应", "Only in the settings":"仅在设置中", "Running":"运行中", "Running, no standby ready":"运行中，没有就绪的备用", "Down":"已停止", "Coding CLIs":"编程 CLI", "via {name}":"经由 {name}", "Nothing runs here that this core knows of.":"本核心不知道这里运行着什么。", "standby, ready":"备用，已就绪", "standby, not ready":"备用，未就绪", "No hosts.":"没有主机。", "Pods":"Pod",
   "today":"今日", "all time":"累计", "tokens":"tokens", "calls":"调用", "mcp":"MCP", "memory":"记忆", "orders":"指令", "coding":"编程", "workers busy":"忙碌的工作节点", "failed today":"今日失败",
 };
+// English is the keys; the other languages are looked up, and a string a
+// language has no translation for yet stays English.
+const dicts: Partial<Record<Language, Record<string, string>>> = { "zh-CN": zh, de, fr, es, ja, ko };
 export function translate(key:string, values:Record<string,string|number> = {}) {
-  let value = language === "zh-CN" ? zh[key] ?? key : key;
+  let value = dicts[language]?.[key] ?? key;
   for (const [name,replacement] of Object.entries(values)) value = value.split(`{${name}}`).join(String(replacement));
   return value;
 }

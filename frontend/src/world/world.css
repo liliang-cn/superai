@@ -474,3 +474,4 @@
 .wh-who b { text-align: right; font-weight: 600; }
 @media (max-width: 600px) { .wl-holo.wl-hive { width: auto; } .wl-hive .wh-row .wh-fig:not(.bad) + .wh-fig:not(.bad) { display: none; } }
 .wl-hive .wh-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; margin-top: 12px; }
+.wi-lang { border: 0; border-radius: 8px; padding: 4px 8px; background: rgba(255, 255, 255, 0.7); box-shadow: inset 0 0 0 1px rgba(15, 30, 50, 0.12); font: 500 13px var(--font-sans, system-ui); color: inherit; cursor: pointer; }

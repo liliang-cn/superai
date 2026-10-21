@@ -7,7 +7,7 @@ import {
   StartCLIRun, WakeStandingAgent,
 } from "../../wailsjs/go/app/App";
 import { type CCActivity, type CLIActivity, type HAService, type Host, type HostAgent } from "../canvas/data";
-import { useI18n } from "../lib/i18n";
+import { LANGUAGES, Language, useI18n } from "../lib/i18n";
 import { queenNamed, queenRef, useQueenName } from "../lib/queenName";
 import { toast } from "../lib/toasts";
 import { PATHS, attentionPath, taskPath } from "../lib/routes";
@@ -279,11 +279,11 @@ export default function Inspector({ picked, data, onClose, open, openDash }: {
       kind = "This core";
       body = (
         <>
-        <div className="wi-seg" role="radiogroup" aria-label="Language">
+        <div className="wi-seg">
           <span>{t("Language")}</span>
-          {([["en", "English"], ["zh-CN", "中文"]] as const).map(([v, label]) => (
-            <button key={v} role="radio" aria-checked={language === v} className={language === v ? "on" : ""} onClick={() => setLanguage(v)}>{label}</button>
-          ))}
+          <select className="wi-lang" aria-label={t("Language")} value={language} onChange={(e) => setLanguage(e.target.value as Language)}>
+            {LANGUAGES.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+          </select>
         </div>
         {(() => { const h = data.hosts?.find((x) => x.agents.some(isCore)); return h ? <HostCard host={h} data={data} withControls={false} /> : null; })()}
         <div className="wi-acts">

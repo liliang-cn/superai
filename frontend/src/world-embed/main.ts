@@ -4,7 +4,7 @@ import "./embed.css";
 import { WorldEngine, type EngineOptions, type Picked } from "../world/engine";
 import { cluster, lensOf, type WorldData } from "../world/cluster";
 import { setQueenName } from "../lib/queenName";
-import { setLanguage } from "../lib/i18n";
+import { LANGUAGES, Language, setLanguage } from "../lib/i18n";
 import { PROTOCOL, normalize, parse, type EmbedMessage, type HostMessage } from "./protocol";
 
 // The 3D world alone, for a native host: the same scene the desktop draws,
@@ -24,7 +24,7 @@ declare global {
 
 const query = new URLSearchParams(location.search);
 const lang = query.get("lang");
-if (lang === "zh-CN" || lang === "en") setLanguage(lang);
+if (LANGUAGES.some((l) => l.id === lang)) setLanguage(lang as Language);
 
 /** How hard to work: the host knows the device; the query says. */
 function options(): EngineOptions {

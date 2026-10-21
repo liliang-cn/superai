@@ -1,5 +1,5 @@
 import { ChevronDownIcon, LanguagesIcon } from "lucide-react";
-import { Language, useI18n } from "../lib/i18n";
+import { LANGUAGES, Language, useI18n } from "../lib/i18n";
 
 /** The interface language: a small picker beside the Settings title. */
 export default function LanguageSettings() {
@@ -8,8 +8,7 @@ export default function LanguageSettings() {
     <label className="lang-pick" title={t("Interface language")}>
       <LanguagesIcon size={15} />
       <select aria-label={t("Interface language")} value={language} onChange={(e) => setLanguage(e.target.value as Language)}>
-        <option value="zh-CN">简体中文</option>
-        <option value="en">English</option>
+        {LANGUAGES.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
       </select>
       <ChevronDownIcon size={13} />
     </label>
