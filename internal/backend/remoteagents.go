@@ -544,6 +544,40 @@ func (r *RemoteRunner) host(ctx context.Context, name string, a RemoteAgent) (st
 	return "", fmt.Errorf("%s is not running on any of its hosts (tried %s)", name, strings.Join(tried, ", "))
 }
 
+// FollowsOneHost says whether an agent moves between its hosts and runs on
+// one at a time: several hosts and a probe that says which holds it now (an
+// HA resource such as the openclaw cluster's).
+func (a RemoteAgent) FollowsOneHost() bool {
+	return a.URL == "" && len(a.Hosts) > 1 && strings.TrimSpace(a.Probe) != ""
+}
+
+// Locate is the host entry that holds a configured agent now, found the way
+// Run finds it (and remembered for Run): the cached answer while it is fresh,
+// else the probe on each host in turn. An error when it is on none of them.
+func (r *RemoteRunner) Locate(ctx context.Context, name string) (string, error) {
+	a, ok := r.cfg.Agents[name]
+	if !ok || a.URL != "" || len(a.Hosts) == 0 {
+		return "", fmt.Errorf("%s is not an agent reached over ssh", name)
+	}
+	return r.host(ctx, name, a)
+}
+
+// RemoteHostname is what a host entry's machine calls itself: "sds-b" for
+// "sds@192.168.123.227". It is how an ssh destination given by address is
+// known to be a machine that is also drawn under its own name.
+func RemoteHostname(ctx context.Context, host string) (string, error) {
+	out, err := sshRun(ctx, host, "hostname", remoteProbeTimeout)
+	if err != nil {
+		return "", err
+	}
+	name, _, _ := strings.Cut(strings.TrimSpace(out), "\n")
+	name = strings.TrimSpace(name)
+	if name == "" || len(name) > 253 || strings.ContainsAny(name, " \t/") {
+		return "", fmt.Errorf("%s gave no usable hostname", hostLabel(host))
+	}
+	return name, nil
+}
+
 func (r *RemoteRunner) remember(name, host string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()

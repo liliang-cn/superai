@@ -98,6 +98,9 @@ type App struct {
 	pushV     alarmPusher
 	// Each year's holidays AlarmRings expanded with. See app_alarm_rings.go.
 	ringHolidays holidayCache
+	// Where the agents the settings reach over ssh run, and what their hosts
+	// call themselves, looked up in the background. See remote_where.go.
+	remoteWhere remoteWhere
 
 	mu       sync.Mutex
 	svc      *backend.Service
@@ -304,6 +307,7 @@ func (a *App) boot() {
 	a.startTelegram()
 	a.startHive()
 	a.startAlarmWatch()
+	a.lookForRemoteAgents()
 }
 
 // syncProxy brings the embedded CLIProxyAPI in line with the current settings:

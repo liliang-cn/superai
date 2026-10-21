@@ -86,6 +86,10 @@ type HostAgent struct {
 	// there cannot start: not installed for it, or its CLIs switched off.
 	// Someone is using it; core cannot hand it work.
 	Unrunnable bool `json:"unrunnable,omitempty"`
+	// spare is a named agent that follows one host at a time, on a host of
+	// its the apps do not draw it on: while it is not known to run anywhere
+	// it is drawn once, on its first host, not on all of them.
+	spare bool
 }
 
 // HiveTopology is the hive in one answer: the hosts with what runs on each,
@@ -112,8 +116,9 @@ func (a *App) fullTopology() HiveTopology {
 // parents before the hosts inside them.
 func (a *App) Hosts() []Host { return a.HiveTopology().Hosts }
 
-// withoutHA drops what only HA knows: an agent's standby copies, a host known
-// only as an HA node that is left with nothing on it, and the services.
+// withoutHA drops what only HA knows: an agent's standby copies (and the
+// spare ones of an agent that runs on one host at a time), a host known only
+// as an HA node that is left with nothing on it, and the services.
 func withoutHA(t HiveTopology) HiveTopology {
 	haNode := map[string]bool{}
 	for _, s := range t.Services {
@@ -126,7 +131,7 @@ func withoutHA(t HiveTopology) HiveTopology {
 	for _, h := range t.Hosts {
 		kept := make([]HostAgent, 0, len(h.Agents))
 		for _, ag := range h.Agents {
-			if ag.State != "standby" && ag.State != "standby-unready" {
+			if ag.State != "standby" && ag.State != "standby-unready" && !ag.spare {
 				kept = append(kept, ag)
 			}
 		}
@@ -322,38 +327,64 @@ func (a *App) hostsWith(services []backend.HAService) []Host {
 		}
 	}
 
-	// Agents the settings reach over ssh, on every host of theirs: pi and
-	// hermes are installed on several VMs, and are on each of them. A
-	// destination is matched to a host already drawn by its name or
-	// address; one that matches none is a host of its own, unless an HA
-	// service runs the agent: the service says which hosts it is on, and an
-	// unmatched destination is one of those by another name.
+	// Agents the settings reach over ssh. A destination is matched to a host
+	// already drawn by its name or address, or by the hostname its machine
+	// gave (sds@192.168.123.227 is sds-b); one that matches none is a host of
+	// its own, unless an HA service runs the agent: the service says which
+	// hosts it is on, and an unmatched destination is one of those by
+	// another name.
+	//
+	// An agent installed on several machines (one host each, or no probe) is
+	// on each of them. One that follows one host at a time (several hosts and
+	// a probe: the openclaw cluster's) runs on the host its probe succeeds on
+	// and stands by on the others; while nobody knows where, or it runs on
+	// none, the apps draw it once, on its first host. Every destination stays
+	// on the full list: "pi.sds-a" asks pi there whatever runs where.
 	if s != nil && s.RemoteAgents.Enabled {
+		where := a.remoteSpotsNow(s, services)
 		for _, n := range s.RemoteAgents.Names() {
 			ra := s.RemoteAgents.Agents[n]
 			if ra.URL != "" {
 				continue
 			}
 			ha := haServes(services, n)
-			for _, dest := range ra.Hosts {
-				hn := sshHost(dest)
-				// This machine, or a forwarded port on it (a Lima VM's
-				// "-p 52848 me@127.0.0.1"), says nothing of which host it is.
-				if hn == "" || backend.IsLocalHost(hn) || loopback(hn) {
-					continue
-				}
-				x := b.find(hn)
+			follows := !ha && ra.FollowsOneHost()
+			at, known := where.active[n]
+			drawn := false
+			for _, dest := range sshDests(ra) {
+				hn, name := sshHost(dest), where.names[dest]
+				x := b.sshHostOf(hn, name)
 				if x == nil {
 					if ha {
 						continue
 					}
-					x = b.host(hn, "", "", "", "", "")
+					if name != "" && isIP(hn) {
+						x = b.host(name, "", "", "", "", "")
+					} else {
+						x = b.host(hn, "", "", "", "", "")
+					}
 				}
-				x.configured()
+				if name != "" && isIP(hn) {
+					x.addAddress(strings.Trim(hn, "[]"))
+				}
+				g := HostAgent{Name: n, Kind: hostAgentNamed, About: ra.About, State: "configured"}
+				switch {
+				case follows && known && at == dest:
+					x.live(where.at)
+					g.State = "live"
+				case follows && known && at != "":
+					x.configured()
+					g.State = "standby"
+				default:
+					x.configured()
+					g.spare = follows && drawn
+					drawn = true
+				}
 				if x.hasNamed(n) {
+					x.placeNamed(g)
 					continue
 				}
-				b.agent(x, HostAgent{Name: n, Kind: hostAgentNamed, About: ra.About, State: "configured"})
+				b.agent(x, g)
 			}
 		}
 	}
@@ -478,6 +509,32 @@ func (x *Host) hasNamed(name string) bool {
 		}
 	}
 	return false
+}
+
+// placeNamed sets what the settings' lookup found for the named agent of g's
+// name already on x (a relay's, or an HA service's): running here wins over
+// any other word, standing by here wins over a relay's, and a spare stays
+// one only while nothing says it runs here.
+func (x *Host) placeNamed(g HostAgent) {
+	for i := range x.Agents {
+		e := &x.Agents[i]
+		if e.Kind != hostAgentNamed || e.Name != g.Name {
+			continue
+		}
+		switch g.State {
+		case "live":
+			e.State = "live"
+		case "standby":
+			if e.State == "live" || e.State == "configured" {
+				e.State, e.Activity = "standby", ""
+			}
+		default:
+			e.spare = g.spare && e.State == "configured"
+		}
+		if e.About == "" {
+			e.About = g.About
+		}
+	}
 }
 
 // mergeCLIs folds a coding CLI into the named agent of the same name on x:
