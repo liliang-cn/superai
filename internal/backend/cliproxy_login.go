@@ -26,7 +26,6 @@ func CLIProxyProviders() []CLIProxyProvider {
 	return []CLIProxyProvider{
 		{ID: "claude", Label: "Claude", Note: "Your Claude subscription."},
 		{ID: "codex", Label: "ChatGPT", Note: "Your ChatGPT subscription."},
-		{ID: "gemini", Label: "Gemini", NeedsProject: true, Note: "Needs a Google Cloud project ID."},
 		{ID: "antigravity", Label: "Antigravity", Note: "Your Google Antigravity account."},
 		{ID: "kimi", Label: "Kimi", Note: "Your Moonshot Kimi account."},
 	}

@@ -26,7 +26,6 @@ type Agent = { name: string; label: string; signedIn?: boolean; canBeDefault: bo
 const PRESETS = [
   { id: "openai", label: "OpenAI", base: "https://api.openai.com/v1", key: true },
   { id: "deepseek", label: "DeepSeek", base: "https://api.deepseek.com/v1", key: true },
-  { id: "gemini", label: "Google Gemini", base: "https://generativelanguage.googleapis.com/v1beta/openai", key: true },
   { id: "openrouter", label: "OpenRouter", base: "https://openrouter.ai/api/v1", key: true },
   { id: "ollama", label: "Ollama", base: "http://127.0.0.1:11434/v1", key: false },
   { id: "other", label: "Other", base: "", key: true },
@@ -206,7 +205,7 @@ export default function Onboarding({ onDone, web = false, start = "ask" }: {
 
         {step === "model" && <>
           <h1>{t("Sign in with your AI account")}</h1>
-          <p className="gate2-note">Claude · ChatGPT · Gemini</p>
+          <p className="gate2-note">Claude · ChatGPT · Antigravity</p>
           <button className="cv-pill ink gate2-go" disabled={busy} onClick={useAccounts}>
             {busy ? t("Setting up…") : t("Sign in")}
           </button>

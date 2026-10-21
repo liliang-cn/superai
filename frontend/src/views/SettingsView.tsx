@@ -265,7 +265,6 @@ const SECTIONS: { id: SectionID; label: string }[] = [
 const AGENT_CLIS: { name: string; label: string }[] = [
   { name: "claude", label: "Claude Code" },
   { name: "codex", label: "Codex" },
-  { name: "gemini", label: "Gemini" },
   { name: "cursor-agent", label: "Cursor Agent" },
 ];
 
