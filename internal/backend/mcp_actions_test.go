@@ -288,7 +288,7 @@ func TestNotedSectionOnlyWhenConfigured(t *testing.T) {
 	}
 	s := notedSection(true)
 	for _, want := range []string{"mcp_noted_", "resolve_datetime", "card", "timeline", "stat", "noted://",
-		"create_alarm", `"alarm"`, `"reminder"`, "interval 2", "anchor", "nextFires", "update_alarm", "enabled false", "delete_alarm", "confirm"} {
+		"still ahead", "already over is left out", "create_alarm", `"alarm"`, `"reminder"`, "interval 2", "anchor", "nextFires", "update_alarm", "enabled false", "delete_alarm", "confirm"} {
 		if !strings.Contains(s, want) {
 			t.Errorf("noted section lacks %q", want)
 		}
