@@ -6,7 +6,7 @@ import { forgetActor, registerActor } from "./bubbles";
 import { Packets, type Link } from "./packets";
 import { CSS2DObject } from "three/examples/jsm/renderers/CSS2DRenderer.js";
 import type { Bee, CCActivity, CCActivitySession, CLIActivity, HAService, Hive, HiveTask, Host, HostAgent, LinkedAgent, RelayAgent } from "../canvas/data";
-import { SLAB_TOP, cliName, floorLink, forgetLines, haRoles, isStandby, kindLabel, planHosts, pod, serviceMarker, setLinesNight, setServiceState, slab, socket, unlinkedStatus, type HostPlan, type Plot } from "./hosts";
+import { CLOUD_LIFT, SLAB_TOP, cliName, cloud, floorLink, forgetLines, haRoles, isStandby, kindLabel, planHosts, pod, serviceMarker, setLinesNight, setServiceState, slab, socket, unlinkedStatus, type HostPlan, type Plot } from "./hosts";
 import type { CodingRun } from "../canvas/tiles";
 import type { AttentionItem } from "../canvas/attention";
 import type { Member } from "../components/HiveMeter";
@@ -538,7 +538,8 @@ export const cluster: District<WorldData> = {
       }
     });
 
-    // ── Dashboards: a wall of screens ────────────────────────────────────
+    // ── Dashboards: a row of holograms, each standing on the light of a
+    //    projector on the floor, like the desks' monitors ─────────────────
     const wall = new THREE.Group();
     wall.position.set(-21, 0, -3);
     wall.rotation.y = Math.PI / 2;
@@ -546,12 +547,11 @@ export const cluster: District<WorldData> = {
     const wallScreens: { node: THREE.Group; sc: Screen; id: string }[] = [];
     for (let i = 0; i < 4; i++) {
       const node = new THREE.Group();
-      const post = cyl(0.09, 0.09, 2.6, 16, FIN.alu(), true);
-      const bezel = rbox(4, 2.5, 0.14, FIN.glass(), 0.06);
-      bezel.position.y = 2.4;
-      const sc = screen(3.7, 2.2, 640);
-      sc.mesh.position.set(0, 3.65, 0.1);
-      node.add(post, bezel, sc.mesh);
+      const sw = 3.7, sh = 2.2, mid = 3.65;
+      const bar = projector(2.4, 0.4);
+      const sc = screen(sw, sh, 640, true);
+      sc.mesh.position.set(0, mid, 0);
+      node.add(bar, beam(0.08, mid - sh / 2, 1.9, sw), sc.mesh);
       node.position.set(-6.6 + i * 4.4, 0, 0);
       node.visible = false;
       wall.add(node);
@@ -905,15 +905,19 @@ export const cluster: District<WorldData> = {
       for (const p of pl.plots) {
         const grp = new THREE.Group();
         grp.position.copy(p.at);
+        // An HA cluster floats, a cloud with its agents on top.
+        const ha = p.host.kind === "ha";
+        if (ha) grp.position.y += CLOUD_LIFT;
         hostLayer.add(grp);
-        const sl = slab(p.w, p.d, p.host.state);
+        const sl = ha ? cloud(p.w, p.d, p.host.state) : slab(p.w, p.d, p.host.state);
         grp.add(sl);
         ctx.pickable(sl, { kind: "host", id: p.host.id, title: p.host.name });
-        // Its name and kind at the front edge, on the floor.
+        // Its name and kind at the front edge, on the floor; a cluster's says
+        // which node runs it now.
         const plate = new THREE.Object3D();
-        plate.position.set(0, 0.3, p.d / 2 + 0.4);
+        plate.position.set(0, ha ? -0.9 : 0.3, p.d / 2 + 0.4);
         grp.add(plate);
-        const label = ctx.label(plate, hostTitle(p.host), "", 0);
+        const label = ctx.label(plate, hostTitle(p.host), ha && p.host.on ? translate("on {name}", { name: p.host.on }) : "", 0);
         const c = cable(coreAt, edgeOf(p, new THREE.Vector3()), hash01(p.host.id));
         c.setOk(p.host.state === "live");
         cables.add(c.tube);
@@ -1004,12 +1008,14 @@ export const cluster: District<WorldData> = {
             return;
           }
           const via = a.via || p.via;
-          ctx.pickable(r, { kind: a.kind === "cli" ? "cli" : "agent", id: `${n}.${via}`, title: `${n} · ${p.host.name}` });
+          // On a cluster, the agent by its own name: whichever node runs it.
+          const id = ha ? n : `${n}.${via}`;
+          ctx.pickable(r, { kind: a.kind === "cli" ? "cli" : "agent", id, title: ha ? n : `${n} · ${p.host.name}` });
           clis.set(n, { r, label: ctx.label(r, n, "", k % 2 ? 2.9 : 2.1) });
           crew.set(n, a);
           placed.push({ key: `${a.kind}:${n}`, host: p.host.id, r });
-          actor((a.kind === "cli" ? "cli:" : "agent:") + `${n}.${via}`, r);
-          if (a.kind !== "cli") actor("agent:" + n, r);
+          actor((a.kind === "cli" ? "cli:" : "agent:") + id, r);
+          if (a.kind !== "cli" && !ha) actor("agent:" + n, r);
         });
         if (dev || clis.size) machines.set(p.station ? p.via : p.host.name, { dev: dev ?? grp, label, cable: c, at: p.at, clis });
         plotViews.set(p.host.id, { p, label, cable: c, dev, crew });
@@ -1134,7 +1140,9 @@ export const cluster: District<WorldData> = {
         }
         const pods = p.pods.length;
         const agents = p.host.agents.filter((a) => !isStandby(a)).length + p.pods.reduce((n, h) => n + h.agents.length, 0);
-        const status = p.host.state === "lost" ? translate("not answering") : p.host.state === "configured" ? unlinkedStatus(p.host, svcs, translate) || translate("not linked")
+        // A cluster says which node runs it now.
+        const status = p.host.kind === "ha" ? (p.host.on ? translate("on {name}", { name: p.host.on }) : translate("not running"))
+          : p.host.state === "lost" ? translate("not answering") : p.host.state === "configured" ? unlinkedStatus(p.host, svcs, translate) || translate("not linked")
           : [pods ? translate(pods === 1 ? "1 pod" : "{count} pods", { count: pods }) : "", translate(agents === 1 ? "1 agent" : "{count} agents", { count: agents })].filter(Boolean).join(" · ");
         v.label.set(hostTitle(p.host), status, p.host.state === "lost" ? "bad" : onNode || busy || liveHere.length ? "work" : "idle");
       }

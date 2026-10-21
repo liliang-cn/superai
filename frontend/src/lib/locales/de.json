@@ -502,6 +502,7 @@
  "this core": "Dieser Kern",
  "needs your OK": "Erfordert Bestätigung",
  "not answering": "Antwortet nicht",
+ "not running": "Läuft nicht",
  "configured": "Konfiguriert",
  "{count} agents ready": "{count} Agents bereit",
  "not linked": "Nicht verknüpft",

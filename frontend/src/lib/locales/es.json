@@ -502,6 +502,7 @@
  "this core": "este núcleo",
  "needs your OK": "requiere tu aprobación",
  "not answering": "sin respuesta",
+ "not running": "No se está ejecutando",
  "configured": "configurado",
  "{count} agents ready": "{count} agentes listos",
  "not linked": "no vinculado",

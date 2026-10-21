@@ -11,7 +11,7 @@ import { contact, ownMat, rbox } from "./kit";
 // agent, if it has one, stands as a ghost). This file plans where things go
 // and makes the parts; cluster.ts puts the agents on them.
 
-const KIND: Record<string, string> = { pod: "Pod", container: "Container", mac: "Mac", vm: "VM", metal: "Bare metal" };
+const KIND: Record<string, string> = { pod: "Pod", container: "Container", mac: "Mac", vm: "VM", metal: "Bare metal", ha: "HA" };
 /** What a host is, as a label says it: "VM", "Pod", "Host" when it has not
  *  said; "HA node" for one known only as an HA service's node, whose kind
  *  nothing has said either. */
@@ -333,6 +333,47 @@ export function slab(w: number, d: number, state: Host["state"]) {
   g.add(top, rim);
   if (!faint) g.add(contact(w + 2, d + 2, 0.08));
   g.userData.top = top;
+  return g;
+}
+
+/** How high an HA cluster's cloud floats. */
+export const CLOUD_LIFT = 1.8;
+
+/**
+ * An HA cluster: a cloud the size of a plot, its agents standing on top
+ * (at SLAB_TOP, like on a slab), floating CLOUD_LIFT above the floor with
+ * its shadow there. Puffs of white, flattened, along the plot and either side.
+ */
+export function cloud(w: number, d: number, state: Host["state"]) {
+  const g = new THREE.Group();
+  const faint = state === "configured";
+  const m = ownMat(state === "lost" ? 0xe3e7ec : 0xffffff, { rough: 0.95, opacity: faint ? 0.6 : 1 });
+  const flat = 0.42;
+  const puff = (x: number, z: number, r: number) => {
+    const s = new THREE.Mesh(new THREE.SphereGeometry(r, 28, 18), m);
+    s.scale.set(1, flat, 1);
+    // The tops meet just under the robots' feet.
+    s.position.set(x, SLAB_TOP - r * flat * 0.82, z);
+    s.castShadow = !faint;
+    s.receiveShadow = true;
+    g.add(s);
+    return s;
+  };
+  const n = Math.max(3, Math.round(w / 1.9));
+  for (let i = 0; i < n; i++) {
+    const t = n === 1 ? 0.5 : i / (n - 1);
+    const x = (t - 0.5) * (w - 1.6);
+    const edge = 1 - Math.abs(t - 0.5) * 1.1;
+    puff(x, (i % 2 ? 0.35 : -0.3) * (d / 4), 1.55 + 0.55 * edge);
+    puff(x + 0.6, d * 0.3, 1.05 + 0.35 * edge);
+    puff(x - 0.5, -d * 0.3, 1.0 + 0.35 * edge);
+  }
+  puff(-w / 2 + 0.4, 0, 1.15);
+  puff(w / 2 - 0.4, 0, 1.15);
+  const shadow = contact(w + 1, d + 1.5, faint ? 0.05 : 0.12);
+  shadow.position.y = -CLOUD_LIFT;
+  g.add(shadow);
+  g.userData.top = g.children[0];
   return g;
 }
 

@@ -237,11 +237,15 @@ func TestHostsPlaceHAServices(t *testing.T) {
 		t.Fatalf("the queen's view:\n%s", txt)
 	}
 
-	// The apps see no HA: openclaw stands on the node it is active on, its
-	// standby and the node known only for that are gone.
+	// The apps draw the HA cluster: openclaw once, running, on sds-e now;
+	// its standby and the node known only for that are gone.
 	apps := core.HiveTopology()
-	if g := agentNamed(hostByName(apps.Hosts, "sds-e"), "openclaw"); g == nil || g.State != "live" || g.Via != "sds-e" {
-		t.Fatalf("openclaw on its active node: %+v", g)
+	c := hostByName(apps.Hosts, "openclaw")
+	if g := agentNamed(c, "openclaw"); c == nil || c.Kind != hostKindHA || c.On != "sds-e" || g == nil || g.State != "live" || g.Via != "sds-e" {
+		t.Fatalf("the openclaw cluster: %+v", c)
+	}
+	if g := agentNamed(hostByName(apps.Hosts, "sds-e"), "openclaw"); g != nil {
+		t.Fatalf("openclaw on its node as well: %+v", g)
 	}
 	if h := hostByName(apps.Hosts, "sds-b"); h != nil {
 		t.Fatalf("an HA node with nothing on it: %+v", h)

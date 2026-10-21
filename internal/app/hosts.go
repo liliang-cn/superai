@@ -44,7 +44,14 @@ type Host struct {
 	// sds@192.168.123.212 is known to mean this host.
 	Addresses []string    `json:"addresses,omitempty"`
 	Agents    []HostAgent `json:"agents"`
+	// On is, for an HA cluster (Kind "ha"), the host its agents run on now;
+	// empty while they run on none.
+	On string `json:"on,omitempty"`
 }
+
+// hostKindHA is the kind of the host the apps draw for an HA cluster: the
+// agents an HA service keeps up, together, whichever node runs them now.
+const hostKindHA = "ha"
 
 // What an agent on a host is.
 const (
@@ -100,9 +107,10 @@ type HiveTopology struct {
 }
 
 // HiveTopology is the hive as the apps draw it: every host with what runs on
-// it. An agent an HA service keeps up stands on the node it is active on, and
-// moves with it; how HA does that — standbys, service IPs — is left out. The
-// queen's hive_hosts and the hosts tool read fullTopology.
+// it. The agents an HA service keeps up are a cluster of their own (Kind
+// "ha"), once each, saying which node runs them now; standbys and service
+// IPs are left out. The queen's hive_hosts and the hosts tool read
+// fullTopology.
 func (a *App) HiveTopology() HiveTopology { return onlyWhatWorks(withoutHA(a.fullTopology())) }
 
 // fullTopology lists the hosts and the HA services together, read at the
@@ -116,9 +124,10 @@ func (a *App) fullTopology() HiveTopology {
 // parents before the hosts inside them.
 func (a *App) Hosts() []Host { return a.HiveTopology().Hosts }
 
-// withoutHA drops what only HA knows: an agent's standby copies (and the
-// spare ones of an agent that runs on one host at a time), a host known only
-// as an HA node that is left with nothing on it, and the services.
+// withoutHA gathers the agents an HA service keeps up into one cluster host
+// per service, each agent once, live when it runs on any node, and drops the
+// rest of what only HA knows: standby and spare copies, a host known only as
+// an HA node that is left with nothing on it, and the services.
 func withoutHA(t HiveTopology) HiveTopology {
 	haNode := map[string]bool{}
 	for _, s := range t.Services {
@@ -127,21 +136,74 @@ func withoutHA(t HiveTopology) HiveTopology {
 			haNode[hostID(b.Host)] = true
 		}
 	}
+	parents := map[string]bool{}
+	for _, h := range t.Hosts {
+		if h.Parent != "" {
+			parents[h.Parent] = true
+		}
+	}
+	clouds := map[string]*Host{}
+	var order []string
 	hosts := make([]Host, 0, len(t.Hosts))
 	for _, h := range t.Hosts {
 		kept := make([]HostAgent, 0, len(h.Agents))
 		for _, ag := range h.Agents {
+			if ag.Kind == hostAgentNamed && ag.Service != "" {
+				c := clouds[ag.Service]
+				if c == nil {
+					c = &Host{ID: hostKindHA + ":" + hostID(ag.Service), Name: ag.Service, Kind: hostKindHA, State: "configured", LastSeen: h.LastSeen}
+					clouds[ag.Service] = c
+					order = append(order, ag.Service)
+				}
+				if ag.State == "live" {
+					c.State, c.On = "live", h.Name
+				}
+				c.joinHA(ag)
+				continue
+			}
 			if ag.State != "standby" && ag.State != "standby-unready" && !ag.spare {
 				kept = append(kept, ag)
 			}
 		}
-		if len(kept) == 0 && h.State == "configured" && (haNode[h.ID] || haNode[hostID(h.Hostname)]) {
+		// Nothing left on it, and nothing inside it: a node that only held
+		// HA agents, or one only HA knows of.
+		if len(kept) == 0 && !parents[h.ID] && (len(h.Agents) > 0 || h.State == "configured" && (haNode[h.ID] || haNode[hostID(h.Hostname)])) {
 			continue
 		}
 		h.Agents = kept
 		hosts = append(hosts, h)
 	}
+	sort.Strings(order)
+	for _, n := range order {
+		hosts = append(hosts, *clouds[n])
+	}
 	return HiveTopology{Hosts: hosts, Services: []backend.HAService{}}
+}
+
+// joinHA puts an HA agent on its cluster once: live wins over a standby or
+// configured copy, and a copy that is not running shows as configured.
+func (c *Host) joinHA(ag HostAgent) {
+	ag.spare = false
+	if ag.State != "live" {
+		ag.State, ag.Activity = "configured", ""
+	}
+	for i := range c.Agents {
+		e := &c.Agents[i]
+		if e.Name != ag.Name {
+			continue
+		}
+		if ag.State == "live" && e.State != "live" {
+			about := e.About
+			*e = ag
+			if e.About == "" {
+				e.About = about
+			}
+		} else if e.About == "" {
+			e.About = ag.About
+		}
+		return
+	}
+	c.Agents = append(c.Agents, ag)
 }
 
 // onlyWhatWorks keeps the agents that can do work, and the hosts only as the
@@ -380,8 +442,14 @@ func (a *App) hostsWith(services []backend.HAService) []Host {
 					g.spare = follows && drawn
 					drawn = true
 				}
+				if follows {
+					g.Service = haCluster(ra, n)
+				}
 				if x.hasNamed(n) {
 					x.placeNamed(g)
+					if follows {
+						setService(x, n, g.Service)
+					}
 					continue
 				}
 				b.agent(x, g)
@@ -759,6 +827,20 @@ func (b *hostBook) service(sv backend.HAService, configured []string) {
 			b.agent(x, HostAgent{Name: n, Kind: hostAgentNamed, State: state, Service: sv.Name})
 		}
 	}
+}
+
+// haCluster names the HA cluster an agent that follows one host belongs to:
+// the unit its probe asks systemd about ("openclaw" for systemctl is-active
+// --quiet openclaw), else the agent itself.
+func haCluster(ra backend.RemoteAgent, name string) string {
+	f := strings.Fields(ra.Probe)
+	if len(f) >= 3 && f[0] == "systemctl" && f[1] == "is-active" {
+		unit := f[len(f)-1]
+		if !strings.HasPrefix(unit, "-") {
+			return strings.TrimSuffix(unit, ".service")
+		}
+	}
+	return name
 }
 
 func setService(x *Host, name, service string) {

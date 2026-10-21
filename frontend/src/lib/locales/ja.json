@@ -502,6 +502,7 @@
  "this core": "このコア",
  "needs your OK": "承認が必要",
  "not answering": "応答なし",
+ "not running": "停止中",
  "configured": "設定済み",
  "{count} agents ready": "{count} エージェント準備完了",
  "not linked": "未連携",

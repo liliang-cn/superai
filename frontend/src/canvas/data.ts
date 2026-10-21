@@ -308,7 +308,8 @@ export function useLinkedAgents(): LinkedAgent[] {
 
 /** What a host is: a pod, a container, a Mac, a VM or a bare machine; empty
  *  when nothing on it has said. */
-export type HostKind = "pod" | "container" | "mac" | "vm" | "metal" | "";
+/** "ha" is an HA cluster: the agents an HA service keeps up, together. */
+export type HostKind = "pod" | "container" | "mac" | "vm" | "metal" | "ha" | "";
 
 /** One agent on a host: a SuperAI (queen, worker, machine agent, relay), a
  *  coding CLI ("claude.mac"), or a named agent a SuperAI serves (openclaw). */
@@ -348,6 +349,8 @@ export interface Host {
   /** Its IP addresses, where something has said them (haify's node list). */
   addresses?: string[];
   agents: HostAgent[];
+  /** For an HA cluster, the node its agents run on now. */
+  on?: string;
 }
 
 /** A service kept up by HA (haify's drbd-reactor promoters): it runs on one

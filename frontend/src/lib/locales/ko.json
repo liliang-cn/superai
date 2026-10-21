@@ -502,6 +502,7 @@
  "this core": "현재 코어",
  "needs your OK": "승인 필요",
  "not answering": "응답 없음",
+ "not running": "실행 중 아님",
  "configured": "구성됨",
  "{count} agents ready": "에이전트 {count}개 준비됨",
  "not linked": "연결되지 않음",

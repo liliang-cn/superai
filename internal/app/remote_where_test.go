@@ -84,22 +84,30 @@ func TestAgentThatFollowsOneHostIsDrawnWhereItRuns(t *testing.T) {
 	}
 	core.fullTopology() // starts the first look
 	waitFor(t, "the agents located", func() bool {
-		return len(where(core.HiveTopology().Hosts)["pi"]) == 1 && where(core.HiveTopology().Hosts)["pi"][0] == "sds-b:live"
+		return strings.Join(where(core.HiveTopology().Hosts)["pi"], ",") == "ha:openclaw:live"
 	})
 	if probes != 1 {
 		t.Fatalf("one resource, %d lookups", probes)
 	}
 
+	// The apps draw the cluster: the three together, once each, running,
+	// on sds-b now; sds-b, holding nothing else, is not a plot of its own.
 	apps := core.HiveTopology().Hosts
-	want := map[string][]string{"hermes": {"sds-b:live"}, "openclaw": {"sds-b:live"}, "pi": {"sds-b:live"}}
-	if got := where(apps); len(got) != 3 || strings.Join(got["openclaw"], ",") != "sds-b:live" ||
-		strings.Join(got["hermes"], ",") != "sds-b:live" || strings.Join(got["pi"], ",") != "sds-b:live" {
-		t.Fatalf("drawn %v, want %v", got, want)
+	want := "ha:openclaw:live"
+	if got := where(apps); len(got) != 3 || strings.Join(got["openclaw"], ",") != want ||
+		strings.Join(got["hermes"], ",") != want || strings.Join(got["pi"], ",") != want {
+		t.Fatalf("drawn %v, want each on %s", got, want)
 	}
 	noAddressHosts(t, apps)
-	b := hostByName(apps, "sds-b")
-	if b == nil || b.State != "live" || len(b.Addresses) != 1 || b.Addresses[0] != "192.168.123.227" {
-		t.Fatalf("sds-b: %+v", b)
+	c := hostByName(apps, "openclaw")
+	if c == nil || c.Kind != hostKindHA || c.State != "live" || c.On != "sds-b" {
+		t.Fatalf("the cluster: %+v", c)
+	}
+	if hostByName(apps, "sds-b") != nil {
+		t.Fatal("an HA node with nothing else on it is drawn")
+	}
+	if b := hostByName(core.fullTopology().Hosts, "sds-b"); b == nil || b.State != "live" || len(b.Addresses) != 1 || b.Addresses[0] != "192.168.123.227" {
+		t.Fatalf("sds-b on the queen's list: %+v", b)
 	}
 	n := 0
 	for _, h := range apps {
@@ -133,8 +141,8 @@ func TestAgentThatFollowsOneHostIsDrawnWhereItRuns(t *testing.T) {
 	}
 }
 
-// On none of its hosts, or before anyone has looked: drawn once, on its
-// first host, not running; never on all three.
+// On none of its hosts, or before anyone has looked: drawn once, on the
+// cluster, not running; never on all three.
 func TestAgentThatFollowsOneHostIsDrawnOnceWhenNotRunning(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
@@ -154,13 +162,12 @@ func TestAgentThatFollowsOneHostIsDrawnOnceWhenNotRunning(t *testing.T) {
 			apps := core.HiveTopology().Hosts
 			got := where(apps)
 			for _, n := range []string{"openclaw", "hermes", "pi"} {
-				if len(got[n]) != 1 || !strings.HasSuffix(got[n][0], ":configured") {
+				if strings.Join(got[n], ",") != "ha:openclaw:configured" {
 					t.Fatalf("%s drawn as %v", n, got[n])
 				}
 			}
-			// The first host is sds-e, by its address, once its name is known.
-			if tc.locate != nil && got["pi"][0] != "sds-e:configured" {
-				t.Fatalf("pi drawn on %v, want its first host", got["pi"])
+			if c := hostByName(apps, "openclaw"); c == nil || c.State != "configured" || c.On != "" {
+				t.Fatalf("the cluster: %+v", c)
 			}
 			if tc.locate != nil {
 				noAddressHosts(t, apps)
