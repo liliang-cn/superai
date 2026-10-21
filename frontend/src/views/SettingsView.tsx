@@ -1346,7 +1346,7 @@ export default function SettingsView({
           {section === "runtime" && <AvatarSection status={status} />}
 
           {!served && section === "runtime" && <OpenInBrowserCard />}
-          {served && section === "runtime" && <PairPhoneCard />}
+          {section === "runtime" && <PairPhoneCard />}
           {section === "runtime" && (
             <LocalHiveCard
               onChanged={(fresh) => setS((cur) => (cur ? backend.Settings.createFrom({ ...cur, hive: fresh.hive }) : fresh))}

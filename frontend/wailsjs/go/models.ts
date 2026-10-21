@@ -984,6 +984,7 @@ export namespace app {
 	    via?: string;
 	    mcp?: string[];
 	    service?: string;
+	    unrunnable?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new HostAgent(source);
@@ -1001,6 +1002,7 @@ export namespace app {
 	        this.via = source["via"];
 	        this.mcp = source["mcp"];
 	        this.service = source["service"];
+	        this.unrunnable = source["unrunnable"];
 	    }
 	}
 	export class Host {
@@ -1092,6 +1094,7 @@ export namespace app {
 	    host: string;
 	    state: string;
 	    up: boolean;
+	    via?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new HiveWorker(source);
@@ -1104,6 +1107,7 @@ export namespace app {
 	        this.host = source["host"];
 	        this.state = source["state"];
 	        this.up = source["up"];
+	        this.via = source["via"];
 	    }
 	}
 	
@@ -1376,6 +1380,22 @@ export namespace app {
 	    }
 	}
 	
+	export class ModelCheck {
+	    ok: boolean;
+	    models: string[];
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ModelCheck(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ok = source["ok"];
+	        this.models = source["models"];
+	        this.error = source["error"];
+	    }
+	}
 	export class NewIntegrationToken {
 	    id: string;
 	    name: string;
@@ -1422,6 +1442,7 @@ export namespace app {
 	    code: string;
 	    // Go type: time
 	    expires_at: any;
+	    link?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new PairCode(source);
@@ -1431,6 +1452,7 @@ export namespace app {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.code = source["code"];
 	        this.expires_at = this.convertValues(source["expires_at"], null);
+	        this.link = source["link"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

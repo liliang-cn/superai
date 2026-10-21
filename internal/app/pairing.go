@@ -499,6 +499,10 @@ func validVendorToken(t string) bool {
 type PairCode struct {
 	Code      string    `json:"code"`
 	ExpiresAt time.Time `json:"expires_at"`
+	// Link is the whole pairing link when this is the desktop app, which
+	// knows where a phone can reach it (phonelink.go). Empty in serve mode,
+	// where the page builds it from the address it was opened at.
+	Link string `json:"link,omitempty"`
 }
 
 // PairedDevice is a paired phone as the settings page lists it.
@@ -516,7 +520,15 @@ func (a *App) PairPhone() (PairCode, error) {
 		return PairCode{}, err
 	}
 	code, exp := s.newCode()
-	return PairCode{Code: code, ExpiresAt: exp.UTC()}, nil
+	out := PairCode{Code: code, ExpiresAt: exp.UTC()}
+	if a.ctx != nil {
+		p, err := a.ensurePhoneLink()
+		if err != nil {
+			return PairCode{}, err
+		}
+		out.Link = p.pairLink(code)
+	}
+	return out, nil
 }
 
 // PairedDevices lists the paired phones, oldest first.

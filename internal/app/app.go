@@ -245,6 +245,9 @@ type App struct {
 	// from whatever goroutine a chat turn happens to be on, and a.mu is held
 	// across a whole service rebuild — an event must never queue behind that.
 	companionHub atomic.Pointer[eventHub]
+	// phones is the phone link (phonelink.go), started once a phone is
+	// paired with the desktop app. Guarded by a.mu.
+	phones *phoneLink
 
 	buildErr string
 	proxyErr string
@@ -267,6 +270,7 @@ func (a *App) Startup(ctx context.Context) {
 	// CLI plugins stay pointed at whoever installed them (the node).
 	go a.serveCCHookSocket(ctx)
 	go a.firstRun()
+	go a.startPhoneLinkIfPaired()
 }
 
 // startupHeadless boots the same backend with no Wails context: events go
@@ -351,6 +355,7 @@ func (a *App) Shutdown(ctx context.Context) {
 	// drain, and stopCompanion takes a.mu itself to unhook the server. An open
 	// browser tab must not outlive the app it is a window onto.
 	_ = a.graphs.Close()
+	a.stopPhoneLink()
 	a.stopCompanion()
 	a.actionsV.Close() // nil-safe: never built when no button was pressed
 

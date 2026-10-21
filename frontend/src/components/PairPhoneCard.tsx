@@ -13,7 +13,9 @@ import { toast } from "../lib/toasts";
  * trades the code for a token of its own (internal/app/pairing.go), so each
  * phone is listed below and can be unpaired without touching anything else.
  *
- * Only in the browser: the desktop window has no address a phone could reach.
+ * In the desktop app the link comes from the backend: the window has no
+ * address a phone could reach, and the app opens one for phones, on the local
+ * network and through the relay (app/phonelink.go).
  */
 export default function PairPhoneCard() {
   const [code, setCode] = useState<app.PairCode | null>(null);
@@ -59,7 +61,7 @@ export default function PairPhoneCard() {
     setBusy(true);
     try {
       const c = await PairPhone();
-      const link = `superai://pair?server=${encodeURIComponent(window.location.origin)}&code=${c.code}`;
+      const link = c.link || `superai://pair?server=${encodeURIComponent(window.location.origin)}&code=${c.code}`;
       setQr(await QRCode.toDataURL(link, { margin: 1, width: 360, errorCorrectionLevel: "M" }));
       setCode(c);
     } catch (e: any) {
@@ -100,7 +102,7 @@ export default function PairPhoneCard() {
             <span style={{ fontSize: 34, fontWeight: 600, letterSpacing: "0.18em", fontVariantNumeric: "tabular-nums" }}>
               {code.code.slice(0, 3)} {code.code.slice(3)}
             </span>
-            <span className="card-desc" style={{ margin: 0 }}>{window.location.origin}</span>
+            {!code.link && <span className="card-desc" style={{ margin: 0 }}>{window.location.origin}</span>}
             <span className="card-desc" style={{ margin: 0 }}>
               Expires in {Math.floor(left / 60)}:{String(left % 60).padStart(2, "0")}
             </span>
