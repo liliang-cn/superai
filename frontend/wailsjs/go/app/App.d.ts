@@ -58,6 +58,8 @@ export function ChatHistory(arg1:string):Promise<Array<backend.ChatTurn>>;
 
 export function ChatSessions():Promise<Array<backend.ChatSessionInfo>>;
 
+export function CheckModel(arg1:string,arg2:string,arg3:string):Promise<app.ModelCheck>;
+
 export function CheckRemoteAgents():Promise<Array<app.RemoteAgentStatus>>;
 
 export function ClearNotifications():Promise<Record<string, any>>;

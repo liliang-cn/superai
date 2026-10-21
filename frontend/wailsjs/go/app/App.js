@@ -106,6 +106,10 @@ export function ChatSessions() {
   return window['go']['app']['App']['ChatSessions']();
 }
 
+export function CheckModel(arg1, arg2, arg3) {
+  return window['go']['app']['App']['CheckModel'](arg1, arg2, arg3);
+}
+
 export function CheckRemoteAgents() {
   return window['go']['app']['App']['CheckRemoteAgents']();
 }

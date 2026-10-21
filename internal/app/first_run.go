@@ -9,8 +9,12 @@ package app
 // question is asked once, and what is set afterwards in Settings stands.
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -189,4 +193,112 @@ func askAgent(bin string, both bool, args ...string) ([]byte, error) {
 		return cmd.CombinedOutput()
 	}
 	return cmd.Output()
+}
+
+// ModelCheck is what CheckModel found at an endpoint.
+type ModelCheck struct {
+	// OK is whether the model answered (or, with no model named, whether the
+	// endpoint listed any).
+	OK bool `json:"ok"`
+	// Models are the ones the endpoint lists, for picking one.
+	Models []string `json:"models"`
+	Error  string   `json:"error,omitempty"`
+}
+
+// CheckModel tries an OpenAI-compatible endpoint before it is saved: lists
+// its models, and asks the named one for a single token, so a wrong key or
+// model name is found while the person is still looking at the form.
+func (a *App) CheckModel(baseURL, key, model string) ModelCheck {
+	base := strings.TrimRight(strings.TrimSpace(baseURL), "/")
+	if base == "" {
+		return ModelCheck{Error: "the API address is empty"}
+	}
+	client := &http.Client{Timeout: 20 * time.Second}
+	do := func(method, path string, body any) ([]byte, int, error) {
+		var r io.Reader
+		if body != nil {
+			b, _ := json.Marshal(body)
+			r = bytes.NewReader(b)
+		}
+		req, err := http.NewRequest(method, base+path, r)
+		if err != nil {
+			return nil, 0, err
+		}
+		if body != nil {
+			req.Header.Set("Content-Type", "application/json")
+		}
+		if k := strings.TrimSpace(key); k != "" {
+			req.Header.Set("Authorization", "Bearer "+k)
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			return nil, 0, err
+		}
+		defer resp.Body.Close()
+		raw, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+		return raw, resp.StatusCode, nil
+	}
+	why := func(raw []byte, code int) string {
+		var e struct {
+			Error any `json:"error"`
+		}
+		_ = json.Unmarshal(raw, &e)
+		switch v := e.Error.(type) {
+		case string:
+			return fmt.Sprintf("HTTP %d: %s", code, v)
+		case map[string]any:
+			if m, ok := v["message"].(string); ok {
+				return fmt.Sprintf("HTTP %d: %s", code, m)
+			}
+		}
+		if code == http.StatusUnauthorized || code == http.StatusForbidden {
+			return fmt.Sprintf("HTTP %d: the key was refused", code)
+		}
+		return fmt.Sprintf("HTTP %d", code)
+	}
+
+	out := ModelCheck{Models: []string{}}
+	raw, code, err := do(http.MethodGet, "/models", nil)
+	if err != nil {
+		return ModelCheck{Models: []string{}, Error: "cannot reach " + base + ": " + err.Error()}
+	}
+	if code == http.StatusOK {
+		var list struct {
+			Data []struct {
+				ID string `json:"id"`
+			} `json:"data"`
+		}
+		_ = json.Unmarshal(raw, &list)
+		for _, m := range list.Data {
+			if m.ID != "" {
+				out.Models = append(out.Models, m.ID)
+			}
+		}
+		slices.Sort(out.Models)
+	} else if strings.TrimSpace(model) == "" {
+		out.Error = why(raw, code)
+		return out
+	}
+	if strings.TrimSpace(model) == "" {
+		out.OK = len(out.Models) > 0
+		if !out.OK {
+			out.Error = "the endpoint lists no models; type the model's name"
+		}
+		return out
+	}
+	raw, code, err = do(http.MethodPost, "/chat/completions", map[string]any{
+		"model":      strings.TrimSpace(model),
+		"messages":   []map[string]string{{"role": "user", "content": "Reply with OK."}},
+		"max_tokens": 8,
+	})
+	if err != nil {
+		out.Error = "cannot reach " + base + ": " + err.Error()
+		return out
+	}
+	if code != http.StatusOK {
+		out.Error = why(raw, code)
+		return out
+	}
+	out.OK = true
+	return out
 }
