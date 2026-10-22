@@ -59,12 +59,12 @@ export function queenNamed(q: QueenName = current) {
   return q.name !== DEFAULT_QUEEN;
 }
 
-/** The queen as a title: "The queen" (主助手) until she has a name. */
+/** The queen as a title: "The queen" (蜂后) until she has a name. */
 export function queenTitle(q: QueenName = current) {
   return queenNamed(q) ? q.name : translate("The queen");
 }
 
-/** The queen inside a sentence: "the queen" (主助手) until she has a name. */
+/** The queen inside a sentence: "the queen" (蜂后) until she has a name. */
 export function queenRef(q: QueenName = current) {
   return queenNamed(q) ? q.name : translate("the queen");
 }
