@@ -446,7 +446,7 @@ export const cluster: District<WorldData> = {
     brain.position.set(-4.6, 0, 3.4);
     g.add(brain);
     ctx.pickable(brain, { kind: "brain", id: "brain", title: "Shared brain" });
-    ctx.label(brain, "CortexDB", "shared brain", 3.4);
+    ctx.label(brain, "CortexDB", translate("shared brain"), 3.4);
 
     // ── Skills: a wrench over a stand, a small one circling it per skill ──
     const rack = new THREE.Group();
@@ -464,7 +464,7 @@ export const cluster: District<WorldData> = {
     g.add(skillRoute.tube);
     ctx.pickable(skillStand, { kind: "skills", id: "rack", title: "Skills" });
     ctx.pickable(bigWrench, { kind: "skills", id: "rack", title: "Skills" });
-    const rackLab = ctx.label(rack, "Skills", "", 5.6);
+    const rackLab = ctx.label(rack, translate("Skills"), "", 5.6);
     let skillSig = "";
 
     // ── MCP: a plug over a stand; each server a plug of its own out on the
@@ -1204,7 +1204,7 @@ export const cluster: District<WorldData> = {
               const plate = new THREE.Object3D();
               plate.position.set(4, 2.6, 0.4);
               b.add(plate);
-              x = { box: b, label: ctx.label(plate, n, "node", 0), cable: c, at };
+              x = { box: b, label: ctx.label(plate, n, translate("node"), 0), cable: c, at };
               nodes.set(n, x);
               ctx.pickable(b, { kind: "node", id: n, title: n });
             }
@@ -1255,7 +1255,7 @@ export const cluster: District<WorldData> = {
             setState(w.r, st);
             if (st === "think" && mine.length) (w.r.userData.carry as THREE.Object3D).visible = true;
             nx.cable.setActive(run.some((x) => workers.get(x.worker)?.node === node));
-            w.label.set(short(m.name), st === "lost" ? "not answering" : mine.length ? clip(mine[0].tool ? `${mine[0].tool} · ${mine[0].prompt}` : mine[0].prompt, 28) : st === "fail" ? "failed" : "idle",
+            w.label.set(short(m.name), st === "lost" ? translate("not answering") : mine.length ? clip(mine[0].tool ? `${mine[0].tool} · ${mine[0].prompt}` : mine[0].prompt, 28) : st === "fail" ? translate("failed") : translate("idle"),
               st === "lost" || st === "fail" ? "bad" : st === "work" || st === "think" ? "work" : "idle");
           });
 
@@ -1265,8 +1265,8 @@ export const cluster: District<WorldData> = {
             const doing = on.flatMap((m) => run.filter((t) => t.worker === m.name).map((t) => `${short(m.name)}: ${t.tool ? t.tool + " · " : ""}${t.prompt}`));
             const lost = on.some((m) => m.state === "lost");
             setLight(x.box, lost ? "lost" : doing.length ? "busy" : "idle");
-            show((x.box.userData.screens as Screen[])[0], n, lost ? "a worker is not answering" : doing.length ? `${doing.length} order${doing.length > 1 ? "s" : ""} running` : "idle",
-              doing.length ? doing : on.map((m) => `${short(m.name)} · ${m.state === "lost" ? "lost" : "ready"}`), doing.length > 0);
+            show((x.box.userData.screens as Screen[])[0], n, lost ? translate("a worker is not answering") : doing.length ? translate(doing.length > 1 ? "{count} orders running" : "1 order running", { count: doing.length }) : translate("idle"),
+              doing.length ? doing : on.map((m) => `${short(m.name)} · ${m.state === "lost" ? translate("lost") : translate("ready")}`), doing.length > 0);
           }
 
           // Linked machines and the coding agents on them. A machine with
@@ -1406,7 +1406,7 @@ export const cluster: District<WorldData> = {
               const st: RobotState = asks ? "wait" : delegated.length || own.work ? "work" : own.wait ? "wait" : "idle";
               busyHere = busyHere || st === "work";
               setState(b.r, st);
-              b.label.set(n, asks ? "needs your OK" : delegated.length ? clip(delegated[0].prompt, 24) : own.status || "idle",
+              b.label.set(n, asks ? translate("needs your OK") : delegated.length ? clip(delegated[0].prompt, 24) : own.status || translate("idle"),
                 st === "wait" ? "wait" : st === "work" ? "work" : "idle");
             });
             setLight(x.pad, busyHere ? "busy" : "idle");
@@ -1440,7 +1440,7 @@ export const cluster: District<WorldData> = {
           setState(b.r, info.waitingFor ? "wait" : info.running ? "work" : info.paused ? "lost" : "idle");
           const next = info.nextDue ? new Date(info.nextDue) : null;
           const at = next && !isNaN(+next) ? next.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false }) : "";
-          b.label.set(info.name, info.waitingFor ? "waiting for you" : info.running ? "out now" : info.paused ? "paused" : at ? "next " + at : "resting",
+          b.label.set(info.name, info.waitingFor ? translate("waiting for you") : info.running ? translate("out now") : info.paused ? translate("paused") : at ? translate("next {at}", { at }) : translate("resting"),
             info.waitingFor ? "wait" : info.running ? "work" : "idle");
         });
 
@@ -1459,13 +1459,13 @@ export const cluster: District<WorldData> = {
         if (calls >= 0 && d.meter.total.calls > calls) { ctx.spark(new THREE.Vector3(0.8, 4.6, 1.4)); queen.userData.gestureUntil = clock + 0.9; }
         calls = d.meter.total.calls;
         const doing = d.meter.members.find((m) => m.live && m.doing)?.doing;
-        queenLab.set(queenLabel(d.hive.engine), live ? clip(doing || "thinking", 26) : "idle", live ? "work" : queenState === "wait" ? "wait" : "idle");
+        queenLab.set(queenLabel(d.hive.engine), live ? clip(doing || translate("thinking"), 26) : translate("idle"), live ? "work" : queenState === "wait" ? "wait" : "idle");
         setLight(core, live ? "busy" : "idle");
         const [s1, s2, s3] = core.userData.screens as Screen[];
         const fmt = (n: number) => (n >= 1e6 ? (n / 1e6).toFixed(2) + "M" : n >= 1e3 ? (n / 1e3).toFixed(1) + "k" : String(Math.round(n)));
-        show(s1, "hive tokens", `${fmt(d.meter.total.tokens)}`, [`${Math.round(d.meter.total.tokPerSec)} tok/s`, `${d.meter.total.calls} tool calls`], d.meter.total.tokPerSec > 0.5);
-        show(s2, getQueenName().name, live ? "working" : "idle", live ? [doing || "thinking…"] : ["say something below"], live);
-        show(s3, "orders out", String(run.length), run.slice(0, 5).map((t) => `${short(t.worker)}: ${t.prompt}`), run.length > 0);
+        show(s1, translate("hive tokens"), `${fmt(d.meter.total.tokens)}`, [`${Math.round(d.meter.total.tokPerSec)} tok/s`, translate("{count} tool calls", { count: d.meter.total.calls })], d.meter.total.tokPerSec > 0.5);
+        show(s2, getQueenName().name, live ? translate("working") : translate("idle"), live ? [doing || translate("thinking…")] : [translate("say something below")], live);
+        show(s3, translate("orders out"), String(run.length), run.slice(0, 5).map((t) => `${short(t.worker)}: ${t.prompt}`), run.length > 0);
         // Marks over whatever needs you, each tied to the one it is about.
         const needs = d.attention.filter((a) => a.level === "needs");
         const bSig = JSON.stringify([needs.map((a) => [a.kind, a.ref, a.title]), workers.size, bees.size, machines.size, hostSig]);
@@ -1531,7 +1531,7 @@ export const cluster: District<WorldData> = {
             ctx.pickable(w, { kind: "skill", id: name, title: name });
           });
         }
-        rackLab.set("Skills", d.skills.length ? `${d.skills.length} installed` : "none yet — click to add", "idle");
+        rackLab.set(translate("Skills"), d.skills.length ? translate("{count} installed", { count: d.skills.length }) : translate("none yet — click to add"), "idle");
 
         // MCP servers: a box each, on an arc beyond the hub, cabled to it.
         const ms = JSON.stringify(d.mcp);
@@ -1556,10 +1556,10 @@ export const cluster: District<WorldData> = {
             c.setOk(m.ok);
             services.add(c.tube);
             ctx.pickable(boxNode, { kind: "mcp", id: m.name, title: m.name });
-            mcpLabels.push(ctx.label(boxNode, m.name, m.ok ? `${m.tools} tools` : "not connected", 3.6));
+            mcpLabels.push(ctx.label(boxNode, m.name, m.ok ? translate("{count} tools", { count: m.tools }) : translate("not connected"), 3.6));
           });
         }
-        hubLab.set("MCP", `${d.mcp.filter((m) => m.ok).length}/${d.mcp.length} connected`, "idle");
+        hubLab.set("MCP", translate("{ok}/{all} connected", { ok: d.mcp.filter((m) => m.ok).length, all: d.mcp.length }), "idle");
 
         // Dashboards on the wall.
         wallScreens.forEach((w, i) => {

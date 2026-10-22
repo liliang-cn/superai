@@ -94,7 +94,7 @@ export default function Inspector({ picked, data, onClose, open, openDash }: {
       if (p) rows.push(["Tokens", fmt(p.tokens)], ["Tool calls", String(p.calls)]);
       body = (
         <>
-          <Talk who={{ kind: "worker", name: picked.id }} placeholder={`Talk to ${picked.id.replace(/^superai-/, "")}…`} />
+          <Talk who={{ kind: "worker", name: picked.id }} placeholder={t("Talk to {name}…", { name: picked.id.replace(/^superai-/, "") })} />
           {mine.length > 0 && (
             <ul className="wi-list">
               {mine.slice(0, 4).map((x) => (
@@ -179,7 +179,7 @@ export default function Inspector({ picked, data, onClose, open, openDash }: {
       body = (
         <>
           <TermSessions clis={mineTerm ? { [name]: mineTerm } : {}} />
-          <Talk who={picked.kind === "cli" ? { kind: "cli", agent: picked.id } : { kind: "agent", name }} placeholder={picked.kind === "cli" ? `What should ${name} do?` : `Talk to ${name}…`} />
+          <Talk who={picked.kind === "cli" ? { kind: "cli", agent: picked.id } : { kind: "agent", name }} placeholder={picked.kind === "cli" ? t("What should {name} do?", { name }) : t("Talk to {name}…", { name })} />
           {live.length > 0 && (
             <ul className="wi-list">
               {live.map((r) => (
