@@ -557,6 +557,11 @@ html[data-desk] body { background: transparent; }
 .dk-statusbar > .dk-status-spacer { flex:1; }
 .dk-statusbar > .dk-status-stream { color:var(--danger, #c0392b); font-weight:600; }
 .dk-statusbar > .dk-status-queen { color:var(--warn, #b26a00); }
+.dk-statusbar > .dk-status-yolo { display:flex; align-items:center; gap:5px; border:1px solid var(--line); border-radius:999px; padding:1px 9px; background:transparent; color:var(--ink-2); font:600 10.5px/1.6 var(--font-mono, ui-monospace); letter-spacing:.06em; cursor:pointer; }
+.dk-statusbar > .dk-status-yolo:hover { border-color:var(--ink-3, #9aa4ad); }
+.dk-statusbar > .dk-status-yolo .dk-yolo-dot { width:6px; height:6px; border-radius:50%; background:var(--ink-3, #b8c0c7); }
+.dk-statusbar > .dk-status-yolo.on { background:#e8590c; border-color:#e8590c; color:#fff; }
+.dk-statusbar > .dk-status-yolo.on .dk-yolo-dot { background:#fff; }
 .cd-agent-select { appearance:auto; max-width:170px; border:0; background:transparent; color:inherit; font:inherit; cursor:pointer; outline-offset:3px; }
 @media(max-width:1000px) { .dk-statusbar .dk-status-tools { display:none; } .dk-statusbar .dk-status-model { max-width:170px; } }
 @media(max-width:800px) { .dk-statusbar .dk-status-workers { display:none; } .dk-statusbar .dk-status-backend { max-width:145px; } }

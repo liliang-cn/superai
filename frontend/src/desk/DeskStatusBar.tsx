@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { BotIcon, CpuIcon, HexagonIcon } from "lucide-react";
-import { Dashboard, HiveLinkStatus } from "../../wailsjs/go/app/App";
+import { Dashboard, HiveLinkStatus, StartYoloMode, StopYoloMode, ToolApprovalInfo } from "../../wailsjs/go/app/App";
 import { EventsOn } from "../../wailsjs/runtime";
 import { useHive, useWorkers } from "../canvas/data";
 import { useI18n } from "../lib/i18n";
@@ -49,6 +49,21 @@ export default function DeskStatusBar({ status, loading, codingRuns }: { status:
     return () => { if (typeof off === "function") off(); };
   }, []);
   const queenNote = queenEngineNote(hive.engine, hive.engineNow);
+  // YOLO: every approval says yes until it is switched off (app_permission.go
+  // StartYoloMode). Here, so it is one click from any screen.
+  const [yolo, setYolo] = useState(false);
+  useEffect(() => {
+    ToolApprovalInfo(1).then((info: Record<string, unknown>) => setYolo(Boolean(info?.yolo))).catch(() => {});
+    const off = EventsOn("tool:yolo", (e: Record<string, unknown>) => setYolo(Boolean(e?.active)));
+    return () => { if (typeof off === "function") off(); };
+  }, []);
+  const flipYolo = () => {
+    const next = !yolo;
+    setYolo(next);
+    (next ? StartYoloMode() : StopYoloMode())
+      .then((r: Record<string, unknown>) => { if (r?.error) setYolo(!next); })
+      .catch(() => setYolo(!next));
+  };
   const disconnected = runtime.error || (link?.linked && !link.live);
   const state = loading ? "Connecting…" : disconnected ? "Disconnected" : status?.ready ? "Ready" : "Not ready";
   const error = disconnected ? t("Backend connection is unavailable.") : status?.error;
@@ -61,6 +76,10 @@ export default function DeskStatusBar({ status, loading, codingRuns }: { status:
     {runtime.model && <span className="dk-status-model" title={runtime.model}><CpuIcon size={12}/>{runtime.model}</span>}
     {served && stream === "down" && <span className="dk-status-stream" title={t("Answers and live updates are not arriving; reconnecting.")}><i className="dk-status-dot bad"/>{t("Live updates off")}</span>}
     {queenNote && <span className="dk-status-queen" title={t("SuperAI answered in the engine's place")}>{t("Queen")}: {queenNote}</span>}
+    <button type="button" className={`dk-status-yolo${yolo ? " on" : ""}`} onClick={flipYolo} aria-pressed={yolo}
+      title={yolo ? t("YOLO on: tools and coding agents run without asking. Click to ask again.") : t("YOLO off: risky tools ask first. Click to stop asking.")} data-testid="yolo">
+      <i className="dk-yolo-dot"/>YOLO
+    </button>
     <span className="dk-status-spacer"/>
     {workers.list.length > 0 && <span className="dk-status-workers" title={workers.list.map((w) => `${w.name} · ${w.host}`).join("\n")}><HexagonIcon size={12}/>{t("{live}/{total} workers online",{live:workers.up,total:workers.list.length})}</span>}
     <span className="dk-status-runs"><BotIcon size={12}/>{runtime.active + codingRuns > 0 ? t("{count} running",{count:runtime.active+codingRuns}) : t("Idle")}</span>

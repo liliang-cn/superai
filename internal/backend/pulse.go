@@ -302,6 +302,10 @@ type Pulse struct {
 	mcp    int
 	memory int
 	errors int
+	// keepPath, day and kept make the totals today's (pulse_keep.go).
+	keepPath string
+	day      string
+	kept     pulseTotals
 }
 
 // NewPulse returns a meter that starts counting now.
@@ -652,17 +656,23 @@ func (p *Pulse) Start(ctx context.Context, emit func(name string, payload map[st
 	go func() {
 		tick := time.NewTicker(pulseFrameEvery)
 		defer tick.Stop()
-		var lastFrame, lastSample time.Time
+		var lastFrame, lastSample, lastKept time.Time
 		for {
 			select {
 			case <-ctx.Done():
+				p.keep(true)
 				return
 			case now := <-tick.C:
 				if now.Sub(lastSample) >= pulseSampleEvery {
 					lastSample = now
 					p.sample(now)
 				}
+				if now.Sub(lastKept) >= pulseKeepEvery {
+					lastKept = now
+					p.keep(false)
+				}
 				p.mu.Lock()
+				p.rollLocked(now)
 				due := p.dirty || p.openModel > 0 || p.openTool > 0 || now.Sub(lastFrame) >= pulseIdleEvery
 				if !due {
 					p.mu.Unlock()

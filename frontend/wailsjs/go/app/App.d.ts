@@ -122,6 +122,8 @@ export function HivePulse():Promise<app.HivePulse>;
 
 export function HiveRetire(arg1:number,arg2:boolean):Promise<Record<string, any>>;
 
+export function HiveRoster(arg1:app.LanRoster):Promise<Record<string, any>>;
+
 export function HiveSpawn(arg1:number):Promise<Record<string, any>>;
 
 export function HiveStatus():Promise<Record<string, any>>;

@@ -234,6 +234,10 @@ export function HiveRetire(arg1, arg2) {
   return window['go']['app']['App']['HiveRetire'](arg1, arg2);
 }
 
+export function HiveRoster(arg1) {
+  return window['go']['app']['App']['HiveRoster'](arg1);
+}
+
 export function HiveSpawn(arg1) {
   return window['go']['app']['App']['HiveSpawn'](arg1);
 }

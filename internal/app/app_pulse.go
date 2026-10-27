@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"path/filepath"
 
 	"github.com/liliang-cn/superai/internal/backend"
 )
@@ -19,6 +20,8 @@ import (
 func (a *App) livePulse() *backend.Pulse {
 	a.pulseOnce.Do(func() {
 		a.pulse = backend.NewPulse()
+		// Today's totals, not this process's: a restart does not zero them.
+		a.pulse.Keep(filepath.Join(backend.DataDir(), "pulse-today.json"))
 		a.pulse.Start(context.Background(), a.emit)
 	})
 	return a.pulse
