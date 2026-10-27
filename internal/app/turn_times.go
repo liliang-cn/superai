@@ -40,8 +40,6 @@ type turnBy struct {
 	Engine     string  `json:"e,omitempty"`
 	CostUSD    float64 `json:"c,omitempty"`
 	StoodInFor string  `json:"f,omitempty"`
-	// BackupFor is the first-choice engine a backup Engine answered for.
-	BackupFor string `json:"b,omitempty"`
 }
 
 var turnTimesMu sync.Mutex
@@ -131,7 +129,7 @@ func withTurnTimes(sessionID string, turns []backend.ChatTurn) []backend.ChatTur
 			if open != nil {
 				t.At = open.At.Add(time.Duration(open.ElapsedMs) * time.Millisecond).Format(time.RFC3339)
 				t.ElapsedMs = open.ElapsedMs
-				t.Engine, t.CostUSD, t.BackupFor, t.StandInFor = open.Engine, open.CostUSD, open.BackupFor, open.StoodInFor
+				t.Engine, t.CostUSD, t.StandInFor = open.Engine, open.CostUSD, open.StoodInFor
 				if open.StoodInFor != "" {
 					t.Content = standInNote(open.StoodInFor) + t.Content
 				}

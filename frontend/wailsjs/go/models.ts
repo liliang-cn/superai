@@ -2065,7 +2065,6 @@ export namespace backend {
 	    elapsed_ms?: number;
 	    engine?: string;
 	    cost_usd?: number;
-	    backup_for?: string;
 	    stand_in_for?: string;
 	
 	    static createFrom(source: any = {}) {
@@ -2083,7 +2082,6 @@ export namespace backend {
 	        this.elapsed_ms = source["elapsed_ms"];
 	        this.engine = source["engine"];
 	        this.cost_usd = source["cost_usd"];
-	        this.backup_for = source["backup_for"];
 	        this.stand_in_for = source["stand_in_for"];
 	    }
 	}
@@ -2443,7 +2441,6 @@ export namespace backend {
 	    delegation?: string;
 	    delegate_timeout_seconds?: number;
 	    queen_engine?: string;
-	    queen_backups?: string[];
 	    queen_fallback?: boolean;
 	    public_url?: string;
 	
@@ -2465,7 +2462,6 @@ export namespace backend {
 	        this.delegation = source["delegation"];
 	        this.delegate_timeout_seconds = source["delegate_timeout_seconds"];
 	        this.queen_engine = source["queen_engine"];
-	        this.queen_backups = source["queen_backups"];
 	        this.queen_fallback = source["queen_fallback"];
 	        this.public_url = source["public_url"];
 	    }

@@ -12,7 +12,6 @@ import (
 	"net/url"
 	"os"
 	"regexp"
-	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -109,10 +108,6 @@ type HiveSettings struct {
 	// calls, dashboards and the hive's own traffic stay with SuperAI's agent
 	// whatever this says. See app_queen_engine.go.
 	QueenEngine string `json:"queen_engine,omitempty"`
-	// QueenBackups are the engines tried after QueenEngine, in order, when it
-	// cannot take a turn: Claude Code on the Mac, then on another machine,
-	// and only then SuperAI's own agent (QueenFallback).
-	QueenBackups []string `json:"queen_backups,omitempty"`
 	// QueenFallback is whether SuperAI's own agent answers a turn the engine
 	// cannot take (not installed, machine offline, failed before saying
 	// anything), with a note saying so. Nil is on.
@@ -126,23 +121,6 @@ type HiveSettings struct {
 // QueenFallsBack reports whether SuperAI's own agent stands in for an engine
 // that cannot take a turn.
 func (h HiveSettings) QueenFallsBack() bool { return h.QueenFallback == nil || *h.QueenFallback }
-
-// QueenChain is every engine a person's turn may go to, first choice first:
-// QueenEngine and then its backups, each once. Empty when SuperAI's own
-// agent is the engine.
-func (h HiveSettings) QueenChain() []string {
-	first := strings.TrimSpace(h.QueenEngine)
-	if first == "" {
-		return nil
-	}
-	chain := []string{first}
-	for _, e := range h.QueenBackups {
-		if e = strings.TrimSpace(e); e != "" && !slices.Contains(chain, e) {
-			chain = append(chain, e)
-		}
-	}
-	return chain
-}
 
 // Public is PublicURL or $SUPERAI_PUBLIC_URL, without a trailing slash.
 func (h HiveSettings) Public() string {

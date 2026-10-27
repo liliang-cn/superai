@@ -60,7 +60,7 @@ export default function DeskStatusBar({ status, loading, codingRuns }: { status:
     </button>
     {runtime.model && <span className="dk-status-model" title={runtime.model}><CpuIcon size={12}/>{runtime.model}</span>}
     {served && stream === "down" && <span className="dk-status-stream" title={t("Answers and live updates are not arriving; reconnecting.")}><i className="dk-status-dot bad"/>{t("Live updates off")}</span>}
-    {queenNote && <span className="dk-status-queen" title={t("The queen's first-choice engine could not answer")}>{t("Queen")}: {queenNote}</span>}
+    {queenNote && <span className="dk-status-queen" title={t("SuperAI answered in the engine's place")}>{t("Queen")}: {queenNote}</span>}
     <span className="dk-status-spacer"/>
     {workers.list.length > 0 && <span className="dk-status-workers" title={workers.list.map((w) => `${w.name} · ${w.host}`).join("\n")}><HexagonIcon size={12}/>{t("{live}/{total} workers online",{live:workers.up,total:workers.list.length})}</span>}
     <span className="dk-status-runs"><BotIcon size={12}/>{runtime.active + codingRuns > 0 ? t("{count} running",{count:runtime.active+codingRuns}) : t("Idle")}</span>

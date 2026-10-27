@@ -181,9 +181,8 @@ func (a *App) HiveStatus() map[string]any {
 	out["role"] = s.Hive.Role
 	// Who thinks for her in a person's chat; empty is SuperAI's own agent.
 	out["queen_engine"] = s.Hive.QueenEngine
-	out["queen_backups"] = s.Hive.QueenBackups
-	// Who is taking her turns now: a backup, or "superai" standing in, when
-	// the first choice could not.
+	// Who took her latest turn: the engine, or "superai" when SuperAI
+	// answered in its place.
 	out["queen_engine_now"] = a.queenEngineNow()
 	if s.Hive.Role == backend.HiveRoleWorker {
 		a.mu.Lock()

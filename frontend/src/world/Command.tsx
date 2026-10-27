@@ -58,7 +58,7 @@ export default function Command({ view, onConversation, onTyping, hosts }: {
   // The conversation with the queen, the same thread the home screen shows:
   // its last turns stay above the line, and what is typed continues it.
   // by: who answered for the queen, when not SuperAI's own agent alone
-  // (engineByline): a backup engine, or SuperAI standing in.
+  // (engineByline): the engine, or SuperAI in its place.
   // What the model call is stuck on, when it is: a queue, a retry, a quiet provider.
   const [wire, setWire] = useState("");
   const [lines, setLines] = useState<{ who: "you" | "queen"; text: string; by?: string }[]>([]);
@@ -79,7 +79,7 @@ export default function Command({ view, onConversation, onTyping, hosts }: {
     loadQueenSession().then((id) => ChatHistory(id)).then((turns: any[]) => {
       setLines((turns ?? []).filter((x) => (x.role === "user" || x.role === "assistant") && x.kind !== "context" && x.content)
         .slice(-8).map((x) => ({ who: x.role === "user" ? "you" : "queen", text: String(x.content),
-          by: engineByline({ engine: x.engine, backupFor: x.backup_for, standInFor: x.stand_in_for }) || undefined })));
+          by: engineByline({ engine: x.engine, standInFor: x.stand_in_for }) || undefined })));
     }).catch(() => {});
   }, []);
   useEffect(() => { end.current?.scrollIntoView({ block: "end" }); }, [lines, live, step, open]);
@@ -128,11 +128,11 @@ export default function Command({ view, onConversation, onTyping, hosts }: {
 
   useEffect(() => {
     if (!req) return;
-    const who: { engine?: string; backupFor?: string; standInFor?: string } = {};
+    const who: { engine?: string; standInFor?: string } = {};
     const a = EventsOn("chat:event", (p: any) => {
       if (p?.requestId !== req) return;
-      if (p.standInFor) Object.assign(who, { engine: undefined, backupFor: undefined, standInFor: p.standInFor });
-      else if (p.engine) Object.assign(who, { engine: p.engine, backupFor: p.backupFor, standInFor: undefined });
+      if (p.standInFor) Object.assign(who, { engine: undefined, standInFor: p.standInFor });
+      else if (p.engine) Object.assign(who, { engine: p.engine, standInFor: undefined });
       // Work the queen handed out is drawn on the worker doing it.
       if (p.type === "tool_call" && p.tool && p.worker) { setStep(p.tool); say("worker:" + p.worker, p.workerTool || p.tool, "think", 60); }
       else if (p.type === "tool_call" && p.tool) { setStep(p.tool); say("queen", p.tool, "think", 60); }
@@ -143,7 +143,7 @@ export default function Command({ view, onConversation, onTyping, hosts }: {
     const finish = (text: string, by?: string) => { setWire(""); sayDone("queen", text); setLines((l) => [...l, { who: "queen" as const, text, by }].slice(-12)); setLive(""); setStep(""); setReq(""); raw.current = ""; };
     const b = EventsOn("chat:done", (p: any) => {
       if (p?.requestId !== req) return;
-      if (p.standInFor) Object.assign(who, { engine: undefined, backupFor: undefined, standInFor: p.standInFor });
+      if (p.standInFor) Object.assign(who, { engine: undefined, standInFor: p.standInFor });
       finish(String(p.final ?? visibleAnswer(raw.current)), engineByline(who) || undefined);
     });
     const c = EventsOn("chat:error", (p: any) => { if (p?.requestId === req) finish(String(p.error ?? "")); });

@@ -4,7 +4,7 @@ package app
 //
 // Each turn is taken from the events every client is sent (emit), so no path
 // that answers a person can be missed: the queen's own model, an engine, a
-// backup engine, SuperAI standing in, a worker. Each step is logged as it
+// SuperAI answering in an engine's place, a worker. Each step is logged as it
 // happens ("turn 1a2b3c4d …"), and the last turns are kept in memory with
 // their timelines for TurnTraces / TurnTrace:
 //
@@ -208,7 +208,7 @@ func (j *turnJournal) record(name string, p map[string]any) {
 		if c, ok := p["costUsd"].(float64); ok {
 			t.CostUSD = c
 		}
-		t.By = turnByline(engine, str("backupFor"), str("standInFor"))
+		t.By = turnByline(engine, str("standInFor"))
 		e := TraceEvent{Name: name, Engine: who}
 		if t.State == "error" {
 			t.Error = cliClip(str("error"), 500)
@@ -271,12 +271,10 @@ func byWhom(engine string) string {
 }
 
 // turnByline is who answered, as the log and the trace say it.
-func turnByline(engine, backupFor, standInFor string) string {
+func turnByline(engine, standInFor string) string {
 	switch {
 	case standInFor != "":
-		return "SuperAI, standing in for " + standInFor
-	case engine != "" && backupFor != "":
-		return engine + ", backup for " + backupFor
+		return "SuperAI, in place of " + standInFor
 	case engine != "":
 		return engine
 	}

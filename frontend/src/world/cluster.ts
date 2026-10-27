@@ -69,8 +69,8 @@ function termState(act: CCActivity | undefined) {
 /** An HA service's pin says which it is and where to reach it: "openclaw · 192.168.123.252". */
 const svcTitle = (s: HAService) => (s.vip ? `${s.name} · ${s.vip}` : s.name);
 const clip = (s: string, n = 30) => { const t = s.replace(/\s+/g, " ").trim(); return t.length > n ? t.slice(0, n - 1) + "…" : t; };
-/** The queen's name over her robot, with the engine thinking for her when it is not SuperAI's own: "queen · Claude Code",
- *  or who stands in when it cannot: "queen · Claude Code · dell · backup", "queen · SuperAI · standing in". */
+/** The queen's name over her robot, with who is thinking for her: "queen · Claude Code", or "queen · SuperAI" when
+ *  SuperAI answered in the engine's place. */
 const queenLabel = (engine?: string, now?: string) => {
   const name = getQueenName().name;
   const note = queenEngineNote(engine, now);

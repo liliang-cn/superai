@@ -24,9 +24,8 @@ package app
 // CLI session, for a CLI that keeps one.
 //
 // An engine that cannot take a turn — switched off, not installed, its
-// machine asleep, failed before it said or did anything — hands it to the
-// next of its backups (Hive.QueenBackups), in order. When none can, SuperAI's
-// agent stands in, its answer opening with a line saying so, unless the
+// machine asleep, failed before it said or did anything — is stood in for by
+// SuperAI's agent, whose answer opens with a line saying so, unless the
 // fallback is switched off; then the turn fails with the reason.
 
 import (
@@ -210,31 +209,12 @@ func (a *App) routeToEngine(requestID, sessionID, engine, message string, fresh 
 		return m
 	}
 	label := engineLabel(engine)
-	primary := engine
-	if chain := s.Hive.QueenChain(); len(chain) > 0 {
-		primary = chain[0]
-	}
-	if engine != primary {
-		tag = func(m map[string]any) map[string]any {
-			m["requestId"], m["engine"], m["backupFor"] = requestID, engine, primary
-			return m
-		}
-	}
 	a.setQueenNow(engine)
-	// busy is fresh as it came: fresh is the stream's own flag further down.
-	busy := fresh
 
-	// standIn hands the turn to the next engine in the chain, then to this
-	// app's model, or reports why not.
+	// standIn hands the turn to this app's model, or reports why not.
 	standIn := func(reason string) {
 		end()
 		reason = cliClip(strings.TrimSpace(reason), 300)
-		if next := nextQueenEngine(s.Hive.QueenChain(), engine); next != "" {
-			a.emit("chat:event", map[string]any{"requestId": requestID, "type": "state_update", "failed": engine,
-				"content": label + " could not take this turn (" + reason + "); trying " + engineLabel(next)})
-			a.routeToEngine(requestID, sessionID, next, message, busy)
-			return
-		}
 		if !s.Hive.QueenFallsBack() {
 			a.emit("chat:error", tag(map[string]any{"error": label + " could not answer: " + reason}))
 			return
@@ -344,11 +324,7 @@ func (a *App) routeToEngine(requestID, sessionID, engine, message string, fresh 
 		if engineCLI(engine) == "claude" && o.Prev != nil && r.Session == o.Prev.Session && cost >= o.Prev.CostUSD {
 			cost -= o.Prev.CostUSD
 		}
-		by := turnBy{Engine: engine, CostUSD: cost}
-		if engine != primary {
-			by.BackupFor = primary
-		}
-		recordTurnTimeBy(sessionID, message, started, time.Since(started), by)
+		recordTurnTimeBy(sessionID, message, started, time.Since(started), turnBy{Engine: engine, CostUSD: cost})
 		done := tag(map[string]any{"final": answer})
 		if cost > 0 {
 			done["costUsd"] = cost
@@ -371,17 +347,8 @@ func (a *App) routeToEngine(requestID, sessionID, engine, message string, fresh 
 	}
 }
 
-// nextQueenEngine is the engine after this one in the chain, or "" when it
-// is the last (or not in the chain at all, so a turn never goes round twice).
-func nextQueenEngine(chain []string, engine string) string {
-	if i := slices.Index(chain, engine); i >= 0 && i+1 < len(chain) {
-		return chain[i+1]
-	}
-	return ""
-}
-
-// queenNowSuperAI is queenEngineNow while SuperAI's own agent stands in for
-// every engine in the chain.
+// queenNowSuperAI is queenEngineNow while SuperAI's own agent answers in
+// the engine's place.
 const queenNowSuperAI = "superai"
 
 // queenNowState is the engine the queen's latest turn went to.
@@ -391,8 +358,8 @@ type queenNowState struct {
 }
 
 // setQueenNow notes who takes the queen's turns now and tells every client
-// when that changes, so the 3D queen and the settings show a backup or
-// SuperAI standing in as it happens.
+// when that changes, so the 3D queen and the settings show SuperAI
+// answering in the engine's place as it happens.
 func (a *App) setQueenNow(engine string) {
 	q := &a.queenNow
 	q.mu.Lock()
@@ -404,21 +371,21 @@ func (a *App) setQueenNow(engine string) {
 	}
 }
 
-// queenEngineNow is the engine the queen's latest turn went to: an engine of
-// the chain, queenNowSuperAI, or "" before any turn or once the chain no
-// longer holds it.
+// queenEngineNow is who took the queen's latest turn: the engine, or
+// queenNowSuperAI when SuperAI answered in its place; "" before any turn or
+// once the engine has been changed.
 func (a *App) queenEngineNow() string {
 	q := &a.queenNow
 	q.mu.Lock()
 	now := q.engine
 	q.mu.Unlock()
 	a.mu.Lock()
-	var chain []string
+	engine := ""
 	if a.settings != nil {
-		chain = a.settings.Hive.QueenChain()
+		engine = strings.TrimSpace(a.settings.Hive.QueenEngine)
 	}
 	a.mu.Unlock()
-	if len(chain) == 0 || (now != queenNowSuperAI && !slices.Contains(chain, now)) {
+	if engine == "" || (now != queenNowSuperAI && now != engine) {
 		return ""
 	}
 	return now
@@ -577,12 +544,13 @@ type QueenEngineChoice struct {
 	Online bool `json:"online"`
 }
 
-// QueenEngines is what the queen thinks with, the engines tried after it,
-// which of them (or "superai") took her latest turn, whether SuperAI stands in when none can answer, and every engine there is
+// QueenEngines is what the queen thinks with, who took her latest turn (the
+// engine, or "superai" when SuperAI answered in its place), whether SuperAI
+// stands in for an engine that cannot answer, and every engine there is
 // to choose from:
 //
 //	POST /api/rpc/QueenEngines  []
-//	→ {"engine":"claude","backups":["claude.dell"],"now":"claude.dell","fallback":true,"public_url":"","choices":[{"name":"","label":"SuperAI","online":true},…]}
+//	→ {"engine":"claude","now":"claude","fallback":true,"public_url":"","choices":[{"name":"","label":"SuperAI","online":true},…]}
 func (a *App) QueenEngines() map[string]any {
 	a.mu.Lock()
 	var s backend.Settings
@@ -613,17 +581,11 @@ func (a *App) QueenEngines() map[string]any {
 			}
 		}
 	}
-	chain := s.Hive.QueenChain()
-	for _, name := range chain {
-		if !slices.ContainsFunc(choices, func(c QueenEngineChoice) bool { return c.Name == name }) {
-			choices = append(choices, QueenEngineChoice{Name: name, Label: engineLabel(name)})
-		}
+	cur := strings.TrimSpace(s.Hive.QueenEngine)
+	if cur != "" && !slices.ContainsFunc(choices, func(c QueenEngineChoice) bool { return c.Name == cur }) {
+		choices = append(choices, QueenEngineChoice{Name: cur, Label: engineLabel(cur)})
 	}
-	cur, backups := "", []string{}
-	if len(chain) > 0 {
-		cur, backups = chain[0], chain[1:]
-	}
-	return map[string]any{"engine": cur, "backups": backups, "now": a.queenEngineNow(), "fallback": s.Hive.QueenFallsBack(), "public_url": s.Hive.PublicURL, "choices": choices}
+	return map[string]any{"engine": cur, "now": a.queenEngineNow(), "fallback": s.Hive.QueenFallsBack(), "public_url": s.Hive.PublicURL, "choices": choices}
 }
 
 // SetQueenEngine picks what the queen thinks with ("" is SuperAI's own agent)
@@ -646,42 +608,11 @@ func (a *App) SetQueenEngine(engine string, fallback bool) (map[string]any, erro
 	return a.QueenEngines(), nil
 }
 
-// SetQueenBackups sets the engines tried, in order, after the queen engine
-// when it cannot take a turn:
-//
-//	POST /api/rpc/SetQueenBackups  [["claude.dell","codex"]]
-func (a *App) SetQueenBackups(backups []string) (map[string]any, error) {
-	a.mu.Lock()
-	var next backend.Settings
-	if a.settings != nil {
-		next = *a.settings
-	} else if s, err := backend.LoadSettings(); err == nil {
-		next = *s
-	}
-	a.mu.Unlock()
-	next.Hive.QueenBackups = backups
-	if err := a.SaveSettings(next); err != nil {
-		return nil, err
-	}
-	return a.QueenEngines(), nil
-}
-
 // validQueenEngine checks an engine before it is saved: a CLI that can think
 // for the queen (queenCLIs), here with External agents on, or on a machine
 // linked now. The engine already saved passes as it is, since its machine may
 // only be asleep.
 func (a *App) validQueenEngine(next *backend.Settings, prev string) error {
-	// A backup is only tried when a turn needs it, so its machine may well be
-	// asleep when it is chosen: it need only be a CLI that can think for her.
-	for _, b := range next.Hive.QueenBackups {
-		name, _, remote := splitRemoteCLI(strings.TrimSpace(b))
-		if !remote {
-			name = strings.TrimSpace(b)
-		}
-		if name != "" && !canThinkForQueen(name) {
-			return fmt.Errorf("%s cannot think for the queen: Claude Code, Codex, pi and Hermes can", b)
-		}
-	}
 	engine := strings.TrimSpace(next.Hive.QueenEngine)
 	if engine == "" || engine == strings.TrimSpace(prev) {
 		return nil

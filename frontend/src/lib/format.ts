@@ -153,19 +153,16 @@ export function engineLabel(engine: string): string {
   return dot > 0 && dot < engine.length - 1 ? `${name} · ${engine.slice(dot + 1)}` : name;
 }
 
-/** Who answered for the queen, as it goes under an answer: "Claude Code",
- *  "Claude Code · dell · backup" when the first choice could not, or
- *  "standing in for Claude Code" when SuperAI's own agent took the turn. */
-export function engineByline(m: { engine?: string; backupFor?: string; standInFor?: string }): string {
-  if (m.standInFor) return translate("standing in for {engine}", { engine: engineLabel(m.standInFor) });
-  if (!m.engine) return "";
-  return m.backupFor ? `${engineLabel(m.engine)} · ${translate("backup")}` : engineLabel(m.engine);
+/** Who answered for the queen, as it goes under an answer: the engine
+ *  ("Claude Code"), or "SuperAI" when its own agent answered in the
+ *  engine's place. Empty for SuperAI's own turns, which need no name. */
+export function engineByline(m: { engine?: string; standInFor?: string }): string {
+  if (m.standInFor) return "SuperAI";
+  return m.engine ? engineLabel(m.engine) : "";
 }
 
-/** The engine taking the queen's turns now, when it is not her first choice:
- *  a backup, or SuperAI standing in ("superai"). Empty when all is as set. */
+/** Who answers for the queen now when it is not her engine: "SuperAI",
+ *  answering in its place. Empty when the engine is answering. */
 export function queenEngineNote(engine?: string, now?: string): string {
-  if (!engine || !now || now === engine) return "";
-  if (now === "superai") return `SuperAI · ${translate("standing in")}`;
-  return `${engineLabel(now)} · ${translate("backup")}`;
+  return engine && now === "superai" ? "SuperAI" : "";
 }

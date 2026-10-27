@@ -216,7 +216,7 @@ export function useChat(): UseChatResult {
         emotion: opts.emotion || m.emotion,
         error: opts.error || m.error,
         cancelled: opts.cancelled || m.cancelled,
-        ...(opts.standInFor ? { engine: undefined, backupFor: undefined, standInFor: opts.standInFor } : { engine: opts.engine || m.engine }),
+        ...(opts.standInFor ? { engine: undefined, standInFor: opts.standInFor } : { engine: opts.engine || m.engine }),
         costUsd: opts.costUsd || m.costUsd,
         stopping: false,
         streaming: false,
@@ -254,11 +254,10 @@ function lintRetryLine(content: string | undefined): string {
       if (ev.standInFor) {
         // No engine could take it: SuperAI's own agent answers.
         const standInFor = ev.standInFor;
-        patchMessage(askId, (m) => (m.standInFor === standInFor ? m : { ...m, engine: undefined, backupFor: undefined, standInFor }));
+        patchMessage(askId, (m) => (m.standInFor === standInFor ? m : { ...m, engine: undefined, standInFor }));
       } else if (ev.engine) {
         const engine = ev.engine;
-        const backupFor = ev.backupFor || undefined;
-        patchMessage(askId, (m) => (m.engine === engine && m.backupFor === backupFor ? m : { ...m, engine, backupFor }));
+        patchMessage(askId, (m) => (m.engine === engine ? m : { ...m, engine }));
       }
       switch (ev.type) {
         case "partial": {
@@ -689,7 +688,6 @@ function lintRetryLine(content: string | undefined): string {
                 : undefined,
           emotion: t.emotion || undefined,
           engine: t.engine || undefined,
-          backupFor: t.backup_for || undefined,
           standInFor: t.stand_in_for || undefined,
           costUsd: t.cost_usd || undefined,
           // The working, recovered from the scripts the transcript hid, so a

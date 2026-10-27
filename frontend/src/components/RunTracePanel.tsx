@@ -123,8 +123,8 @@ const secs = (ms?: number) => (ms ? `${(ms / 1000).toFixed(ms < 10000 ? 1 : 0)}s
 
 /**
  * The conversation's turns as the server ran them, whoever answered: the
- * queen's own model, an engine, a backup engine after the first choice
- * failed, or SuperAI standing in. The JSONL below is only her own model's;
+ * queen's own model, an engine, or SuperAI answering in an engine's
+ * place. The JSONL below is only her own model's;
  * a turn an engine took shows here alone.
  */
 function TurnsStrip({ session, live }: { session: string; live?: boolean }) {

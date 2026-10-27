@@ -400,30 +400,11 @@ func TestSuperAIStandsInForAnEngineThatFailsBeforeSayingAnything(t *testing.T) {
 	}
 }
 
-func TestAnEngineThatCannotStartHandsTheTurnToItsBackup(t *testing.T) {
+func TestTheEnginesTurnIsInTheJournalWithWhoAnswered(t *testing.T) {
 	h := newEngineHarness(t, fakeClaudeTurn, 0)
-	// No linked machine called nowhere: it cannot start, and claude here can.
-	h.a.settings.Hive.QueenEngine = "claude.nowhere"
-	h.a.settings.Hive.QueenBackups = []string{"claude"}
 	id := h.a.SendChat("c1", "你好", nil)
-	name, done := h.ev.wait(t, id)
-	if name != "chat:done" || done["engine"] != "claude" || done["final"] != "hive 里有两个成员。" {
+	if name, done := h.ev.wait(t, id); name != "chat:done" || done["engine"] != "claude" {
 		t.Fatalf("%s %v", name, done)
-	}
-	if own := h.owned(); len(own) != 0 {
-		t.Fatalf("SuperAI answered while a backup could: %v", own)
-	}
-	tried := false
-	for _, p := range h.ev.all("chat:event", id) {
-		if c, _ := p["content"].(string); strings.Contains(c, "trying Claude Code") {
-			tried = true
-		}
-	}
-	if !tried {
-		t.Fatal("the turn moved to the backup without a word")
-	}
-	if done["backupFor"] != "claude.nowhere" {
-		t.Fatalf("the answer does not say it came from a backup: %v", done)
 	}
 	if now := h.a.queenEngineNow(); now != "claude" {
 		t.Fatalf("now %q", now)
@@ -436,18 +417,14 @@ func TestAnEngineThatCannotStartHandsTheTurnToItsBackup(t *testing.T) {
 		}
 	}
 	h.ev.mu.Unlock()
-	if fmt.Sprint(said) != "[claude.nowhere claude]" {
+	if fmt.Sprint(said) != "[claude]" {
 		t.Fatalf("queen:engine said %v", said)
-	}
-	turns := withTurnTimes("c1", []backend.ChatTurn{{Role: "user", Content: "你好"}, {Role: "assistant", Content: "hive 里有两个成员。"}})
-	if turns[1].Engine != "claude" || turns[1].BackupFor != "claude.nowhere" {
-		t.Fatalf("history %+v", turns[1])
 	}
 	tr, err := h.a.TurnTrace(id[:8])
 	if err != nil {
 		t.Fatal(err)
 	}
-	if tr.State != "done" || tr.By != "claude, backup for claude.nowhere" || fmt.Sprint(tr.Engines) != "[claude.nowhere claude]" || len(tr.Events) == 0 {
+	if tr.State != "done" || tr.By != "claude" || fmt.Sprint(tr.Engines) != "[claude]" || len(tr.Events) == 0 {
 		t.Fatalf("trace %+v", tr)
 	}
 	if list := h.a.TurnTraces(5); len(list) != 1 || list[0].ID != id || list[0].Events != nil {
@@ -455,10 +432,8 @@ func TestAnEngineThatCannotStartHandsTheTurnToItsBackup(t *testing.T) {
 	}
 }
 
-func TestSuperAIStandsInOnlyWhenEveryBackupFailedToo(t *testing.T) {
+func TestWhenTheEngineFailsSuperAIAnswersAndTheJournalSaysSo(t *testing.T) {
 	h := newEngineHarness(t, fakeClaudeLoggedOut, 1)
-	h.a.settings.Hive.QueenEngine = "claude.nowhere"
-	h.a.settings.Hive.QueenBackups = []string{"claude", "claude.nowhere", ""}
 	h.ev.wait(t, h.a.SendChat("c1", "你好", nil))
 	if own := h.owned(); len(own) != 1 || own[0].standIn != "claude" {
 		t.Fatalf("own %v", own)
@@ -466,19 +441,14 @@ func TestSuperAIStandsInOnlyWhenEveryBackupFailedToo(t *testing.T) {
 	if now := h.a.queenEngineNow(); now != queenNowSuperAI {
 		t.Fatalf("now %q", now)
 	}
-	if tr := h.a.TurnTraces(1); len(tr) != 1 || fmt.Sprint(tr[0].Engines) != "[claude.nowhere claude superai]" {
+	if tr := h.a.TurnTraces(1); len(tr) != 1 || fmt.Sprint(tr[0].Engines) != "[claude superai]" {
 		t.Fatalf("traces %+v", tr)
 	}
+	// SuperAI answered: nothing is left for the person to do about it.
 	for _, it := range h.a.Attention() {
 		if it.Kind == "run" {
-			t.Fatalf("a queen run that was handed on still asks for the person: %+v", it)
+			t.Fatalf("a queen run SuperAI answered for still asks for the person: %+v", it)
 		}
-	}
-	if runs := len(h.a.cliStore().runs); runs != 1 {
-		t.Fatalf("%d runs: a backup was tried twice", runs)
-	}
-	if chain := h.a.settings.Hive.QueenChain(); !slices.Equal(chain, []string{"claude.nowhere", "claude"}) {
-		t.Fatalf("chain %v", chain)
 	}
 }
 
@@ -592,12 +562,6 @@ func TestAnEngineThatIsThereCanBeTheEngine(t *testing.T) {
 	}
 	if err := check("claude.mac", on, "claude.mac"); err != nil {
 		t.Fatalf("the saved engine was refused while its machine is away: %v", err)
-	}
-	if err := a.validQueenEngine(&backend.Settings{Hive: backend.HiveSettings{QueenBackups: []string{"claude.asleep", "codex"}}}, ""); err != nil {
-		t.Fatalf("a backup on a machine that is away was refused: %v", err)
-	}
-	if err := a.validQueenEngine(&backend.Settings{Hive: backend.HiveSettings{QueenBackups: []string{"vim"}}}, ""); err == nil {
-		t.Fatal("a backup that cannot think for the queen passed")
 	}
 	if !(backend.HiveSettings{}).QueenFallsBack() {
 		t.Fatal("the fallback is off by default")
