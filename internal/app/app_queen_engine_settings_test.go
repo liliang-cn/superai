@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/liliang-cn/superai/internal/backend"
@@ -34,6 +35,9 @@ func TestTheQueenEngineSurvivesTheEntrypointRewritingSettings(t *testing.T) {
 	if _, err := callMethod(a, "SetQueenEngine", []json.RawMessage{json.RawMessage(`"claude"`), json.RawMessage(`false`)}); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := callMethod(a, "SetQueenBackups", []json.RawMessage{json.RawMessage(`["claude.dell"]`)}); err != nil {
+		t.Fatal(err)
+	}
 
 	// What deploy/docker-entrypoint.sh does on every start.
 	secret := `{"llm_model":"m","hive":{"role":"queen","name":"queen"}}`
@@ -43,6 +47,9 @@ func TestTheQueenEngineSurvivesTheEntrypointRewritingSettings(t *testing.T) {
 	again, err := backend.LoadSettings()
 	if err != nil {
 		t.Fatal(err)
+	}
+	if !slices.Equal(again.Hive.QueenBackups, []string{"claude.dell"}) {
+		t.Fatalf("backups after the rewrite: %v", again.Hive.QueenBackups)
 	}
 	if again.Hive.QueenEngine != "claude" || again.Hive.QueenFallsBack() || again.Hive.Public() != "https://ai.example.test" {
 		t.Fatalf("after the rewrite: engine %q fallback %v public %q", again.Hive.QueenEngine, again.Hive.QueenFallsBack(), again.Hive.Public())

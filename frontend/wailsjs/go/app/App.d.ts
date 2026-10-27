@@ -316,6 +316,8 @@ export function SetHomeLayout(arg1:any,arg2:number):Promise<Record<string, any>>
 
 export function SetLocalHive(arg1:boolean,arg2:number,arg3:number):Promise<backend.Settings>;
 
+export function SetQueenBackups(arg1:Array<string>):Promise<Record<string, any>>;
+
 export function SetQueenEngine(arg1:string,arg2:boolean):Promise<Record<string, any>>;
 
 export function SetQueenIdentity(arg1:string,arg2:Array<string>):Promise<Record<string, any>>;

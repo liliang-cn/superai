@@ -2357,6 +2357,7 @@ export namespace backend {
 	    delegation?: string;
 	    delegate_timeout_seconds?: number;
 	    queen_engine?: string;
+	    queen_backups?: string[];
 	    queen_fallback?: boolean;
 	    public_url?: string;
 	
@@ -2378,6 +2379,7 @@ export namespace backend {
 	        this.delegation = source["delegation"];
 	        this.delegate_timeout_seconds = source["delegate_timeout_seconds"];
 	        this.queen_engine = source["queen_engine"];
+	        this.queen_backups = source["queen_backups"];
 	        this.queen_fallback = source["queen_fallback"];
 	        this.public_url = source["public_url"];
 	    }

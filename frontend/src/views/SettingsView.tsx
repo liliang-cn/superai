@@ -833,13 +833,14 @@ export default function SettingsView({
             <QueenEngineCard
               hidden={section !== "model"}
               engine={s.hive?.queen_engine ?? ""}
+              backups={s.hive?.queen_backups ?? []}
               fallback={s.hive?.queen_fallback !== false}
               publicURL={s.hive?.public_url ?? ""}
-              onChange={(engine, fallback, publicURL) =>
+              onChange={(engine, backups, fallback, publicURL) =>
                 setS((prev) =>
                   prev
                     ? Object.assign(new backend.Settings(prev), {
-                        hive: new backend.HiveSettings({ ...prev.hive, queen_engine: engine, queen_fallback: fallback, public_url: publicURL }),
+                        hive: new backend.HiveSettings({ ...prev.hive, queen_engine: engine, queen_backups: backups, queen_fallback: fallback, public_url: publicURL }),
                       })
                     : prev,
                 )

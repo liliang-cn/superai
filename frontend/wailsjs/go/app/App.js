@@ -622,6 +622,10 @@ export function SetLocalHive(arg1, arg2, arg3) {
   return window['go']['app']['App']['SetLocalHive'](arg1, arg2, arg3);
 }
 
+export function SetQueenBackups(arg1) {
+  return window['go']['app']['App']['SetQueenBackups'](arg1);
+}
+
 export function SetQueenEngine(arg1, arg2) {
   return window['go']['app']['App']['SetQueenEngine'](arg1, arg2);
 }
