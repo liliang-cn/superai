@@ -7,6 +7,7 @@ import LinkSuperAICard from "../components/LinkSuperAICard";
 import LocalHiveCard from "../components/LocalHiveCard";
 import QueenEngineCard from "../components/QueenEngineCard";
 import ProxyCard from "../components/ProxyCard";
+import AddAgentCard from "../components/AddAgentCard";
 import { AppStatus } from "../lib/types";
 import {
   CLIProxyAccounts,
@@ -1234,6 +1235,8 @@ export default function SettingsView({
               onRecheck={recheckAgentCLIs}
             />
           )}
+
+          {section === "agents" && <AddAgentCard />}
 
           {section === "agents" && (
             <RemoteAgentsCard

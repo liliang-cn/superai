@@ -77,6 +77,8 @@ type App struct {
 	// electedTerm is the term this instance was elected queen in, for the
 	// roster made when it takes over (app_election.go).
 	electedTerm int64
+	// agentDoor is where agents come in (app_agentdoor.go).
+	agentDoor agentDoor
 	// turnLog is every recent chat turn as it ran (turn_journal.go).
 	turnLog turnJournal
 	// Direct MCP calls from chat-block buttons and home tiles. See
@@ -281,6 +283,8 @@ func (a *App) Startup(ctx context.Context) {
 	go a.serveCCHookSocket(ctx)
 	go a.firstRun()
 	go a.startPhoneLinkIfPaired()
+	// Other machines join this one as agents (app_agentdoor.go).
+	go a.openAgentDoor(ctx)
 }
 
 // startupHeadless boots the same backend with no Wails context: events go

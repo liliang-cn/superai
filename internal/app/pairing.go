@@ -26,10 +26,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -345,7 +347,12 @@ const pairClaimPath = "/api/pair/claim"
 
 // pairRoutes registers the claim, the one pairing route that is not an RPC
 // method: the phone calling it has no credential yet.
-func pairRoutes(mux *http.ServeMux, c *credentials) {
+func pairRoutes(mux *http.ServeMux, c *credentials) { pairRoutesLinking(mux, c, nil) }
+
+// pairRoutesLinking is pairRoutes for a core whose agent link is linkPort on
+// whatever address the claim came in by: the desktop app's agent door
+// (app_agentdoor.go), which no one tells its own address.
+func pairRoutesLinking(mux *http.ServeMux, c *credentials, linkPort func() int) {
 	throttle := newLoginThrottle()
 	mux.HandleFunc(pairClaimPath, func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
@@ -380,6 +387,14 @@ func pairRoutes(mux *http.ServeMux, c *credentials) {
 		// core was told (agent_join.go).
 		if l := strings.TrimSpace(os.Getenv(agentAdvertiseEnv)); l != "" {
 			out["agent_link"] = l
+		} else if linkPort != nil {
+			if port := linkPort(); port > 0 {
+				host := r.Host
+				if h, _, err := net.SplitHostPort(r.Host); err == nil {
+					host = h
+				}
+				out["agent_link"] = net.JoinHostPort(host, strconv.Itoa(port))
+			}
 		}
 		writeJSON(w, out)
 	})

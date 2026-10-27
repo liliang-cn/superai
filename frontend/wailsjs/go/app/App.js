@@ -10,6 +10,10 @@ export function AddSchedule(arg1, arg2, arg3, arg4) {
   return window['go']['app']['App']['AddSchedule'](arg1, arg2, arg3, arg4);
 }
 
+export function AgentJoinCode() {
+  return window['go']['app']['App']['AgentJoinCode']();
+}
+
 export function AlarmRings(arg1) {
   return window['go']['app']['App']['AlarmRings'](arg1);
 }

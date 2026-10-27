@@ -322,7 +322,9 @@ func newAPIMux(app *App, hub *eventHub, creds *credentials, handoff *handoffStor
 	// Sign-in lives on the mux rather than in the middleware so it is a route
 	// like any other; requireAuth lets exactly these four through. See auth.go.
 	authRoutes(mux, creds)
-	pairRoutes(mux, creds)
+	// A core's claim says where its agent link is, on the address the
+	// claim came in by, when no address was configured (app_agentdoor.go).
+	pairRoutesLinking(mux, creds, func() int { _, l, _ := app.agentDoor.get(); return l })
 	registerPushRoute(mux, creds)
 	agentHookRoute(mux, app)
 	// The desktop app's "Open in Browser" hands the tab it opens a one-shot
@@ -419,6 +421,7 @@ func ServeMain(argv []string) {
 
 	// Core: agents dial in here.
 	if *agentPort > 0 {
+		app.agentDoor.set(*port, *agentPort, nil)
 		agentAddr := net.JoinHostPort(*bind, fmt.Sprint(*agentPort))
 		go func() {
 			if err := ServeAgentLink(ctx, app, agentAddr, credentialsCheck(creds)); err != nil {
