@@ -35,6 +35,10 @@ export interface ChatEvent {
   debugType: string;
   /** The agent CLI thinking for the queen ("claude", "claude.mac"); absent for SuperAI's own agent. */
   engine?: string;
+  /** The first-choice engine a backup engine answers for. */
+  backupFor?: string;
+  /** The engine SuperAI's own agent answers for, when none in the chain could. */
+  standInFor?: string;
 }
 
 /**
@@ -55,6 +59,8 @@ export interface ChatDone {
   final: string;
   emotion: string;
   engine?: string;
+  backupFor?: string;
+  standInFor?: string;
   /** What the engine's turn cost, when its CLI said. */
   costUsd?: number;
 }
@@ -135,6 +141,10 @@ export interface ChatMessage {
   finishedAt?: number;
   /** Who thought for the queen in this answer, when it was not SuperAI's own agent. */
   engine?: string;
+  /** The first-choice engine a backup answered for. */
+  backupFor?: string;
+  /** The engine SuperAI's own agent answered for, when no engine could. */
+  standInFor?: string;
   costUsd?: number;
 }
 

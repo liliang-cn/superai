@@ -1,5 +1,4 @@
 import { cn } from "@/lib/utils";
-import { engineLabel } from "@/lib/format";
 import type { HTMLAttributes } from "react";
 
 /**
@@ -42,7 +41,7 @@ export type MessageBylineProps = {
   name: string;
   /** What the turn cost — "34s · 6 tools". Left off when nothing is known. */
   meta?: string;
-  /** The engine that thought for the queen, when it was not SuperAI's own agent. */
+  /** Who thought for the queen, as engineByline puts it, when it was not SuperAI's own agent alone. */
   engine?: string;
 };
 
@@ -60,6 +59,6 @@ export const MessageByline = ({ name, meta, engine }: MessageBylineProps) => (
       <span className="msg-byline-name">{name}</span>
       {meta && <span className="msg-byline-meta">{meta}</span>}
     </div>
-    {engine && <span className="msg-byline-engine">{engineLabel(engine)}</span>}
+    {engine && <span className="msg-byline-engine">{engine}</span>}
   </div>
 );

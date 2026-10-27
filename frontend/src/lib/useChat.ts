@@ -202,6 +202,7 @@ export function useChat(): UseChatResult {
         error?: string;
         cancelled?: boolean;
         engine?: string;
+        standInFor?: string;
         costUsd?: number;
       },
     ) => {
@@ -215,7 +216,7 @@ export function useChat(): UseChatResult {
         emotion: opts.emotion || m.emotion,
         error: opts.error || m.error,
         cancelled: opts.cancelled || m.cancelled,
-        engine: opts.engine || m.engine,
+        ...(opts.standInFor ? { engine: undefined, backupFor: undefined, standInFor: opts.standInFor } : { engine: opts.engine || m.engine }),
         costUsd: opts.costUsd || m.costUsd,
         stopping: false,
         streaming: false,
@@ -250,9 +251,14 @@ function lintRetryLine(content: string | undefined): string {
 
   const applyEvent = useCallback(
     (askId: string, ev: ChatEvent) => {
-      if (ev.engine) {
+      if (ev.standInFor) {
+        // No engine could take it: SuperAI's own agent answers.
+        const standInFor = ev.standInFor;
+        patchMessage(askId, (m) => (m.standInFor === standInFor ? m : { ...m, engine: undefined, backupFor: undefined, standInFor }));
+      } else if (ev.engine) {
         const engine = ev.engine;
-        patchMessage(askId, (m) => (m.engine === engine ? m : { ...m, engine }));
+        const backupFor = ev.backupFor || undefined;
+        patchMessage(askId, (m) => (m.engine === engine && m.backupFor === backupFor ? m : { ...m, engine, backupFor }));
       }
       switch (ev.type) {
         case "partial": {
@@ -392,6 +398,7 @@ function lintRetryLine(content: string | undefined): string {
             final: item.payload?.final,
             emotion: item.payload?.emotion,
             engine: item.payload?.engine,
+            standInFor: item.payload?.standInFor,
             costUsd: item.payload?.costUsd,
           });
           if (doneCb.current) doneCb.current();
@@ -682,6 +689,8 @@ function lintRetryLine(content: string | undefined): string {
                 : undefined,
           emotion: t.emotion || undefined,
           engine: t.engine || undefined,
+          backupFor: t.backup_for || undefined,
+          standInFor: t.stand_in_for || undefined,
           costUsd: t.cost_usd || undefined,
           // The working, recovered from the scripts the transcript hid, so a
           // reopened conversation still shows what the agent did and not just

@@ -34,6 +34,9 @@ export interface Hive {
   tasks: HiveTask[];
   /** Who thinks for the queen in a person's chat ("claude", "claude.mac"); empty is SuperAI's own agent. */
   engine?: string;
+  /** Who took her latest turn when it was not that engine: a backup, or
+   *  "superai" standing in for them all. Kept current by queen:engine. */
+  engineNow?: string;
   /** The relay agents (agent_link.relay_only): not machines, but the named
    *  agents they serve are drawn as their own group. */
   relays?: RelayAgent[];
@@ -90,6 +93,7 @@ export function useHive(): Hive {
           role: s.role ?? "",
           name: s.name ?? "",
           engine: s.queen_engine ?? "",
+          engineNow: s.queen_engine_now ?? "",
           relays: Array.isArray(s.relays) ? s.relays : [],
           members: [...(s.members ?? [])].sort((a: HiveMember, b: HiveMember) => a.name.localeCompare(b.name, undefined, { numeric: true })),
           // The first load seeds the orders; after that the stream is the source.
@@ -116,10 +120,14 @@ export function useHive(): Hive {
         ? { ...cur, relays: cur.relays.map((r) => (r.name === p.agent ? { ...r, cliActivity: withCLI(r.cliActivity, p.cli!, p.activity) } : r)) }
         : cur));
     });
+    // The queen's turn went to a backup, or to SuperAI: shown as it happens.
+    const offNow = EventsOn("queen:engine", (p: { engine?: string }) => {
+      if (typeof p?.engine === "string") setHive((cur) => ({ ...cur, engineNow: p.engine }));
+    });
     return () => {
       alive = false;
       window.clearInterval(t);
-      [off, offCli].forEach((o) => typeof o === "function" && o());
+      [off, offCli, offNow].forEach((o) => typeof o === "function" && o());
     };
   }, []);
   return hive;

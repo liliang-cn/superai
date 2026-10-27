@@ -14,7 +14,7 @@ import { translate } from "../lib/i18n";
 import { boardLine, touchesNoted, type AgendaEntry } from "./agenda";
 import { along, movesOf, tripTime, turn, type Stand } from "./travel";
 import { getQueenName, queenTitle } from "../lib/queenName";
-import { engineLabel } from "../lib/format";
+import { engineLabel, queenEngineNote } from "../lib/format";
 
 // The cluster, as it is: the core in the middle with the queen at its console
 // and the shared brain beside it; the nodes around it with their workers
@@ -69,8 +69,13 @@ function termState(act: CCActivity | undefined) {
 /** An HA service's pin says which it is and where to reach it: "openclaw · 192.168.123.252". */
 const svcTitle = (s: HAService) => (s.vip ? `${s.name} · ${s.vip}` : s.name);
 const clip = (s: string, n = 30) => { const t = s.replace(/\s+/g, " ").trim(); return t.length > n ? t.slice(0, n - 1) + "…" : t; };
-/** The queen's name over her robot, with the engine thinking for her when it is not SuperAI's own: "queen · Claude Code". */
-const queenLabel = (engine?: string) => (engine ? `${getQueenName().name} · ${engineLabel(engine)}` : getQueenName().name);
+/** The queen's name over her robot, with the engine thinking for her when it is not SuperAI's own: "queen · Claude Code",
+ *  or who stands in when it cannot: "queen · Claude Code · dell · backup", "queen · SuperAI · standing in". */
+const queenLabel = (engine?: string, now?: string) => {
+  const name = getQueenName().name;
+  const note = queenEngineNote(engine, now);
+  return note ? `${name} · ${note}` : engine ? `${name} · ${engineLabel(engine)}` : name;
+};
 const CABLE = 0xc7cfd9;
 const TRIMS = [0x2bb3a3, 0x3b82f6, 0x22a06b, 0xe0a020, 0xef6c4a, 0x5b7cfa];
 let accentColor = 0xf2b416;
@@ -1459,7 +1464,7 @@ export const cluster: District<WorldData> = {
         if (calls >= 0 && d.meter.total.calls > calls) { ctx.spark(new THREE.Vector3(0.8, 4.6, 1.4)); queen.userData.gestureUntil = clock + 0.9; }
         calls = d.meter.total.calls;
         const doing = d.meter.members.find((m) => m.live && m.doing)?.doing;
-        queenLab.set(queenLabel(d.hive.engine), live ? clip(doing || translate("thinking"), 26) : translate("idle"), live ? "work" : queenState === "wait" ? "wait" : "idle");
+        queenLab.set(queenLabel(d.hive.engine, d.hive.engineNow), live ? clip(doing || translate("thinking"), 26) : translate("idle"), live ? "work" : queenState === "wait" ? "wait" : "idle");
         setLight(core, live ? "busy" : "idle");
         const [s1, s2, s3] = core.userData.screens as Screen[];
         const fmt = (n: number) => (n >= 1e6 ? (n / 1e6).toFixed(2) + "M" : n >= 1e3 ? (n / 1e3).toFixed(1) + "k" : String(Math.round(n)));

@@ -50,6 +50,10 @@ type ChatTurn struct {
 	// that turn cost, when the CLI said. Filled in by the app layer.
 	Engine  string  `json:"engine,omitempty"`
 	CostUSD float64 `json:"cost_usd,omitempty"`
+	// BackupFor is the queen engine a backup answered for, when the first
+	// choice could not; StandInFor the one SuperAI's own agent answered for.
+	BackupFor  string `json:"backup_for,omitempty"`
+	StandInFor string `json:"stand_in_for,omitempty"`
 }
 
 // maxTitle caps how much of the opening message becomes a session title.

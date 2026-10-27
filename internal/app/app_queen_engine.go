@@ -210,6 +210,17 @@ func (a *App) routeToEngine(requestID, sessionID, engine, message string, fresh 
 		return m
 	}
 	label := engineLabel(engine)
+	primary := engine
+	if chain := s.Hive.QueenChain(); len(chain) > 0 {
+		primary = chain[0]
+	}
+	if engine != primary {
+		tag = func(m map[string]any) map[string]any {
+			m["requestId"], m["engine"], m["backupFor"] = requestID, engine, primary
+			return m
+		}
+	}
+	a.setQueenNow(engine)
 	// busy is fresh as it came: fresh is the stream's own flag further down.
 	busy := fresh
 
@@ -228,7 +239,8 @@ func (a *App) routeToEngine(requestID, sessionID, engine, message string, fresh 
 			a.emit("chat:error", tag(map[string]any{"error": label + " could not answer: " + reason}))
 			return
 		}
-		a.emit("chat:event", map[string]any{"requestId": requestID, "type": "state_update",
+		a.setQueenNow(queenNowSuperAI)
+		a.emit("chat:event", map[string]any{"requestId": requestID, "type": "state_update", "engine": "", "standInFor": engine,
 			"content": label + " could not take this turn (" + reason + "); SuperAI answers it"})
 		a.ownTurn(requestID, sessionID, message, nil, engine)
 	}
@@ -332,7 +344,11 @@ func (a *App) routeToEngine(requestID, sessionID, engine, message string, fresh 
 		if engineCLI(engine) == "claude" && o.Prev != nil && r.Session == o.Prev.Session && cost >= o.Prev.CostUSD {
 			cost -= o.Prev.CostUSD
 		}
-		recordTurnTimeBy(sessionID, message, started, time.Since(started), turnBy{Engine: engine, CostUSD: cost})
+		by := turnBy{Engine: engine, CostUSD: cost}
+		if engine != primary {
+			by.BackupFor = primary
+		}
+		recordTurnTimeBy(sessionID, message, started, time.Since(started), by)
 		done := tag(map[string]any{"final": answer})
 		if cost > 0 {
 			done["costUsd"] = cost
@@ -362,6 +378,50 @@ func nextQueenEngine(chain []string, engine string) string {
 		return chain[i+1]
 	}
 	return ""
+}
+
+// queenNowSuperAI is queenEngineNow while SuperAI's own agent stands in for
+// every engine in the chain.
+const queenNowSuperAI = "superai"
+
+// queenNowState is the engine the queen's latest turn went to.
+type queenNowState struct {
+	mu     sync.Mutex
+	engine string
+}
+
+// setQueenNow notes who takes the queen's turns now and tells every client
+// when that changes, so the 3D queen and the settings show a backup or
+// SuperAI standing in as it happens.
+func (a *App) setQueenNow(engine string) {
+	q := &a.queenNow
+	q.mu.Lock()
+	changed := q.engine != engine
+	q.engine = engine
+	q.mu.Unlock()
+	if changed {
+		a.emit("queen:engine", map[string]any{"engine": engine})
+	}
+}
+
+// queenEngineNow is the engine the queen's latest turn went to: an engine of
+// the chain, queenNowSuperAI, or "" before any turn or once the chain no
+// longer holds it.
+func (a *App) queenEngineNow() string {
+	q := &a.queenNow
+	q.mu.Lock()
+	now := q.engine
+	q.mu.Unlock()
+	a.mu.Lock()
+	var chain []string
+	if a.settings != nil {
+		chain = a.settings.Hive.QueenChain()
+	}
+	a.mu.Unlock()
+	if len(chain) == 0 || (now != queenNowSuperAI && !slices.Contains(chain, now)) {
+		return ""
+	}
+	return now
 }
 
 // queenKitFor puts together what the engine is handed for one turn.
@@ -518,11 +578,11 @@ type QueenEngineChoice struct {
 }
 
 // QueenEngines is what the queen thinks with, the engines tried after it,
-// whether SuperAI stands in when none can answer, and every engine there is
+// which of them (or "superai") took her latest turn, whether SuperAI stands in when none can answer, and every engine there is
 // to choose from:
 //
 //	POST /api/rpc/QueenEngines  []
-//	→ {"engine":"claude","backups":["claude.dell"],"fallback":true,"public_url":"","choices":[{"name":"","label":"SuperAI","online":true},…]}
+//	→ {"engine":"claude","backups":["claude.dell"],"now":"claude.dell","fallback":true,"public_url":"","choices":[{"name":"","label":"SuperAI","online":true},…]}
 func (a *App) QueenEngines() map[string]any {
 	a.mu.Lock()
 	var s backend.Settings
@@ -563,7 +623,7 @@ func (a *App) QueenEngines() map[string]any {
 	if len(chain) > 0 {
 		cur, backups = chain[0], chain[1:]
 	}
-	return map[string]any{"engine": cur, "backups": backups, "fallback": s.Hive.QueenFallsBack(), "public_url": s.Hive.PublicURL, "choices": choices}
+	return map[string]any{"engine": cur, "backups": backups, "now": a.queenEngineNow(), "fallback": s.Hive.QueenFallsBack(), "public_url": s.Hive.PublicURL, "choices": choices}
 }
 
 // SetQueenEngine picks what the queen thinks with ("" is SuperAI's own agent)

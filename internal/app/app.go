@@ -72,6 +72,8 @@ type App struct {
 	appendFn   func(sessionID, question, answer string) error
 	turnsFn    func(sessionID string) []backend.ChatTurn
 	queenToken queenTokenCache
+	// queenNow is the engine taking the queen's turns now (app_queen_engine.go).
+	queenNow queenNowState
 	// Direct MCP calls from chat-block buttons and home tiles. See
 	// app_actions.go.
 	actionsOnce sync.Once
@@ -1050,7 +1052,8 @@ func (a *App) ownTurn(requestID, sessionID, message string, imagePaths []string,
 
 		driver.Emit(backend.AvatarEvent{Type: "state", State: backend.AvatarStateThinking})
 		if standIn != "" {
-			a.emit("chat:event", map[string]any{"requestId": requestID, "type": "partial", "content": standInNote(standIn)})
+			a.emit("chat:event", map[string]any{"requestId": requestID, "type": "partial", "content": standInNote(standIn),
+				"engine": "", "standInFor": standIn})
 		}
 
 		pulser := backend.NewPulser(func(kind, tool string, n int) { board.Pulse(taskID, kind, tool, n) })

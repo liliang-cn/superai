@@ -3,7 +3,7 @@ import { useChat } from "../lib/useChat";
 import { useRoom } from "../lib/useViewport";
 import { useAttachments } from "../lib/useAttachments";
 import { AppStatus, ChatMessage } from "../lib/types";
-import { copyText, withoutCallNotes } from "../lib/format";
+import { copyText, engineByline, withoutCallNotes } from "../lib/format";
 import AttachmentChips from "../components/AttachmentChips";
 import RunTracePanel from "../components/RunTracePanel";
 import { AgentMenu, AddressedBanner } from "../components/AgentMenu";
@@ -286,7 +286,7 @@ export default function ChatView({
                                 <MessageByline
                                   name="SuperAI"
                                   meta={bylineMeta(m)}
-                                  engine={m.engine}
+                                  engine={engineByline(m)}
                                 />
                                 {m.progress && m.progress.length > 0 && (
                                   <AgentProgress

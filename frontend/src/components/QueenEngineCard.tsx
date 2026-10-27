@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { QueenEngines } from "../../wailsjs/go/app/App";
 import { translate } from "../lib/i18n";
+import { queenEngineNote } from "../lib/format";
+import { EventsOn } from "../../wailsjs/runtime";
 
 type Choice = { name: string; label: string; online: boolean };
 
@@ -19,13 +21,23 @@ export default function QueenEngineCard({ hidden, engine, backups, fallback, pub
   onChange: (engine: string, backups: string[], fallback: boolean, publicURL: string) => void;
 }) {
   const [choices, setChoices] = useState<Choice[]>([]);
+  // Who took her latest turn, when the first choice could not.
+  const [now, setNow] = useState("");
 
   useEffect(() => {
     if (hidden) return;
     QueenEngines()
-      .then((r: any) => setChoices((r?.choices ?? []) as Choice[]))
+      .then((r: any) => {
+        setChoices((r?.choices ?? []) as Choice[]);
+        setNow(r?.now ?? "");
+      })
       .catch(() => setChoices([{ name: "", label: "SuperAI", online: true }]));
+    const off = EventsOn("queen:engine", (p: { engine?: string }) => setNow(p?.engine ?? ""));
+    return () => {
+      if (typeof off === "function") off();
+    };
   }, [hidden]);
+  const inUse = queenEngineNote(engine, now);
 
   const chain = engine === "" ? [] : [engine, ...backups.filter((b) => b !== engine)];
   const remote = chain.some((e) => e.includes("."));
@@ -58,6 +70,7 @@ export default function QueenEngineCard({ hidden, engine, backups, fallback, pub
             </button>
           ))}
         </div>
+        {inUse && <span className="hint">{translate("In use: {engine}", { engine: inUse })}</span>}
       </div>
       {engine !== "" && (
         <div className="field">

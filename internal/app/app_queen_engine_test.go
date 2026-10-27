@@ -422,6 +422,27 @@ func TestAnEngineThatCannotStartHandsTheTurnToItsBackup(t *testing.T) {
 	if !tried {
 		t.Fatal("the turn moved to the backup without a word")
 	}
+	if done["backupFor"] != "claude.nowhere" {
+		t.Fatalf("the answer does not say it came from a backup: %v", done)
+	}
+	if now := h.a.queenEngineNow(); now != "claude" {
+		t.Fatalf("now %q", now)
+	}
+	var said []any
+	h.ev.mu.Lock()
+	for _, g := range h.ev.got {
+		if g.name == "queen:engine" {
+			said = append(said, g.p["engine"])
+		}
+	}
+	h.ev.mu.Unlock()
+	if fmt.Sprint(said) != "[claude.nowhere claude]" {
+		t.Fatalf("queen:engine said %v", said)
+	}
+	turns := withTurnTimes("c1", []backend.ChatTurn{{Role: "user", Content: "你好"}, {Role: "assistant", Content: "hive 里有两个成员。"}})
+	if turns[1].Engine != "claude" || turns[1].BackupFor != "claude.nowhere" {
+		t.Fatalf("history %+v", turns[1])
+	}
 }
 
 func TestSuperAIStandsInOnlyWhenEveryBackupFailedToo(t *testing.T) {
@@ -431,6 +452,9 @@ func TestSuperAIStandsInOnlyWhenEveryBackupFailedToo(t *testing.T) {
 	h.ev.wait(t, h.a.SendChat("c1", "你好", nil))
 	if own := h.owned(); len(own) != 1 || own[0].standIn != "claude" {
 		t.Fatalf("own %v", own)
+	}
+	if now := h.a.queenEngineNow(); now != queenNowSuperAI {
+		t.Fatalf("now %q", now)
 	}
 	if runs := len(h.a.cliStore().runs); runs != 1 {
 		t.Fatalf("%d runs: a backup was tried twice", runs)

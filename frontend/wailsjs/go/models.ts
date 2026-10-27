@@ -1983,6 +1983,8 @@ export namespace backend {
 	    elapsed_ms?: number;
 	    engine?: string;
 	    cost_usd?: number;
+	    backup_for?: string;
+	    stand_in_for?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new ChatTurn(source);
@@ -1999,6 +2001,8 @@ export namespace backend {
 	        this.elapsed_ms = source["elapsed_ms"];
 	        this.engine = source["engine"];
 	        this.cost_usd = source["cost_usd"];
+	        this.backup_for = source["backup_for"];
+	        this.stand_in_for = source["stand_in_for"];
 	    }
 	}
 	export class Dashboard {

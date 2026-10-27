@@ -73,6 +73,7 @@ export function normalize(d: Partial<WorldData> | undefined): WorldData {
       role: (h.role ?? "") as WorldData["hive"]["role"],
       name: str(h.name),
       engine: str(h.engine),
+      engineNow: str(h.engineNow),
       members: arr<WorldData["hive"]["members"][number]>(h.members).filter((m) => m && typeof m.name === "string"),
       tasks: arr<WorldData["hive"]["tasks"][number]>(h.tasks).filter((t) => t && typeof t.id === "string")
         .map((t) => ({ ...t, worker: str(t.worker), prompt: str(t.prompt), tools: num(t.tools), started_at: str(t.started_at) })),

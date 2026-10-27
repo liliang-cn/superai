@@ -1,4 +1,5 @@
 import { ClipboardSetText } from "../../wailsjs/runtime";
+import { translate } from "./i18n";
 
 // copyText copies via the Wails clipboard runtime, falling back to the Web API.
 export async function copyText(s: string): Promise<boolean> {
@@ -150,4 +151,21 @@ export function engineLabel(engine: string): string {
   const agent = dot > 0 ? engine.slice(0, dot) : engine;
   const name = agent === "claude" ? "Claude Code" : agent;
   return dot > 0 && dot < engine.length - 1 ? `${name} · ${engine.slice(dot + 1)}` : name;
+}
+
+/** Who answered for the queen, as it goes under an answer: "Claude Code",
+ *  "Claude Code · dell · backup" when the first choice could not, or
+ *  "standing in for Claude Code" when SuperAI's own agent took the turn. */
+export function engineByline(m: { engine?: string; backupFor?: string; standInFor?: string }): string {
+  if (m.standInFor) return translate("standing in for {engine}", { engine: engineLabel(m.standInFor) });
+  if (!m.engine) return "";
+  return m.backupFor ? `${engineLabel(m.engine)} · ${translate("backup")}` : engineLabel(m.engine);
+}
+
+/** The engine taking the queen's turns now, when it is not her first choice:
+ *  a backup, or SuperAI standing in ("superai"). Empty when all is as set. */
+export function queenEngineNote(engine?: string, now?: string): string {
+  if (!engine || !now || now === engine) return "";
+  if (now === "superai") return `SuperAI · ${translate("standing in")}`;
+  return `${engineLabel(now)} · ${translate("backup")}`;
 }

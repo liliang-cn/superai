@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ChatMessage } from "../lib/types";
-import { copyText, engineLabel } from "../lib/format";
+import { copyText, engineByline } from "../lib/format";
 import { isExternallyOpenable, openExternal } from "../lib/openExternal";
 
 function CodeBlock({ className, text }: { className?: string; text: string }) {
@@ -87,7 +87,7 @@ function Bubble({ msg }: { msg: ChatMessage }) {
               <div className="msg-byline">
                 <span className="msg-byline-name">SuperAI</span>
               </div>
-              {msg.engine && <span className="msg-byline-engine">{engineLabel(msg.engine)}</span>}
+              {engineByline(msg) && <span className="msg-byline-engine">{engineByline(msg)}</span>}
             </div>
           )}
           {isUser ? (
