@@ -468,6 +468,10 @@ func (a *App) registerHiveTools(svc *backend.Service, cfg *backend.Settings) {
 			name, _ = os.Hostname()
 		}
 		a.hive = backend.NewHive(name, h.Interval())
+		// Elected (app_election.go): her term from the first hello on, so
+		// a member already following her is not taken for a later queen's.
+		a.hive.SetTerm(a.electedTerm)
+		a.hive.SetTerm(loadTerm())
 	}
 	if h.Role != backend.HiveRoleQueen {
 		// Not a queen any more (or never): drop a stale roster so a demoted

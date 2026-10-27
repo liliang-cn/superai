@@ -241,3 +241,38 @@ func TestAQueenWhoSaidSheIsRestartingIsWaitedFor(t *testing.T) {
 		t.Fatal("still waiting after the hold ran out")
 	}
 }
+
+// A member following an elected queen by her own address, who has stepped
+// down since, goes back to the address that always leads to the queen
+// instead of electing again — the flapping seen on the cluster.
+func TestAFollowerOfAQueenWhoSteppedDownGoesHomeInsteadOfElecting(t *testing.T) {
+	home := &member{name: "superai-queen-0", hive: NewHive("superai-queen-0", 50*time.Millisecond)}
+	home.hive.SetTerm(5)
+	home.srv = httptest.NewServer(http.HandlerFunc(home.serveHTTP))
+	t.Cleanup(home.srv.Close)
+	stepped := &member{name: "superai-worker-0"} // up, but no longer a queen: 404
+	stepped.srv = httptest.NewServer(http.HandlerFunc(stepped.serveHTTP))
+	t.Cleanup(stepped.srv.Close)
+
+	w := newMember(t, "superai-worker-1", home.srv.URL)
+	w.ann.term, w.ann.queen, w.ann.target = 4, stepped.name, stepped.srv.URL
+	w.ann.roster = []RosterEntry{{stepped.name, stepped.srv.URL}, {w.name, w.srv.URL}}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go w.ann.Run(ctx)
+	deadline := time.Now().Add(5 * time.Second)
+	for w.ann.Queen() != home.name {
+		if time.Now().After(deadline) {
+			t.Fatalf("still following %q", w.ann.Queen())
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	select {
+	case term := <-w.promoted:
+		t.Fatalf("elected itself on term %d instead of going home", term)
+	default:
+	}
+	if w.ann.Term() != 5 {
+		t.Fatalf("term %d", w.ann.Term())
+	}
+}

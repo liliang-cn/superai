@@ -74,6 +74,9 @@ type App struct {
 	queenToken queenTokenCache
 	// queenNow is the engine taking the queen's turns now (app_queen_engine.go).
 	queenNow queenNowState
+	// electedTerm is the term this instance was elected queen in, for the
+	// roster made when it takes over (app_election.go).
+	electedTerm int64
 	// turnLog is every recent chat turn as it ran (turn_journal.go).
 	turnLog turnJournal
 	// Direct MCP calls from chat-block buttons and home tiles. See

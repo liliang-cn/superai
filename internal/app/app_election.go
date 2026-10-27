@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -52,6 +53,10 @@ func (a *App) promoteToQueen(term int64) {
 	}
 	a.mu.Unlock()
 	next.Hive.Role = backend.HiveRoleQueen
+	a.mu.Lock()
+	a.electedTerm = term
+	a.mu.Unlock()
+	saveTerm(term)
 	// A worker's settings say nothing of growing the hive; a queen's do.
 	if next.Hive.Spawner == nil {
 		if set := strings.TrimSpace(os.Getenv("SUPERAI_WORKER_STATEFULSET")); set != "" {
@@ -297,4 +302,24 @@ func (a *App) handleHiveHold(w http.ResponseWriter, r *http.Request) {
 	}
 	ann.Hold(d)
 	writeJSONStatus(w, http.StatusOK, map[string]any{"ok": true, "seconds": int(d / time.Second)})
+}
+
+// termPath keeps the term this instance last held as queen, so a queen that
+// restarts is still on it: started on 0, the first member that beats with
+// the real one would take her for a leftover and she would step down.
+func termPath() string { return filepath.Join(backend.DataDir(), "hive-term") }
+
+func loadTerm() int64 {
+	raw, err := os.ReadFile(termPath())
+	if err != nil {
+		return 0
+	}
+	t, _ := strconv.ParseInt(strings.TrimSpace(string(raw)), 10, 64)
+	return t
+}
+
+func saveTerm(t int64) {
+	if err := os.WriteFile(termPath(), []byte(strconv.FormatInt(t, 10)+"\n"), 0o644); err != nil {
+		log.Printf("hive: could not keep the term: %v", err)
+	}
 }

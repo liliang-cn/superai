@@ -554,7 +554,11 @@ func (a *Announcer) Once(ctx context.Context) (HiveWelcome, error) {
 		tok = a.Token
 	}
 	req.Header.Set("Authorization", "Bearer "+tok)
-	resp, err := a.client.Do(req)
+	// A beat is small and a queen answers it at once: one that has not in a
+	// few seconds is not answering, and waiting longer only delays noticing.
+	beat, cancel := context.WithTimeout(ctx, beatTimeout)
+	defer cancel()
+	resp, err := a.client.Do(req.WithContext(beat))
 	if err != nil {
 		return HiveWelcome{}, err
 	}
@@ -659,6 +663,12 @@ func (a *Announcer) Run(ctx context.Context) {
 			limit := hiveMisses
 			if errors.Is(err, errNotQueen) {
 				limit = 3 * hiveMisses
+				// The queen followed by her own address has stepped down
+				// since: whoever is queen now is at the address that always
+				// leads to her, not a reason to elect again.
+				if a.unpin() {
+					misses, backoff, wait = 0, first, first
+				}
 			}
 			if a.OnPromote != nil && misses >= limit && !a.holding() {
 				misses = 0
@@ -833,6 +843,23 @@ func (a *Announcer) reportTo(ctx context.Context, path string, v any) error {
 
 // errNotQueen is a member answering a join that it is not a queen.
 var errNotQueen = errors.New("not a queen")
+
+// beatTimeout bounds one beat.
+const beatTimeout = 3 * time.Second
+
+// unpin goes back from following a queen by her own address (set by an
+// election) to Settings.JoinURL. False when not pinned, or when JoinURL is
+// that same address.
+func (a *Announcer) unpin() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.target == "" || a.target == a.Settings.JoinURL {
+		return false
+	}
+	log.Printf("hive: %s is not queen any more; following %s", a.queen, a.Settings.JoinURL)
+	a.target = ""
+	return true
+}
 
 // elect passes over the queen that went quiet and follows the next one:
 // term's pick from the last roster. True when the pick is this worker, which
