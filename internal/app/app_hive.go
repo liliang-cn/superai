@@ -385,6 +385,16 @@ func (a *App) startHive() {
 		go a.keepQueenLabel(ctx)
 		return
 	}
+	// A queen of machines joined over the agent link keeps them told who
+	// could follow her, and asks whether the hive moved on (app_lanhive.go).
+	if s != nil && s.Hive.Role == backend.HiveRoleQueen {
+		ctx, cancel := context.WithCancel(context.Background())
+		a.mu.Lock()
+		a.hiveStop = cancel
+		a.mu.Unlock()
+		go a.keepLanHive(ctx)
+		return
+	}
 	if s == nil || s.Hive.Role != backend.HiveRoleWorker {
 		return
 	}

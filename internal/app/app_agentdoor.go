@@ -73,7 +73,8 @@ func (a *App) openAgentDoor(ctx context.Context) {
 		a.agentDoor.set(0, 0, fmt.Errorf("no credentials: %w", err))
 		return
 	}
-	linkAddr := fmt.Sprintf("0.0.0.0:%d", desktopAgentPort)
+	claimPort, linkPort := doorPorts()
+	linkAddr := fmt.Sprintf("0.0.0.0:%d", linkPort)
 	lis, err := net.Listen("tcp", linkAddr)
 	if err != nil {
 		log.Printf("agent door: %v", err)
@@ -93,12 +94,14 @@ func (a *App) openAgentDoor(ctx context.Context) {
 	}()
 
 	mux := http.NewServeMux()
-	pairRoutesLinking(mux, creds, func() int { return desktopAgentPort })
-	srv := &http.Server{Addr: fmt.Sprintf("0.0.0.0:%d", desktopClaimPort), Handler: mux, ReadHeaderTimeout: 10 * time.Second}
+	pairRoutesLinking(mux, creds, func() int { return linkPort })
+	// Who is queen now, for a queen back from away (app_lanhive.go).
+	mux.HandleFunc(hiveTermPath, a.handleHiveTerm)
+	srv := &http.Server{Addr: fmt.Sprintf("0.0.0.0:%d", claimPort), Handler: mux, ReadHeaderTimeout: 10 * time.Second}
 	claim, err := net.Listen("tcp", srv.Addr)
 	if err != nil {
 		log.Printf("agent door: %v", err)
-		a.agentDoor.set(0, desktopAgentPort, err)
+		a.agentDoor.set(0, linkPort, err)
 		return
 	}
 	go func() {
@@ -106,7 +109,7 @@ func (a *App) openAgentDoor(ctx context.Context) {
 		_ = srv.Close()
 	}()
 	go func() { _ = srv.Serve(claim) }()
-	a.agentDoor.set(desktopClaimPort, desktopAgentPort, nil)
+	a.agentDoor.set(claimPort, linkPort, nil)
 }
 
 // AgentJoin is what Settings shows to add an agent: the code, until when it
@@ -189,6 +192,9 @@ var cgnatNet = func() *net.IPNet { _, n, _ := net.ParseCIDR("100.64.0.0/10"); re
 // from then on (hive_delegate). Not a worker, not one already a queen, and
 // not one the person said is to stay on its own (Hive.Standalone).
 func (a *App) queenForWorkers(who string) {
+	// Two thinking machines joining at once make one queen, not two saves.
+	a.queenFor.Lock()
+	defer a.queenFor.Unlock()
 	a.mu.Lock()
 	var next backend.Settings
 	ok := a.settings != nil

@@ -44,7 +44,9 @@ type AgentLinkOptions struct {
 // answering their approvals, asking the agents this machine can reach.
 var agentCallable = map[string]bool{
 	"StartCLIRun": true, "FollowUpCLIRun": true, "CancelCLIRun": true,
-	"CLIRuns": true, "CLIRunDetail": true,
+	// The queen's roster, for picking the next queen if she goes (app_lanhive.go).
+	"HiveRoster": true,
+	"CLIRuns":    true, "CLIRunDetail": true,
 	// A coding agent here thinking for core's queen (app_queen_engine.go).
 	"StartQueenCLIRun":     true,
 	"ExternalAgentsStatus": true, "RemoteAgentNames": true, "AskRemoteAgent": true,
@@ -87,6 +89,9 @@ func (a *App) RunAgentLink(ctx context.Context, o AgentLinkOptions) {
 		return
 	}
 	wait, next := time.Second, 0
+	// fails counts the tries in a row the queen has not been reached, and
+	// skip who has been passed over since (app_lanhive.go).
+	fails, skip := 0, map[string]bool{}
 	for ctx.Err() == nil {
 		// Elected queen (app_election.go): core is this instance now, and
 		// dialling the queen's address would be dialling itself.
@@ -108,6 +113,21 @@ func (a *App) RunAgentLink(ctx context.Context, o AgentLinkOptions) {
 		next++
 		if time.Since(started) > time.Minute {
 			wait = time.Second // it was up a good while: this is a fresh drop
+			fails, skip = 0, map[string]bool{}
+		}
+		// A member of a hive on a network that has lost its queen draws the
+		// next one (the pods' hive elects its own way, app_election.go).
+		if fails++; fails >= lanMisses*len(cores) && !electionOn() {
+			fails = 0
+			if pick, self, ok := a.lanElect(o.Name, skip); ok {
+				if self {
+					return
+				}
+				cores, next, wait = []string{pick.Link}, 0, time.Second
+				o.Token = hiveKey()
+				log.Printf("agent link: following %s at %s", pick.Name, pick.Link)
+				continue
+			}
 		}
 		log.Printf("agent link to %s: %v; again in %s", one.Core, err, wait)
 		select {

@@ -79,6 +79,11 @@ type App struct {
 	electedTerm int64
 	// agentDoor is where agents come in (app_agentdoor.go).
 	agentDoor agentDoor
+	// lanHive is a member's last roster from its queen (app_lanhive.go).
+	lanHive lanHive
+	// queenFor serialises becoming queen for the machines that joined
+	// (queenForWorkers).
+	queenFor sync.Mutex
 	// turnLog is every recent chat turn as it ran (turn_journal.go).
 	turnLog turnJournal
 	// Direct MCP calls from chat-block buttons and home tiles. See

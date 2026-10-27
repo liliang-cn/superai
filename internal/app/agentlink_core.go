@@ -28,6 +28,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
 )
 
@@ -51,6 +52,10 @@ type agentConn struct {
 	// last said (cli:activity, cli_activity.go); cliMu orders the writes.
 	cliMu sync.Mutex
 	clis  atomic.Pointer[cliMap]
+	// addr is the address the agent dialled from, and doorPort the port it
+	// would take agents in on as queen (app_lanhive.go).
+	addr     string
+	doorPort atomic.Int32
 }
 
 func (c *agentConn) name() string { return c.hello.GetName() }
@@ -484,7 +489,9 @@ type tokenCheck func(token string) bool
 func credentialsCheck(c *credentials) tokenCheck {
 	want := []byte(c.Token)
 	return func(tok string) bool {
-		return subtle.ConstantTimeCompare([]byte(tok), want) == 1 || (c.devices != nil && c.devices.authenticate(tok))
+		return subtle.ConstantTimeCompare([]byte(tok), want) == 1 || (c.devices != nil && c.devices.authenticate(tok)) ||
+			// A member of this hive moving to its next queen (app_lanhive.go).
+			hiveKeyMatches(tok)
 	}
 }
 
@@ -545,6 +552,11 @@ func (s *agentLinkServer) Connect(stream agentlinkpb.AgentLink_ConnectServer) er
 	c := &agentConn{hello: hello, connected: time.Now(), out: make(chan *agentlinkpb.CoreFrame, 64),
 		done: make(chan struct{}), pending: map[string]chan *agentlinkpb.Reply{}, subs: map[int]chan *agentlinkpb.Event{}}
 	c.lastSeen.Store(time.Now().UnixMilli())
+	if p, ok := peer.FromContext(stream.Context()); ok && p.Addr != nil {
+		if host, _, err := net.SplitHostPort(p.Addr.String()); err == nil {
+			c.addr = host
+		}
+	}
 
 	hub := s.app.agents()
 	hub.mu.Lock()
