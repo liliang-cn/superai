@@ -2688,6 +2688,38 @@ export namespace backend {
 		    return a;
 		}
 	}
+	export class ProxySettings {
+	    mode?: string;
+	    url?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ProxySettings(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.mode = source["mode"];
+	        this.url = source["url"];
+	    }
+	}
+	export class ProxyState {
+	    mode: string;
+	    using: string;
+	    system?: string;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ProxyState(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.mode = source["mode"];
+	        this.using = source["using"];
+	        this.system = source["system"];
+	        this.error = source["error"];
+	    }
+	}
 	export class PulseBin {
 	    sec: number;
 	    tokens: number;
@@ -3092,6 +3124,7 @@ export namespace backend {
 	    avatar_port: number;
 	    cliproxy_enabled: boolean;
 	    cliproxy_port: number;
+	    proxy?: ProxySettings;
 	    memory_backend: string;
 	    shared_memory_endpoint: string;
 	    shared_memory_token: string;
@@ -3150,6 +3183,7 @@ export namespace backend {
 	        this.avatar_port = source["avatar_port"];
 	        this.cliproxy_enabled = source["cliproxy_enabled"];
 	        this.cliproxy_port = source["cliproxy_port"];
+	        this.proxy = this.convertValues(source["proxy"], ProxySettings);
 	        this.memory_backend = source["memory_backend"];
 	        this.shared_memory_endpoint = source["shared_memory_endpoint"];
 	        this.shared_memory_token = source["shared_memory_token"];

@@ -6,6 +6,7 @@ import PairPhoneCard from "../components/PairPhoneCard";
 import LinkSuperAICard from "../components/LinkSuperAICard";
 import LocalHiveCard from "../components/LocalHiveCard";
 import QueenEngineCard from "../components/QueenEngineCard";
+import ProxyCard from "../components/ProxyCard";
 import { AppStatus } from "../lib/types";
 import {
   CLIProxyAccounts,
@@ -1245,6 +1246,11 @@ export default function SettingsView({
             />
           )}
 
+          <ProxyCard
+            hidden={section !== "runtime"}
+            proxy={s.proxy ?? new backend.ProxySettings()}
+            onChange={(p) => set("proxy", p)}
+          />
           <div className="card" hidden={section !== "runtime"}>
             <div className="card-title">{translate("Runtime")}</div>
             <div className="card-desc">Workspace, agent loop limits, and avatar bridge.</div>

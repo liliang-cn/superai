@@ -244,6 +244,8 @@ export function Presence():Promise<app.CCPresence>;
 
 export function PreviewPrompt(arg1:string,arg2:string):Promise<backend.PromptPreview>;
 
+export function ProxyStatus():Promise<backend.ProxyState>;
+
 export function Pulse():Promise<backend.PulseSnapshot>;
 
 export function QueenConsole():Promise<Record<string, string>>;
@@ -345,6 +347,8 @@ export function StartYoloMode():Promise<Record<string, any>>;
 export function StopYoloMode():Promise<Record<string, any>>;
 
 export function TakeOver(arg1:string,arg2:string,arg3:string):Promise<void>;
+
+export function TestProxy(arg1:backend.ProxySettings):Promise<Record<string, any>>;
 
 export function TestWebhook():Promise<string>;
 

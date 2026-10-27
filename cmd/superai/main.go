@@ -102,6 +102,8 @@ func main() {
 	if err != nil {
 		log.Printf("settings: %v (continuing with defaults)", err)
 	}
+	backend.InstallProxy()
+	backend.ApplyProxy(settings.Proxy)
 	// One prompt, one answer. A run this short has no business installing an
 	// MCP server or a skill, and carrying those tools costs a schema slot and a
 	// tempting detour on every task — the efficiency audit counted 37

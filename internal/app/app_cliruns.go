@@ -313,6 +313,11 @@ func (a *App) startCLIRun(o cliStart) (CLIRun, error) {
 		// and stays out of it (cchook.go).
 		Env: map[string]string{"SUPERAI_CLI_RUN": id},
 	}
+	// The CLI goes out the way this machine's own requests do (Settings →
+	// Runtime → Proxy); its own servers here stay direct through NO_PROXY.
+	for k, v := range backend.ProxyEnv() {
+		req.Env[k] = v
+	}
 	// A run thinking for the queen is handed her kit the way its CLI takes
 	// it (queen_engine_cli.go).
 	approve := ""

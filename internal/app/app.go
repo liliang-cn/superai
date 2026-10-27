@@ -291,6 +291,9 @@ func (a *App) startupHeadless() {
 func (a *App) boot() {
 	s, _ := backend.LoadSettings() // returns defaults even on error
 	a.settings = s
+	// Before anything reaches out: every request from here on asks it.
+	backend.InstallProxy()
+	backend.ApplyProxy(s.Proxy)
 
 	sse := backend.NewSSEServer(s.AvatarPort, avatarWeb())
 	if err := sse.Start(); err != nil {
@@ -498,6 +501,9 @@ func (a *App) SaveSettings(s backend.Settings) error {
 	if err := backend.ValidateQueenName(s.QueenName, s.QueenAliases); err != nil {
 		return err
 	}
+	if err := s.Proxy.Validate(); err != nil {
+		return err
+	}
 	a.mu.Lock()
 	prev := ""
 	if a.settings != nil {
@@ -513,6 +519,7 @@ func (a *App) SaveSettings(s backend.Settings) error {
 	a.mu.Lock()
 	a.settings = &s
 	a.mu.Unlock()
+	backend.ApplyProxy(s.Proxy)
 	a.syncProxy()
 	a.rebuild()
 	// The scheduler runs turns against the service that was just replaced, and

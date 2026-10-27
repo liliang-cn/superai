@@ -478,6 +478,10 @@ export function PreviewPrompt(arg1, arg2) {
   return window['go']['app']['App']['PreviewPrompt'](arg1, arg2);
 }
 
+export function ProxyStatus() {
+  return window['go']['app']['App']['ProxyStatus']();
+}
+
 export function Pulse() {
   return window['go']['app']['App']['Pulse']();
 }
@@ -680,6 +684,10 @@ export function StopYoloMode() {
 
 export function TakeOver(arg1, arg2, arg3) {
   return window['go']['app']['App']['TakeOver'](arg1, arg2, arg3);
+}
+
+export function TestProxy(arg1) {
+  return window['go']['app']['App']['TestProxy'](arg1);
 }
 
 export function TestWebhook() {

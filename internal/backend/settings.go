@@ -174,6 +174,11 @@ type Settings struct {
 	// CLIProxyPort is the local port the embedded proxy binds (loopback only).
 	CLIProxyPort int `json:"cliproxy_port"`
 
+	// Proxy is the network proxy SuperAI's own outside requests and the
+	// agent CLIs it starts go through (proxy.go): the environment by
+	// default, off, the system's, or a URL.
+	Proxy ProxySettings `json:"proxy,omitempty"`
+
 	// MemoryBackend selects where durable memory lives:
 	//
 	//	"local"  (default) — this machine's own store under <data>/data.
