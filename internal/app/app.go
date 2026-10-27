@@ -357,6 +357,9 @@ func (a *App) Shutdown(ctx context.Context) {
 	// its turns against. The Telegram poller is stopped first and for exactly
 	// the same reason — it may be in the middle of a turn.
 	a.stopTelegram()
+	// A queen going on purpose says she will be back, before anything of
+	// her stops: her members wait instead of electing another.
+	a.announceRestart()
 	a.stopHive()
 	a.stopLocalHive()
 	a.stopAlarmWatch()

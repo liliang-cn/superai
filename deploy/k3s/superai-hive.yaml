@@ -98,6 +98,18 @@ spec:
             - {name: POD_NAME, valueFrom: {fieldRef: {fieldPath: metadata.name}}}
             - {name: SUPERAI_NODE, valueFrom: {fieldRef: {fieldPath: spec.nodeName}}}
             - {name: SUPERAI_ADVERTISE_URL, value: "http://$(POD_NAME).superai-queen.superai.svc.cluster.local:43117"}
+            # Any pod may be elected queen (internal/app/app_election.go): the
+            # queen wears the superai/queen label, superai-leader and the
+            # NodePorts follow it, and a member steps up when she goes quiet.
+            - {name: POD_NAMESPACE, valueFrom: {fieldRef: {fieldPath: metadata.namespace}}}
+            - {name: SUPERAI_ELECTION, value: "1"}
+            - {name: SUPERAI_QUEEN_LABEL, value: superai/queen}
+            - {name: SUPERAI_QUEEN_URL, value: "http://superai-leader.superai.svc.cluster.local:43117"}
+            - {name: SUPERAI_WORKER_STATEFULSET, value: superai-worker}
+            # Once another pod is queen, this one is an agent of hers like any worker.
+            - {name: SUPERAI_CORE, value: "superai-leader.superai.svc.cluster.local:43120"}
+            - {name: SUPERAI_CORE_TOKEN, valueFrom: {secretKeyRef: {name: superai-hive, key: token}}}
+            - {name: SUPERAI_AGENT_NAME, value: "$(POD_NAME)"}
             # Where machines other than the queen reach her API: a queen engine
             # on a linked machine (claude.mac) calls /mcp here. The default for
             # hive.public_url; one set from a client (/data/queenengine.json) wins.
@@ -166,6 +178,17 @@ spec:
         storageClassName: haify-drbd-remote
         resources: {requests: {storage: 2Gi}}
 ---
+# Whoever is queen now: the pod wearing the superai/queen label, which the
+# elected queen puts on herself (internal/app/app_election.go). superai-queen
+# above stays the governing service of the queen StatefulSet, so its pod
+# keeps its own name when it is no longer queen.
+apiVersion: v1
+kind: Service
+metadata: {name: superai-leader, namespace: superai}
+spec:
+  selector: {superai/queen: "yes"}
+  ports: [{name: http, port: 43117}, {name: agent, port: 43120}]
+---
 apiVersion: v1
 kind: Service
 metadata: {name: superai-worker, namespace: superai}
@@ -201,7 +224,7 @@ spec:
         - name: superai
           image: superai:hive
           imagePullPolicy: IfNotPresent
-          ports: [{containerPort: 43117}]
+          ports: [{containerPort: 43117}, {containerPort: 43120, name: agent}]
           env:
             # The person's zone, not the node's. Unset, the pod ran in UTC and
             # "下周三上午十点" was stored as 10:00Z — 18:00 in Hangzhou.
@@ -218,8 +241,16 @@ spec:
             - {name: POD_NAME, valueFrom: {fieldRef: {fieldPath: metadata.name}}}
             - {name: SUPERAI_NODE, valueFrom: {fieldRef: {fieldPath: spec.nodeName}}}
             - {name: SUPERAI_ADVERTISE_URL, value: "http://$(POD_NAME).superai-worker.superai.svc.cluster.local:43117"}
+            # Any pod may be elected queen (internal/app/app_election.go): the
+            # queen wears the superai/queen label, superai-leader and the
+            # NodePorts follow it, and a member steps up when she goes quiet.
+            - {name: POD_NAMESPACE, valueFrom: {fieldRef: {fieldPath: metadata.namespace}}}
+            - {name: SUPERAI_ELECTION, value: "1"}
+            - {name: SUPERAI_QUEEN_LABEL, value: superai/queen}
+            - {name: SUPERAI_QUEEN_URL, value: "http://superai-leader.superai.svc.cluster.local:43117"}
+            - {name: SUPERAI_WORKER_STATEFULSET, value: superai-worker}
             # Each worker is also an agent of the queen, over the agent link.
-            - {name: SUPERAI_CORE, value: "superai-queen.superai.svc.cluster.local:43120"}
+            - {name: SUPERAI_CORE, value: "superai-leader.superai.svc.cluster.local:43120"}
             - {name: SUPERAI_CORE_TOKEN, valueFrom: {secretKeyRef: {name: superai-hive, key: token}}}
             - {name: SUPERAI_AGENT_NAME, value: "$(POD_NAME)"}
             - {name: CORTEXDB_GRPC_TOKEN, valueFrom: {secretKeyRef: {name: superai-hive, key: cortexdb_token}}}
@@ -233,7 +264,7 @@ spec:
             # cluster's file rather than synced from the queen's, so it is here
             # from the first start; the abilities sync skips a server a worker
             # already configures, so there is never a second copy.
-            - {name: SUPERAI_MCP_JSON, value: '{"mcpServers":{"cortexdb":{"type":"stdio","command":"cortexdb-mcp-stdio","env":{"CORTEXDB_REMOTE":"192.168.123.253:47821"}},"noted":{"type":"http","url":"http://192.168.123.65:43638/mcp","headers":{"Authorization":"Bearer ${NOTED_TOKEN}"}},"vita":{"type":"http","url":"http://192.168.123.65:43671/mcp","headers":{"Authorization":"Bearer ${VITA_TOKEN}"}}}}'}
+            - {name: SUPERAI_MCP_JSON, value: '{"mcpServers":{"cortexdb":{"type":"stdio","command":"cortexdb-mcp-stdio","env":{"CORTEXDB_REMOTE":"192.168.123.253:47821"}},"noted":{"type":"http","url":"http://192.168.123.65:43638/mcp","headers":{"Authorization":"Bearer ${NOTED_TOKEN}"}},"vita":{"type":"http","url":"http://192.168.123.65:43671/mcp","headers":{"Authorization":"Bearer ${VITA_TOKEN}"}},"haify":{"type":"http","url":"http://192.168.123.251:43871/mcp","headers":{"Authorization":"Bearer ${HAIFY_MCP_TOKEN}"}}}}'}
             # Optional: without it the worker leaves noted out (and tells the
             # queen so, which keeps noted work off it).
             - {name: NOTED_TOKEN, valueFrom: {secretKeyRef: {name: superai-hive, key: noted_token, optional: true}}}
@@ -247,6 +278,17 @@ spec:
             - {name: CORTEXDB_LLM_BASE_URL, valueFrom: {secretKeyRef: {name: superai-hive, key: cortexdb_llm_base_url, optional: true}}}
             - {name: CORTEXDB_LLM_MODEL, valueFrom: {secretKeyRef: {name: superai-hive, key: cortexdb_llm_model, optional: true}}}
             - {name: CORTEXDB_LLM_API_KEY, valueFrom: {secretKeyRef: {name: superai-hive, key: cortexdb_llm_key, optional: true}}}
+            # What a queen needs, for the day this worker is elected one.
+            - {name: SUPERAI_PUBLIC_URL, value: "https://ai.superleo.cn"}
+            - {name: SUPERAI_AGENT_PORT, value: "43120"}
+            - {name: SUPERAI_AGENT_ADVERTISE, value: "192.168.123.214:31744,192.168.123.215:31744,192.168.123.216:31744"}
+            - {name: HAIFY_MCP_TOKEN, valueFrom: {secretKeyRef: {name: superai-hive, key: haify_mcp_token, optional: true}}}
+            - {name: SUPERAI_HIVE_DELEGATION, value: auto}
+            - {name: SUPERAI_QUOTE_PROXY, value: "http://192.168.123.61:43127"}
+            - {name: APNS_KEY, valueFrom: {secretKeyRef: {name: superai-hive, key: apns_key, optional: true}}}
+            - {name: APNS_KEY_ID, valueFrom: {secretKeyRef: {name: superai-hive, key: apns_key_id, optional: true}}}
+            - {name: SUPERAI_HAIFY_URL, value: "http://192.168.123.251:3375"}
+            - {name: SUPERAI_HAIFY_TOKEN, valueFrom: {secretKeyRef: {name: superai-hive, key: haify_token, optional: true}}}
           readinessProbe:
             httpGet: {path: /api/session, port: 43117}
           volumeMounts: [{name: data, mountPath: /data}]
@@ -271,7 +313,7 @@ kind: Service
 metadata: {name: superai-queen-web, namespace: superai}
 spec:
   type: NodePort
-  selector: {app: superai-queen}
+  selector: {superai/queen: "yes"}
   ports: [{name: http, port: 80, targetPort: 43117, nodePort: 31743}]
 ---
 # Where agents outside the cluster dial in: the Mac, the orange machines, the
@@ -281,7 +323,7 @@ kind: Service
 metadata: {name: superai-queen-agent, namespace: superai}
 spec:
   type: NodePort
-  selector: {app: superai-queen}
+  selector: {superai/queen: "yes"}
   ports: [{name: agent, port: 43120, targetPort: 43120, nodePort: 31744}]
 ---
 apiVersion: networking.k8s.io/v1

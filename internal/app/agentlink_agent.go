@@ -88,6 +88,16 @@ func (a *App) RunAgentLink(ctx context.Context, o AgentLinkOptions) {
 	}
 	wait, next := time.Second, 0
 	for ctx.Err() == nil {
+		// Elected queen (app_election.go): core is this instance now, and
+		// dialling the queen's address would be dialling itself.
+		if electionOn() && a.isQueen() {
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(5 * time.Second):
+			}
+			continue
+		}
 		one := o
 		one.Core = cores[next%len(cores)]
 		started := time.Now()

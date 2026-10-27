@@ -177,6 +177,9 @@ type HiveHello struct {
 	// CLIs names the coding CLIs installed where the worker runs (claude,
 	// codex, ...), so work that needs one goes to a worker that has it.
 	CLIs []string `json:"clis,omitempty"`
+	// Term is the latest queen's term this worker has followed
+	// (hive_election.go): a queen on an earlier one is stale.
+	Term int64 `json:"term,omitempty"`
 }
 
 // HiveWelcome is the queen's answer.
@@ -185,6 +188,10 @@ type HiveWelcome struct {
 	Queen      string `json:"queen"`
 	IntervalMS int    `json:"interval_ms"`
 	Members    int    `json:"members"`
+	// Term is the queen's, and Roster the live workers: what every worker
+	// needs to pick the same next queen should this one go quiet.
+	Term   int64         `json:"term,omitempty"`
+	Roster []RosterEntry `json:"roster,omitempty"`
 }
 
 // HiveMember is one worker on the roster.
@@ -225,6 +232,8 @@ type Hive struct {
 
 	mu      sync.Mutex
 	members map[string]*HiveMember
+	// term is this queen's (hive_election.go).
+	term int64
 	// retired is who was let go, by the start time of the process let go, so
 	// its last heartbeats while the pod stops do not put it back.
 	retired map[string]time.Time
@@ -258,9 +267,13 @@ func (h *Hive) Join(hello HiveHello) (HiveWelcome, error) {
 
 	h.mu.Lock()
 	defer h.mu.Unlock()
+	if hello.Term > h.term {
+		// The worker has followed a later queen: this one is left over.
+		return HiveWelcome{}, ErrSuperseded{Term: hello.Term}
+	}
 	if at, ok := h.retired[hello.Name]; ok {
 		if hello.StartedAt.Equal(at) {
-			return HiveWelcome{Protocol: HiveProtocol, Queen: h.name, IntervalMS: int(h.interval / time.Millisecond), Members: len(h.members)}, nil
+			return HiveWelcome{Protocol: HiveProtocol, Queen: h.name, IntervalMS: int(h.interval / time.Millisecond), Members: len(h.members), Term: h.term}, nil
 		}
 		delete(h.retired, hello.Name)
 	}
@@ -284,6 +297,7 @@ func (h *Hive) Join(hello HiveHello) (HiveWelcome, error) {
 	return HiveWelcome{
 		Protocol: HiveProtocol, Queen: h.name,
 		IntervalMS: int(h.interval / time.Millisecond), Members: len(h.members),
+		Term: h.term, Roster: h.rosterLocked(now),
 	}, nil
 }
 
@@ -383,6 +397,10 @@ type Announcer struct {
 	Capabilities func() []string
 	// CLIs, when set, names the coding CLIs installed here.
 	CLIs func() []string
+	// OnPromote, when set, is called when this worker is elected queen
+	// (hive_election.go) with the term it now holds; Run returns after it.
+	// Unset, the worker only waits for its queen to come back.
+	OnPromote func(term int64)
 
 	started time.Time
 	client  *http.Client
@@ -394,6 +412,50 @@ type Announcer struct {
 	peers   map[string]RemoteAgent
 	peersAt time.Time
 	queen   string
+	// What an election needs (hive_election.go): the term followed, the
+	// roster the queen last gave, and the queen being followed when she is
+	// not the one Settings.JoinURL names.
+	term   int64
+	roster []RosterEntry
+	target string
+	// retry is the first wait after a missed beat; zero is a second. A test
+	// sets it shorter.
+	retry time.Duration
+	// holdUntil is when a queen who said she was restarting (Hold) is given
+	// up on; until then her silence elects nobody.
+	holdUntil time.Time
+}
+
+// Hold is the queen saying she is restarting: wait d for her before electing
+// another.
+func (a *Announcer) Hold(d time.Duration) {
+	a.mu.Lock()
+	a.holdUntil = time.Now().Add(d)
+	a.mu.Unlock()
+	log.Printf("hive: the queen is restarting; waiting up to %s for her", d.Round(time.Second))
+}
+
+func (a *Announcer) holding() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return time.Now().Before(a.holdUntil)
+}
+
+// joinURL is where the queen being followed is reached.
+func (a *Announcer) joinURL() string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.target != "" {
+		return a.target
+	}
+	return a.Settings.JoinURL
+}
+
+// Term is the latest queen's term this worker has followed.
+func (a *Announcer) Term() int64 {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.term
 }
 
 // AnnouncerState is what a worker knows about its own membership.
@@ -470,7 +532,7 @@ func (a *Announcer) Once(ctx context.Context) (HiveWelcome, error) {
 	hello := HiveHello{
 		Protocol: HiveProtocol, Name: a.Name(), Role: HiveRoleWorker, URL: a.advertise(),
 		Token: a.Token, Version: a.Version, StartedAt: a.started, Engine: a.Engine, About: a.About,
-		Node: os.Getenv("SUPERAI_NODE"), Kind: host.Kind, Host: host.Name,
+		Node: os.Getenv("SUPERAI_NODE"), Kind: host.Kind, Host: host.Name, Term: a.Term(),
 	}
 	if a.Capabilities != nil {
 		// Never nil once asked: an empty list is "none", which is not the
@@ -482,7 +544,7 @@ func (a *Announcer) Once(ctx context.Context) (HiveWelcome, error) {
 	}
 	body, _ := json.Marshal(hello)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
-		strings.TrimRight(a.Settings.JoinURL, "/")+"/api/hive/join", bytes.NewReader(body))
+		strings.TrimRight(a.joinURL(), "/")+"/api/hive/join", bytes.NewReader(body))
 	if err != nil {
 		return HiveWelcome{}, err
 	}
@@ -498,6 +560,11 @@ func (a *Announcer) Once(ctx context.Context) (HiveWelcome, error) {
 	}
 	defer resp.Body.Close()
 	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if resp.StatusCode == http.StatusNotFound {
+		// Up, but not a queen (yet): a member just elected that has not
+		// taken over.
+		return HiveWelcome{}, fmt.Errorf("%w: %s", errNotQueen, strings.TrimSpace(string(raw)))
+	}
 	if resp.StatusCode != http.StatusOK {
 		return HiveWelcome{}, fmt.Errorf("%s: %s", resp.Status, strings.TrimSpace(string(raw)))
 	}
@@ -505,11 +572,17 @@ func (a *Announcer) Once(ctx context.Context) (HiveWelcome, error) {
 	if err := json.Unmarshal(raw, &w); err != nil || w.Protocol != HiveProtocol {
 		return HiveWelcome{}, fmt.Errorf("that is not a %s queen: %s", HiveProtocol, strings.TrimSpace(string(raw)))
 	}
+	a.mu.Lock()
 	if w.Queen != "" {
-		a.mu.Lock()
 		a.queen = w.Queen
-		a.mu.Unlock()
 	}
+	if w.Term > a.term {
+		a.term = w.Term
+	}
+	if w.Roster != nil {
+		a.roster = w.Roster
+	}
+	a.mu.Unlock()
 	return w, nil
 }
 
@@ -522,7 +595,7 @@ func (a *Announcer) Leave(ctx context.Context) error {
 		a.client = &http.Client{Timeout: 10 * time.Second}
 	}
 	body, _ := json.Marshal(HiveHello{Protocol: HiveProtocol, Name: a.Name(), Role: HiveRoleWorker, StartedAt: a.started})
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(a.Settings.JoinURL, "/")+"/api/hive/leave", bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(a.joinURL(), "/")+"/api/hive/leave", bytes.NewReader(body))
 	if err != nil {
 		return err
 	}
@@ -544,9 +617,16 @@ func (a *Announcer) Leave(ctx context.Context) error {
 // or is restarting is the ordinary case, and the loop is what makes the order
 // pods start in irrelevant.
 func (a *Announcer) Run(ctx context.Context) {
+	first := a.retry
+	if first <= 0 {
+		first = time.Second
+	}
 	wait := a.Settings.Interval()
-	backoff := time.Second
+	backoff := first
 	joined := false
+	// misses counts the beats in a row the queen has not answered, and skip
+	// who has been passed over since the last queen that did.
+	misses, skip := 0, map[string]bool{}
 	for {
 		w, err := a.Once(ctx)
 		a.record(err)
@@ -556,7 +636,8 @@ func (a *Announcer) Run(ctx context.Context) {
 				log.Printf("hive: joined %q as %s", w.Queen, a.Name())
 				joined = true
 			}
-			backoff = time.Second
+			misses, skip = 0, map[string]bool{}
+			backoff = first
 			wait = a.Settings.Interval()
 			if w.IntervalMS > 0 {
 				wait = time.Duration(w.IntervalMS) * time.Millisecond
@@ -564,13 +645,27 @@ func (a *Announcer) Run(ctx context.Context) {
 		default:
 			if joined {
 				log.Printf("hive: lost the queen: %v", err)
-			} else if backoff == time.Second {
+			} else if backoff == first {
 				log.Printf("hive: cannot join yet: %v", err)
 			}
 			joined = false
 			wait = backoff
 			if backoff < 30*time.Second {
 				backoff *= 2
+			}
+			misses++
+			// A member that is up but not queen yet is given longer: it is
+			// most likely the one just picked, taking over.
+			limit := hiveMisses
+			if errors.Is(err, errNotQueen) {
+				limit = 3 * hiveMisses
+			}
+			if a.OnPromote != nil && misses >= limit && !a.holding() {
+				misses = 0
+				if a.elect(skip) {
+					return
+				}
+				backoff, wait = first, first
 			}
 		}
 		select {
@@ -606,6 +701,17 @@ func (h *Hive) Roster() []RosterEntry {
 	return out
 }
 
+func (h *Hive) rosterLocked(now time.Time) []RosterEntry {
+	out := []RosterEntry{}
+	for _, m := range h.members {
+		if h.stateLocked(m, now) == "live" {
+			out = append(out, RosterEntry{Name: m.Name, URL: m.URL})
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out
+}
+
 // peerTTL is how long a worker believes the roster it fetched. Short: a peer
 // that just joined should be askable within a moment, and one that left should
 // stop being offered.
@@ -629,7 +735,7 @@ func (a *Announcer) Peers(ctx context.Context) map[string]RemoteAgent {
 	if a.client == nil {
 		a.client = &http.Client{Timeout: 10 * time.Second}
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimRight(a.Settings.JoinURL, "/")+"/api/hive/roster", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimRight(a.joinURL(), "/")+"/api/hive/roster", nil)
 	if err != nil {
 		return nil
 	}
@@ -685,7 +791,7 @@ func (a *Announcer) SendToQueen(ctx context.Context, m HiveMessage) error {
 	if tok == "" {
 		tok = a.Token
 	}
-	return PostMessage(ctx, a.Settings.JoinURL, tok, m)
+	return PostMessage(ctx, a.joinURL(), tok, m)
 }
 
 // Report tells the queen about a task this worker gave a peer, so the queen's
@@ -704,7 +810,7 @@ func (a *Announcer) reportTo(ctx context.Context, path string, v any) error {
 		a.client = &http.Client{Timeout: 10 * time.Second}
 	}
 	body, _ := json.Marshal(v)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(a.Settings.JoinURL, "/")+path, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(a.joinURL(), "/")+path, bytes.NewReader(body))
 	if err != nil {
 		return err
 	}
@@ -723,4 +829,41 @@ func (a *Announcer) reportTo(ctx context.Context, path string, v any) error {
 		return fmt.Errorf("%s", resp.Status)
 	}
 	return nil
+}
+
+// errNotQueen is a member answering a join that it is not a queen.
+var errNotQueen = errors.New("not a queen")
+
+// elect passes over the queen that went quiet and follows the next one:
+// term's pick from the last roster. True when the pick is this worker, which
+// has then become queen (OnPromote).
+func (a *Announcer) elect(skip map[string]bool) bool {
+	a.mu.Lock()
+	roster, term, gone := a.roster, a.term, a.queen
+	a.mu.Unlock()
+	if len(roster) == 0 {
+		return false // nobody to pick from yet: wait for the queen
+	}
+	if gone != "" {
+		skip[gone] = true
+	}
+	term++
+	pick, ok := ElectQueen(roster, term, skip)
+	if !ok {
+		return false
+	}
+	self := pick.Name == a.Name()
+	a.mu.Lock()
+	a.term, a.queen = term, pick.Name
+	if !self {
+		a.target = pick.URL
+	}
+	a.mu.Unlock()
+	if self {
+		log.Printf("hive: %q is not answering; this member is queen now (term %d)", gone, term)
+		a.OnPromote(term)
+		return true
+	}
+	log.Printf("hive: %q is not answering; %s is queen now (term %d)", gone, pick.Name, term)
+	return false
 }

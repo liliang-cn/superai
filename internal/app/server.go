@@ -339,6 +339,7 @@ func newAPIMux(app *App, hub *eventHub, creds *credentials, handoff *handoffStor
 	// the streaming.
 	mux.HandleFunc("/api/tts", app.handleSpeak)
 	mux.HandleFunc("/api/hive/join", app.handleHiveJoin)
+	mux.HandleFunc("/api/hive/hold", app.handleHiveHold)
 	mux.HandleFunc("/api/hive/roster", app.handleHiveRoster)
 	mux.HandleFunc("/api/hive/leave", app.handleHiveLeave)
 	mux.HandleFunc("/api/hive/pulse", app.handleHivePulse)

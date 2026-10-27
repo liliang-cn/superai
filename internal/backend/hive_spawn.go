@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -137,6 +138,22 @@ func (k *kubectlSpawner) SetReplicas(ctx context.Context, n int) error {
 	if n < 0 || n > k.s.MaxWorkers {
 		return fmt.Errorf("%d workers is outside 0..%d", n, k.s.MaxWorkers)
 	}
+	// A queen elected from among the workers (hive_election.go) is one of
+	// the pods this would take away: scaling below her ordinal removes her.
+	if ord, ok := statefulOrdinal(os.Getenv("POD_NAME"), k.s.StatefulSet); ok && n <= ord {
+		return fmt.Errorf("the queen is %s; there have to be at least %d workers so she stays", os.Getenv("POD_NAME"), ord+1)
+	}
 	_, err := k.run(ctx, "scale", "statefulset", k.s.StatefulSet, fmt.Sprintf("--replicas=%d", n))
 	return err
+}
+
+// statefulOrdinal is pod's ordinal in the StatefulSet set, when pod is one
+// of its pods.
+func statefulOrdinal(pod, set string) (int, bool) {
+	rest, ok := strings.CutPrefix(pod, set+"-")
+	if !ok || set == "" {
+		return 0, false
+	}
+	n, err := strconv.Atoi(rest)
+	return n, err == nil && n >= 0
 }

@@ -300,7 +300,7 @@ func mcpCommandOf(entry map[string]any) string {
 
 // Abilities asks the queen for hers.
 func (a *Announcer) Abilities(ctx context.Context) (HiveAbilities, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimRight(a.Settings.JoinURL, "/")+"/api/hive/abilities", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimRight(a.joinURL(), "/")+"/api/hive/abilities", nil)
 	if err != nil {
 		return HiveAbilities{}, err
 	}

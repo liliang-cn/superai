@@ -240,6 +240,15 @@ func (a *App) handleHiveJoin(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	welcome, err := h.Join(hello)
+	if s, ok := backend.IsSuperseded(err); ok {
+		// A worker has followed a queen of a later term: this one is left
+		// over (app_election.go).
+		writeJSONStatus(w, http.StatusConflict, map[string]any{"error": err.Error()})
+		if electionOn() {
+			go a.stepDown(fmt.Sprintf("a worker follows a queen of term %d", s.Term))
+		}
+		return
+	}
 	if err != nil {
 		writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
 		return
@@ -366,6 +375,16 @@ func (a *App) startHive() {
 	a.mu.Lock()
 	s := a.settings
 	a.mu.Unlock()
+	// A queen in an electing hive keeps an eye on the label that says
+	// she is the queen (app_election.go).
+	if s != nil && s.Hive.Role == backend.HiveRoleQueen && electionOn() {
+		ctx, cancel := context.WithCancel(context.Background())
+		a.mu.Lock()
+		a.hiveStop = cancel
+		a.mu.Unlock()
+		go a.keepQueenLabel(ctx)
+		return
+	}
 	if s == nil || s.Hive.Role != backend.HiveRoleWorker {
 		return
 	}
@@ -376,6 +395,11 @@ func (a *App) startHive() {
 		return
 	}
 	ann := &backend.Announcer{Settings: s.Hive, Token: creds.Token}
+	// In an electing hive the queen is whoever wears the label, reached at
+	// $SUPERAI_QUEEN_URL, not a fixed address (app_election.go).
+	if electionOn() && electionJoinURL() != "" {
+		ann.Settings.JoinURL = electionJoinURL()
+	}
 	// What this worker can reach, said with every hello, so the queen sends
 	// noted work only where noted is (see backend/hive_delegate.go).
 	ann.Capabilities = func() []string {
@@ -386,6 +410,10 @@ func (a *App) startHive() {
 	}
 	// And the coding CLIs installed here: a Mac worker takes the coding work.
 	ann.CLIs = func() []string { return cliNames(a.localAgentNames()) }
+	// In an electing hive this worker may be picked as the next queen.
+	if electionOn() {
+		ann.OnPromote = func(term int64) { go a.promoteToQueen(term) }
+	}
 	if err := ann.Validate(); err != nil {
 		log.Printf("hive: not joining: %v", err)
 		return
