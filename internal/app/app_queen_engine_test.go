@@ -443,6 +443,16 @@ func TestAnEngineThatCannotStartHandsTheTurnToItsBackup(t *testing.T) {
 	if turns[1].Engine != "claude" || turns[1].BackupFor != "claude.nowhere" {
 		t.Fatalf("history %+v", turns[1])
 	}
+	tr, err := h.a.TurnTrace(id[:8])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tr.State != "done" || tr.By != "claude, backup for claude.nowhere" || fmt.Sprint(tr.Engines) != "[claude.nowhere claude]" || len(tr.Events) == 0 {
+		t.Fatalf("trace %+v", tr)
+	}
+	if list := h.a.TurnTraces(5); len(list) != 1 || list[0].ID != id || list[0].Events != nil {
+		t.Fatalf("traces %+v", list)
+	}
 }
 
 func TestSuperAIStandsInOnlyWhenEveryBackupFailedToo(t *testing.T) {
@@ -455,6 +465,14 @@ func TestSuperAIStandsInOnlyWhenEveryBackupFailedToo(t *testing.T) {
 	}
 	if now := h.a.queenEngineNow(); now != queenNowSuperAI {
 		t.Fatalf("now %q", now)
+	}
+	if tr := h.a.TurnTraces(1); len(tr) != 1 || fmt.Sprint(tr[0].Engines) != "[claude.nowhere claude superai]" {
+		t.Fatalf("traces %+v", tr)
+	}
+	for _, it := range h.a.Attention() {
+		if it.Kind == "run" {
+			t.Fatalf("a queen run that was handed on still asks for the person: %+v", it)
+		}
 	}
 	if runs := len(h.a.cliStore().runs); runs != 1 {
 		t.Fatalf("%d runs: a backup was tried twice", runs)

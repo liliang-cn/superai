@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { TraceCall, TraceLines } from "../../wailsjs/go/app/App";
+import { TraceCall, TraceLines, TurnTrace, TurnTraces } from "../../wailsjs/go/app/App";
+import { EventsOn } from "../../wailsjs/runtime";
 import { useImeGuard } from "@/lib/ime";
 import { ChevronDown, ChevronRight, RotateCw, ScrollText, X } from "lucide-react";
 
@@ -101,6 +102,99 @@ const answered = (r: TraceRow) =>
 // what the row says, if anything: an error beats a reason beats a result.
 const detail = (r: TraceRow) => r.error ?? r.reason ?? r.message ?? r.result ?? answered(r);
 
+type Turn = {
+  id: string;
+  session?: string;
+  message?: string;
+  started: string;
+  state: string;
+  ms: number;
+  firstWordsMs?: number;
+  quietMs?: number;
+  engines?: string[];
+  by?: string;
+  tools?: number;
+  costUsd?: number;
+  error?: string;
+  events?: { at: string; ms: number; name: string; type?: string; engine?: string; tool?: string; text?: string }[];
+};
+
+const secs = (ms?: number) => (ms ? `${(ms / 1000).toFixed(ms < 10000 ? 1 : 0)}s` : "");
+
+/**
+ * The conversation's turns as the server ran them, whoever answered: the
+ * queen's own model, an engine, a backup engine after the first choice
+ * failed, or SuperAI standing in. The JSONL below is only her own model's;
+ * a turn an engine took shows here alone.
+ */
+function TurnsStrip({ session, live }: { session: string; live?: boolean }) {
+  const [turns, setTurns] = useState<Turn[]>([]);
+  const [open, setOpen] = useState("");
+  const [steps, setSteps] = useState<Turn["events"]>([]);
+  const load = useCallback(async () => {
+    try {
+      const all = ((await TurnTraces(100)) ?? []) as Turn[];
+      setTurns(all.filter((t) => !session || t.session === session).slice(0, 20));
+    } catch {
+      /* keep what is on screen */
+    }
+  }, [session]);
+  useEffect(() => {
+    load();
+    const offs = ["chat:turn", "chat:done", "chat:error", "chat:cancelled"].map((n) => EventsOn(n, () => window.setTimeout(load, 200)));
+    const t = live ? window.setInterval(load, 2000) : 0;
+    return () => {
+      offs.forEach((o) => typeof o === "function" && o());
+      if (t) window.clearInterval(t);
+    };
+  }, [load, live]);
+  const toggle = async (id: string) => {
+    if (open === id) return setOpen("");
+    setOpen(id);
+    try {
+      setSteps(((await TurnTrace(id)) as Turn).events ?? []);
+    } catch {
+      setSteps([]);
+    }
+  };
+  if (turns.length === 0) return null;
+  return (
+    <div className="cr-turns">
+      {turns.map((t) => (
+        <div key={t.id} className={`cr-turn ${t.state}`}>
+          <button className="cr-turn-row" onClick={() => toggle(t.id)}>
+            {open === t.id ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+            <span className="cr-turn-dot" />
+            <span className="cr-turn-time">{t.started.slice(11, 19)}</span>
+            <span className="cr-turn-msg" title={t.message}>{t.message || t.id.slice(0, 8)}</span>
+            <span className="cr-turn-by">
+              {(t.engines?.length ?? 0) > 1 ? t.engines!.join(" → ") : t.by || t.engines?.[0] || ""}
+            </span>
+            <span className="cr-turn-ms">
+              {t.state === "running"
+                ? `${secs(t.ms)}${t.quietMs && t.quietMs > 15000 ? ` · quiet ${secs(t.quietMs)}` : ""}`
+                : `${secs(t.firstWordsMs) ? `${secs(t.firstWordsMs)} / ` : ""}${secs(t.ms)}`}
+            </span>
+          </button>
+          {t.error && <div className="cr-turn-err">{t.error}</div>}
+          {open === t.id && (
+            <div className="cr-turn-steps">
+              {(steps ?? []).map((e, i) => (
+                <div key={i}>
+                  <span>+{secs(e.ms) || "0s"}</span>
+                  <span>{e.type || e.name}</span>
+                  <span>{e.engine}</span>
+                  <span>{[e.tool, e.text].filter(Boolean).join(" · ")}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function RunTracePanel({
   taskId,
   live,
@@ -165,6 +259,8 @@ export default function RunTracePanel({
             <X size={14} />
           </button>
         </div>
+
+        <TurnsStrip session={taskId} live={live} />
 
         <div className="cr-trace-bar">
           <input

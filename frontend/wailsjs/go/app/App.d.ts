@@ -356,6 +356,10 @@ export function TraceCall(arg1:string,arg2:string):Promise<string>;
 
 export function TraceLines(arg1:string,arg2:number):Promise<Array<string>>;
 
+export function TurnTrace(arg1:string):Promise<app.TurnTrace>;
+
+export function TurnTraces(arg1:number):Promise<Array<app.TurnTrace>>;
+
 export function UnlinkHive():Promise<void>;
 
 export function UnlinkSuperAI(arg1:string):Promise<void>;

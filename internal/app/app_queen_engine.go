@@ -230,7 +230,7 @@ func (a *App) routeToEngine(requestID, sessionID, engine, message string, fresh 
 		end()
 		reason = cliClip(strings.TrimSpace(reason), 300)
 		if next := nextQueenEngine(s.Hive.QueenChain(), engine); next != "" {
-			a.emit("chat:event", map[string]any{"requestId": requestID, "type": "state_update",
+			a.emit("chat:event", map[string]any{"requestId": requestID, "type": "state_update", "failed": engine,
 				"content": label + " could not take this turn (" + reason + "); trying " + engineLabel(next)})
 			a.routeToEngine(requestID, sessionID, next, message, busy)
 			return
@@ -240,7 +240,7 @@ func (a *App) routeToEngine(requestID, sessionID, engine, message string, fresh 
 			return
 		}
 		a.setQueenNow(queenNowSuperAI)
-		a.emit("chat:event", map[string]any{"requestId": requestID, "type": "state_update", "engine": "", "standInFor": engine,
+		a.emit("chat:event", map[string]any{"requestId": requestID, "type": "state_update", "engine": "", "standInFor": engine, "failed": engine,
 			"content": label + " could not take this turn (" + reason + "); SuperAI answers it"})
 		a.ownTurn(requestID, sessionID, message, nil, engine)
 	}

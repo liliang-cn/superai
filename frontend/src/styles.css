@@ -1683,6 +1683,22 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
 .cr-trace .cr-panel-h { margin-bottom: 0; }
 .cr-trace-x { background: none; border: none; color: var(--cr-dim); cursor: pointer; padding: 2px 4px; border-radius: 5px; display: inline-flex; }
 .cr-trace-x:hover { color: var(--cr-text); background: var(--cr-line); }
+/* The conversation's turns above the JSONL: who answered each, in what order
+   engines were tried, first words / total time, and the steps on a click. */
+.cr-turns { display: flex; flex-direction: column; gap: 2px; max-height: 34vh; overflow: auto; border: 1px solid var(--cr-line); border-radius: 8px; padding: 4px; background: var(--cr-panel-2); }
+.cr-turn-row { display: grid; grid-template-columns: 12px 8px 62px minmax(0,1fr) auto auto; gap: 8px; align-items: center; width: 100%; background: none; border: 0; padding: 4px 6px; color: var(--cr-text); font: 12px var(--cr-mono); text-align: left; cursor: pointer; border-radius: 5px; }
+.cr-turn-row:hover { background: var(--cr-bg); }
+.cr-turn-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--cr-mute); }
+.cr-turn.done .cr-turn-dot { background: var(--cr-lime); }
+.cr-turn.running .cr-turn-dot { background: var(--cr-amber); }
+.cr-turn.error .cr-turn-dot { background: var(--cr-rose); }
+.cr-turn-time, .cr-turn-ms { color: var(--cr-dim); }
+.cr-turn-msg { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cr-turn-by { color: var(--cr-amber); white-space: nowrap; }
+.cr-turn-err { color: var(--cr-rose); font: 11px var(--cr-mono); padding: 0 6px 4px 34px; }
+.cr-turn-steps { font: 11px var(--cr-mono); color: var(--cr-dim); padding: 2px 6px 6px 34px; }
+.cr-turn-steps > div { display: grid; grid-template-columns: 52px 110px 90px minmax(0,1fr); gap: 8px; padding: 1px 0; }
+.cr-turn-steps > div > span:last-child { color: var(--cr-text); overflow-wrap: anywhere; }
 .cr-trace-bar { display: flex; align-items: center; gap: 6px; }
 .cr-trace-bar .input { flex: 1; min-width: 0; font-family: var(--cr-mono); font-size: 12px; background: var(--cr-bg); color: var(--cr-text); border: 1px solid var(--cr-line-2); border-radius: 7px; padding: 6px 10px; }
 .cr-trace-rows { flex: 1; min-height: 0; overflow: auto; border: 1px solid var(--cr-line); border-radius: 8px; background: var(--cr-bg); padding: 4px 0; }

@@ -7,6 +7,7 @@ import { useI18n } from "../lib/i18n";
 import { openSwitcher } from "../lib/hivelink";
 import type { AppStatus } from "../lib/types";
 import { machine } from "../lib/machine";
+import { queenEngineNote } from "../lib/format";
 
 /** Runtime status belongs to every desktop page, below its working area. */
 const served = Boolean((window as unknown as Record<string, unknown>).superaiServed);
@@ -37,6 +38,17 @@ export default function DeskStatusBar({ status, loading, codingRuns }: { status:
     const off = ["hivelink:state","chat:event","chat:done","chat:error","chat:cancelled","cli:run"].map(name=>EventsOn(name,refresh));
     return () => {alive=false;window.clearInterval(interval);window.clearTimeout(timer);off.forEach(stop=>typeof stop==="function"&&stop());};
   }, []);
+  // A browser tab's live updates: a stream that is down means answers and
+  // events stop arriving while everything else still looks fine.
+  const [stream, setStream] = useState<string>(() => String((window as unknown as { superaiStream?: { state: string } }).superaiStream?.state ?? "open"));
+  useEffect(() => {
+    if (!served) return;
+    const off = EventsOn("stream:status", (h: { state?: string }) => setStream(String(h?.state ?? "")));
+    // It may have changed between the first render and this subscription.
+    setStream(String((window as unknown as { superaiStream?: { state: string } }).superaiStream?.state ?? "open"));
+    return () => { if (typeof off === "function") off(); };
+  }, []);
+  const queenNote = queenEngineNote(hive.engine, hive.engineNow);
   const disconnected = runtime.error || (link?.linked && !link.live);
   const state = loading ? "Connecting…" : disconnected ? "Disconnected" : status?.ready ? "Ready" : "Not ready";
   const error = disconnected ? t("Backend connection is unavailable.") : status?.error;
@@ -47,6 +59,8 @@ export default function DeskStatusBar({ status, loading, codingRuns }: { status:
       <span>{t(state)}</span><span className="dk-status-backend">{link?.linked ? link.url?.replace(/^https?:\/\//,"") : t("This {machine} only", { machine: t(machine) })}</span>
     </button>
     {runtime.model && <span className="dk-status-model" title={runtime.model}><CpuIcon size={12}/>{runtime.model}</span>}
+    {served && stream === "down" && <span className="dk-status-stream" title={t("Answers and live updates are not arriving; reconnecting.")}><i className="dk-status-dot bad"/>{t("Live updates off")}</span>}
+    {queenNote && <span className="dk-status-queen" title={t("The queen's first-choice engine could not answer")}>{t("Queen")}: {queenNote}</span>}
     <span className="dk-status-spacer"/>
     {workers.list.length > 0 && <span className="dk-status-workers" title={workers.list.map((w) => `${w.name} · ${w.host}`).join("\n")}><HexagonIcon size={12}/>{t("{live}/{total} workers online",{live:workers.up,total:workers.list.length})}</span>}
     <span className="dk-status-runs"><BotIcon size={12}/>{runtime.active + codingRuns > 0 ? t("{count} running",{count:runtime.active+codingRuns}) : t("Idle")}</span>

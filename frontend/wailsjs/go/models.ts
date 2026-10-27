@@ -1713,6 +1713,88 @@ export namespace app {
 	        this.ms = source["ms"];
 	    }
 	}
+	export class TraceEvent {
+	    at: string;
+	    ms: number;
+	    name: string;
+	    type?: string;
+	    engine?: string;
+	    tool?: string;
+	    text?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new TraceEvent(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.at = source["at"];
+	        this.ms = source["ms"];
+	        this.name = source["name"];
+	        this.type = source["type"];
+	        this.engine = source["engine"];
+	        this.tool = source["tool"];
+	        this.text = source["text"];
+	    }
+	}
+	export class TurnTrace {
+	    id: string;
+	    session?: string;
+	    message?: string;
+	    started: string;
+	    state: string;
+	    ms: number;
+	    firstWordsMs?: number;
+	    quietMs?: number;
+	    engines?: string[];
+	    by?: string;
+	    tools?: number;
+	    chars?: number;
+	    costUsd?: number;
+	    error?: string;
+	    events?: TraceEvent[];
+	
+	    static createFrom(source: any = {}) {
+	        return new TurnTrace(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.session = source["session"];
+	        this.message = source["message"];
+	        this.started = source["started"];
+	        this.state = source["state"];
+	        this.ms = source["ms"];
+	        this.firstWordsMs = source["firstWordsMs"];
+	        this.quietMs = source["quietMs"];
+	        this.engines = source["engines"];
+	        this.by = source["by"];
+	        this.tools = source["tools"];
+	        this.chars = source["chars"];
+	        this.costUsd = source["costUsd"];
+	        this.error = source["error"];
+	        this.events = this.convertValues(source["events"], TraceEvent);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class UpcomingItem {
 	    kind: string;
 	    id: string;

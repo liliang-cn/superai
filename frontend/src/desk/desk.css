@@ -555,6 +555,8 @@ html[data-desk] body { background: transparent; }
 .dk-status-backend,.dk-status-model { max-width:240px; overflow:hidden; text-overflow:ellipsis; }
 .dk-status-model { font-family:var(--font-mono); }
 .dk-statusbar > .dk-status-spacer { flex:1; }
+.dk-statusbar > .dk-status-stream { color:var(--danger, #c0392b); font-weight:600; }
+.dk-statusbar > .dk-status-queen { color:var(--warn, #b26a00); }
 .cd-agent-select { appearance:auto; max-width:170px; border:0; background:transparent; color:inherit; font:inherit; cursor:pointer; outline-offset:3px; }
 @media(max-width:1000px) { .dk-statusbar .dk-status-tools { display:none; } .dk-statusbar .dk-status-model { max-width:170px; } }
 @media(max-width:800px) { .dk-statusbar .dk-status-workers { display:none; } .dk-statusbar .dk-status-backend { max-width:145px; } }

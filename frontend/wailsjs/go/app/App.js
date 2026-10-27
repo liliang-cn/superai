@@ -702,6 +702,14 @@ export function TraceLines(arg1, arg2) {
   return window['go']['app']['App']['TraceLines'](arg1, arg2);
 }
 
+export function TurnTrace(arg1) {
+  return window['go']['app']['App']['TurnTrace'](arg1);
+}
+
+export function TurnTraces(arg1) {
+  return window['go']['app']['App']['TurnTraces'](arg1);
+}
+
 export function UnlinkHive() {
   return window['go']['app']['App']['UnlinkHive']();
 }

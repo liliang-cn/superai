@@ -107,6 +107,12 @@ func (a *App) Attention() []AttentionItem {
 	}
 
 	for _, r := range a.CLIRuns() {
+		// A queen run that failed before doing anything was handed to the
+		// next engine or to SuperAI (app_queen_engine.go): there is nothing
+		// left to do, and the queen's label already says who stands in.
+		if r.Queen && r.Tools == 0 {
+			continue
+		}
 		if (r.State == "failed" || r.State == "error") && r.Ended != nil && r.Ended.After(dayAgo) {
 			at := *r.Ended
 			needs = append(needs, AttentionItem{Level: "needs", Kind: "run", Title: r.Agent + " stopped with an error",

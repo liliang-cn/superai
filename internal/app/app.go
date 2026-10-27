@@ -74,6 +74,8 @@ type App struct {
 	queenToken queenTokenCache
 	// queenNow is the engine taking the queen's turns now (app_queen_engine.go).
 	queenNow queenNowState
+	// turnLog is every recent chat turn as it ran (turn_journal.go).
+	turnLog turnJournal
 	// Direct MCP calls from chat-block buttons and home tiles. See
 	// app_actions.go.
 	actionsOnce sync.Once
@@ -755,6 +757,7 @@ var windowEmit = func(ctx context.Context, name string, payload map[string]any) 
 // against a nil context (which the Wails runtime treats as fatal).
 func (a *App) emit(name string, payload map[string]any) {
 	payload = a.withTurnSession(name, payload)
+	a.journal().record(name, payload)
 	if a.emitFn != nil {
 		a.emitFn(name, payload)
 	}

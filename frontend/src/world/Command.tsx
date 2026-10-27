@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowUpIcon, MessageSquareIcon, PlusIcon, MinusIcon, ChevronDownIcon } from "lucide-react";
 import { ChatHistory, HiveRetire, HiveSpawn, SendChat } from "../../wailsjs/go/app/App";
 import { earlyError, requestSetup, useReady } from "../lib/ready";
-import { visibleAnswer } from "../lib/format";
+import { engineByline, visibleAnswer } from "../lib/format";
 import { Response } from "@/components/ai-elements/response";
 import { onBubbleClick, say, sayDone } from "./bubbles";
 import { focusInWorld } from "./bus";
@@ -57,7 +57,9 @@ export default function Command({ view, onConversation, onTyping, hosts }: {
   const [busy, setBusy] = useState("");
   // The conversation with the queen, the same thread the home screen shows:
   // its last turns stay above the line, and what is typed continues it.
-  const [lines, setLines] = useState<{ who: "you" | "queen"; text: string }[]>([]);
+  // by: who answered for the queen, when not SuperAI's own agent alone
+  // (engineByline): a backup engine, or SuperAI standing in.
+  const [lines, setLines] = useState<{ who: "you" | "queen"; text: string; by?: string }[]>([]);
   const [live, setLive] = useState("");
   const [open, setOpen] = useState(false);
   // A pod about to come or go, waiting for the person's yes.
@@ -74,7 +76,8 @@ export default function Command({ view, onConversation, onTyping, hosts }: {
   useEffect(() => {
     loadQueenSession().then((id) => ChatHistory(id)).then((turns: any[]) => {
       setLines((turns ?? []).filter((x) => (x.role === "user" || x.role === "assistant") && x.kind !== "context" && x.content)
-        .slice(-8).map((x) => ({ who: x.role === "user" ? "you" : "queen", text: String(x.content) })));
+        .slice(-8).map((x) => ({ who: x.role === "user" ? "you" : "queen", text: String(x.content),
+          by: engineByline({ engine: x.engine, backupFor: x.backup_for, standInFor: x.stand_in_for }) || undefined })));
     }).catch(() => {});
   }, []);
   useEffect(() => { end.current?.scrollIntoView({ block: "end" }); }, [lines, live, step, open]);
@@ -113,7 +116,7 @@ export default function Command({ view, onConversation, onTyping, hosts }: {
         setLines((l) => [...l, { who: "you" as const, text: String(p.message ?? "") }].slice(-12));
       }),
       EventsOn("chat:done", (p: any) => {
-        if (others.delete(p?.requestId)) setLines((l) => [...l, { who: "queen" as const, text: String(p.final ?? "") }].slice(-12));
+        if (others.delete(p?.requestId)) setLines((l) => [...l, { who: "queen" as const, text: String(p.final ?? ""), by: engineByline(p) || undefined }].slice(-12));
       }),
       EventsOn("chat:error", (p: any) => { others.delete(p?.requestId); }),
       EventsOn("chat:cancelled", (p: any) => { others.delete(p?.requestId); }),
@@ -123,15 +126,22 @@ export default function Command({ view, onConversation, onTyping, hosts }: {
 
   useEffect(() => {
     if (!req) return;
+    const who: { engine?: string; backupFor?: string; standInFor?: string } = {};
     const a = EventsOn("chat:event", (p: any) => {
       if (p?.requestId !== req) return;
+      if (p.standInFor) Object.assign(who, { engine: undefined, backupFor: undefined, standInFor: p.standInFor });
+      else if (p.engine) Object.assign(who, { engine: p.engine, backupFor: p.backupFor, standInFor: undefined });
       // Work the queen handed out is drawn on the worker doing it.
       if (p.type === "tool_call" && p.tool && p.worker) { setStep(p.tool); say("worker:" + p.worker, p.workerTool || p.tool, "think", 60); }
       else if (p.type === "tool_call" && p.tool) { setStep(p.tool); say("queen", p.tool, "think", 60); }
       else if (p.type === "partial" && p.content) { raw.current += p.content; const v = visibleAnswer(raw.current); setLive(v); setStep(""); if (v) say("queen", v, "say", 60); }
     });
-    const finish = (text: string) => { sayDone("queen", text); setLines((l) => [...l, { who: "queen" as const, text }].slice(-12)); setLive(""); setStep(""); setReq(""); raw.current = ""; };
-    const b = EventsOn("chat:done", (p: any) => { if (p?.requestId === req) finish(String(p.final ?? visibleAnswer(raw.current))); });
+    const finish = (text: string, by?: string) => { sayDone("queen", text); setLines((l) => [...l, { who: "queen" as const, text, by }].slice(-12)); setLive(""); setStep(""); setReq(""); raw.current = ""; };
+    const b = EventsOn("chat:done", (p: any) => {
+      if (p?.requestId !== req) return;
+      if (p.standInFor) Object.assign(who, { engine: undefined, backupFor: undefined, standInFor: p.standInFor });
+      finish(String(p.final ?? visibleAnswer(raw.current)), engineByline(who) || undefined);
+    });
     const c = EventsOn("chat:error", (p: any) => { if (p?.requestId === req) finish(String(p.error ?? "")); });
     return () => { [a, b, c].forEach((f) => typeof f === "function" && f()); };
   }, [req]);
@@ -185,7 +195,10 @@ export default function Command({ view, onConversation, onTyping, hosts }: {
           </header>
           <div className="wc-lines">
             {lines.map((l, i) => (
-              <div key={i} className={`wc-${l.who}`}>{l.who === "queen" ? <Response>{l.text}</Response> : l.text}</div>
+              <div key={i} className={`wc-${l.who}`}>
+                {l.who === "queen" && l.by && <span className="msg-byline-engine">{l.by}</span>}
+                {l.who === "queen" ? <Response>{l.text}</Response> : l.text}
+              </div>
             ))}
             {req && (
               <div className="wc-queen">
