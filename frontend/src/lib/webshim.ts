@@ -50,11 +50,38 @@ function installWebShim() {
   );
 
   const listeners = new Map<string, Set<EventCallback>>();
+  const fire = (name: string, ...data: unknown[]) =>
+    listeners.get(name)?.forEach((cb) => {
+      try {
+        cb(...data);
+      } catch (err) {
+        console.error(`event handler for ${name}:`, err);
+      }
+    });
+
+  // The stream's health, for the status bar and for anyone debugging from the
+  // console (window.superaiStream): a stream that died quietly is a chat that
+  // says "Thinking…" forever.
+  const health = { state: "connecting" as "connecting" | "open" | "down", since: Date.now(), lastEvent: 0, events: 0, drops: 0 };
+  (window as unknown as Record<string, unknown>).superaiStream = health;
+  const setState = (state: typeof health.state) => {
+    if (health.state === state) return;
+    health.state = state;
+    health.since = Date.now();
+    if (state === "down") health.drops++;
+    console.info(`[superai] event stream ${state}`);
+    fire("stream:status", { ...health });
+  };
+
   let source: EventSource | null = null;
+  let opened = false;
+  let retry = 1000;
   const ensureStream = () => {
     if (source) return;
-    source = new EventSource("/api/events");
-    source.onmessage = (e: MessageEvent) => {
+    const es = new EventSource("/api/events");
+    source = es;
+    if (health.state === "down") setState("connecting");
+    es.onmessage = (e: MessageEvent) => {
       let envelope: { name?: string; payload?: unknown };
       try {
         envelope = JSON.parse(e.data);
@@ -62,31 +89,39 @@ function installWebShim() {
         return;
       }
       if (!envelope.name) return;
-      listeners.get(envelope.name)?.forEach((cb) => {
-        try {
-          cb(envelope.payload);
-        } catch (err) {
-          console.error(`event handler for ${envelope.name}:`, err);
-        }
-      });
+      health.events++;
+      health.lastEvent = Date.now();
+      fire(envelope.name, envelope.payload);
     };
-    // EventSource reconnects on its own; nothing to do on error beyond not
-    // tearing the listener map down. What was missed while it was down is not
-    // replayed, so a reconnect is announced to the page as a local
-    // "stream:reconnect", and a conversation on screen reads itself again.
-    let opened = false;
-    source.onopen = () => {
-      if (opened) {
-        listeners.get("stream:reconnect")?.forEach((cb) => {
-          try {
-            cb();
-          } catch (err) {
-            console.error("event handler for stream:reconnect:", err);
-          }
-        });
-      }
+    // What was missed while the stream was down is not replayed, so a
+    // reconnect is announced to the page as a local "stream:reconnect", and a
+    // conversation on screen reads itself again.
+    es.onopen = () => {
+      retry = 1000;
+      setState("open");
+      if (opened) fire("stream:reconnect");
       opened = true;
     };
+    // EventSource retries a dropped connection on its own, but an HTTP error
+    // (the 401 the page gets while it is still at the door) closes it for
+    // good. Open a new one then, or every event after signing in is lost.
+    es.onerror = () => {
+      setState(es.readyState === EventSource.CLOSED ? "down" : "connecting");
+      if (es.readyState !== EventSource.CLOSED || source !== es) return;
+      source = null;
+      window.setTimeout(ensureStream, retry);
+      retry = Math.min(retry * 2, 15000);
+    };
+  };
+
+  // Signing in makes the stream possible: open it now rather than at the
+  // next retry.
+  (window as unknown as Record<string, unknown>).superaiStreamKick = () => {
+    retry = 1000;
+    if (source && source.readyState !== EventSource.CLOSED) return;
+    source?.close();
+    source = null;
+    ensureStream();
   };
 
   const eventsOn = (name: string, cb: EventCallback): (() => void) => {

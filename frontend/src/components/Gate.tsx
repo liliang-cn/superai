@@ -61,6 +61,7 @@ export default function Gate({ onEnter }: { onEnter: () => void }) {
         field.current?.focus();
         return;
       }
+      (window as unknown as { superaiStreamKick?: () => void }).superaiStreamKick?.();
       onEnter();
     } catch {
       setErr("Cannot reach the server.");
