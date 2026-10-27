@@ -383,6 +383,8 @@ func (a *App) startHive() {
 		a.hiveStop = cancel
 		a.mu.Unlock()
 		go a.keepQueenLabel(ctx)
+		// Her paired devices to every member, for the one elected next.
+		go a.shareDevices(ctx)
 		return
 	}
 	// A queen of machines joined over the agent link keeps them told who

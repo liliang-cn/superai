@@ -64,6 +64,9 @@ type LanRoster struct {
 	Term    int64       `json:"term"`
 	Key     string      `json:"key"`
 	Members []LanMember `json:"members"`
+	// Devices are the queen's paired devices, for the one elected next
+	// (app_devicesync.go).
+	Devices []Device `json:"devices,omitempty"`
 }
 
 // lanHive is a member's last word from its queen.
@@ -134,7 +137,7 @@ func (a *App) tellLanRoster(ctx context.Context) {
 	if len(thinkers) == 0 {
 		return
 	}
-	r := LanRoster{Queen: s.Hive.Self(), Term: h.Term(), Key: ensureHiveKey()}
+	r := LanRoster{Queen: s.Hive.Self(), Term: h.Term(), Key: ensureHiveKey(), Devices: queenDevices()}
 	for _, c := range thinkers {
 		if p := c.doorPort.Load(); p > 0 && c.addr != "" {
 			r.Members = append(r.Members, LanMember{Name: c.name(), Link: net.JoinHostPort(c.addr, strconv.Itoa(int(p)))})
@@ -276,6 +279,11 @@ func (a *App) HiveRoster(r LanRoster) (map[string]any, error) {
 	}
 	if r.Key != "" && hiveKey() != r.Key {
 		_ = os.WriteFile(hiveKeyPath(), []byte(r.Key+"\n"), 0o600)
+	}
+	if r.Devices != nil {
+		if err := adoptDevices(r.Devices); err != nil {
+			log.Printf("hive: could not keep the queen's devices: %v", err)
+		}
 	}
 	_, link := doorPorts()
 	return map[string]any{"door_port": link}, nil
