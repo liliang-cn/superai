@@ -186,6 +186,14 @@ func (j *turnJournal) record(name string, p map[string]any) {
 				log.Printf("%s tool %s failed%s", tag, e.Tool, byWhom(who))
 			}
 			j.note(t, now, e)
+		case "model_wire":
+			// Every step goes in the timeline; the log keeps the ones worth a
+			// line: a queue, an error, a retry, a restart, a call gone quiet.
+			c := cliClip(str("content"), 300)
+			j.note(t, now, TraceEvent{Name: name, Type: typ, Engine: who, Text: c})
+			if wireWorthALine(p["wire"]) {
+				log.Printf("%s model: %s", tag, cliClip(c, 240))
+			}
 		case "state_update", "workflow_error", "workflow_blocked":
 			c := cliClip(str("content"), 300)
 			j.note(t, now, TraceEvent{Name: name, Type: typ, Engine: who, Text: c})
@@ -225,6 +233,34 @@ func (j *turnJournal) record(name string, p map[string]any) {
 		}
 		log.Print(line)
 	}
+}
+
+// wireWorthALine is whether a model call's wire step is logged: not the
+// request, the first bytes or a plain 2xx of a call going well, nor a slot
+// had at once.
+func wireWorthALine(raw any) bool {
+	w, _ := raw.(map[string]any)
+	kind, _ := w["kind"].(string)
+	num := func(k string) float64 {
+		switch v := w[k].(type) {
+		case float64:
+			return v
+		case int:
+			return float64(v)
+		case int64:
+			return float64(v)
+		}
+		return 0
+	}
+	switch kind {
+	case "request", "first_byte":
+		return false
+	case "response":
+		return num("status") >= 400
+	case "slot":
+		return num("wait_ms") >= 1000
+	}
+	return kind != ""
 }
 
 func byWhom(engine string) string {

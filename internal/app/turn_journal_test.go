@@ -1,6 +1,8 @@
 package app
 
 import (
+	"log"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -26,5 +28,35 @@ func TestATurnThatGoesQuietIsSaidOnce(t *testing.T) {
 	}
 	if tr := (&App{turnLog: turnJournal{}}).TurnTraces(5); len(tr) != 0 {
 		t.Fatalf("a fresh app has turns: %+v", tr)
+	}
+}
+
+// Every step of a model call on the wire is in the turn's timeline; the log
+// keeps the ones worth reading.
+func TestAModelCallsWireIsInTheTimelineAndItsTroubleInTheLog(t *testing.T) {
+	var logs strings.Builder
+	log.SetOutput(&logs)
+	defer log.SetOutput(os.Stderr)
+	j := &turnJournal{turns: map[string]*TurnTrace{}}
+	id := "0123456789ab"
+	j.record("chat:turn", map[string]any{"requestId": id, "message": "hi"})
+	for _, w := range []map[string]any{
+		{"kind": "request", "attempt": 1},
+		{"kind": "response", "status": 429, "attempt": 1},
+		{"kind": "retry", "wait_ms": 2000},
+		{"kind": "request", "attempt": 2},
+		{"kind": "response", "status": 200, "attempt": 2},
+		{"kind": "slot", "wait_ms": 10},
+		{"kind": "waiting", "wait_ms": 20000},
+		{"kind": "first_byte"},
+	} {
+		j.record("chat:event", map[string]any{"requestId": id, "type": "model_wire", "content": "step " + w["kind"].(string), "wire": w})
+	}
+	if n := len(j.turns[id].Events); n != 9 {
+		t.Fatalf("%d events in the timeline", n)
+	}
+	got := logs.String()
+	if strings.Count(got, "model: step") != 3 || !strings.Contains(got, "step retry") || !strings.Contains(got, "step waiting") || strings.Contains(got, "step first_byte") {
+		t.Fatal(got)
 	}
 }

@@ -490,3 +490,4 @@
 .wl-hive .wh-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; margin-top: 12px; }
 .wi-lang { border: 0; border-radius: 8px; padding: 4px 8px; background: rgba(255, 255, 255, 0.7); box-shadow: inset 0 0 0 1px rgba(15, 30, 50, 0.12); font: 500 13px var(--font-sans, system-ui); color: inherit; cursor: pointer; }
 .wc-queen > .msg-byline-engine { display: inline-block; margin-bottom: 4px; }
+.wc-wire { opacity: .7; font-size: 11px; }

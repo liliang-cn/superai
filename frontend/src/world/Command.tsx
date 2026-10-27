@@ -59,6 +59,8 @@ export default function Command({ view, onConversation, onTyping, hosts }: {
   // its last turns stay above the line, and what is typed continues it.
   // by: who answered for the queen, when not SuperAI's own agent alone
   // (engineByline): a backup engine, or SuperAI standing in.
+  // What the model call is stuck on, when it is: a queue, a retry, a quiet provider.
+  const [wire, setWire] = useState("");
   const [lines, setLines] = useState<{ who: "you" | "queen"; text: string; by?: string }[]>([]);
   const [live, setLive] = useState("");
   const [open, setOpen] = useState(false);
@@ -134,9 +136,11 @@ export default function Command({ view, onConversation, onTyping, hosts }: {
       // Work the queen handed out is drawn on the worker doing it.
       if (p.type === "tool_call" && p.tool && p.worker) { setStep(p.tool); say("worker:" + p.worker, p.workerTool || p.tool, "think", 60); }
       else if (p.type === "tool_call" && p.tool) { setStep(p.tool); say("queen", p.tool, "think", 60); }
-      else if (p.type === "partial" && p.content) { raw.current += p.content; const v = visibleAnswer(raw.current); setLive(v); setStep(""); if (v) say("queen", v, "say", 60); }
+      // The model call stuck somewhere on the wire: queued, retrying, quiet.
+      else if (p.type === "model_wire") { const k = p.wire?.kind; if (["queued", "retry", "restart", "waiting", "error"].includes(k)) setWire(String(p.content ?? "")); else if (k === "first_byte" || k === "slot" || k === "request" || (k === "response" && p.wire?.status < 400)) setWire(""); }
+      else if (p.type === "partial" && p.content) { setWire(""); raw.current += p.content; const v = visibleAnswer(raw.current); setLive(v); setStep(""); if (v) say("queen", v, "say", 60); }
     });
-    const finish = (text: string, by?: string) => { sayDone("queen", text); setLines((l) => [...l, { who: "queen" as const, text, by }].slice(-12)); setLive(""); setStep(""); setReq(""); raw.current = ""; };
+    const finish = (text: string, by?: string) => { setWire(""); sayDone("queen", text); setLines((l) => [...l, { who: "queen" as const, text, by }].slice(-12)); setLive(""); setStep(""); setReq(""); raw.current = ""; };
     const b = EventsOn("chat:done", (p: any) => {
       if (p?.requestId !== req) return;
       if (p.standInFor) Object.assign(who, { engine: undefined, backupFor: undefined, standInFor: p.standInFor });
@@ -202,7 +206,7 @@ export default function Command({ view, onConversation, onTyping, hosts }: {
             ))}
             {req && (
               <div className="wc-queen">
-                {live ? <Response>{live}</Response> : <span className="wc-busy">{step ? t("Using {tool}…", { tool: step }) : t("Thinking…")}</span>}
+                {live ? <Response>{live}</Response> : <span className="wc-busy">{step ? t("Using {tool}…", { tool: step }) : t("Thinking…")}{wire && <span className="wc-wire" title={wire}> · {wire}</span>}</span>}
               </div>
             )}
             <div ref={end} />

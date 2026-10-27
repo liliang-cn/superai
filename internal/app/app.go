@@ -1083,7 +1083,7 @@ func (a *App) ownTurn(requestID, sessionID, message string, imagePaths []string,
 			}
 			// Every type is forwarded, unfiltered: "thinking" and "state_update"
 			// are the only progress the UI has while PTC writes its code.
-			a.emit("chat:event", map[string]any{
+			out := map[string]any{
 				"requestId": requestID,
 				"type":      string(ev.Type),
 				"content":   ev.Content,
@@ -1091,7 +1091,14 @@ func (a *App) ownTurn(requestID, sessionID, message string, imagePaths []string,
 				"args":      ev.ToolArgs,
 				"result":    ev.ToolResult,
 				"debugType": ev.DebugType,
-			})
+			}
+			// A model call's progress on the wire (agent-go's model_wire):
+			// its step, attempt, HTTP status and wait, for the turn journal
+			// and the trace.
+			if ev.Type == "model_wire" {
+				out["wire"] = ev.StateDelta
+			}
+			a.emit("chat:event", out)
 			switch ev.Type {
 			case agent.EventTypeToolCall:
 				driver.Emit(backend.AvatarEvent{Type: "state", State: backend.AvatarStateWorking, Tool: ev.ToolName})
