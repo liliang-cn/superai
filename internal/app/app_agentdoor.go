@@ -23,6 +23,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/liliang-cn/superai/internal/backend"
 )
 
 const (
@@ -181,3 +183,27 @@ func reachableAddrs() []string {
 }
 
 var cgnatNet = func() *net.IPNet { _, n, _ := net.ParseCIDR("100.64.0.0/10"); return n }()
+
+// queenForWorkers makes a SuperAI on its own the queen of the machines that
+// joined it, once one that can think has: its work is handed out to them
+// from then on (hive_delegate). Not a worker, not one already a queen, and
+// not one the person said is to stay on its own (Hive.Standalone).
+func (a *App) queenForWorkers(who string) {
+	a.mu.Lock()
+	var next backend.Settings
+	ok := a.settings != nil
+	if ok {
+		next = *a.settings
+	}
+	a.mu.Unlock()
+	if !ok || next.Hive.Role != "" || next.Hive.Standalone {
+		return
+	}
+	next.Hive.Role = backend.HiveRoleQueen
+	if err := a.SaveSettings(next); err != nil {
+		log.Printf("hive: %s can think, but this SuperAI could not become its queen: %v", who, err)
+		return
+	}
+	log.Printf("hive: %s can think; this SuperAI is the queen of the machines that joined it now", who)
+	a.emit("hosts:changed", nil)
+}

@@ -112,6 +112,10 @@ type HiveSettings struct {
 	// cannot take (not installed, machine offline, failed before saying
 	// anything), with a note saying so. Nil is on.
 	QueenFallback *bool `json:"queen_fallback,omitempty"`
+	// Standalone is the person saying this SuperAI is not to be a queen:
+	// a machine that can think joining it (app_agentdoor.go) does not make
+	// it one.
+	Standalone bool `json:"standalone,omitempty"`
 	// PublicURL is where machines other than this one reach its API, e.g.
 	// https://ai.superleo.cn. An engine on a linked machine calls /mcp there;
 	// empty takes $SUPERAI_PUBLIC_URL.

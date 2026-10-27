@@ -1236,7 +1236,23 @@ export default function SettingsView({
             />
           )}
 
-          {section === "agents" && <AddAgentCard />}
+          {section === "agents" && (
+            <AddAgentCard
+              queen={s.hive?.role === "queen"}
+              onQueen={
+                s.hive?.role === "worker"
+                  ? undefined
+                  : (on) =>
+                      setS((prev) =>
+                        prev
+                          ? Object.assign(new backend.Settings(prev), {
+                              hive: new backend.HiveSettings({ ...prev.hive, role: on ? "queen" : "", standalone: !on }),
+                            })
+                          : prev,
+                      )
+              }
+            />
+          )}
 
           {section === "agents" && (
             <RemoteAgentsCard

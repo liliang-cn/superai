@@ -1,12 +1,15 @@
 package app
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/liliang-cn/superai/internal/backend"
 )
 
 // A machine joining the desktop app is told the agent link is on the same
@@ -63,5 +66,36 @@ func TestAddingAnAgentGivesTheCommandToRun(t *testing.T) {
 	}
 	if len(j.Commands) == 0 && j.Error == "" {
 		t.Fatal("no command and no reason")
+	}
+}
+
+// A SuperAI on its own becomes the queen of the machines that joined it once
+// one of them can think; one the person kept on its own, or a worker, stays.
+func TestAThinkingAgentMakesASoloSuperAIItsQueen(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		hive backend.HiveSettings
+		want string
+	}{
+		{"on its own", backend.HiveSettings{}, backend.HiveRoleQueen},
+		{"kept on its own", backend.HiveSettings{Standalone: true}, ""},
+		{"a worker", backend.HiveSettings{Role: backend.HiveRoleWorker, JoinURL: "http://q:1"}, backend.HiveRoleWorker},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Setenv("SUPERAI_HOME", t.TempDir())
+			a := NewApp()
+			s, err := backend.LoadSettings()
+			if err != nil {
+				t.Fatal(err)
+			}
+			s.CLIProxyEnabled = false
+			s.Hive = c.hive
+			a.settings = s
+			defer a.Shutdown(context.Background())
+			a.queenForWorkers("box")
+			if got := a.settings.Hive.Role; got != c.want {
+				t.Fatalf("role %q, want %q", got, c.want)
+			}
+		})
 	}
 }

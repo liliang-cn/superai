@@ -2479,6 +2479,7 @@ export namespace backend {
 	    delegate_timeout_seconds?: number;
 	    queen_engine?: string;
 	    queen_fallback?: boolean;
+	    standalone?: boolean;
 	    public_url?: string;
 	
 	    static createFrom(source: any = {}) {
@@ -2500,6 +2501,7 @@ export namespace backend {
 	        this.delegate_timeout_seconds = source["delegate_timeout_seconds"];
 	        this.queen_engine = source["queen_engine"];
 	        this.queen_fallback = source["queen_fallback"];
+	        this.standalone = source["standalone"];
 	        this.public_url = source["public_url"];
 	    }
 	

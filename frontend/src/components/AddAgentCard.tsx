@@ -10,7 +10,12 @@ type Join = { code: string; expiresAt: string; commands?: string[]; error?: stri
  * command to run there, once per address this machine has (AgentJoinCode,
  * app_agentdoor.go).
  */
-export default function AddAgentCard() {
+export default function AddAgentCard({ queen, onQueen }: {
+  /** Whether this SuperAI is the queen of the machines that joined it. */
+  queen?: boolean;
+  /** Absent where it cannot be one (a worker). */
+  onQueen?: (on: boolean) => void;
+}) {
   const [join, setJoin] = useState<Join | null>(null);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState("");
@@ -38,6 +43,14 @@ export default function AddAgentCard() {
   return (
     <div className="card">
       <div className="card-title">{translate("Add an agent")}</div>
+      {onQueen && (
+        <div className="field">
+          <label>{translate("Act as queen")}</label>
+          <div className="toggle" onClick={() => onQueen(!queen)} style={{ cursor: "pointer", marginTop: 2 }} data-testid="act-as-queen">
+            <div className={`switch${queen ? " on" : ""}`}><div className="knob" /></div>
+          </div>
+        </div>
+      )}
       <div className="field">
         <button type="button" className="btn" onClick={make} disabled={busy} style={{ alignSelf: "flex-start" }}>
           {join?.code ? translate("New code") : translate("Make a code")}
