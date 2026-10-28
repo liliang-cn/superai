@@ -15,7 +15,7 @@ const host = (name, agents) => ({id: name, name, kind: 'machine', state: 'live',
 // "This Mac only": the core on the Mac with its CLIs, named agents on ssh hosts.
 const mac = [
   host('Mac', [
-    {name: 'core', kind: 'superai', role: 'standalone', state: 'live'},
+    {name: 'core', kind: 'superleo', role: 'standalone', state: 'live'},
     {name: 'codex.core', kind: 'cli', state: 'idle', via: 'core'},
     {name: 'claude.core', kind: 'cli', state: 'working', via: 'core'},
   ]),
@@ -32,7 +32,7 @@ test('alone on a Mac, @ offers every worker the status bar counts, and not the c
 
 test('a CLI on another machine keeps its machine, and is found by its bare name', () => {
   const m = mentionsOf([...mac, host('sds-b', [
-    {name: 'sds-b', kind: 'superai', role: 'machine', state: 'live'},
+    {name: 'sds-b', kind: 'superleo', role: 'machine', state: 'live'},
     {name: 'codex.sds-b', kind: 'cli', state: 'installed', via: 'sds-b'},
   ])]);
   const far = m.find((a) => a.name === 'codex.sds-b');
@@ -44,13 +44,13 @@ test('a CLI on another machine keeps its machine, and is found by its bare name'
 test('hive workers are offered with their short names; the queen is not', () => {
   const m = mentionsOf([
     host('node1', [
-      {name: 'queen', kind: 'superai', role: 'queen', state: 'live'},
+      {name: 'queen', kind: 'superleo', role: 'queen', state: 'live'},
       {name: 'claude.queen', kind: 'cli', state: 'idle', via: 'queen'},
     ]),
-    host('node2', [{name: 'superai-worker-3', kind: 'superai', role: 'worker', state: 'live'}]),
+    host('node2', [{name: 'superleo-worker-3', kind: 'superleo', role: 'worker', state: 'live'}]),
   ]);
-  assert.deepEqual(m.map((a) => a.name).sort(), ['claude', 'superai-worker-3']);
-  assert.equal(m.find((a) => a.name === 'superai-worker-3').alias, 'w3');
+  assert.deepEqual(m.map((a) => a.name).sort(), ['claude', 'superleo-worker-3']);
+  assert.equal(m.find((a) => a.name === 'superleo-worker-3').alias, 'w3');
 });
 
 test('an HA agent drawn on several hosts is offered once, where it runs', () => {

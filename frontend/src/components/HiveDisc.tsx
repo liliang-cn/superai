@@ -16,7 +16,7 @@ type Status = { role: "" | "queen" | "worker"; name: string; members?: StageWork
 
 function look(): "orbit" | "mycelium" | "tree" | "hex" {
   try {
-    const v = JSON.parse(localStorage.getItem("superai-hive-stage") || "null");
+    const v = JSON.parse(localStorage.getItem("superleo-hive-stage") || "null");
     return v?.look === "mycelium" || v?.look === "tree" || v?.look === "hex" ? v.look : "orbit";
   } catch {
     return "orbit";

@@ -155,7 +155,7 @@ test('an older noted answer still reads', () => {
 
 test('deeplinks to the schedule open 日程安排', () => {
   const routes = load('src/lib/routes.ts');
-  assert.equal(routes.deeplinkPath('superai://schedule'), '/schedule');
+  assert.equal(routes.deeplinkPath('superleo://schedule'), '/schedule');
   assert.equal(routes.deeplinkPath('noted://alarm/a1'), '/schedule');
   assert.equal(routes.deeplinkPath('https://example.com'), '');
   assert.equal(routes.viewOf('/schedule'), 'schedule');

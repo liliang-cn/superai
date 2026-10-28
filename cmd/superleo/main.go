@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	_ "github.com/liliang-cn/superleo/internal/brand" // the old SuperAI names keep working
+	_ "github.com/liliang-cn/superleo/internal/brand" // the old SuperLeo names keep working
 	"io"
 	"log"
 	"os"

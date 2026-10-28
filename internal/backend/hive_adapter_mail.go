@@ -205,7 +205,7 @@ type adapterNoIn struct{}
 
 // mcpHandler serves the hive tools to the agent behind this adapter.
 func (a *Adapter) mcpHandler() http.Handler {
-	s := mcp.NewServer(&mcp.Implementation{Name: "superai-hive", Title: "SuperLeo hive", Version: "1"},
+	s := mcp.NewServer(&mcp.Implementation{Name: "superleo-hive", Title: "SuperLeo hive", Version: "1"},
 		&mcp.ServerOptions{Instructions: "You are a worker in a hive of agents led by a queen. hive_peers shows who is in it; " +
 			"hive_send puts a short message in another member's inbox without starting work there, and nothing waits for " +
 			"the answer; hive_inbox reads what was sent to you."})

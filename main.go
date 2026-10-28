@@ -2,7 +2,7 @@ package main
 
 import (
 	"embed"
-	_ "github.com/liliang-cn/superleo/internal/brand" // the old SuperAI names keep working
+	_ "github.com/liliang-cn/superleo/internal/brand" // the old SuperLeo names keep working
 	"os"
 
 	"github.com/liliang-cn/superleo/internal/app"

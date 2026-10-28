@@ -103,7 +103,7 @@ func (a *App) StartQueenCLIRun(r QueenRunRequest) (CLIRun, error) {
 		if url, _ := e["url"].(string); url == "" || e["command"] != nil {
 			return CLIRun{}, fmt.Errorf("MCP server %s is not one reached by URL", name)
 		}
-		if name == "superai" || name == "superleo" {
+		if name == "superleo" || name == "superai" { // "superai": saved before the rename
 			return CLIRun{}, errors.New("the superleo server name is this machine's approval channel")
 		}
 	}
@@ -349,7 +349,7 @@ func (a *App) routeToEngine(requestID, sessionID, engine, message string, fresh 
 
 // queenNowSuperLeo is queenEngineNow while SuperLeo's own agent answers in
 // the engine's place.
-const queenNowSuperLeo = "superai" // what the phone apps compare against
+const queenNowSuperLeo = "superleo" // what the phone apps compare against
 
 // queenNowState is the engine the queen's latest turn went to.
 type queenNowState struct {

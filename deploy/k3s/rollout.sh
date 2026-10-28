@@ -5,10 +5,10 @@
 #   ./deploy/k3s/rollout.sh
 #
 # The cluster has no registry: the image is built here, saved, and imported
-# into each node's containerd. The tag stays superai:hive with
+# into each node's containerd. The tag stays superleo:hive with
 # imagePullPolicy IfNotPresent, so a restart is what picks the new one up.
 set -euo pipefail
-IMAGE="${SUPERLEO_IMAGE:-superai:hive}"
+IMAGE="${SUPERLEO_IMAGE:-superleo:hive}"
 NODES="${SUPERLEO_NODES:-orange1 orange2 orange3}"
 KUBE="${SUPERLEO_KUBE:-orange1}"
 NS=superleo
@@ -26,6 +26,6 @@ wait
 
 # Workers first, so the queen comes back to a hive that is already on the new
 # version; the queen's roster refills from their next heartbeat either way.
-ssh "$KUBE" "sudo k3s kubectl -n $NS rollout restart sts/superai-worker sts/superai-queen >/dev/null &&
-  sudo k3s kubectl -n $NS rollout status sts/superai-worker --timeout=600s &&
-  sudo k3s kubectl -n $NS rollout status sts/superai-queen --timeout=300s"
+ssh "$KUBE" "sudo k3s kubectl -n $NS rollout restart sts/superleo-worker sts/superleo-queen >/dev/null &&
+  sudo k3s kubectl -n $NS rollout status sts/superleo-worker --timeout=600s &&
+  sudo k3s kubectl -n $NS rollout status sts/superleo-queen --timeout=300s"

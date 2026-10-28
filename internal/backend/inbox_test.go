@@ -193,7 +193,7 @@ func TestAnIntegrationsNoticeKeepsItsKindLinkAndActions(t *testing.T) {
 	b := testInbox(t)
 	raise(b, Notice{
 		ID: "post-1", Key: "memo-2026-10-14", Title: "今日备忘", Message: "**三件事**",
-		Source: "openclaw", Kind: KindBrief, Deeplink: "superai://chat?prompt=hi",
+		Source: "openclaw", Kind: KindBrief, Deeplink: "superleo://chat?prompt=hi",
 		Actions: []NoticeAction{{Label: "展开", Say: "把今天的备忘展开讲讲"}},
 	})
 	raise(b, Notice{ID: "post-2", Title: "起立喝水"})
@@ -206,7 +206,7 @@ func TestAnIntegrationsNoticeKeepsItsKindLinkAndActions(t *testing.T) {
 		byID[n.ID] = n
 	}
 	n := byID["post-1"]
-	if n.Kind != KindBrief || n.Deeplink != "superai://chat?prompt=hi" || n.Source != "openclaw" ||
+	if n.Kind != KindBrief || n.Deeplink != "superleo://chat?prompt=hi" || n.Source != "openclaw" ||
 		len(n.Actions) != 1 || n.Actions[0].Say != "把今天的备忘展开讲讲" {
 		t.Errorf("kept %+v", n)
 	}
@@ -216,7 +216,7 @@ func TestAnIntegrationsNoticeKeepsItsKindLinkAndActions(t *testing.T) {
 	// The file a client reads is the same shape, and plain notices do not
 	// grow empty fields.
 	raw, _ := os.ReadFile(filepath.Join(b.path))
-	if !strings.Contains(string(raw), `"deeplink": "superai://chat?prompt=hi"`) {
+	if !strings.Contains(string(raw), `"deeplink": "superleo://chat?prompt=hi"`) {
 		t.Errorf("file: %s", raw)
 	}
 	raise(b, Notice{Message: "plain"})

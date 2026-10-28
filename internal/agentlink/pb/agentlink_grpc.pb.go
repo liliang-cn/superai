@@ -14,8 +14,6 @@
 // Over the stream core calls the agent's own methods (the same ones a browser
 // reaches at /api/rpc/<Method>, as far as the agent allows), and the agent
 // sends back the replies and everything its event bus says.
-// The package is wire protocol (the gRPC path every agent dials), so it keeps
-// the name the project had when agents first spoke it.
 
 package agentlinkpb
 
@@ -32,7 +30,7 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	AgentLink_Connect_FullMethodName = "/superai.agentlink.v1.AgentLink/Connect"
+	AgentLink_Connect_FullMethodName = "/superleo.agentlink.v1.AgentLink/Connect"
 )
 
 // AgentLinkClient is the client API for AgentLink service.
@@ -115,7 +113,7 @@ type AgentLink_ConnectServer = grpc.BidiStreamingServer[AgentFrame, CoreFrame]
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var AgentLink_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "superai.agentlink.v1.AgentLink",
+	ServiceName: "superleo.agentlink.v1.AgentLink",
 	HandlerType: (*AgentLinkServer)(nil),
 	Methods:     []grpc.MethodDesc{},
 	Streams: []grpc.StreamDesc{

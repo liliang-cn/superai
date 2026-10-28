@@ -43,7 +43,7 @@ export const isHost = (h: Host, name?: string) => {
 };
 
 /** A SuperLeo that is this core: the queen, or a core in no hive. */
-export const isCore = (a: HostAgent) => a.kind === "superai" && (a.role === "queen" || a.role === "standalone");
+export const isCore = (a: HostAgent) => a.kind === "superleo" && (a.role === "queen" || a.role === "standalone");
 /** An HA service's agent on a host it is not running on now. */
 export const isStandby = (a: HostAgent) => a.state === "standby" || a.state === "standby-unready";
 
@@ -138,13 +138,13 @@ export function planHosts(hosts: Host[], services: HAService[]): HostPlan {
 
   const plots: Plot[] = tops.map((host) => {
     const pods = (kids.get(host.id) ?? []).filter((p) => p !== core);
-    const sup = host.agents.filter((a) => a.kind === "superai");
+    const sup = host.agents.filter((a) => a.kind === "superleo");
     const machine = sup.find((a) => a.role === "machine" || a.role === "standalone") ?? sup.find((a) => a.role === "relay");
     // A CLI that is also a named agent here (the process detector sees
     // openclaw run) is that agent, once: a core from before it said so
     // still lists both.
     const namedHere = new Set(host.agents.filter((a) => a.kind === "agent").map((a) => a.name));
-    const others = host.agents.filter((a) => a.kind !== "superai" && !(a.kind === "cli" && namedHere.has(cliName(a))));
+    const others = host.agents.filter((a) => a.kind !== "superleo" && !(a.kind === "cli" && namedHere.has(cliName(a))));
     const station: Plot["station"] = machine
       ? (machine.role === "relay" && !others.some((a) => a.kind === "cli") ? "pad" : host.kind === "mac" || host.os === "darwin" ? "laptop" : "desk")
       : others.some((a) => a.kind === "cli") ? (host.kind === "mac" ? "laptop" : "desk") : "";
@@ -174,7 +174,7 @@ export function planHosts(hosts: Host[], services: HAService[]): HostPlan {
   ring(plots);
 
   const coreParent = core?.parent ? plots.find((p) => p.host.id === top(core).id) : undefined;
-  const coreCrew = core && !coreIsPlot ? best(core.agents.filter((a) => a.kind !== "superai" && !isStandby(a)), 4) : [];
+  const coreCrew = core && !coreIsPlot ? best(core.agents.filter((a) => a.kind !== "superleo" && !isStandby(a)), 4) : [];
   const spots = placeServices(services, plots);
   // The core, every plot and every service, in one circle: a pin with room
   // for its label beside it, and the lines bowing out to their standbys.

@@ -230,8 +230,6 @@ github.com/ledongthuc/pdf v0.0.0-20220302134840-0c2507a12d80 h1:6Yzfa6GP0rIo/kUL
 github.com/ledongthuc/pdf v0.0.0-20220302134840-0c2507a12d80/go.mod h1:imJHygn/1yfhB7XSJJKlFZKl/J+dCPAknuiaGOshXAs=
 github.com/leodido/go-urn v1.4.0 h1:WT9HwE9SGECu3lg4d/dIA+jxlljEa1/ffXKmRjqdmIQ=
 github.com/leodido/go-urn v1.4.0/go.mod h1:bvxc+MVxLKB4z00jd1z+Dvzr47oO32F/QSNjSBOlFxI=
-github.com/liliang-cn/agent-go/v3 v3.73.2 h1:rPRPwPP07xrirxEiL9s9Wc41wuyj1JNTmYx/GB8Wlq0=
-github.com/liliang-cn/agent-go/v3 v3.73.2/go.mod h1:vTGOAZd4eocSbEu0C4AWzTmJFGHOBWm6hiyWB3IIe9k=
 github.com/liliang-cn/agent-go/v3 v3.74.0 h1:MS+dJ4miLLKal1PWIUO6PvcG327PSpM9kO/DbvwP0eU=
 github.com/liliang-cn/agent-go/v3 v3.74.0/go.mod h1:vTGOAZd4eocSbEu0C4AWzTmJFGHOBWm6hiyWB3IIe9k=
 github.com/liliang-cn/agentexec v0.6.0 h1:AdCAUb+8EeYNR5333V04/MN1G7RQLAQkbZdpTHNCwBE=

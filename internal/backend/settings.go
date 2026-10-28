@@ -4,7 +4,7 @@ package backend
 
 import (
 	"encoding/json"
-	_ "github.com/liliang-cn/superleo/internal/brand" // the old SuperAI names keep working
+	_ "github.com/liliang-cn/superleo/internal/brand" // the old SuperLeo names keep working
 	"os"
 	"path/filepath"
 	"strings"
@@ -293,7 +293,7 @@ type Settings struct {
 // Defaults for APNsSettings: the developer team and the SuperLeo iOS app.
 const (
 	DefaultAPNsTeamID = "NUDL4XSA6J"
-	DefaultAPNsTopic  = "cn.superleo.superai.ios"
+	DefaultAPNsTopic  = "cn.superleo.superleo.ios"
 )
 
 // APNsSettings configures silent pushes to the paired iOS app. Every field

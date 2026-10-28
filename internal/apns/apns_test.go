@@ -39,7 +39,7 @@ func testKey(t *testing.T) (*ecdsa.PrivateKey, []byte) {
 func testClient(t *testing.T, handler http.HandlerFunc) (*Client, *ecdsa.PrivateKey) {
 	t.Helper()
 	key, p8 := testKey(t)
-	c, err := New(Config{Key: p8, KeyID: "KID1234567", TeamID: "NUDL4XSA6J", Topic: "cn.superleo.superai.ios"})
+	c, err := New(Config{Key: p8, KeyID: "KID1234567", TeamID: "NUDL4XSA6J", Topic: "cn.superleo.superleo.ios"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +99,7 @@ func TestWakeSendsASilentPush(t *testing.T) {
 	for h, want := range map[string]string{
 		"apns-push-type": "background",
 		"apns-priority":  "5",
-		"apns-topic":     "cn.superleo.superai.ios",
+		"apns-topic":     "cn.superleo.superleo.ios",
 	} {
 		if v := got.Header.Get(h); v != want {
 			t.Errorf("%s = %q, want %q", h, v, want)
@@ -123,7 +123,7 @@ func TestWakeSendsASilentPush(t *testing.T) {
 
 	var p struct {
 		APS     map[string]any `json:"aps"`
-		SuperLeo map[string]any `json:"superai"`
+		SuperLeo map[string]any `json:"superleo"`
 	}
 	if err := json.Unmarshal(body, &p); err != nil {
 		t.Fatalf("payload %s: %v", body, err)
@@ -249,7 +249,7 @@ func TestAlertSendsAVisibleNotification(t *testing.T) {
 	for h, want := range map[string]string{
 		"apns-push-type":   "alert",
 		"apns-priority":    "10",
-		"apns-topic":       "cn.superleo.superai.ios",
+		"apns-topic":       "cn.superleo.superleo.ios",
 		"apns-collapse-id": "pickup-2026-10-14",
 	} {
 		if v := got.Header.Get(h); v != want {
@@ -268,7 +268,7 @@ func TestAlertSendsAVisibleNotification(t *testing.T) {
 			ContentAvailable  int               `json:"content-available"`
 			Badge             *int              `json:"badge"`
 		} `json:"aps"`
-		SuperLeo map[string]any `json:"superai"`
+		SuperLeo map[string]any `json:"superleo"`
 	}
 	if err := json.Unmarshal(body, &p); err != nil {
 		t.Fatalf("%s: %v", body, err)
@@ -357,13 +357,13 @@ func TestAZeroBadgeIsSent(t *testing.T) {
 func TestACategoryGetsTheAppsButtons(t *testing.T) {
 	var body []byte
 	c, _ := testClient(t, func(w http.ResponseWriter, r *http.Request) { body, _ = io.ReadAll(r.Body) })
-	if err := c.Alert(context.Background(), "abcd", "", Alert{Title: "t", Body: "b", Category: "superai.cc.reply"}); err != nil {
+	if err := c.Alert(context.Background(), "abcd", "", Alert{Title: "t", Body: "b", Category: "superleo.cc.reply"}); err != nil {
 		t.Fatal(err)
 	}
 	var p struct {
 		APS map[string]any `json:"aps"`
 	}
-	if err := json.Unmarshal(body, &p); err != nil || p.APS["category"] != "superai.cc.reply" {
+	if err := json.Unmarshal(body, &p); err != nil || p.APS["category"] != "superleo.cc.reply" {
 		t.Fatalf("aps %v (%v)", p.APS, err)
 	}
 	if err := c.Alert(context.Background(), "abcd", "", Alert{Title: "t", Body: "b"}); err != nil {

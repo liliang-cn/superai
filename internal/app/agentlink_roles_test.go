@@ -45,15 +45,15 @@ func TestWorkersAndRelaysAreNotMachines(t *testing.T) {
 	}
 	core.hive = backend.NewHive("q", 0)
 	// A worker from before Hello.role: known by being on the roster.
-	if _, err := core.hive.Join(backend.HiveHello{Protocol: backend.HiveProtocol, Name: "superai-worker-1",
+	if _, err := core.hive.Join(backend.HiveHello{Protocol: backend.HiveProtocol, Name: "superleo-worker-1",
 		Role: backend.HiveRoleWorker, URL: "http://w1:1"}); err != nil {
 		t.Fatal(err)
 	}
 	addr := startCore(t, core)
 
 	linkHello(t, core, addr, &agentlinkpb.Hello{Name: "mac", Os: "darwin", Clis: []string{"claude"}})
-	linkHello(t, core, addr, &agentlinkpb.Hello{Name: "superai-worker-0", Role: "worker", Clis: []string{"claude"}})
-	linkHello(t, core, addr, &agentlinkpb.Hello{Name: "superai-worker-1", Clis: []string{"claude"}})
+	linkHello(t, core, addr, &agentlinkpb.Hello{Name: "superleo-worker-0", Role: "worker", Clis: []string{"claude"}})
+	linkHello(t, core, addr, &agentlinkpb.Hello{Name: "superleo-worker-1", Clis: []string{"claude"}})
 	linkHello(t, core, addr, &agentlinkpb.Hello{Name: "sds-e", Clis: []string{"pi"},
 		Agents: []*agentlinkpb.NamedAgent{{Name: "openclaw"}, {Name: "hermes"}}})
 
@@ -67,7 +67,7 @@ func TestWorkersAndRelaysAreNotMachines(t *testing.T) {
 		}
 	}
 	// The complete list says what each one is.
-	want := map[string]string{"mac": "machine", "superai-worker-0": "worker", "superai-worker-1": "worker", "sds-e": "relay"}
+	want := map[string]string{"mac": "machine", "superleo-worker-0": "worker", "superleo-worker-1": "worker", "sds-e": "relay"}
 	all := core.LinkedAgentsAll()
 	if len(all) != len(want) {
 		t.Fatalf("all: %s", names(all))
@@ -84,7 +84,7 @@ func TestWorkersAndRelaysAreNotMachines(t *testing.T) {
 	}
 
 	// The machine tools refuse them, and say why.
-	for name, why := range map[string]string{"superai-worker-0": "hive worker", "superai-worker-1": "hive worker", "sds-e": "relay"} {
+	for name, why := range map[string]string{"superleo-worker-0": "hive worker", "superleo-worker-1": "hive worker", "sds-e": "relay"} {
 		_, err := core.MachineStatus(name)
 		if err == nil || !strings.Contains(err.Error(), why) || !strings.Contains(err.Error(), "the machines are core, mac") {
 			t.Fatalf("MachineStatus(%s): %v", name, err)
@@ -111,7 +111,7 @@ func TestALostWorkerPodIsNotAlsoALostMachine(t *testing.T) {
 	h := core.agents()
 	now := time.Now()
 	h.mu.Lock()
-	h.lost["superai-worker-2"], h.lostRole["superai-worker-2"] = now, "worker"
+	h.lost["superleo-worker-2"], h.lostRole["superleo-worker-2"] = now, "worker"
 	h.lost["sds-e"] = now
 	h.lost["orange1"] = now
 	h.mu.Unlock()
@@ -122,7 +122,7 @@ func TestALostWorkerPodIsNotAlsoALostMachine(t *testing.T) {
 			lost[it.Ref] = true
 		}
 	}
-	if lost["superai-worker-2"] || !lost["sds-e"] || !lost["orange1"] {
+	if lost["superleo-worker-2"] || !lost["sds-e"] || !lost["orange1"] {
 		t.Fatalf("lost: %v", lost)
 	}
 }
@@ -131,7 +131,7 @@ func TestALostWorkerPodIsNotAlsoALostMachine(t *testing.T) {
 func TestAWorkerSaysItIsOneOnTheLink(t *testing.T) {
 	a := NewApp()
 	a.settings = &backend.Settings{Hive: backend.HiveSettings{Role: backend.HiveRoleWorker}}
-	if r := a.agentHello(AgentLinkOptions{Name: "superai-worker-0"}).GetRole(); r != "worker" {
+	if r := a.agentHello(AgentLinkOptions{Name: "superleo-worker-0"}).GetRole(); r != "worker" {
 		t.Fatalf("worker hello role %q", r)
 	}
 	a.settings = &backend.Settings{}
@@ -217,7 +217,7 @@ func TestAMacWorkerIsStillAMachine(t *testing.T) {
 	core.hive = backend.NewHive("q", 0)
 	for _, w := range []backend.HiveHello{
 		{Name: "mac", Kind: "mac", MCP: []string{"noted"}, CLIs: []string{"claude", "codex"}},
-		{Name: "superai-worker-0", Kind: "pod", Node: "orange2", MCP: []string{"noted"}},
+		{Name: "superleo-worker-0", Kind: "pod", Node: "orange2", MCP: []string{"noted"}},
 	} {
 		w.Protocol, w.Role, w.URL = backend.HiveProtocol, backend.HiveRoleWorker, "http://"+w.Name+":1"
 		if _, err := core.hive.Join(w); err != nil {
@@ -226,7 +226,7 @@ func TestAMacWorkerIsStillAMachine(t *testing.T) {
 	}
 	addr := startCore(t, core)
 	linkHello(t, core, addr, &agentlinkpb.Hello{Name: "mac", Os: "darwin", Kind: "mac", Role: "worker", Clis: []string{"claude", "codex"}})
-	linkHello(t, core, addr, &agentlinkpb.Hello{Name: "superai-worker-0", Kind: "pod", Role: "worker"})
+	linkHello(t, core, addr, &agentlinkpb.Hello{Name: "superleo-worker-0", Kind: "pod", Role: "worker"})
 
 	if got := names(core.LinkedAgents()); got != "mac" {
 		t.Fatalf("machines: %s", got)

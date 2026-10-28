@@ -10,8 +10,8 @@ import (
 // Ten workers once each wrote "their" audit record to hive-audit/SuperLeo,
 // because nothing in the prompt told them their own name.
 func TestAWorkerIsToldItsNameInTheHive(t *testing.T) {
-	got := hiveSection(HiveSettings{Role: HiveRoleWorker, Name: "superai-worker-3"})
-	if !strings.Contains(got, "you are superai-worker-3, a worker") {
+	got := hiveSection(HiveSettings{Role: HiveRoleWorker, Name: "superleo-worker-3"})
+	if !strings.Contains(got, "you are superleo-worker-3, a worker") {
 		t.Fatalf("worker section does not name it: %q", got)
 	}
 }

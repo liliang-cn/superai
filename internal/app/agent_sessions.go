@@ -115,7 +115,7 @@ func (a *App) cliThreads() []CodingSession {
 			at = *r.Ended
 		}
 		out = append(out, CodingSession{
-			Machine: r.Remote, CLI: r.Agent, Session: r.Session, Run: r.ID, Source: "superai",
+			Machine: r.Remote, CLI: r.Agent, Session: r.Session, Run: r.ID, Source: "superleo",
 			Project: lastElem(r.Cwd), Title: cliClip(r.Prompt, 120), State: r.State, At: at,
 			Readable: true, Replyable: r.State != "running",
 		})

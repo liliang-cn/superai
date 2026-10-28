@@ -69,7 +69,7 @@ base.update(memory_backend='shared', shared_memory_endpoint=s['shared_memory_end
             # routes the model through that, which answers "unknown provider".
             cliproxy_enabled=False)
 # Roles, not a list. The queen accepts joins; a worker announces itself to it
-# (superai-hive/1, see internal/backend/hive.go), so the roster is whoever is
+# (superleo-hive/1, see internal/backend/hive.go), so the roster is whoever is
 # actually there and adding a worker is raising the replica count.
 # The queen may resize the workers' StatefulSet — its own ServiceAccount says how
 # far (superleo-operator) and max_workers says how many.
@@ -78,11 +78,11 @@ base.update(memory_backend='shared', shared_memory_endpoint=s['shared_memory_end
 # shell call she made waited two minutes for an approval nobody was there to
 # give. Like the workers, she is bounded by her pod's Role instead.
 queen = dict(base, disable_tool_approval=True, hive={'role': 'queen', 'name': 'queen',
-                         'spawner': {'kind': 'kubectl', 'namespace': '$NS', 'statefulset': 'superai-worker', 'max_workers': 20}})
+                         'spawner': {'kind': 'kubectl', 'namespace': '$NS', 'statefulset': 'superleo-worker', 'max_workers': 20}})
 # Workers act with nobody at a keyboard to approve a tool call, so the gate would
 # only make every command hang. The pod's Role is what bounds them instead.
 worker = dict(base, disable_tool_approval=True,
-            hive={'role': 'worker', 'join_url': 'http://superai-queen.$NS.svc.cluster.local:43117'})
+            hive={'role': 'worker', 'join_url': 'http://superleo-queen.$NS.svc.cluster.local:43117'})
 out = {'token': token, 'user': a.get('user') or 'superleo', 'password_hash': a.get('password_hash', ''), 'cortexdb_token': s['shared_memory_token'],
                   'settings-queen.json': json.dumps(queen), 'settings-worker.json': json.dumps(worker)}
 if os.environ.get('PW'): out['password_hash'] = os.environ['PW']
@@ -127,6 +127,6 @@ with tempfile.TemporaryDirectory() as t:
     args = []
     for k, v in d.items():
         p = os.path.join(t, k); open(p, \"w\").write(v); args += [\"--from-file=\" + k + \"=\" + p]
-    yaml = subprocess.run([\"sudo\", \"k3s\", \"kubectl\", \"-n\", \"$NS\", \"create\", \"secret\", \"generic\", \"superai-hive\", \"--dry-run=client\", \"-o\", \"yaml\"] + args, check=True, capture_output=True).stdout
+    yaml = subprocess.run([\"sudo\", \"k3s\", \"kubectl\", \"-n\", \"$NS\", \"create\", \"secret\", \"generic\", \"superleo-hive\", \"--dry-run=client\", \"-o\", \"yaml\"] + args, check=True, capture_output=True).stdout
     subprocess.run([\"sudo\", \"k3s\", \"kubectl\", \"apply\", \"-f\", \"-\"], input=yaml, check=True)
 '"

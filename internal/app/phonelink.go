@@ -321,7 +321,7 @@ func (p *phoneLink) pairLink(code string) string {
 	}
 	q.Set("fp", p.fp)
 	q.Set("code", code)
-	return "superai://pair?" + q.Encode()
+	return "superleo://pair?" + q.Encode()
 }
 
 // lanAddrs are this computer's private IPv4 addresses on real interfaces:

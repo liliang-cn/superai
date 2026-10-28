@@ -209,7 +209,7 @@ func (a *App) registerDelegateTool(inner *agent.Service, mode string) {
 								"type": "array", "items": map[string]any{"type": "string"},
 								"description": "MCP servers the task's tools come from, e.g. [\"noted\"], and coding CLIs it needs, e.g. [\"codex\"].",
 							},
-							"worker": map[string]any{"type": "string", "description": "To hand the task to one worker by name (\"openclaw\", \"claude.mac\", \"superai-worker-1\"); omit to let the hive choose."},
+							"worker": map[string]any{"type": "string", "description": "To hand the task to one worker by name (\"openclaw\", \"claude.mac\", \"superleo-worker-1\"); omit to let the hive choose."},
 						},
 						"required": []string{"task"},
 					},

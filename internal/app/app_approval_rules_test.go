@@ -49,7 +49,7 @@ func TestRememberViaRPCAnswersTheNextCallLikeIt(t *testing.T) {
 	a := NewApp()
 	read := captureEmits(a)
 
-	cmd := "kubectl -n superleo rollout restart deployment/superai-worker"
+	cmd := "kubectl -n superleo rollout restart deployment/superleo-worker"
 	first := askInBackground(a, relayedBash("r-1", cmd))
 	waitForPending(t, a, 1)
 
@@ -76,7 +76,7 @@ func TestRememberViaRPCAnswersTheNextCallLikeIt(t *testing.T) {
 	}
 
 	// The next one like it: no card.
-	dec, _ := a.askToolApproval(context.Background(), relayedBash("r-2", "kubectl -n superleo rollout restart deployment/superai-queen"))
+	dec, _ := a.askToolApproval(context.Background(), relayedBash("r-2", "kubectl -n superleo rollout restart deployment/superleo-queen"))
 	if !dec.Allowed || dec.By != backend.DecidedByApprovalRule || !strings.HasPrefix(dec.Reason, "按规则自动同意：") {
 		t.Fatalf("second answer = %+v", dec)
 	}

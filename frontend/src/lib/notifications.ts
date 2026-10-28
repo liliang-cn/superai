@@ -30,7 +30,7 @@ export interface Notification {
   message: string;
   source?: string;
   session?: string;
-  /** Where tapping it goes, e.g. superai://schedule. */
+  /** Where tapping it goes, e.g. superleo://schedule. */
   deeplink?: string;
   at: string;
   read: boolean;

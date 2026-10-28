@@ -45,7 +45,7 @@ import (
 
 // HiveProtocol names the wire format. A queen that meets a different string
 // refuses rather than guessing, so a v2 worker cannot half-join a v1 queen.
-const HiveProtocol = "superai-hive/1"
+const HiveProtocol = "superleo-hive/1"
 
 const (
 	HiveRoleQueen  = "queen"

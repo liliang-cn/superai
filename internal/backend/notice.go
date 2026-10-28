@@ -75,7 +75,7 @@ type Notice struct {
 	// "info".
 	Kind string `json:"kind,omitempty"`
 	// Deeplink is where tapping it goes: noted://alarm/<id>,
-	// superai://chat?prompt=….
+	// superleo://chat?prompt=….
 	Deeplink string `json:"deeplink,omitempty"`
 	// Actions are buttons on it; each says something to the agent when tapped.
 	Actions []NoticeAction `json:"actions,omitempty"`

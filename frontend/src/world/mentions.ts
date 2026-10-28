@@ -15,11 +15,11 @@ export function mentionsOf(hosts: Host[] | null | undefined): AgentInfo[] {
   // The SuperLeo drawn as this core: its CLIs are the local ones.
   const self = new Set<string>();
   for (const h of list) for (const a of h.agents ?? []) {
-    if (a.kind === "superai" && (a.role === "standalone" || a.role === "queen")) self.add(a.name);
+    if (a.kind === "superleo" && (a.role === "standalone" || a.role === "queen")) self.add(a.name);
   }
   const out = new Map<string, AgentInfo & { standby: boolean }>();
   for (const h of list) for (const a of h.agents ?? []) {
-    if (a.kind === "superai" && a.role !== "worker") continue;
+    if (a.kind === "superleo" && a.role !== "worker") continue;
     const info = infoOf(a, h, self);
     const standby = a.state.startsWith("standby");
     const had = out.get(info.name);
@@ -37,8 +37,8 @@ function infoOf(a: HostAgent, h: Host, self: Set<string>): AgentInfo {
     const local = !!a.via && self.has(a.via);
     return { name: local ? bare : a.name, alias: local ? undefined : bare, about: `coding agent on ${where} · ${a.state}` };
   }
-  if (a.kind === "superai") {
-    const n = /^superai-worker-(\d+)$/.exec(a.name);
+  if (a.kind === "superleo") {
+    const n = /^superleo-worker-(\d+)$/.exec(a.name);
     return { name: a.name, alias: n ? "w" + n[1] : undefined, about: `hive worker on ${where} · ${a.state}` };
   }
   return { name: a.name, about: `${a.about || "agent"} · ${where} · ${a.state}` };

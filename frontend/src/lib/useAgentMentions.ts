@@ -18,7 +18,7 @@ import { RemoteAgentNames } from "../../wailsjs/go/app/App";
 export interface AgentInfo {
   name: string;
   about: string;
-  /** A short name that also finds it — "w3" for superai-worker-3. */
+  /** A short name that also finds it — "w3" for superleo-worker-3. */
   alias?: string;
 }
 

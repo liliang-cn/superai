@@ -58,17 +58,17 @@ func TestAnUnreachablePeerIsReachedThroughTheQueen(t *testing.T) {
 	ln.Close()
 	contacts := map[string]HiveContact{
 		"queen":            {Name: "queen", Queen: true},
-		"superai-worker-7": {Name: "superai-worker-7", URL: dead},
+		"superleo-worker-7": {Name: "superleo-worker-7", URL: dead},
 	}
 	var viaQueen []HiveMessage
 	toQueen := func(_ context.Context, m HiveMessage) error { viaQueen = append(viaQueen, m); return nil }
 	var seen []HiveMessage
-	out, err := SendHive(context.Background(), "openclaw", contacts, "superai-worker-7", "what is your hostname?", "", toQueen,
+	out, err := SendHive(context.Background(), "openclaw", contacts, "superleo-worker-7", "what is your hostname?", "", toQueen,
 		func(_ HiveContact, m HiveMessage) { seen = append(seen, m) })
 	if err != nil || !strings.Contains(out, "delivered") {
 		t.Fatalf("out %q err %v", out, err)
 	}
-	if len(viaQueen) != 1 || viaQueen[0].To != "superai-worker-7" || viaQueen[0].Via != "queen" {
+	if len(viaQueen) != 1 || viaQueen[0].To != "superleo-worker-7" || viaQueen[0].Via != "queen" {
 		t.Fatalf("not handed to the queen: %+v", viaQueen)
 	}
 	if len(seen) != 1 || seen[0].Via != "queen" {

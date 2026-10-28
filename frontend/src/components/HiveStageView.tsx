@@ -16,7 +16,7 @@ const HiveHex3D = lazy(() => import("./HiveHex3D"));
 /** The two drawn-with-light looks, and the hexagon cells that came first. */
 type Look = FlowLook | "hex";
 
-const KEY = "superai-hive-stage";
+const KEY = "superleo-hive-stage";
 
 type Dim = "2d" | "3d";
 type Choice = { look: Look; dim: Dim };
@@ -59,7 +59,7 @@ function initial(can3d: boolean): Choice {
   }
 }
 
-const HEIGHT_KEY = "superai-hive-stage-height";
+const HEIGHT_KEY = "superleo-hive-stage-height";
 
 function initialHeight(): number {
   try {

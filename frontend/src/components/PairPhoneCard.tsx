@@ -61,7 +61,7 @@ export default function PairPhoneCard() {
     setBusy(true);
     try {
       const c = await PairPhone();
-      const link = c.link || `superai://pair?server=${encodeURIComponent(window.location.origin)}&code=${c.code}`;
+      const link = c.link || `superleo://pair?server=${encodeURIComponent(window.location.origin)}&code=${c.code}`;
       setQr(await QRCode.toDataURL(link, { margin: 1, width: 360, errorCorrectionLevel: "M" }));
       setCode(c);
     } catch (e: any) {

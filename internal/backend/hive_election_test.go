@@ -14,7 +14,7 @@ import (
 // Every member draws the same queen from the same roster and term, nobody
 // passed over is drawn, and a new term is a new draw.
 func TestEveryMemberDrawsTheSameQueen(t *testing.T) {
-	roster := []RosterEntry{{"superai-worker-0", "http://w0"}, {"superai-worker-1", "http://w1"}, {"superai-worker-2", "http://w2"}, {"mac", "http://mac"}}
+	roster := []RosterEntry{{"superleo-worker-0", "http://w0"}, {"superleo-worker-1", "http://w1"}, {"superleo-worker-2", "http://w2"}, {"mac", "http://mac"}}
 	first, ok := ElectQueen(roster, 1, nil)
 	if !ok {
 		t.Fatal("nobody drawn")
@@ -99,7 +99,7 @@ func TestWhenTheQueenIsGoneTheWorkersAgreeOnANewOne(t *testing.T) {
 	queen := &member{name: "queen", hive: NewHive("queen", 50*time.Millisecond)}
 	queen.srv = httptest.NewServer(http.HandlerFunc(queen.serveHTTP))
 	members := []*member{}
-	for _, n := range []string{"superai-worker-0", "superai-worker-1", "superai-worker-2"} {
+	for _, n := range []string{"superleo-worker-0", "superleo-worker-1", "superleo-worker-2"} {
 		members = append(members, newMember(t, n, queen.srv.URL))
 	}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -196,12 +196,12 @@ func TestAStaleQueenHearsItWasSuperseded(t *testing.T) {
 
 // A queen elected from among the workers is not scaled away.
 func TestAnElectedWorkerQueenIsNotScaledAway(t *testing.T) {
-	t.Setenv("POD_NAME", "superai-worker-2")
-	k := &kubectlSpawner{s: SpawnerSettings{Kind: "kubectl", StatefulSet: "superai-worker", MaxWorkers: 20, Kubectl: "/bin/false"}}
+	t.Setenv("POD_NAME", "superleo-worker-2")
+	k := &kubectlSpawner{s: SpawnerSettings{Kind: "kubectl", StatefulSet: "superleo-worker", MaxWorkers: 20, Kubectl: "/bin/false"}}
 	if err := k.SetReplicas(context.Background(), 2); err == nil || !strings.Contains(err.Error(), "at least 3") {
 		t.Fatalf("%v", err)
 	}
-	if _, ok := statefulOrdinal("superai-queen-0", "superai-worker"); ok {
+	if _, ok := statefulOrdinal("superleo-queen-0", "superleo-worker"); ok {
 		t.Fatal("the queen's own pod counted as a worker")
 	}
 }
@@ -211,7 +211,7 @@ func TestAnElectedWorkerQueenIsNotScaledAway(t *testing.T) {
 func TestAQueenWhoSaidSheIsRestartingIsWaitedFor(t *testing.T) {
 	queen := &member{name: "queen", hive: NewHive("queen", 50*time.Millisecond)}
 	queen.srv = httptest.NewServer(http.HandlerFunc(queen.serveHTTP))
-	w := newMember(t, "superai-worker-0", queen.srv.URL)
+	w := newMember(t, "superleo-worker-0", queen.srv.URL)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go w.ann.Run(ctx)
@@ -246,15 +246,15 @@ func TestAQueenWhoSaidSheIsRestartingIsWaitedFor(t *testing.T) {
 // down since, goes back to the address that always leads to the queen
 // instead of electing again — the flapping seen on the cluster.
 func TestAFollowerOfAQueenWhoSteppedDownGoesHomeInsteadOfElecting(t *testing.T) {
-	home := &member{name: "superai-queen-0", hive: NewHive("superai-queen-0", 50*time.Millisecond)}
+	home := &member{name: "superleo-queen-0", hive: NewHive("superleo-queen-0", 50*time.Millisecond)}
 	home.hive.SetTerm(5)
 	home.srv = httptest.NewServer(http.HandlerFunc(home.serveHTTP))
 	t.Cleanup(home.srv.Close)
-	stepped := &member{name: "superai-worker-0"} // up, but no longer a queen: 404
+	stepped := &member{name: "superleo-worker-0"} // up, but no longer a queen: 404
 	stepped.srv = httptest.NewServer(http.HandlerFunc(stepped.serveHTTP))
 	t.Cleanup(stepped.srv.Close)
 
-	w := newMember(t, "superai-worker-1", home.srv.URL)
+	w := newMember(t, "superleo-worker-1", home.srv.URL)
 	w.ann.term, w.ann.queen, w.ann.target = 4, stepped.name, stepped.srv.URL
 	w.ann.roster = []RosterEntry{{stepped.name, stepped.srv.URL}, {w.name, w.srv.URL}}
 	ctx, cancel := context.WithCancel(context.Background())

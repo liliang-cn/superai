@@ -51,7 +51,7 @@ const (
 	firePollEvery    = 60 * time.Second
 	fireLookBack     = 10 * time.Minute
 	fireSource       = "noted"
-	scheduleDeeplink = "superai://schedule"
+	scheduleDeeplink = "superleo://schedule"
 )
 
 // NotedRings is every schedule item that reaches the person, for the phones'

@@ -64,10 +64,10 @@ func (a *App) remoteRunner() *backend.RemoteRunner {
 			if svc == nil || svc.Agent() == nil {
 				return func(backend.RemoteResult, error) {}
 			}
-			end := svc.Agent().SubAgentBracket(ctx, agent.SubAgentInfo{Name: name, Goal: prompt, Provider: "superai-hive"})
+			end := svc.Agent().SubAgentBracket(ctx, agent.SubAgentInfo{Name: name, Goal: prompt, Provider: "superleo-hive"})
 			return func(res backend.RemoteResult, err error) {
 				out := agent.RemoteAgentRunResult{
-					Agent: res.Agent, Provider: "superai-hive", Endpoint: res.Host,
+					Agent: res.Agent, Provider: "superleo-hive", Endpoint: res.Host,
 					Summary: res.Text, Failed: res.Failed, Reason: res.Reason, Duration: res.MS,
 					Usage: res.Usage,
 				}

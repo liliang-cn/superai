@@ -206,7 +206,7 @@ func TestTheHiveToolsOverMCP(t *testing.T) {
 	queen := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/api/hive/roster":
-			json.NewEncoder(w).Encode([]RosterEntry{{Name: "claude-mac", URL: "x"}, {Name: "superai-worker-1", URL: peer.URL}})
+			json.NewEncoder(w).Encode([]RosterEntry{{Name: "claude-mac", URL: "x"}, {Name: "superleo-worker-1", URL: peer.URL}})
 		case "/api/hive/message":
 			var m HiveMessage
 			json.NewDecoder(r.Body).Decode(&m)
@@ -238,10 +238,10 @@ func TestTheHiveToolsOverMCP(t *testing.T) {
 		return r.Content[0].(*mcp.TextContent).Text
 	}
 
-	if out := call("hive_peers", map[string]any{}); !strings.Contains(out, "You are claude-mac") || !strings.Contains(out, "superai-worker-1") {
+	if out := call("hive_peers", map[string]any{}); !strings.Contains(out, "You are claude-mac") || !strings.Contains(out, "superleo-worker-1") {
 		t.Fatalf("peers: %q", out)
 	}
-	if out := call("hive_send", map[string]any{"to": "superai-worker-1", "text": "the config is in /tmp/x"}); !strings.Contains(out, "delivered") {
+	if out := call("hive_send", map[string]any{"to": "superleo-worker-1", "text": "the config is in /tmp/x"}); !strings.Contains(out, "delivered") {
 		t.Fatalf("send: %q", out)
 	}
 	// The peer got it, and the queen her observed copy.

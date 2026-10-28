@@ -40,7 +40,7 @@ func TestJoiningTwiceIsOneMemberNotTwo(t *testing.T) {
 func TestTheQueenRefusesWhatIsNotAWorker(t *testing.T) {
 	h := NewHive("sup", time.Second)
 	cases := map[string]func(*HiveHello){
-		"wrong protocol": func(x *HiveHello) { x.Protocol = "superai-hive/2" },
+		"wrong protocol": func(x *HiveHello) { x.Protocol = "superleo-hive/2" },
 		"a second queen": func(x *HiveHello) { x.Role = HiveRoleQueen },
 		"bad name":       func(x *HiveHello) { x.Name = "has space" },
 		"empty name":     func(x *HiveHello) { x.Name = "" },

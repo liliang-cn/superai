@@ -629,7 +629,7 @@ func RuleLabel(r ApprovalRule) string {
 	}
 	act := ruleAction(r)
 	b.WriteString(act)
-	// "重启 superai-worker 都不用问": a Latin word does not run into the Chinese.
+	// "重启 superleo-worker 都不用问": a Latin word does not run into the Chinese.
 	if rs := []rune(act); len(rs) > 0 && rs[len(rs)-1] < 0x80 {
 		b.WriteString(" ")
 	}
@@ -678,7 +678,7 @@ func ruleAction(r ApprovalRule) string {
 	return "使用 " + r.Tool
 }
 
-// humanCommand names a few commands by what they do: "重启 superai-worker".
+// humanCommand names a few commands by what they do: "重启 superleo-worker".
 func humanCommand(cmd string) string {
 	if hasShellControl(cmd) {
 		return ""

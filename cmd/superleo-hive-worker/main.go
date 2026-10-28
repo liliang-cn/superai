@@ -1,4 +1,4 @@
-// superai-hive-worker lets an agent that is not a SuperLeo be a worker in a hive.
+// superleo-hive-worker lets an agent that is not a SuperLeo be a worker in a hive.
 //
 // It does the two things a worker has to: it announces itself to the queen and
 // keeps doing so, and it takes the orders the queen sends and reports back the
@@ -7,31 +7,31 @@
 //
 // A command-line agent, its answer taken from what it prints:
 //
-//	superai-hive-worker -queen http://queen:43117 -name codex-box -- \
+//	superleo-hive-worker -queen http://queen:43117 -name codex-box -- \
 //	    codex exec {prompt}
 //
 // Claude Code, with its tool calls shown as they happen:
 //
-//	superai-hive-worker -queen http://queen:43117 -name claude-mac -mode claude -- \
+//	superleo-hive-worker -queen http://queen:43117 -name claude-mac -mode claude -- \
 //	    claude -p {prompt} --output-format stream-json --verbose --dangerously-skip-permissions
 //
 // An agent on another machine, over ssh. The order goes in on standard input,
 // so the remote shell never parses it:
 //
-//	superai-hive-worker -queen http://queen:43117 -name openclaw -stdin -- \
+//	superleo-hive-worker -queen http://queen:43117 -name openclaw -stdin -- \
 //	    ssh -o BatchMode=yes host 'openclaw agent --message "$(cat)"'
 //
 // Claude Code taking hive messages into the turn it is in, and with the hive
 // tools (hive_peers, hive_send, hive_inbox) connected over MCP. {hive-mcp} is
 // replaced by the path of a config file this writes for --mcp-config:
 //
-//	superai-hive-worker -queen http://queen:43117 -name claude-mac -mode claude -stream-input -- \
+//	superleo-hive-worker -queen http://queen:43117 -name claude-mac -mode claude -stream-input -- \
 //	    claude -p --input-format stream-json --output-format stream-json --verbose \
 //	    --mcp-config {hive-mcp} --allowedTools 'Bash Read mcp__hive'
 //
 // A model behind an API:
 //
-//	superai-hive-worker -queen http://queen:43117 -name gpt \
+//	superleo-hive-worker -queen http://queen:43117 -name gpt \
 //	    -openai-base https://api.example.com/v1 -openai-model some-model
 //
 // {prompt} is the order, passed as one argument and never through a shell. The
@@ -45,7 +45,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	_ "github.com/liliang-cn/superleo/internal/brand" // the old SuperAI names keep working
+	_ "github.com/liliang-cn/superleo/internal/brand" // the old SuperLeo names keep working
 	"log"
 	"net"
 	"net/http"
@@ -80,7 +80,7 @@ func main() {
 		oaSystem    = flag.String("openai-system", "", "a system prompt for it")
 	)
 	flag.Usage = func() {
-		fmt.Fprintln(os.Stderr, "usage: superai-hive-worker -queen URL -name NAME [flags] [-- command {prompt} ...]")
+		fmt.Fprintln(os.Stderr, "usage: superleo-hive-worker -queen URL -name NAME [flags] [-- command {prompt} ...]")
 		flag.PrintDefaults()
 	}
 	flag.Parse()

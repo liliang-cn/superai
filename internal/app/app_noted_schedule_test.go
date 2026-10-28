@@ -124,7 +124,7 @@ func TestFireWatcherPostsEachFire(t *testing.T) {
 	}
 	p := posted[0]
 	if p.Title != "交周报" || p.Body != "15:00 开始 · 三楼\n\n带上数据" || p.Key != "fire:e1@1" || p.Source != "noted" ||
-		p.Kind != "info" || p.Deeplink != "superai://schedule" || p.Time != "2026-10-19T14:50:00+08:00" {
+		p.Kind != "info" || p.Deeplink != "superleo://schedule" || p.Time != "2026-10-19T14:50:00+08:00" {
 		t.Fatalf("notice: %+v", p)
 	}
 	if posted[1].Title != "日程" || posted[1].Body != "现在 14:45" {

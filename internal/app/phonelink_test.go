@@ -74,7 +74,7 @@ func TestTheDesktopPairsAPhoneOverTheLANAndTheRelay(t *testing.T) {
 		t.Fatal(err)
 	}
 	u, err := url.Parse(first.Link)
-	if err != nil || u.Scheme != "superai" || u.Host != "pair" {
+	if err != nil || u.Scheme != "superleo" || u.Host != "pair" {
 		t.Fatalf("link %q", first.Link)
 	}
 	q := u.Query()

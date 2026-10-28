@@ -65,8 +65,8 @@ var ccPermAckWait = 5 * time.Second
 // Notification categories the iOS app registers: a text field on a terminal
 // turn, Allow and Deny on a terminal permission prompt.
 const (
-	ccReplyCategory    = "superai.cc.reply"
-	ccApprovalCategory = "superai.cc.approval"
+	ccReplyCategory    = "superleo.cc.reply"
+	ccApprovalCategory = "superleo.cc.approval"
 )
 
 // Verdicts core sends down for a permission request.
@@ -426,7 +426,7 @@ func ccApprovalRequest(agent string, r ccReport, now, expires time.Time) backend
 }
 
 // ccApprovalAlert is the push for a terminal approval card: Allow and Deny
-// on the lock screen (the app's superai.cc.approval category). It replaces
+// on the lock screen (the app's superleo.cc.approval category). It replaces
 // the session's last notification there.
 func ccApprovalAlert(req backend.ApprovalRequest) apns.Alert {
 	body := "Allow " + req.Tool + "?"

@@ -171,7 +171,7 @@ func installPiExtension(dir, socket string) (bool, error) {
 var codexHookEvents = []string{"SessionStart", "SessionEnd", "UserPromptSubmit", "PreToolUse", "PostToolUse", "PermissionRequest", "Stop", "Interrupt"}
 
 // codexHookRE finds SuperLeo's codex hook for an event in a command.
-// The superai names are those it was installed under before the rename.
+// The superleo names are those it was installed under before the rename.
 var codexHookRE = regexp.MustCompile(`(?:super(?:leo|ai)-cchook|super(?:leo|ai)['"]?\s+hook)['"]?\s+--cli\s+codex\s+([A-Za-z]+)`)
 
 func isOurCodexHook(command, event string) bool {

@@ -34,7 +34,7 @@ export interface Hive {
   tasks: HiveTask[];
   /** Who thinks for the queen in a person's chat ("claude", "claude.mac"); empty is SuperLeo's own agent. */
   engine?: string;
-  /** Who took her latest turn: the engine, or "superai" when SuperLeo
+  /** Who took her latest turn: the engine, or "superleo" when SuperLeo
    *  answered in its place. Kept current by queen:engine. */
   engineNow?: string;
   /** The relay agents (agent_link.relay_only): not machines, but the named
@@ -184,8 +184,8 @@ export const isToday = (iso?: string) => {
 };
 
 export function short(name: string): string {
-  if (name.startsWith("superai-worker-")) return "w" + name.slice("superai-worker-".length);
-  if (name === "queen" || name.startsWith("superai-queen")) return "Q";
+  if (name.startsWith("superleo-worker-")) return "w" + name.slice("superleo-worker-".length);
+  if (name === "queen" || name.startsWith("superleo-queen")) return "Q";
   if (name.toLowerCase().includes("mac")) return "Mac";
   return name.slice(0, 3);
 }
@@ -294,7 +294,7 @@ export function useLinkedAgents(): LinkedAgent[] {
   useEffect(() => {
     let alive = true;
     const load = () => LinkedAgents().then((l) => {
-      if (alive) setList(((l ?? []) as unknown as LinkedAgent[]).filter((a) => a.machine ?? !a.name.startsWith("superai-worker-")));
+      if (alive) setList(((l ?? []) as unknown as LinkedAgent[]).filter((a) => a.machine ?? !a.name.startsWith("superleo-worker-")));
     }).catch(() => {});
     load();
     const off = EventsOn("agents:changed", load);
@@ -323,7 +323,7 @@ export type HostKind = "pod" | "container" | "mac" | "vm" | "metal" | "ha" | "";
  *  coding CLI ("claude.mac"), or a named agent a SuperLeo serves (openclaw). */
 export interface HostAgent {
   name: string;
-  kind: "superai" | "cli" | "agent";
+  kind: "superleo" | "cli" | "agent";
   role?: "queen" | "worker" | "machine" | "relay" | "standalone" | string;
   about?: string;
   /** live or lost for a SuperLeo; working, waiting, idle or installed for a

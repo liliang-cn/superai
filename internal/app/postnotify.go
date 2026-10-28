@@ -203,7 +203,7 @@ func checkDeeplink(link string) error {
 	}
 	u, err := url.Parse(link)
 	if err != nil || !schemeRE.MatchString(u.Scheme) || strings.ContainsAny(link, " \t\r\n") {
-		return errors.New("deeplink is not a URL, e.g. superai://chat?prompt=… or noted://alarm/<id>")
+		return errors.New("deeplink is not a URL, e.g. superleo://chat?prompt=… or noted://alarm/<id>")
 	}
 	switch strings.ToLower(u.Scheme) {
 	case "javascript", "data", "file", "vbscript":

@@ -107,8 +107,8 @@ export default function Command({ view, onConversation, onTyping, hosts }: {
     const m = /@([\w.-]+)\s*$/.exec(text) ?? /@([\w.-]+)/.exec(text);
     const name = m?.[1] ?? "";
     if (!name) { onTyping?.("", ""); return; }
-    const worker = /^w\d+$/.test(name) ? "superai-worker-" + name.slice(1) : name;
-    if (worker.startsWith("superai-worker-")) onTyping?.("worker", worker);
+    const worker = /^w\d+$/.test(name) ? "superleo-worker-" + name.slice(1) : name;
+    if (worker.startsWith("superleo-worker-")) onTyping?.("worker", worker);
     else if (name.includes(".")) onTyping?.("machine", name.split(".").slice(1).join("."));
     else onTyping?.("machine", name);
   }, [text]);

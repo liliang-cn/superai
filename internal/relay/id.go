@@ -49,7 +49,7 @@ func idFromDER(der []byte) string {
 // challengeDigest is what the computer signs: the nonce, tied to this protocol
 // so a signature cannot be lifted from anywhere else.
 func challengeDigest(nonce string) []byte {
-	sum := sha256.Sum256([]byte("superai-relay\n" + nonce))
+	sum := sha256.Sum256([]byte("superleo-relay\n" + nonce))
 	return sum[:]
 }
 

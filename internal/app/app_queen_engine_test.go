@@ -441,7 +441,7 @@ func TestWhenTheEngineFailsSuperLeoAnswersAndTheJournalSaysSo(t *testing.T) {
 	if now := h.a.queenEngineNow(); now != queenNowSuperLeo {
 		t.Fatalf("now %q", now)
 	}
-	if tr := h.a.TurnTraces(1); len(tr) != 1 || fmt.Sprint(tr[0].Engines) != "[claude superai]" {
+	if tr := h.a.TurnTraces(1); len(tr) != 1 || fmt.Sprint(tr[0].Engines) != "[claude superleo]" {
 		t.Fatalf("traces %+v", tr)
 	}
 	// SuperLeo answered: nothing is left for the person to do about it.

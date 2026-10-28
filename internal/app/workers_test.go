@@ -32,7 +32,7 @@ func TestEveryAgentThatCanWorkIsAWorker(t *testing.T) {
 		}
 	}
 	sort.Strings(names)
-	if got := strings.Join(names, " "); got != "claude.orange1/cli@orange1 mac/superai@mac" {
+	if got := strings.Join(names, " "); got != "claude.orange1/cli@orange1 mac/superleo@mac" {
 		t.Fatalf("workers = %s", got)
 	}
 }

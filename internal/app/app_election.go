@@ -115,7 +115,7 @@ func (a *App) stepDown(why string) {
 func kubectl(ctx context.Context, args ...string) (string, error) {
 	ns := strings.TrimSpace(os.Getenv("POD_NAMESPACE"))
 	if ns == "" {
-		ns = "superai"
+		ns = "superleo"
 	}
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()

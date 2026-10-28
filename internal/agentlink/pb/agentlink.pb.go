@@ -14,8 +14,6 @@
 // Over the stream core calls the agent's own methods (the same ones a browser
 // reaches at /api/rpc/<Method>, as far as the agent allows), and the agent
 // sends back the replies and everything its event bus says.
-// The package is wire protocol (the gRPC path every agent dials), so it keeps
-// the name the project had when agents first spoke it.
 
 package agentlinkpb
 
@@ -761,27 +759,27 @@ var File_agentlink_v1_agentlink_proto protoreflect.FileDescriptor
 
 const file_agentlink_v1_agentlink_proto_rawDesc = "" +
 	"\n" +
-	"\x1cagentlink/v1/agentlink.proto\x12\x14superai.agentlink.v1\"\xe5\x01\n" +
+	"\x1cagentlink/v1/agentlink.proto\x12\x15superleo.agentlink.v1\"\xe9\x01\n" +
 	"\n" +
-	"AgentFrame\x123\n" +
-	"\x05hello\x18\x01 \x01(\v2\x1b.superai.agentlink.v1.HelloH\x00R\x05hello\x123\n" +
-	"\x05reply\x18\x02 \x01(\v2\x1b.superai.agentlink.v1.ReplyH\x00R\x05reply\x123\n" +
-	"\x05event\x18\x03 \x01(\v2\x1b.superai.agentlink.v1.EventH\x00R\x05event\x120\n" +
-	"\x04pong\x18\x04 \x01(\v2\x1a.superai.agentlink.v1.PongH\x00R\x04pongB\x06\n" +
-	"\x04kind\"\xb2\x01\n" +
-	"\tCoreFrame\x129\n" +
-	"\awelcome\x18\x01 \x01(\v2\x1d.superai.agentlink.v1.WelcomeH\x00R\awelcome\x120\n" +
-	"\x04call\x18\x02 \x01(\v2\x1a.superai.agentlink.v1.CallH\x00R\x04call\x120\n" +
-	"\x04ping\x18\x03 \x01(\v2\x1a.superai.agentlink.v1.PingH\x00R\x04pingB\x06\n" +
-	"\x04kind\"\xb5\x02\n" +
+	"AgentFrame\x124\n" +
+	"\x05hello\x18\x01 \x01(\v2\x1c.superleo.agentlink.v1.HelloH\x00R\x05hello\x124\n" +
+	"\x05reply\x18\x02 \x01(\v2\x1c.superleo.agentlink.v1.ReplyH\x00R\x05reply\x124\n" +
+	"\x05event\x18\x03 \x01(\v2\x1c.superleo.agentlink.v1.EventH\x00R\x05event\x121\n" +
+	"\x04pong\x18\x04 \x01(\v2\x1b.superleo.agentlink.v1.PongH\x00R\x04pongB\x06\n" +
+	"\x04kind\"\xb5\x01\n" +
+	"\tCoreFrame\x12:\n" +
+	"\awelcome\x18\x01 \x01(\v2\x1e.superleo.agentlink.v1.WelcomeH\x00R\awelcome\x121\n" +
+	"\x04call\x18\x02 \x01(\v2\x1b.superleo.agentlink.v1.CallH\x00R\x04call\x121\n" +
+	"\x04ping\x18\x03 \x01(\v2\x1b.superleo.agentlink.v1.PingH\x00R\x04pingB\x06\n" +
+	"\x04kind\"\xb6\x02\n" +
 	"\x05Hello\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
 	"\x04host\x18\x02 \x01(\tR\x04host\x12\x0e\n" +
 	"\x02os\x18\x03 \x01(\tR\x02os\x12\x12\n" +
 	"\x04arch\x18\x04 \x01(\tR\x04arch\x12\x18\n" +
 	"\aversion\x18\x05 \x01(\tR\aversion\x12\x12\n" +
-	"\x04clis\x18\x06 \x03(\tR\x04clis\x128\n" +
-	"\x06agents\x18\a \x03(\v2 .superai.agentlink.v1.NamedAgentR\x06agents\x12\x12\n" +
+	"\x04clis\x18\x06 \x03(\tR\x04clis\x129\n" +
+	"\x06agents\x18\a \x03(\v2!.superleo.agentlink.v1.NamedAgentR\x06agents\x12\x12\n" +
 	"\x04role\x18\b \x01(\tR\x04role\x12\x12\n" +
 	"\x04kind\x18\t \x01(\tR\x04kind\x12\x16\n" +
 	"\x06parent\x18\n" +
@@ -812,9 +810,9 @@ const file_agentlink_v1_agentlink_proto_rawDesc = "" +
 	"at_unix_ms\x18\x01 \x01(\x03R\batUnixMs\"$\n" +
 	"\x04Pong\x12\x1c\n" +
 	"\n" +
-	"at_unix_ms\x18\x01 \x01(\x03R\batUnixMs2]\n" +
-	"\tAgentLink\x12P\n" +
-	"\aConnect\x12 .superai.agentlink.v1.AgentFrame\x1a\x1f.superai.agentlink.v1.CoreFrame(\x010\x01BBZ@github.com/liliang-cn/superleo/internal/agentlink/pb;agentlinkpbb\x06proto3"
+	"at_unix_ms\x18\x01 \x01(\x03R\batUnixMs2_\n" +
+	"\tAgentLink\x12R\n" +
+	"\aConnect\x12!.superleo.agentlink.v1.AgentFrame\x1a .superleo.agentlink.v1.CoreFrame(\x010\x01BBZ@github.com/liliang-cn/superleo/internal/agentlink/pb;agentlinkpbb\x06proto3"
 
 var (
 	file_agentlink_v1_agentlink_proto_rawDescOnce sync.Once
@@ -830,28 +828,28 @@ func file_agentlink_v1_agentlink_proto_rawDescGZIP() []byte {
 
 var file_agentlink_v1_agentlink_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_agentlink_v1_agentlink_proto_goTypes = []any{
-	(*AgentFrame)(nil), // 0: superai.agentlink.v1.AgentFrame
-	(*CoreFrame)(nil),  // 1: superai.agentlink.v1.CoreFrame
-	(*Hello)(nil),      // 2: superai.agentlink.v1.Hello
-	(*NamedAgent)(nil), // 3: superai.agentlink.v1.NamedAgent
-	(*Welcome)(nil),    // 4: superai.agentlink.v1.Welcome
-	(*Call)(nil),       // 5: superai.agentlink.v1.Call
-	(*Reply)(nil),      // 6: superai.agentlink.v1.Reply
-	(*Event)(nil),      // 7: superai.agentlink.v1.Event
-	(*Ping)(nil),       // 8: superai.agentlink.v1.Ping
-	(*Pong)(nil),       // 9: superai.agentlink.v1.Pong
+	(*AgentFrame)(nil), // 0: superleo.agentlink.v1.AgentFrame
+	(*CoreFrame)(nil),  // 1: superleo.agentlink.v1.CoreFrame
+	(*Hello)(nil),      // 2: superleo.agentlink.v1.Hello
+	(*NamedAgent)(nil), // 3: superleo.agentlink.v1.NamedAgent
+	(*Welcome)(nil),    // 4: superleo.agentlink.v1.Welcome
+	(*Call)(nil),       // 5: superleo.agentlink.v1.Call
+	(*Reply)(nil),      // 6: superleo.agentlink.v1.Reply
+	(*Event)(nil),      // 7: superleo.agentlink.v1.Event
+	(*Ping)(nil),       // 8: superleo.agentlink.v1.Ping
+	(*Pong)(nil),       // 9: superleo.agentlink.v1.Pong
 }
 var file_agentlink_v1_agentlink_proto_depIdxs = []int32{
-	2, // 0: superai.agentlink.v1.AgentFrame.hello:type_name -> superai.agentlink.v1.Hello
-	6, // 1: superai.agentlink.v1.AgentFrame.reply:type_name -> superai.agentlink.v1.Reply
-	7, // 2: superai.agentlink.v1.AgentFrame.event:type_name -> superai.agentlink.v1.Event
-	9, // 3: superai.agentlink.v1.AgentFrame.pong:type_name -> superai.agentlink.v1.Pong
-	4, // 4: superai.agentlink.v1.CoreFrame.welcome:type_name -> superai.agentlink.v1.Welcome
-	5, // 5: superai.agentlink.v1.CoreFrame.call:type_name -> superai.agentlink.v1.Call
-	8, // 6: superai.agentlink.v1.CoreFrame.ping:type_name -> superai.agentlink.v1.Ping
-	3, // 7: superai.agentlink.v1.Hello.agents:type_name -> superai.agentlink.v1.NamedAgent
-	0, // 8: superai.agentlink.v1.AgentLink.Connect:input_type -> superai.agentlink.v1.AgentFrame
-	1, // 9: superai.agentlink.v1.AgentLink.Connect:output_type -> superai.agentlink.v1.CoreFrame
+	2, // 0: superleo.agentlink.v1.AgentFrame.hello:type_name -> superleo.agentlink.v1.Hello
+	6, // 1: superleo.agentlink.v1.AgentFrame.reply:type_name -> superleo.agentlink.v1.Reply
+	7, // 2: superleo.agentlink.v1.AgentFrame.event:type_name -> superleo.agentlink.v1.Event
+	9, // 3: superleo.agentlink.v1.AgentFrame.pong:type_name -> superleo.agentlink.v1.Pong
+	4, // 4: superleo.agentlink.v1.CoreFrame.welcome:type_name -> superleo.agentlink.v1.Welcome
+	5, // 5: superleo.agentlink.v1.CoreFrame.call:type_name -> superleo.agentlink.v1.Call
+	8, // 6: superleo.agentlink.v1.CoreFrame.ping:type_name -> superleo.agentlink.v1.Ping
+	3, // 7: superleo.agentlink.v1.Hello.agents:type_name -> superleo.agentlink.v1.NamedAgent
+	0, // 8: superleo.agentlink.v1.AgentLink.Connect:input_type -> superleo.agentlink.v1.AgentFrame
+	1, // 9: superleo.agentlink.v1.AgentLink.Connect:output_type -> superleo.agentlink.v1.CoreFrame
 	9, // [9:10] is the sub-list for method output_type
 	8, // [8:9] is the sub-list for method input_type
 	8, // [8:8] is the sub-list for extension type_name

@@ -444,7 +444,7 @@ const agentRole = (a: HostAgent) => a.kind === "cli" ? "cli" : a.kind === "agent
  *  their node; HA services after, with where each runs. */
 function HostsCard({ hosts, services, sel }: { hosts: Host[]; services: { name: string; vip?: string; active?: string; standbys: { host: string; ready: boolean }[]; state: string }[]; sel: ReturnType<typeof useWorldSelection> }) {
   const focusAgent = (h: Host, a: HostAgent) => {
-    if (a.kind === "superai") return isCore(a) ? focusInWorld("hall", "queen") : focusInWorld("worker", a.name);
+    if (a.kind === "superleo") return isCore(a) ? focusInWorld("hall", "queen") : focusInWorld("worker", a.name);
     if (a.kind === "cli") return focusInWorld("cli", h.agents.some(isCore) ? cliName(a) : `${cliName(a)}.${a.via}`);
     if (isStandby(a)) return focusInWorld("service", a.service || a.name);
     return focusInWorld("agent", `${a.name}.${a.via || h.name}`);

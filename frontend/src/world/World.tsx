@@ -252,7 +252,7 @@ function Hud({ data, on }: { view: ViewKey; data: WorldData; on: boolean }) {
   const line = pts.map((v, i) => `${(i / Math.max(1, pts.length - 1)) * W},${H - 2 - (v / max) * (H - 6)}`).join(" ");
   const members = [...data.meter.members].sort((a, b) => b.tokens - a.tokens).slice(0, 6);
   const topTokens = Math.max(1, ...members.map((m) => m.tokens));
-  const short = (n: string) => n.replace(/^superai-worker-/, "w").replace(/^superleo-/, "");
+  const short = (n: string) => n.replace(/^superleo-worker-/, "w").replace(/^superleo-/, "");
   return (
     <div className={`wl-holo tl wl-hive${open ? " open" : ""}${on ? "" : " off"}`} aria-hidden={!on}>
       <button className="wh-hive-top" onClick={toggle} aria-expanded={open} title={t(open ? "Fold" : "Show the figures")}>

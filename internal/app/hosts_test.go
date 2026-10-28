@@ -51,9 +51,9 @@ func TestHostsPutsAgentsOnTheirHosts(t *testing.T) {
 	}
 	core.hive = backend.NewHive("queen", 0)
 	for _, w := range []backend.HiveHello{
-		{Name: "superai-worker-0", Node: "orange2", Kind: "pod", Host: "superai-worker-0", MCP: []string{"noted", "cortexdb"}},
+		{Name: "superleo-worker-0", Node: "orange2", Kind: "pod", Host: "superleo-worker-0", MCP: []string{"noted", "cortexdb"}},
 		// From before kinds: placed on its node all the same.
-		{Name: "superai-worker-1", Node: "orange1"},
+		{Name: "superleo-worker-1", Node: "orange1"},
 	} {
 		w.Protocol, w.Role, w.URL = backend.HiveProtocol, backend.HiveRoleWorker, "http://"+w.Name+":1"
 		if _, err := core.hive.Join(w); err != nil {
@@ -64,7 +64,7 @@ func TestHostsPutsAgentsOnTheirHosts(t *testing.T) {
 	linkHello(t, core, addr, &agentlinkpb.Hello{Name: "mac", Host: "Liangs-MacBook-Pro", Os: "darwin", Arch: "arm64",
 		Kind: "mac", Clis: []string{"claude", "codex"}})
 	linkHello(t, core, addr, &agentlinkpb.Hello{Name: "orange1", Host: "orange1", Os: "linux", Arch: "amd64", Kind: "vm"})
-	linkHello(t, core, addr, &agentlinkpb.Hello{Name: "superai-worker-0", Host: "superai-worker-0", Role: "worker",
+	linkHello(t, core, addr, &agentlinkpb.Hello{Name: "superleo-worker-0", Host: "superleo-worker-0", Role: "worker",
 		Kind: "pod", Parent: "orange2", Clis: []string{"claude"}})
 	linkHello(t, core, addr, &agentlinkpb.Hello{Name: "sds-e", Host: "node-e", Os: "linux", Kind: "vm",
 		Agents: []*agentlinkpb.NamedAgent{{Name: "openclaw", About: "the gateway"}, {Name: "hermes"}}})
@@ -91,7 +91,7 @@ func TestHostsPutsAgentsOnTheirHosts(t *testing.T) {
 
 	// The worker on the roster and on the link is one pod with one agent,
 	// inside its VM, which is listed before it.
-	w0 := hostByName(hs, "superai-worker-0")
+	w0 := hostByName(hs, "superleo-worker-0")
 	if w0 == nil || w0.Kind != "pod" || w0.Parent != "orange2" {
 		t.Fatalf("worker-0's pod: %+v", w0)
 	}
@@ -104,10 +104,10 @@ func TestHostsPutsAgentsOnTheirHosts(t *testing.T) {
 			}
 		}
 	}
-	if n != 1 || agentNamed(w0, "claude.superai-worker-0") == nil {
+	if n != 1 || agentNamed(w0, "claude.superleo-worker-0") == nil {
 		t.Fatalf("worker-0's agents: %+v", w0.Agents)
 	}
-	w1 := hostByName(hs, "superai-worker-1")
+	w1 := hostByName(hs, "superleo-worker-1")
 	if w1 == nil || w1.Kind != "pod" || w1.Parent != "orange1" {
 		t.Fatalf("worker-1's pod: %+v", w1)
 	}
@@ -123,7 +123,7 @@ func TestHostsPutsAgentsOnTheirHosts(t *testing.T) {
 	for i, h := range hs {
 		index[h.ID] = i
 	}
-	if index["orange2"] > index["superai-worker-0"] || index["orange1"] > index["superai-worker-1"] {
+	if index["orange2"] > index["superleo-worker-0"] || index["orange1"] > index["superleo-worker-1"] {
 		t.Fatalf("parents after children: %v", index)
 	}
 
@@ -375,11 +375,11 @@ func TestHostsPutAnAgentOnEveryHostItIsOn(t *testing.T) {
 // agent) stays, and so does a pod's node that carries a worker.
 func TestOnlyWhatWorksIsDrawn(t *testing.T) {
 	in := HiveTopology{Hosts: []Host{
-		{ID: "orange1", Name: "orange1", Agents: []HostAgent{{Name: "orange1", Kind: "superai", Role: agentRoleMachine}}},
-		{ID: "superai-worker-1", Name: "superai-worker-1", Parent: "orange1", Agents: []HostAgent{{Name: "superai-worker-1", Kind: "superai", Role: "worker"}}},
-		{ID: "win11", Name: "win11", Agents: []HostAgent{{Name: "win11", Kind: "superai", Role: agentRoleMachine}}},
+		{ID: "orange1", Name: "orange1", Agents: []HostAgent{{Name: "orange1", Kind: "superleo", Role: agentRoleMachine}}},
+		{ID: "superleo-worker-1", Name: "superleo-worker-1", Parent: "orange1", Agents: []HostAgent{{Name: "superleo-worker-1", Kind: "superleo", Role: "worker"}}},
+		{ID: "win11", Name: "win11", Agents: []HostAgent{{Name: "win11", Kind: "superleo", Role: agentRoleMachine}}},
 		{ID: "sds-e", Name: "sds-e", Agents: []HostAgent{
-			{Name: "sds-e", Kind: "superai", Role: agentRoleRelay},
+			{Name: "sds-e", Kind: "superleo", Role: agentRoleRelay},
 			{Name: "openclaw", Kind: "agent", Via: "sds-e", State: "live"},
 		}},
 		// Only the settings know openclaw here, and it runs on sds-e.
@@ -387,7 +387,7 @@ func TestOnlyWhatWorksIsDrawn(t *testing.T) {
 			{Name: "openclaw", Kind: "agent", State: "configured"},
 		}},
 		{ID: "pro.local", Name: "mac", Agents: []HostAgent{
-			{Name: "mac", Kind: "superai", Role: "worker"},
+			{Name: "mac", Kind: "superleo", Role: "worker"},
 			{Name: "claude.mac", Kind: "cli", Via: "mac"},
 			{Name: "codex.mac", Kind: "cli", Via: "mac", State: "installed"},                  // can say it is signed in
 			{Name: "goose.mac", Kind: "cli", Via: "mac", State: "installed"},                  // cannot, and is not in use
@@ -406,7 +406,7 @@ func TestOnlyWhatWorksIsDrawn(t *testing.T) {
 	}
 	want := map[string][]string{
 		"orange1":          {}, // kept as the place its worker's pod is
-		"superai-worker-1": {"superai-worker-1"},
+		"superleo-worker-1": {"superleo-worker-1"},
 		"sds-e":            {"openclaw"},
 		"pro.local":        {"mac", "claude.mac", "codex.mac", "opencode.mac"},
 	}
@@ -421,9 +421,9 @@ func TestOnlyWhatWorksIsDrawn(t *testing.T) {
 func TestTheHAServiceSaysWhereItsClusterRuns(t *testing.T) {
 	top := withoutHA(HiveTopology{
 		Hosts: []Host{
-			{ID: "superai-worker-2", Name: "superai-worker-2", State: "live", Agents: []HostAgent{
-				{Name: "superai-worker-2", Kind: hostAgentSuperLeo, Role: "worker", State: "live"},
-				{Name: "openclaw", Kind: hostAgentNamed, State: "live", Via: "superai-worker-2", Service: "openclaw"},
+			{ID: "superleo-worker-2", Name: "superleo-worker-2", State: "live", Agents: []HostAgent{
+				{Name: "superleo-worker-2", Kind: hostAgentSuperLeo, Role: "worker", State: "live"},
+				{Name: "openclaw", Kind: hostAgentNamed, State: "live", Via: "superleo-worker-2", Service: "openclaw"},
 			}},
 			{ID: "sds-e", Name: "sds-e", State: "live", Agents: []HostAgent{
 				{Name: "hermes", Kind: hostAgentNamed, State: "configured", Service: "openclaw"},
@@ -441,7 +441,7 @@ func TestTheHAServiceSaysWhereItsClusterRuns(t *testing.T) {
 			t.Fatalf("%s is %s on a running cluster", g.Name, g.State)
 		}
 	}
-	if w := hostByName(top.Hosts, "superai-worker-2"); w == nil || agentNamed(w, "openclaw") != nil {
+	if w := hostByName(top.Hosts, "superleo-worker-2"); w == nil || agentNamed(w, "openclaw") != nil {
 		t.Fatalf("the worker keeps its SuperLeo and loses the copy: %+v", w)
 	}
 }

@@ -43,7 +43,7 @@ export interface WorldData {
   services?: HAService[];
 }
 
-const short = (n: string) => n.replace(/^superai-worker-/, "w").replace(/^superleo-/, "");
+const short = (n: string) => n.replace(/^superleo-worker-/, "w").replace(/^superleo-/, "");
 /** A tool as a screen line shows it: an MCP tool by its own name, not its server's. */
 const toolName = (t?: string) => (t && t.startsWith("mcp__") ? t.split("__").pop() || t : t || "");
 /** What a terminal session of a coding CLI is on, in one line: "superleo: Bash". */
@@ -987,7 +987,7 @@ export const cluster: District<WorldData> = {
           pd.position.set(p.cols.pods[i], SLAB_TOP, p.station && !p.small ? 1.2 : 0.2);
           grp.add(pd);
           ctx.pickable(pd, { kind: "host", id: h.id, title: h.name });
-          const sup = h.agents.filter((a) => a.kind === "superai").slice(0, 2);
+          const sup = h.agents.filter((a) => a.kind === "superleo").slice(0, 2);
           sup.forEach((a, k) => {
             const r = robot("worker");
             r.position.set(pd.position.x + (sup.length > 1 ? (k - 0.5) * 1.3 : 0), SLAB_TOP + 0.2, pd.position.z);
@@ -1003,7 +1003,7 @@ export const cluster: District<WorldData> = {
         p.loose.forEach((a, k) => {
           const x = p.cols.loose + k * 2.4;
           const z = p.station ? 1.6 : 0.4;
-          if (a.kind === "superai") {
+          if (a.kind === "superleo") {
             const r = robot("worker");
             r.position.set(x, SLAB_TOP, z);
             r.userData.base = SLAB_TOP;
@@ -1108,7 +1108,7 @@ export const cluster: District<WorldData> = {
         travel(before);
       }
       const agentOf = new Map<string, HostAgent>();
-      for (const h of hosts) for (const a of h.agents) if (a.kind === "superai") agentOf.set(a.name, a);
+      for (const h of hosts) for (const a of h.agents) if (a.kind === "superleo") agentOf.set(a.name, a);
 
       // Workers, in their pods.
       for (const [name, w] of workers) {

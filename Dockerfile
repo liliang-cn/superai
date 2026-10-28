@@ -16,7 +16,7 @@ COPY . .
 COPY --from=web /src/frontend/dist ./frontend/dist
 RUN go build -trimpath -ldflags "-s -w" -o /out/superleo . \
  && go build -trimpath -ldflags "-s -w" -o /out/superleo-daemon ./cmd/superleo-daemon \
- && go build -trimpath -ldflags "-s -w" -o /out/superai-hive-worker ./cmd/superai-hive-worker \
+ && go build -trimpath -ldflags "-s -w" -o /out/superleo-hive-worker ./cmd/superleo-hive-worker \
  && go build -trimpath -ldflags "-s -w" -o /out/cortexdb-mcp-stdio github.com/liliang-cn/cortexdb/v2/cmd/cortexdb-mcp-stdio
 
 FROM alpine:3.21 AS kubectl
@@ -32,7 +32,7 @@ RUN apk add --no-cache ca-certificates tzdata su-exec \
 COPY --from=go /out/ /usr/local/bin/
 # In a pod kubectl needs no kubeconfig: it reads the ServiceAccount token
 # mounted at /var/run/secrets, so what the agent may do is exactly what the
-# pod's Role says (deploy/k3s/superai-hive.yaml).
+# pod's Role says (deploy/k3s/superleo-hive.yaml).
 COPY --from=kubectl /kubectl /usr/local/bin/kubectl
 COPY deploy/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 ENV SUPERLEO_HOME=/data SUPERLEO_NO_BROWSER=1

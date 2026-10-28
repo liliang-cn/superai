@@ -257,14 +257,14 @@ func TestTheUIEventCarriesKindLinkAndActionsOnlyWhenSet(t *testing.T) {
 	n.SetEmitter(ui.sink())
 	n.Raise(context.Background(), Notice{
 		ID: "post-1", Title: "价格提醒", Message: "NVDA 跌破 160", Kind: KindAlert,
-		Deeplink: "superai://chat?prompt=NVDA", Actions: []NoticeAction{{Label: "看看", Say: "NVDA 怎么了"}},
+		Deeplink: "superleo://chat?prompt=NVDA", Actions: []NoticeAction{{Label: "看看", Say: "NVDA 怎么了"}},
 	})
 	n.Raise(context.Background(), Notice{Message: "plain"})
 	ev := ui.list()
 	if len(ev) != 2 {
 		t.Fatalf("events %v", ev)
 	}
-	if ev[0]["id"] != "post-1" || ev[0]["kind"] != KindAlert || ev[0]["deeplink"] != "superai://chat?prompt=NVDA" {
+	if ev[0]["id"] != "post-1" || ev[0]["kind"] != KindAlert || ev[0]["deeplink"] != "superleo://chat?prompt=NVDA" {
 		t.Errorf("payload %#v", ev[0])
 	}
 	if acts, _ := ev[0]["actions"].([]NoticeAction); len(acts) != 1 || acts[0].Say != "NVDA 怎么了" {

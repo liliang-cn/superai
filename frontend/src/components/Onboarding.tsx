@@ -97,7 +97,7 @@ export default function Onboarding({ onDone, web = false, start = "ask" }: {
     setErr("");
     try {
       const c = await PairPhone();
-      const link = c.link || `superai://pair?server=${encodeURIComponent(window.location.origin)}&code=${c.code}`;
+      const link = c.link || `superleo://pair?server=${encodeURIComponent(window.location.origin)}&code=${c.code}`;
       const qr = await QRCode.toDataURL(link, { margin: 1, width: 360, errorCorrectionLevel: "M" });
       setPhone({ code: c.code, qr, expires: new Date(c.expires_at as unknown as string).getTime() });
     } catch (e) {

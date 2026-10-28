@@ -164,5 +164,5 @@ export function engineByline(m: { engine?: string; standInFor?: string }): strin
 /** Who answers for the queen now when it is not her engine: "SuperLeo",
  *  answering in its place. Empty when the engine is answering. */
 export function queenEngineNote(engine?: string, now?: string): string {
-  return engine && now === "superai" ? "SuperLeo" : "";
+  return engine && now === "superleo" ? "SuperLeo" : "";
 }

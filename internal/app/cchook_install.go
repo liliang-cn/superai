@@ -60,7 +60,7 @@ var ccHookSpecs = []ccHookSpec{
 const ccSlimHookName = "superleo-cchook"
 
 // slimHookRE finds `superleo-cchook <Event>` in a hook command — or
-// `superai-cchook`, the name it was installed under before the rename, so an
+// `superleo-cchook`, the name it was installed under before the rename, so an
 // old entry is replaced rather than left beside the new one.
 var slimHookRE = regexp.MustCompile(`(?:^|[/\s'"])super(?:leo|ai)-cchook['"]?\s+([A-Za-z]+)`)
 
@@ -87,7 +87,7 @@ func slimHookBeside(bin string) string {
 }
 
 // ourHookRE finds `superleo hook <Event>` in a hook command, whatever the
-// path to the binary and however it is quoted; `superai hook` too, as it
+// path to the binary and however it is quoted; `superleo hook` too, as it
 // was installed before the rename.
 var ourHookRE = regexp.MustCompile(`(?:^|[/\s'"])super(?:leo|ai)['"]?\s+hook\s+([A-Za-z]+)`)
 

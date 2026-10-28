@@ -69,7 +69,7 @@ func TestEveryNameTheQueenAnswersToMatchesExactly(t *testing.T) {
 			t.Fatalf("%q not hers", n)
 		}
 	}
-	for _, n := range []string{"", "小", "bees", "superai-queen", "worker-1"} {
+	for _, n := range []string{"", "小", "bees", "superleo-queen", "worker-1"} {
 		if s.IsQueenName(n) {
 			t.Fatalf("%q taken as hers", n)
 		}
@@ -90,7 +90,7 @@ func TestAQueenNameMustBeAddressable(t *testing.T) {
 }
 
 func TestThePersonaCarriesTheQueensName(t *testing.T) {
-	s := &Settings{QueenName: "小蜂", QueenAliases: []string{"bee"}, Hive: HiveSettings{Role: HiveRoleQueen, Name: "superai-queen"}}
+	s := &Settings{QueenName: "小蜂", QueenAliases: []string{"bee"}, Hive: HiveSettings{Role: HiveRoleQueen, Name: "superleo-queen"}}
 	p := buildPersona(time.Now(), false, false) + hiveSection(s.Hive) + queenNameSection(s)
 	for _, want := range []string{"The person calls you 小蜂", "queen, bee also mean you", "Call yourself 小蜂"} {
 		if !strings.Contains(p, want) {

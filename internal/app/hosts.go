@@ -55,14 +55,14 @@ const hostKindHA = "ha"
 
 // What an agent on a host is.
 const (
-	hostAgentSuperLeo = "superai" // a SuperLeo process: core, a worker, superleo agent
+	hostAgentSuperLeo = "superleo" // a SuperLeo process: core, a worker, superleo agent
 	hostAgentCLI     = "cli"     // a coding CLI installed there: claude, codex, ...
 	hostAgentNamed   = "agent"   // a named agent a SuperLeo serves: openclaw, hermes, pi
 )
 
 // HostAgent is one agent on a host.
 type HostAgent struct {
-	// Name is what to call it by with @: "superai-worker-1", "claude.mac",
+	// Name is what to call it by with @: "superleo-worker-1", "claude.mac",
 	// "openclaw".
 	Name string `json:"name"`
 	Kind string `json:"kind"`

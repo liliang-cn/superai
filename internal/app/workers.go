@@ -24,7 +24,7 @@ import (
 // HiveWorker is one agent that can work, as the screens count it.
 type HiveWorker struct {
 	Name string `json:"name"`
-	// Kind is superai (a SuperLeo process; the value clients know), cli or agent, as on the host it is on.
+	// Kind is superleo (a SuperLeo process; the value clients know), cli or agent, as on the host it is on.
 	Kind string `json:"kind"`
 	// Host is the machine it runs on, by name: where it is, not what it is.
 	Host string `json:"host"`

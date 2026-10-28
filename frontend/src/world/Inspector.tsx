@@ -92,7 +92,7 @@ export default function Inspector({ picked, data, onClose, open, openDash }: {
       const now = mine.find((x) => x.state === "running");
       kind = "Worker";
       rows.push(["State", m?.state === "lost" ? "Not answering" : now ? "Working" : "Idle"]);
-      const on = data.hosts?.find((h) => h.agents.some((a) => a.kind === "superai" && a.name === picked.id));
+      const on = data.hosts?.find((h) => h.agents.some((a) => a.kind === "superleo" && a.name === picked.id));
       if (on) rows.push([kindLabel(on.kind), on.parent ? `${on.name} · ${data.hosts?.find((h) => h.id === on.parent)?.name ?? on.parent}` : on.name]);
       if (now) rows.push(["Doing", now.prompt]);
       if (p) rows.push(["Tokens", fmt(p.tokens)], ["Tool calls", String(p.calls)]);
@@ -638,7 +638,7 @@ const roleLabel = (r?: string) => (r === "queen" ? "queen" : r === "worker" ? "w
  */
 function HostCard({ host, data, withControls, onRun, busy }: { host: Host; data: WorldData; withControls: boolean; onRun?: (agent: string, prompt: string) => Promise<unknown>; busy?: boolean }) {
   const { t } = useI18n();
-  const sup = host.agents.filter((a) => a.kind === "superai");
+  const sup = host.agents.filter((a) => a.kind === "superleo");
   const clis = host.agents.filter((a) => a.kind === "cli");
   const named = host.agents.filter((a) => a.kind === "agent");
   const inside = (data.hosts ?? []).filter((x) => x.parent === host.id);
@@ -649,7 +649,7 @@ function HostCard({ host, data, withControls, onRun, busy }: { host: Host; data:
   const runVia = core ? "core" : machine?.name ?? clis[0]?.via;
   const stateWord = (a: HostAgent) => t(a.state === "standby-unready" ? "standby · not ready" : a.state);
   const focusOf = (a: HostAgent) => {
-    if (a.kind === "superai") return isCore(a) ? focusInWorld("hall", "queen") : focusInWorld("worker", a.name);
+    if (a.kind === "superleo") return isCore(a) ? focusInWorld("hall", "queen") : focusInWorld("worker", a.name);
     if (a.kind === "cli") return focusInWorld("cli", core ? cliName(a) : `${cliName(a)}.${a.via}`);
     if (isStandby(a)) return focusInWorld("service", a.service || a.name);
     return focusInWorld("agent", `${a.name}.${a.via || host.name}`);
@@ -684,7 +684,7 @@ function HostCard({ host, data, withControls, onRun, busy }: { host: Host; data:
           {inside.map((x) => (
             <li key={x.id} onClick={() => focusInWorld("host", x.id)}>
               <i className={`wi-dot ${x.state === "live" ? "done" : x.state === "lost" ? "failed" : ""}`} />{x.name}
-              <em>{[t(kindLabel(x.kind)), x.agents.filter((a) => a.kind === "superai").map((a) => t(roleLabel(a.role))).join(", ")].filter(Boolean).join(" · ")}</em>
+              <em>{[t(kindLabel(x.kind)), x.agents.filter((a) => a.kind === "superleo").map((a) => t(roleLabel(a.role))).join(", ")].filter(Boolean).join(" · ")}</em>
             </li>
           ))}
         </ul>

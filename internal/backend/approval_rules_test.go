@@ -63,10 +63,10 @@ func TestSubjectOfReadsAskerMachineAndTarget(t *testing.T) {
 
 func TestCommandPrefixStopsAtTheFirstVariableArgument(t *testing.T) {
 	ok := map[string]string{
-		"kubectl -n superleo rollout restart deployment/superai-worker": "kubectl -n superleo rollout restart",
+		"kubectl -n superleo rollout restart deployment/superleo-worker": "kubectl -n superleo rollout restart",
 		"go test ./internal/...":                       "go test",
 		"git commit -m 'fix the thing'":                "git commit -m",
-		"kubectl -n superleo logs superai-worker-7d9f8": "kubectl -n superleo logs",
+		"kubectl -n superleo logs superleo-worker-7d9f8": "kubectl -n superleo logs",
 	}
 	for cmd, want := range ok {
 		if got, found := CommandPrefix(cmd); !found || got != want {
@@ -101,7 +101,7 @@ func TestCommandPrefixStopsAtTheFirstVariableArgument(t *testing.T) {
 }
 
 func TestPrefixRuleMatchesOnlySimpleCommandsWithThoseWords(t *testing.T) {
-	r, err := RuleFromApproval(workerShell("orange2", "kubectl -n superleo rollout restart deployment/superai-worker"),
+	r, err := RuleFromApproval(workerShell("orange2", "kubectl -n superleo rollout restart deployment/superleo-worker"),
 		RememberSameCommandPrefix, true)
 	if err != nil {
 		t.Fatal(err)
@@ -110,8 +110,8 @@ func TestPrefixRuleMatchesOnlySimpleCommandsWithThoseWords(t *testing.T) {
 		t.Fatalf("rule = %+v", r)
 	}
 	match := []string{
-		"kubectl -n superleo rollout restart deployment/superai-worker",
-		"kubectl -n superleo rollout restart deployment/superai-queen",
+		"kubectl -n superleo rollout restart deployment/superleo-worker",
+		"kubectl -n superleo rollout restart deployment/superleo-queen",
 		"kubectl  -n superleo rollout restart   deployment/x",
 	}
 	for _, c := range match {
@@ -182,7 +182,7 @@ func TestPathRuleCoversTheProjectAndNothingBeside(t *testing.T) {
 }
 
 func TestSuggestionsAreNarrowestFirstAndWorded(t *testing.T) {
-	sug := SuggestApprovalRules(workerShell("orange2", "kubectl -n superleo rollout restart deployment/superai-worker"))
+	sug := SuggestApprovalRules(workerShell("orange2", "kubectl -n superleo rollout restart deployment/superleo-worker"))
 	if len(sug) != 3 {
 		t.Fatalf("suggestions = %+v", sug)
 	}
@@ -192,7 +192,7 @@ func TestSuggestionsAreNarrowestFirstAndWorded(t *testing.T) {
 	if want := "以后在 orange2 上运行以 “kubectl -n superleo rollout restart” 开头的命令都不用问"; sug[0].Label != want {
 		t.Errorf("prefix label = %q", sug[0].Label)
 	}
-	if want := "以后在 orange2 上重启 superai-worker 都不用问"; sug[1].Label != want {
+	if want := "以后在 orange2 上重启 superleo-worker 都不用问"; sug[1].Label != want {
 		t.Errorf("exact label = %q", sug[1].Label)
 	}
 	if want := "以后在 orange2 上运行任何命令都不用问"; sug[2].Label != want {
@@ -200,7 +200,7 @@ func TestSuggestionsAreNarrowestFirstAndWorded(t *testing.T) {
 	}
 	// What a suggestion shows is what remembering it saves.
 	for _, s := range sug {
-		r, err := RuleFromApproval(workerShell("orange2", "kubectl -n superleo rollout restart deployment/superai-worker"), s.Scope, true)
+		r, err := RuleFromApproval(workerShell("orange2", "kubectl -n superleo rollout restart deployment/superleo-worker"), s.Scope, true)
 		if err != nil || ruleKey(r) != ruleKey(s.Rule) || r.Label != s.Label {
 			t.Errorf("scope %s saved %+v, suggested %+v (%v)", s.Scope, r, s.Rule, err)
 		}
