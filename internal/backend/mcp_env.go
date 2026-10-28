@@ -60,6 +60,22 @@ func expandMCPEnv(s string, lookup func(string) (string, bool)) (string, []strin
 func expandMCPEntry(entry map[string]any, lookup func(string) (string, bool)) (map[string]any, []string) {
 	out := make(map[string]any, len(entry))
 	missing := map[string]bool{}
+	// A variable the entry sets in its own env is there for its args and
+	// headers too: mcp-remote's documented form is
+	// "--header", "Authorization:${AUTH}" with "env": {"AUTH": "Bearer …"},
+	// and the token is in no shell. The process's own value still wins.
+	if own, ok := entry["env"].(map[string]any); ok && len(own) > 0 {
+		outer := lookup
+		lookup = func(k string) (string, bool) {
+			if v, ok := outer(k); ok {
+				return v, true
+			}
+			if v, ok := own[k].(string); ok && !strings.Contains(v, "${") {
+				return v, true
+			}
+			return "", false
+		}
+	}
 	str := func(v string) string {
 		s, miss := expandMCPEnv(v, lookup)
 		for _, m := range miss {
