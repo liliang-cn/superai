@@ -105,7 +105,7 @@ func TestTheSmallHookIsUsedOnlyWhenItIsThere(t *testing.T) {
 		t.Fatalf("PostToolUse: %v", got)
 	}
 	for cmd, want := range map[string]bool{
-		slim + " PreToolUse":               true,
+		slim + " PreToolUse":                true,
 		"'/a b/superleo-cchook' PreToolUse": true,
 		"/x/superleo hook PreToolUse":       false,
 		"/x/superleo-cchook PostToolUse":    false,

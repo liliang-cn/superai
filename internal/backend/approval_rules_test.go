@@ -64,8 +64,8 @@ func TestSubjectOfReadsAskerMachineAndTarget(t *testing.T) {
 func TestCommandPrefixStopsAtTheFirstVariableArgument(t *testing.T) {
 	ok := map[string]string{
 		"kubectl -n superleo rollout restart deployment/superleo-worker": "kubectl -n superleo rollout restart",
-		"go test ./internal/...":                       "go test",
-		"git commit -m 'fix the thing'":                "git commit -m",
+		"go test ./internal/...":                         "go test",
+		"git commit -m 'fix the thing'":                  "git commit -m",
 		"kubectl -n superleo logs superleo-worker-7d9f8": "kubectl -n superleo logs",
 	}
 	for cmd, want := range ok {

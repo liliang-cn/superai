@@ -122,7 +122,7 @@ func TestWakeSendsASilentPush(t *testing.T) {
 	}
 
 	var p struct {
-		APS     map[string]any `json:"aps"`
+		APS      map[string]any `json:"aps"`
 		SuperLeo map[string]any `json:"superleo"`
 	}
 	if err := json.Unmarshal(body, &p); err != nil {

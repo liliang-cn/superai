@@ -341,7 +341,7 @@ func TestClusterCallsAreAlwaysAsked(t *testing.T) {
 	// The card says what and where.
 	for args, want := range map[string]string{
 		`{"machine":"orange1","action":"exec","command":"df -h"}`:     "df -h   on orange1",
-		`{"machine":"","action":"restart","service":"superleo"}`:       "restart superleo   on core",
+		`{"machine":"","action":"restart","service":"superleo"}`:      "restart superleo   on core",
 		`{"machine":"sds-b","action":"stop","service":"openclaw-gw"}`: "stop openclaw-gw   on sds-b",
 	} {
 		var m map[string]any

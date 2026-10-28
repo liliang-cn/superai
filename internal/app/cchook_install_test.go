@@ -219,7 +219,7 @@ func TestOnlyAnOptedInSettingsFileIsUpgraded(t *testing.T) {
 		"/x/superleo hook Stop":                             "/x/superleo",
 		"'/a b/superleo' hook PermissionRequest --wait 100": "/a b/superleo",
 		"superleo hook Stop":                                "superleo",
-		"/opt/homebrew/bin/anywhered PreToolUse":           "",
+		"/opt/homebrew/bin/anywhered PreToolUse":            "",
 	} {
 		if got := hookCommandBinary(cmd); got != want {
 			t.Errorf("hookCommandBinary(%q) = %q, want %q", cmd, got, want)
@@ -239,12 +239,12 @@ func TestOnlyAnOptedInSettingsFileIsUpgraded(t *testing.T) {
 		t.Fatal("anywhered's hook taken for SuperLeo's")
 	}
 	for cmd, want := range map[string]bool{
-		"/x/superleo hook Stop":                  true,
-		"'/a b/superleo' hook Stop":              true,
-		"superleo hook Stop --flag":              true,
+		"/x/superleo hook Stop":                 true,
+		"'/a b/superleo' hook Stop":             true,
+		"superleo hook Stop --flag":             true,
 		"/opt/homebrew/bin/anywhered hook Stop": false,
-		"/x/superleo-desktop hook Stop":          false,
-		"/x/superleo hook StopFailure":           false,
+		"/x/superleo-desktop hook Stop":         false,
+		"/x/superleo hook StopFailure":          false,
 	} {
 		if got := isOurHook(cmd, "Stop"); got != want {
 			t.Errorf("isOurHook(%q) = %v", cmd, got)

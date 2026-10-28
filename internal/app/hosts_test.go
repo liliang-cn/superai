@@ -405,10 +405,10 @@ func TestOnlyWhatWorksIsDrawn(t *testing.T) {
 		}
 	}
 	want := map[string][]string{
-		"orange1":          {}, // kept as the place its worker's pod is
+		"orange1":           {}, // kept as the place its worker's pod is
 		"superleo-worker-1": {"superleo-worker-1"},
-		"sds-e":            {"openclaw"},
-		"pro.local":        {"mac", "claude.mac", "codex.mac", "opencode.mac"},
+		"sds-e":             {"openclaw"},
+		"pro.local":         {"mac", "claude.mac", "codex.mac", "opencode.mac"},
 	}
 	if fmt.Sprint(got) != fmt.Sprint(want) {
 		t.Fatalf("drawn = %v\nwant    %v", got, want)

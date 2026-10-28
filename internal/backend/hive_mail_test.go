@@ -57,7 +57,7 @@ func TestAnUnreachablePeerIsReachedThroughTheQueen(t *testing.T) {
 	dead := "http://" + ln.Addr().String()
 	ln.Close()
 	contacts := map[string]HiveContact{
-		"queen":            {Name: "queen", Queen: true},
+		"queen":             {Name: "queen", Queen: true},
 		"superleo-worker-7": {Name: "superleo-worker-7", URL: dead},
 	}
 	var viaQueen []HiveMessage

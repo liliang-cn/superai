@@ -56,8 +56,8 @@ const hostKindHA = "ha"
 // What an agent on a host is.
 const (
 	hostAgentSuperLeo = "superleo" // a SuperLeo process: core, a worker, superleo agent
-	hostAgentCLI     = "cli"     // a coding CLI installed there: claude, codex, ...
-	hostAgentNamed   = "agent"   // a named agent a SuperLeo serves: openclaw, hermes, pi
+	hostAgentCLI      = "cli"      // a coding CLI installed there: claude, codex, ...
+	hostAgentNamed    = "agent"    // a named agent a SuperLeo serves: openclaw, hermes, pi
 )
 
 // HostAgent is one agent on a host.

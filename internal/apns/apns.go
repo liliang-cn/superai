@@ -167,7 +167,7 @@ func signES256(key *ecdsa.PrivateKey, header, claims map[string]any) (string, er
 // "superleo" key (what the phone apps read). env is "sandbox" or "production"; empty takes the config's.
 func (c *Client) Wake(ctx context.Context, deviceToken, env string, data any) error {
 	payload, err := json.Marshal(map[string]any{
-		"aps":     map[string]any{"content-available": 1},
+		"aps":      map[string]any{"content-available": 1},
 		"superleo": data,
 	})
 	if err != nil {

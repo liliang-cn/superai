@@ -134,14 +134,14 @@ func TestCLIHooksInstallBesideTheirConfig(t *testing.T) {
 		}
 	}
 	others := map[string]string{
-		filepath.Join(oc, "opencode.jsonc"):             "{\n  // mine\n  \"model\": \"linode/gemini\",\n  \"plugin\": [\"opencode-wakatime\"]\n}\n",
-		filepath.Join(oc, "package.json"):               `{"dependencies":{"@opencode-ai/plugin":"1.18.3"}}`,
-		filepath.Join(oc, "plugins", "mine.ts"):         "export const Mine = async () => ({})\n",
-		filepath.Join(oc, "node_modules", "x", "i.js"):  "module.exports = 1\n",
-		filepath.Join(pi, "settings.json"):              `{"theme":"light"}`,
-		filepath.Join(pi, "extensions", "hello.ts"):     "export default function () {}\n",
-		filepath.Join(cx, "config.toml"):                "model = \"gpt\"\n[features]\nhooks = true\n",
-		filepath.Join(cx, "hooks.json"):                 codexHooksJSON,
+		filepath.Join(oc, "opencode.jsonc"):              "{\n  // mine\n  \"model\": \"linode/gemini\",\n  \"plugin\": [\"opencode-wakatime\"]\n}\n",
+		filepath.Join(oc, "package.json"):                `{"dependencies":{"@opencode-ai/plugin":"1.18.3"}}`,
+		filepath.Join(oc, "plugins", "mine.ts"):          "export const Mine = async () => ({})\n",
+		filepath.Join(oc, "node_modules", "x", "i.js"):   "module.exports = 1\n",
+		filepath.Join(pi, "settings.json"):               `{"theme":"light"}`,
+		filepath.Join(pi, "extensions", "hello.ts"):      "export default function () {}\n",
+		filepath.Join(cx, "config.toml"):                 "model = \"gpt\"\n[features]\nhooks = true\n",
+		filepath.Join(cx, "hooks.json"):                  codexHooksJSON,
 		filepath.Join(oc, "plugins", "superleo-old.txt"): "not ours to touch",
 	}
 	for p, s := range others {
