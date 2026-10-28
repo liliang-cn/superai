@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useStickToBottom } from "../lib/useStickToBottom";
-import { ArrowUpIcon, MessageSquareIcon, PlusIcon, MinusIcon, ChevronDownIcon } from "lucide-react";
+import { useAttachments } from "../lib/useAttachments";
+import AttachmentChips from "../components/AttachmentChips";
+import { ArrowUpIcon, MessageSquareIcon, PlusIcon, MinusIcon, ChevronDownIcon, PaperclipIcon } from "lucide-react";
 import { ChatHistory, HiveRetire, HiveSpawn, SendChat } from "../../wailsjs/go/app/App";
 import { earlyError, requestSetup, useReady } from "../lib/ready";
 import { engineByline, visibleAnswer } from "../lib/format";
@@ -85,6 +87,9 @@ export default function Command({ view, onConversation, onTyping, hosts }: {
   }, []);
   // The thread stays on its newest line; sending brings it back down.
   const thread = useStickToBottom<HTMLDivElement>();
+  // Files and pictures: the paperclip, or pasted (⌘V). Drops stay with the
+  // chat page, which has the runtime's one drop handler.
+  const attach = useAttachments({ drop: false });
   useEffect(() => {
     if (lines[lines.length - 1]?.who === "you") thread.follow();
   }, [lines]);
@@ -156,19 +161,21 @@ export default function Command({ view, onConversation, onTyping, hosts }: {
   }, [req]);
 
   const send = async () => {
-    const s = text.trim();
-    if (!s || req) return;
+    const typed = text.trim();
+    if ((!typed && attach.paths.length === 0) || req) return;
+    const { payload: s, images } = attach.build(typed);
     // Nothing to think with: say so and open the setup, keeping the words.
     if (ready === false) { requestSetup(); return; }
     setText("");
     mentions.close();
     say("queen", "", "think", 120);
-    setLines((l) => [...l, { who: "you" as const, text: s }].slice(-12));
+    attach.clear();
+    setLines((l) => [...l, { who: "you" as const, text: typed || s }].slice(-12));
     setStep("");
     raw.current = "";
     mine.current = s;
     try {
-      const id = await SendChat(queenSession(), s, []);
+      const id = await SendChat(queenSession(), s, images);
       reqRef.current = id;
       mine.current = "";
       // Failed before its id came back: no event will follow.
@@ -233,6 +240,7 @@ export default function Command({ view, onConversation, onTyping, hosts }: {
         ))}
         <button className={`wc-act${open ? " on" : ""}`} title={t("The conversation")} onClick={() => setOpen((v) => !v)}><MessageSquareIcon size={14} /></button>
         <form className="wc-say" onSubmit={(e) => { e.preventDefault(); void send(); }}>
+          {attach.paths.length > 0 && <div className="wc-files"><AttachmentChips paths={attach.paths} onRemove={attach.remove} /></div>}
           <AgentMenu
             matches={mentions.matches}
             active={mentions.active}
@@ -244,6 +252,7 @@ export default function Command({ view, onConversation, onTyping, hosts }: {
           <span className="wc-prompt">›</span>
           <input ref={box} value={text} onChange={(e) => type(e.target.value, e.target.selectionStart ?? e.target.value.length)}
             onBlur={mentions.close}
+            onPaste={attach.paste}
             placeholder={t(lines.length ? "Reply to {name}… @ for a worker or an agent" : "Tell {name}, from anywhere. @ for a worker or an agent", { name: queenRef(queen) })}
             onCompositionStart={ime.handlers.onCompositionStart} onCompositionEnd={ime.handlers.onCompositionEnd}
             onKeyDown={(e) => {
@@ -251,7 +260,8 @@ export default function Command({ view, onConversation, onTyping, hosts }: {
               // Picking a name with Enter must never also send.
               mentions.onKeyDown(e);
             }} />
-          <button type="submit" disabled={!text.trim() || !!req} title={t("Send")}><ArrowUpIcon size={16} /></button>
+          <button type="button" className="wc-clip" onClick={attach.pick} disabled={attach.importing} title={t("Attach")} data-testid="wc-attach"><PaperclipIcon size={15} /></button>
+          <button type="submit" disabled={(!text.trim() && attach.paths.length === 0) || !!req} title={t("Send")}><ArrowUpIcon size={16} /></button>
         </form>
       </div>
     </div>

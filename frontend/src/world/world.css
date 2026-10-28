@@ -200,6 +200,10 @@
 .wc-say input { flex: 1; min-width: 0; height: 34px; border: 0; background: transparent; outline: none; font: 13.5px Geist, system-ui, sans-serif; color: #16202b; }
 .wc-say button { width: 28px; height: 28px; border: 0; border-radius: 8px; background: #16202b; color: #fff; display: grid; place-items: center; cursor: pointer; }
 .wc-say button:disabled { opacity: 0.3; cursor: default; }
+.wc-say button.wc-clip { background: transparent; color: #4f5e68; }
+.wc-say button.wc-clip:hover { background: #e8ecf0; }
+.wc-files { position: absolute; left: 0; right: 0; bottom: calc(100% + 8px); }
+.wc-files > div { padding: 6px 8px; background: #fff; border-radius: 10px; box-shadow: 0 6px 20px rgba(20, 30, 40, .12); }
 /* The @ menu, above the line: who the queen can hand work to. */
 .wc-say { position: relative; }
 .wc-say .agent-menu { left: -6px; right: -6px; bottom: calc(100% + 14px); max-width: none; margin: 0; max-height: 300px; border-radius: 12px;

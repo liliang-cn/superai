@@ -28,7 +28,8 @@ export interface Attachments {
  * Attachment handling shared by the Chat and Agent views: native OS file drop,
  * the file picker, and the payload both views send.
  */
-export function useAttachments(): Attachments {
+export function useAttachments(opts: { drop?: boolean } = {}): Attachments {
+  const drop = opts.drop ?? true;
   const [paths, setPaths] = useState<string[]>([]);
   const [importing, setImporting] = useState(false);
 
@@ -38,7 +39,9 @@ export function useAttachments(): Attachments {
   }, []);
 
   // Native OS file drop -> copy into the agent workspace -> attach the path.
+  // Only one composer on screen takes drops: the runtime has one handler.
   useEffect(() => {
+    if (!drop) return;
     OnFileDrop((_x, _y, dropped) => {
       if (!dropped || dropped.length === 0) return;
       setImporting(true);
@@ -48,7 +51,7 @@ export function useAttachments(): Attachments {
         .finally(() => setImporting(false));
     }, true);
     return () => OnFileDropOff();
-  }, [add]);
+  }, [add, drop]);
 
   const pick = useCallback(() => {
     setImporting(true);
