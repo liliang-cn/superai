@@ -185,6 +185,7 @@ func NewService(s *Settings) (*Service, error) {
 			Name: "brain", BaseURL: s.LLMBaseURL, Key: s.LLMKey,
 			ModelName: s.LLMModel, MaxConcurrency: 5, Capability: 8,
 			ReasoningEffort: s.LLMReasoningEffort,
+			NativeWebSearch: brainNativeSearch(s),
 		}},
 	})
 	if err != nil {
@@ -481,10 +482,14 @@ func NewService(s *Settings) (*Service, error) {
 	if strings.TrimSpace(s.SearchModel) == "" {
 		searchEffort = s.LLMReasoningEffort
 	}
-	agent.RegisterWebSearchTool(svc, agent.WebSearchConfig{
-		BaseURL: searchBase, APIKey: searchKey, Model: searchModel,
-		Native: searchNative, ReasoningEffort: searchEffort,
-	})
+	// A brain that searches itself has the provider's web_search beside its
+	// tools; ours would take the name and the provider's would be dropped.
+	if !s.BrainSearchesItself() {
+		agent.RegisterWebSearchTool(svc, agent.WebSearchConfig{
+			BaseURL: searchBase, APIKey: searchKey, Model: searchModel,
+			Native: searchNative, ReasoningEffort: searchEffort,
+		})
+	}
 
 	// --- Life-assistant store + tools (ported from examples/superleo). ---
 	out.dashboards = newDashboardStore(filepath.Join(cfg.DataDir(), "dashboards.json"))

@@ -5,12 +5,14 @@ package backend
 import (
 	"encoding/json"
 	_ "github.com/liliang-cn/superleo/internal/brand" // the old SuperLeo names keep working
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/liliang-cn/agent-go/v3/pkg/agent"
+	"github.com/liliang-cn/agent-go/v3/pkg/domain"
 	"github.com/liliang-cn/agent-go/v3/pkg/pool"
 )
 
@@ -64,9 +66,11 @@ type Settings struct {
 	SearchKey     string `json:"search_key"`
 	SearchModel   string `json:"search_model"`
 	// SearchNative names the field that turns that endpoint's search on:
-	// google_search (a Gemini gateway), openai, dashscope or none. Empty sends
-	// both the OpenAI and the DashScope field, which a Gemini gateway accepts
-	// and ignores — the call then answers without searching.
+	// google_search (a Gemini gateway), openai, dashscope, anthropic or none.
+	// Empty sends both the OpenAI and the DashScope field, which a Gemini
+	// gateway accepts and ignores — the call then answers without searching;
+	// with the brain on api.anthropic.com and no search endpoint of its own,
+	// empty means anthropic (BrainSearchesItself).
 	SearchNative string `json:"search_native"`
 
 	// SearXNGURL points the builtin websearch MCP at a self-hosted SearXNG
@@ -750,6 +754,33 @@ func (s *Settings) Save() error {
 // for, and a search-grounded model behind it answers a grounded request. A
 // dedicated search endpoint is configured by filling the Search* fields (or
 // SEARCH_BASE / SEARCH_KEY / SEARCH_MODEL).
+// BrainSearchesItself reports whether the brain's own requests carry the
+// provider's web search: Anthropic's API takes its search tool beside the
+// function tools, so there the model searches in the same call instead of
+// through a web_search tool of ours. search_native, when set, decides.
+func (s *Settings) BrainSearchesItself() bool {
+	if s == nil {
+		return false
+	}
+	switch strings.TrimSpace(s.SearchNative) {
+	case string(domain.NativeWebSearchAnthropic):
+		return true
+	case "":
+		u, err := url.Parse(strings.TrimSpace(s.LLMBaseURL))
+		return err == nil && strings.EqualFold(u.Hostname(), "api.anthropic.com") && strings.TrimSpace(s.SearchBaseURL) == ""
+	}
+	return false
+}
+
+// brainNativeSearch is what the brain declares to its provider: "anthropic"
+// when it searches itself, otherwise undeclared, as it has always been.
+func brainNativeSearch(s *Settings) string {
+	if s.BrainSearchesItself() {
+		return string(domain.NativeWebSearchAnthropic)
+	}
+	return ""
+}
+
 func (s *Settings) WebSearch() (baseURL, key, model string) {
 	if s == nil {
 		return "", "", ""
