@@ -4,11 +4,12 @@
 // (app/first_run.go). It ends with SuperAI able to answer, or with the person
 // saying "later", never in a window that silently cannot reply.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import QRCode from "qrcode";
 import Sky from "../canvas/Sky";
 import "../canvas/canvas.css";
 import { loadTheme, themeVars } from "../canvas/theme";
-import { CheckModel, DetectAgents, FinishOnboarding, GetSettings, SaveSettings } from "../../wailsjs/go/app/App";
+import { CheckModel, DetectAgents, FinishOnboarding, GetSettings, PairedDevices, PairPhone, SaveSettings } from "../../wailsjs/go/app/App";
 import { backend } from "../../wailsjs/go/models";
 import { useI18n } from "../lib/i18n";
 import { machine } from "../lib/machine";
@@ -41,7 +42,7 @@ export default function Onboarding({ onDone, web = false, start = "ask" }: {
 }) {
   const { t } = useI18n();
   const theme = loadTheme();
-  const [step, setStep] = useState<"looking" | "found" | "model" | "key">(start === "model" ? "model" : "looking");
+  const [step, setStep] = useState<"looking" | "found" | "model" | "key" | "phone">(start === "model" ? "model" : "looking");
   const [pick, setPick] = useState("");
   // Where the agents are looked for: this Mac, or the machine a browser's
   // SuperAI runs on.
@@ -74,12 +75,56 @@ export default function Onboarding({ onDone, web = false, start = "ask" }: {
   };
   // The agents on the host are looked for at once: they are the first way to think.
   useEffect(() => { if (step === "looking" && !looked) void look(); }, []);
+  // The last step: the phone. Skipped when one is paired already.
+  const [phone, setPhone] = useState<{ code: string; qr: string; expires: number } | null>(null);
+  const [left, setLeft] = useState(0);
+  const [joined, setJoined] = useState("");
+  const known = useRef<Set<string> | null>(null);
+  const done = async () => {
+    try {
+      const ds = (await PairedDevices()) ?? [];
+      if (ds.length > 0) { onDone(); return; }
+      known.current = new Set();
+    } catch {
+      onDone();
+      return;
+    }
+    setBusy(false);
+    setStep("phone");
+    void newCode();
+  };
+  const newCode = async () => {
+    setErr("");
+    try {
+      const c = await PairPhone();
+      const link = c.link || `superai://pair?server=${encodeURIComponent(window.location.origin)}&code=${c.code}`;
+      const qr = await QRCode.toDataURL(link, { margin: 1, width: 360, errorCorrectionLevel: "M" });
+      setPhone({ code: c.code, qr, expires: new Date(c.expires_at as unknown as string).getTime() });
+    } catch (e) {
+      setErr(String((e as Error)?.message ?? e));
+    }
+  };
+  // The countdown, and the phone that claims the code, seen without a reload.
+  useEffect(() => {
+    if (step !== "phone" || !phone || joined) return;
+    const tick = () => setLeft(Math.max(0, Math.ceil((phone.expires - Date.now()) / 1000)));
+    const poll = async () => {
+      const ds = (await PairedDevices().catch(() => [])) ?? [];
+      const fresh = ds.find((d) => !known.current?.has(d.id));
+      if (fresh) setJoined(fresh.name || t("Your phone"));
+    };
+    tick();
+    const a = window.setInterval(tick, 1000);
+    const b = window.setInterval(() => void poll(), 2000);
+    return () => { window.clearInterval(a); window.clearInterval(b); };
+  }, [step, phone, joined]);
+
   const finish = async (engine: string, useAgents: boolean) => {
     setBusy(true);
     setErr("");
     try {
       await FinishOnboarding(engine, useAgents);
-      onDone();
+      await done();
     } catch (e) {
       setErr(String((e as Error)?.message ?? e));
       setBusy(false);
@@ -137,7 +182,7 @@ export default function Onboarding({ onDone, web = false, start = "ask" }: {
       const s = await GetSettings();
       await SaveSettings(new backend.Settings({ ...s, llm_base_url: base.trim(), llm_key: key.trim(), llm_model: model.trim(), cliproxy_enabled: false }));
       await FinishOnboarding("", looked);
-      onDone();
+      await done();
     } catch (e) {
       setErr(String((e as Error)?.message ?? e));
       setBusy(false);
@@ -154,7 +199,7 @@ export default function Onboarding({ onDone, web = false, start = "ask" }: {
       await SaveSettings(new backend.Settings({ ...s, cliproxy_enabled: true }));
       await FinishOnboarding("", looked);
       window.location.hash = "#/settings";
-      onDone();
+      await done();
     } catch (e) {
       setErr(String((e as Error)?.message ?? e));
       setBusy(false);
@@ -250,6 +295,30 @@ export default function Onboarding({ onDone, web = false, start = "ask" }: {
             {busy ? t("Setting up…") : t("Save and start")}
           </button>
           <button className="gate2-alt" disabled={busy} onClick={() => setStep("model")}>{t("Back")}</button>
+          {err && <div className="gate2-err">{err}</div>}
+        </>}
+
+        {step === "phone" && <>
+          <h1>{t("Connect your phone")}</h1>
+          {joined ? (
+            <div className="gate2-check ok">{t("{name} is connected", { name: joined })}</div>
+          ) : phone && left > 0 ? (
+            <div className="gate2-pair">
+              <img src={phone.qr} alt="" width={180} height={180} />
+              <div>
+                <b>{phone.code.slice(0, 3)} {phone.code.slice(3)}</b>
+                <span>{t("Scan with your phone's camera")}</span>
+                <span>{t("Expires in {time}", { time: `${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}` })}</span>
+              </div>
+            </div>
+          ) : phone ? (
+            <button className="gate2-alt" onClick={() => void newCode()}>{t("Show a new code")}</button>
+          ) : (
+            <p>{t("Looking…")}</p>
+          )}
+          {joined
+            ? <button className="cv-pill ink gate2-go" onClick={onDone}>{t("Done")}</button>
+            : <button className="gate2-alt" onClick={onDone}>{t("Later")}</button>}
           {err && <div className="gate2-err">{err}</div>}
         </>}
       </div>

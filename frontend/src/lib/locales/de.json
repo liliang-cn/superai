@@ -610,5 +610,11 @@
  "Where": "Wo",
  "Workers": "Worker",
  "Orders out": "Aufträge unterwegs",
- "What should {name} do?": "Was soll {name} tun?"
+ "What should {name} do?": "Was soll {name} tun?",
+ "Connect your phone": "Telefon verbinden",
+ "Scan with your phone's camera": "Mit der Kamera des Telefons scannen",
+ "Expires in {time}": "Läuft ab in {time}",
+ "Show a new code": "Neuen Code zeigen",
+ "{name} is connected": "{name} ist verbunden",
+ "Your phone": "Dein Telefon"
 }

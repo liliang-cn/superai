@@ -236,6 +236,11 @@
 .gate2-alt:hover { color: var(--ink); }
 .gate2-over { z-index: 200; }
 .gate2-drag { position: absolute; left: 0; right: 0; top: 0; height: 44px; z-index: 2; }
+.gate2-pair { display: flex; gap: 20px; align-items: center; margin: 4px 0 20px; flex-wrap: wrap; }
+.gate2-pair img { border-radius: 10px; background: #fff; border: 1px solid var(--line); }
+.gate2-pair div { display: flex; flex-direction: column; gap: 6px; }
+.gate2-pair b { font-size: 32px; font-weight: 600; letter-spacing: 0.18em; font-variant-numeric: tabular-nums; }
+.gate2-pair span { font-size: 13px; color: var(--ink-2, #5b6573); }
 .gate2-agents { list-style: none; margin: 0 0 20px; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .gate2-agents li { display: flex; align-items: center; gap: 10px; padding: 8px 4px; font-size: 15px; border-bottom: 1px solid var(--line); }
 .gate2-agents li:last-child { border-bottom: 0; }
