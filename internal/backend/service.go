@@ -412,6 +412,11 @@ func NewService(s *Settings) (*Service, error) {
 	if len(mcpPaths) > 0 {
 		mcpOpts = append(mcpOpts, agent.WithMCPConfigPaths(mcpPaths...))
 	}
+	// Build must not wait on the servers: the desktop's page loads only after
+	// Startup returns, and one slow server (npx resolving mcp-remote on every
+	// launch took 12-27s) left the window black for that long. Each server's
+	// tools appear as it connects.
+	mcpOpts = append(mcpOpts, agent.WithMCPBackgroundStart())
 	b = b.WithMCP(mcpOpts...)
 	// Each model call's request, the messages and the tools, reaches the
 	// observers, so the trace store (trace.go) records what the model was
