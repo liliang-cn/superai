@@ -150,7 +150,8 @@ func mcpMissingEnv(entry map[string]any, lookup func(string) (string, bool)) []s
 func resolvedMCPDir() string { return filepath.Join(DataDir(), "run", "mcp") }
 
 // resolveMCPConfig returns the path agent-go should read for src. A file with
-// no ${NAME} in it is returned as it is. Otherwise an expanded copy is written
+// no ${NAME} in it and no npx server whose package is installed is returned as
+// it is. Otherwise an expanded copy is written
 // under resolvedMCPDir and its path returned; a server whose variables are not
 // all set is left out of the copy and logged, never started half-configured.
 func resolveMCPConfig(src string, lookup func(string) (string, bool)) (string, error) {
@@ -158,23 +159,35 @@ func resolveMCPConfig(src string, lookup func(string) (string, bool)) (string, e
 	if err != nil {
 		return "", err
 	}
-	if !mcpEnvRef.Match(raw) {
+	hasRefs := mcpEnvRef.Match(raw)
+	if !hasRefs && !strings.Contains(string(raw), "npx") {
 		return src, nil
 	}
 	var f struct {
 		MCPServers map[string]map[string]any `json:"mcpServers"`
 	}
 	if err := json.Unmarshal(raw, &f); err != nil {
+		if !hasRefs {
+			return src, nil // agent-go reports a broken file itself
+		}
 		return "", err
 	}
 	out := map[string]map[string]any{}
+	localized := false
 	for name, entry := range f.MCPServers {
 		resolved, missing := expandMCPEntry(entry, lookup)
 		if len(missing) > 0 {
 			log.Printf("superai: mcp server %s (%s) left out: %s not set", name, src, strings.Join(missing, ", "))
 			continue
 		}
+		// An npx server runs from its installed package (mcp_npx.go).
+		if local, ok := localizeNpx(resolved); ok {
+			resolved, localized = local, true
+		}
 		out[name] = resolved
+	}
+	if !hasRefs && !localized {
+		return src, nil
 	}
 	body, err := json.MarshalIndent(map[string]any{"mcpServers": out}, "", "  ")
 	if err != nil {
