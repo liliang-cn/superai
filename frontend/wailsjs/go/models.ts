@@ -1519,6 +1519,24 @@ export namespace app {
 	        this.note = source["note"];
 	    }
 	}
+	export class LocalWorkerCandidate {
+	    name: string;
+	    about: string;
+	    command: string[];
+	    added: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new LocalWorkerCandidate(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.about = source["about"];
+	        this.command = source["command"];
+	        this.added = source["added"];
+	    }
+	}
 	
 	export class ModelCheck {
 	    ok: boolean;

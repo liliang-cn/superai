@@ -174,6 +174,8 @@ export function ListApprovalRules():Promise<Array<backend.ApprovalRule>>;
 
 export function ListIntegrationTokens():Promise<Array<app.IntegrationToken>>;
 
+export function LocalWorkerCandidates():Promise<Array<app.LocalWorkerCandidate>>;
+
 export function LongRunList():Promise<Array<backend.TaskSummary>>;
 
 export function LongRunStart(arg1:string,arg2:number,arg3:number,arg4:number,arg5:number,arg6:string,arg7:boolean):Promise<string>;

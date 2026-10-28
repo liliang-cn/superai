@@ -422,6 +422,13 @@ func (a *App) hostsWith(services []backend.HAService) []Host {
 			}
 			ha := haServes(services, n)
 			follows := !ha && ra.FollowsOneHost()
+			for _, h := range ra.Hosts {
+				// Installed beside this SuperAI: on this machine, and up as
+				// long as this SuperAI is.
+				if backend.IsLocalHost(h) && !me.hasNamed(n) {
+					b.agent(me, HostAgent{Name: n, Kind: hostAgentNamed, About: ra.About, State: "live"})
+				}
+			}
 			at, known := where.active[n]
 			drawn := false
 			for _, dest := range sshDests(ra) {

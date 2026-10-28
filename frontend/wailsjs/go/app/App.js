@@ -338,6 +338,10 @@ export function ListIntegrationTokens() {
   return window['go']['app']['App']['ListIntegrationTokens']();
 }
 
+export function LocalWorkerCandidates() {
+  return window['go']['app']['App']['LocalWorkerCandidates']();
+}
+
 export function LongRunList() {
   return window['go']['app']['App']['LongRunList']();
 }

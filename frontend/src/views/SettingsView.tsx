@@ -8,6 +8,7 @@ import LocalHiveCard from "../components/LocalHiveCard";
 import QueenEngineCard from "../components/QueenEngineCard";
 import ProxyCard from "../components/ProxyCard";
 import AddAgentCard from "../components/AddAgentCard";
+import AddWorkerCard from "../components/AddWorkerCard";
 import { AppStatus } from "../lib/types";
 import {
   CLIProxyAccounts,
@@ -1251,6 +1252,20 @@ export default function SettingsView({
                           : prev,
                       )
               }
+            />
+          )}
+
+          {section === "agents" && (
+            <AddWorkerCard
+              ra={s.remote_agents ?? new backend.RemoteAgents()}
+              onSave={async (agents) => {
+                const next = Object.assign(new backend.Settings(s), {
+                  remote_agents: Object.assign(new backend.RemoteAgents(s.remote_agents), { agents, enabled: true }),
+                });
+                await SaveSettings(next);
+                setS(next);
+                onSaved();
+              }}
             />
           )}
 
