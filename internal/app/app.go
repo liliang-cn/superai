@@ -153,6 +153,8 @@ type App struct {
 	// a rebuild, so a settings save does not reset the counters.
 	pulseOnce sync.Once
 	pulse     *backend.Pulse
+	pulseMu   sync.Mutex
+	pulseStop func() // ends the push loop after its last write; nil when not running
 	// longRuns holds the segmented tasks in flight, by task id, so a stop
 	// button has something to press.
 	longMu   sync.Mutex
@@ -376,6 +378,7 @@ func (a *App) Shutdown(ctx context.Context) {
 	a.stopLocalHive()
 	a.stopAlarmWatch()
 	a.stopScheduler()
+	a.stopPulse()
 	// Also before the lock, and both for the same reason as the scheduler: each
 	// takes a lock that is not a.mu — the view waits for its HTTP server to
 	// drain, and stopCompanion takes a.mu itself to unhook the server. An open

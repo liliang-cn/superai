@@ -95,7 +95,7 @@ func gateTestApp(t *testing.T, command string, disable bool) (*App, string) {
 	if a.svc == nil {
 		t.Fatalf("rebuild did not produce a Service: %s", a.buildErr)
 	}
-	t.Cleanup(func() { _ = a.svc.Close() })
+	t.Cleanup(func() { a.stopPulse(); _ = a.svc.Close() })
 	return a, home
 }
 

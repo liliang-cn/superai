@@ -22,9 +22,24 @@ func (a *App) livePulse() *backend.Pulse {
 		a.pulse = backend.NewPulse()
 		// Today's totals, not this process's: a restart does not zero them.
 		a.pulse.Keep(filepath.Join(backend.DataDir(), "pulse-today.json"))
-		a.pulse.Start(context.Background(), a.emit)
+		stop := a.pulse.Start(context.Background(), a.emit)
+		a.pulseMu.Lock()
+		a.pulseStop = stop
+		a.pulseMu.Unlock()
 	})
 	return a.pulse
+}
+
+// stopPulse ends the push loop, which writes today's totals one last time
+// first. Nothing touches the data directory for the meter after it returns.
+func (a *App) stopPulse() {
+	a.pulseMu.Lock()
+	stop := a.pulseStop
+	a.pulseStop = nil
+	a.pulseMu.Unlock()
+	if stop != nil {
+		stop()
+	}
 }
 
 // Pulse reports the whole window: the per-second histogram of the last two

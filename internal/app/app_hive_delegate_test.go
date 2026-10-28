@@ -206,7 +206,7 @@ func newDelegateHive(t *testing.T, mode string, step func(r llmRequest) (string,
 	if a.svc == nil {
 		t.Fatalf("rebuild: %s", a.buildErr)
 	}
-	t.Cleanup(func() { _ = a.svc.Close() })
+	t.Cleanup(func() { a.stopPulse(); _ = a.svc.Close() })
 	a.svc.Agent().AddToolWithMetadata("mcp_noted_list_events", "List calendar events.",
 		map[string]any{"type": "object", "properties": map[string]any{}},
 		func(context.Context, map[string]any) (any, error) {

@@ -650,10 +650,15 @@ const (
 	pulseSampleEvery = time.Second
 )
 
-// Start pushes frames to emit until ctx ends. Frames go out only when there
-// is something in them, and never more often than pulseFrameEvery.
-func (p *Pulse) Start(ctx context.Context, emit func(name string, payload map[string]any)) {
+// Start pushes frames to emit until ctx ends or stop is called. Frames go out
+// only when there is something in them, and never more often than
+// pulseFrameEvery. stop returns once the loop has written today's totals for
+// the last time, so nothing is written after it.
+func (p *Pulse) Start(ctx context.Context, emit func(name string, payload map[string]any)) (stop func()) {
+	ctx, cancel := context.WithCancel(ctx)
+	done := make(chan struct{})
 	go func() {
+		defer close(done)
 		tick := time.NewTicker(pulseFrameEvery)
 		defer tick.Stop()
 		var lastFrame, lastSample, lastKept time.Time
@@ -685,6 +690,7 @@ func (p *Pulse) Start(ctx context.Context, emit func(name string, payload map[st
 			}
 		}
 	}()
+	return func() { cancel(); <-done }
 }
 
 // sample reads the runtime and records it in the current second.

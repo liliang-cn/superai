@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -43,5 +44,36 @@ func TestTheMetersTotalsAreTodaysAcrossRestarts(t *testing.T) {
 	again.mu.Unlock()
 	if n != 0 {
 		t.Fatal("the count did not begin again at midnight")
+	}
+}
+
+// Stopping the push loop writes the totals once more and then nothing: a
+// shutdown keeps the last seconds, and a removed data directory stays removed.
+func TestStoppingThePulseWritesOnceAndThenNever(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "pulse-today.json")
+	p := NewPulse()
+	p.Keep(path)
+	stop := p.Start(context.Background(), func(string, map[string]any) {})
+	p.mu.Lock()
+	p.tokens = 42
+	p.mu.Unlock()
+	stop()
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("no totals written on stop: %v", err)
+	}
+	var kept struct {
+		Tokens int `json:"tokens"`
+	}
+	if json.Unmarshal(raw, &kept); kept.Tokens != 42 {
+		t.Fatalf("kept %s; want tokens 42", raw)
+	}
+	if err := os.RemoveAll(dir); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(3 * pulseFrameEvery)
+	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+		t.Fatalf("something wrote after stop: %v", err)
 	}
 }

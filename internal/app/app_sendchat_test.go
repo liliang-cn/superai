@@ -146,7 +146,7 @@ func newChatApp(t *testing.T, delay time.Duration) (*App, *eventLog) {
 	if a.svc == nil {
 		t.Fatalf("rebuild did not produce a Service: %s", a.buildErr)
 	}
-	t.Cleanup(func() { _ = a.svc.Close() })
+	t.Cleanup(func() { a.stopPulse(); _ = a.svc.Close() })
 	return a, log
 }
 
