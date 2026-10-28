@@ -291,9 +291,11 @@ type Settings struct {
 }
 
 // Defaults for APNsSettings: the developer team and the SuperLeo iOS app.
+// The topic is the app's bundle id as registered with Apple, which kept its
+// superai name through the rename: a push to any other topic is refused.
 const (
 	DefaultAPNsTeamID = "NUDL4XSA6J"
-	DefaultAPNsTopic  = "cn.superleo.superleo.ios"
+	DefaultAPNsTopic  = "cn.superleo.superai.ios"
 )
 
 // APNsSettings configures silent pushes to the paired iOS app. Every field

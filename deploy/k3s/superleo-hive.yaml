@@ -148,7 +148,7 @@ spec:
             - {name: SUPERLEO_QUOTE_PROXY, value: "http://192.168.123.61:43127"}
             # APNs: the silent push that tells the iOS app its alarms changed.
             # The .p8 key's PEM text and its id; team and topic default to
-            # NUDL4XSA6J and cn.superleo.superleo.ios. Without them the queen
+            # NUDL4XSA6J and cn.superleo.superai.ios. Without them the queen
             # logs "apns: pushes disabled" and the app syncs when it opens.
             - {name: APNS_KEY, valueFrom: {secretKeyRef: {name: superleo-hive, key: apns_key, optional: true}}}
             - {name: APNS_KEY_ID, valueFrom: {secretKeyRef: {name: superleo-hive, key: apns_key_id, optional: true}}}
