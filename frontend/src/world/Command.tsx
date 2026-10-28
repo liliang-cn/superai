@@ -43,6 +43,9 @@ const ACTIONS: Record<string, { label: string; say?: string; run?: () => Promise
  * The bar along the bottom of the world: the district's actions, a line to
  * the queen from anywhere, and her answer above it while it is fresh.
  */
+/** A turn of ours the queen is still answering. */
+type Turn = { id: string; live: string; step: string; wire: string };
+
 export default function Command({ view, onConversation, onTyping, hosts }: {
   view: ViewKey; onConversation: () => void;
   /** The world's machines and what runs on them: whom @ offers. */
@@ -55,21 +58,18 @@ export default function Command({ view, onConversation, onTyping, hosts }: {
   const ime = useImeGuard();
   const [text, setText] = useState("");
   const ready = useReady();
-  const [req, setReq] = useState("");
-  const [step, setStep] = useState("");
+  // Every turn still being answered. A new one can be sent at any time; each
+  // has its own words so far, tool and wire, and lands in the thread on its own.
+  const [pending, setPending] = useState<Turn[]>([]);
   const [busy, setBusy] = useState("");
   // The conversation with the queen, the same thread the home screen shows:
   // its last turns stay above the line, and what is typed continues it.
   // by: who answered for the queen, when not SuperAI's own agent alone
   // (engineByline): the engine, or SuperAI in its place.
-  // What the model call is stuck on, when it is: a queue, a retry, a quiet provider.
-  const [wire, setWire] = useState("");
   const [lines, setLines] = useState<{ who: "you" | "queen"; text: string; by?: string }[]>([]);
-  const [live, setLive] = useState("");
   const [open, setOpen] = useState(false);
   // A pod about to come or go, waiting for the person's yes.
   const [pod, setPod] = useState<{ change: PodChange; go: () => void } | null>(null);
-  const raw = useRef("");
   const box = useRef<HTMLInputElement>(null);
   const end = useRef<HTMLDivElement>(null);
   const district = view === "chat" ? "home" : view === "mcp" ? "skills" : view;
@@ -115,14 +115,13 @@ export default function Command({ view, onConversation, onTyping, hosts }: {
 
   // A turn another device takes in the same conversation: its words when it
   // starts, its answer when it ends.
-  const reqRef = useRef("");
-  reqRef.current = req;
+  const mineIds = useRef(new Set<string>());
   const mine = useRef("");
   useEffect(() => {
     const others = new Set<string>();
     const offs = [
       EventsOn("chat:turn", (p: any) => {
-        if (!p?.requestId || p.sessionId !== queenSession() || p.requestId === reqRef.current) return;
+        if (!p?.requestId || p.sessionId !== queenSession() || mineIds.current.has(p.requestId)) return;
         if (mine.current && mine.current === p.message) { mine.current = ""; return; }
         others.add(p.requestId);
         setLines((l) => [...l, { who: "you" as const, text: String(p.message ?? "") }].slice(-12));
@@ -136,33 +135,44 @@ export default function Command({ view, onConversation, onTyping, hosts }: {
     return () => offs.forEach((f) => typeof f === "function" && f());
   }, []);
 
+  // Our own turns: their words as they stream, the tool in use, and what the
+  // model call is stuck on when it is (a queue, a retry, a quiet provider).
+  const raw = useRef(new Map<string, string>());
+  const who = useRef(new Map<string, { engine?: string; standInFor?: string }>());
+  const patch = (id: string, p: Partial<Turn>) => setPending((l) => l.map((x) => x.id === id ? { ...x, ...p } : x));
   useEffect(() => {
-    if (!req) return;
-    const who: { engine?: string; standInFor?: string } = {};
+    const ours = (p: any) => !!p?.requestId && mineIds.current.has(p.requestId);
+    const credit = (p: any) => {
+      const w = who.current.get(p.requestId) ?? {};
+      if (p.standInFor) who.current.set(p.requestId, { ...w, engine: undefined, standInFor: p.standInFor });
+      else if (p.engine) who.current.set(p.requestId, { ...w, engine: p.engine, standInFor: undefined });
+    };
     const a = EventsOn("chat:event", (p: any) => {
-      if (p?.requestId !== req) return;
-      if (p.standInFor) Object.assign(who, { engine: undefined, standInFor: p.standInFor });
-      else if (p.engine) Object.assign(who, { engine: p.engine, standInFor: undefined });
+      if (!ours(p)) return;
+      const id = p.requestId;
+      credit(p);
       // Work the queen handed out is drawn on the worker doing it.
-      if (p.type === "tool_call" && p.tool && p.worker) { setStep(p.tool); say("worker:" + p.worker, p.workerTool || p.tool, "think", 60); }
-      else if (p.type === "tool_call" && p.tool) { setStep(p.tool); say("queen", p.tool, "think", 60); }
-      // The model call stuck somewhere on the wire: queued, retrying, quiet.
-      else if (p.type === "model_wire") { const k = p.wire?.kind; if (["queued", "retry", "restart", "waiting", "error"].includes(k)) setWire(String(p.content ?? "")); else if (k === "first_byte" || k === "slot" || k === "request" || (k === "response" && p.wire?.status < 400)) setWire(""); }
-      else if (p.type === "partial" && p.content) { setWire(""); raw.current += p.content; const v = visibleAnswer(raw.current); setLive(v); setStep(""); if (v) say("queen", v, "say", 60); }
+      if (p.type === "tool_call" && p.tool && p.worker) { patch(id, { step: p.tool }); say("worker:" + p.worker, p.workerTool || p.tool, "think", 60); }
+      else if (p.type === "tool_call" && p.tool) { patch(id, { step: p.tool }); say("queen", p.tool, "think", 60); }
+      else if (p.type === "model_wire") { const k = p.wire?.kind; if (["queued", "retry", "restart", "waiting", "error"].includes(k)) patch(id, { wire: String(p.content ?? "") }); else if (k === "first_byte" || k === "slot" || k === "request" || (k === "response" && p.wire?.status < 400)) patch(id, { wire: "" }); }
+      else if (p.type === "partial" && p.content) { const r = (raw.current.get(id) ?? "") + p.content; raw.current.set(id, r); const v = visibleAnswer(r); patch(id, { live: v, step: "", wire: "" }); if (v) say("queen", v, "say", 60); }
     });
-    const finish = (text: string, by?: string) => { setWire(""); sayDone("queen", text); setLines((l) => [...l, { who: "queen" as const, text, by }].slice(-12)); setLive(""); setStep(""); setReq(""); raw.current = ""; };
-    const b = EventsOn("chat:done", (p: any) => {
-      if (p?.requestId !== req) return;
-      if (p.standInFor) Object.assign(who, { engine: undefined, standInFor: p.standInFor });
-      finish(String(p.final ?? visibleAnswer(raw.current)), engineByline(who) || undefined);
-    });
-    const c = EventsOn("chat:error", (p: any) => { if (p?.requestId === req) finish(String(p.error ?? "")); });
-    return () => { [a, b, c].forEach((f) => typeof f === "function" && f()); };
-  }, [req]);
+    const finish = (id: string, text: string) => {
+      const by = engineByline(who.current.get(id) ?? {}) || undefined;
+      mineIds.current.delete(id); raw.current.delete(id); who.current.delete(id);
+      sayDone("queen", text);
+      setLines((l) => [...l, { who: "queen" as const, text, by }].slice(-12));
+      setPending((l) => l.filter((x) => x.id !== id));
+    };
+    const b = EventsOn("chat:done", (p: any) => { if (!ours(p)) return; credit(p); finish(p.requestId, String(p.final ?? visibleAnswer(raw.current.get(p.requestId) ?? ""))); });
+    const c = EventsOn("chat:error", (p: any) => { if (ours(p)) finish(p.requestId, String(p.error ?? "")); });
+    const d = EventsOn("chat:cancelled", (p: any) => { if (ours(p)) finish(p.requestId, visibleAnswer(raw.current.get(p.requestId) ?? "")); });
+    return () => { [a, b, c, d].forEach((f) => typeof f === "function" && f()); };
+  }, []);
 
   const send = async () => {
     const typed = text.trim();
-    if ((!typed && attach.paths.length === 0) || req) return;
+    if (!typed && attach.paths.length === 0) return;
     const { payload: s, images } = attach.build(typed);
     // Nothing to think with: say so and open the setup, keeping the words.
     if (ready === false) { requestSetup(); return; }
@@ -171,22 +181,19 @@ export default function Command({ view, onConversation, onTyping, hosts }: {
     say("queen", "", "think", 120);
     attach.clear();
     setLines((l) => [...l, { who: "you" as const, text: typed || s }].slice(-12));
-    setStep("");
-    raw.current = "";
     mine.current = s;
     try {
       const id = await SendChat(queenSession(), s, images);
-      reqRef.current = id;
       mine.current = "";
       // Failed before its id came back: no event will follow.
       const failed = earlyError(id);
       if (failed !== undefined) {
         sayDone("queen", failed);
         setLines((l) => [...l, { who: "queen" as const, text: failed }].slice(-12));
-        reqRef.current = "";
         return;
       }
-      setReq(id);
+      mineIds.current.add(id);
+      setPending((l) => [...l, { id, live: "", step: "", wire: "" }]);
     }
     catch (e) { toast.error(String(e instanceof Error ? e.message : e)); }
   };
@@ -202,7 +209,7 @@ export default function Command({ view, onConversation, onTyping, hosts }: {
 
   return (
     <div className="wc">
-      {open && (lines.length > 0 || req) && (
+      {open && (lines.length > 0 || pending.length > 0) && (
         <div className="wc-thread">
           <header>
             <span className="wc-q">Q</span><b>{queenTitle(queen)}</b>
@@ -216,11 +223,11 @@ export default function Command({ view, onConversation, onTyping, hosts }: {
                 {l.who === "queen" ? <Response>{l.text}</Response> : l.text}
               </div>
             ))}
-            {req && (
-              <div className="wc-queen">
-                {live ? <Response>{live}</Response> : <span className="wc-busy">{step ? t("Using {tool}…", { tool: step }) : t("Thinking…")}{wire && <span className="wc-wire" title={wire}> · {wire}</span>}</span>}
+            {pending.map((p) => (
+              <div key={p.id} className="wc-queen">
+                {p.live ? <Response>{p.live}</Response> : <span className="wc-busy">{p.step ? t("Using {tool}…", { tool: p.step }) : t("Thinking…")}{p.wire && <span className="wc-wire" title={p.wire}> · {p.wire}</span>}</span>}
               </div>
-            )}
+            ))}
             <div ref={end} />
           </div>
         </div>
@@ -261,7 +268,7 @@ export default function Command({ view, onConversation, onTyping, hosts }: {
               mentions.onKeyDown(e);
             }} />
           <button type="button" className="wc-clip" onClick={attach.pick} disabled={attach.importing} title={t("Attach")} data-testid="wc-attach"><PaperclipIcon size={15} /></button>
-          <button type="submit" disabled={(!text.trim() && attach.paths.length === 0) || !!req} title={t("Send")}><ArrowUpIcon size={16} /></button>
+          <button type="submit" disabled={!text.trim() && attach.paths.length === 0} title={t("Send")}><ArrowUpIcon size={16} /></button>
         </form>
       </div>
     </div>
