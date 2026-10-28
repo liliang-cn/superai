@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronDownIcon, GaugeIcon, HomeIcon, LocateFixedIcon, MinusIcon, PlusIcon, RotateCcwIcon, RotateCwIcon } from "lucide-react";
+import { ChevronDownIcon, GaugeIcon, HomeIcon, LocateFixedIcon, MinusIcon, MoonIcon, PlusIcon, RotateCcwIcon, RotateCwIcon, SunIcon } from "lucide-react";
 import { Dashboards, MCP, NotedToday, Skills } from "../../wailsjs/go/app/App";
 import { EventsOn } from "../../wailsjs/runtime";
 import { useBees, useCodingRuns, useHive, useHosts, useLinkedAgents, useWorkers } from "../canvas/data";
@@ -73,7 +73,9 @@ function useBusy() {
  * What is selected gets a card tied to it by a line, with everything that can
  * be done to it; the bar along the bottom talks to the queen from anywhere.
  */
-export default function World({ view }: { view: ViewKey }) {
+/** onFlipTheme: light or dark, from the world's own controls. In 3D the
+ *  desk's toolbar is not drawn, so without it the switch had no way in. */
+export default function World({ view, onFlipTheme }: { view: ViewKey; onFlipTheme?: () => void }) {
   const host = useRef<HTMLDivElement>(null);
   const card = useRef<HTMLDivElement>(null);
   const line = useRef<SVGLineElement>(null);
@@ -203,6 +205,11 @@ export default function World({ view }: { view: ViewKey }) {
         }}><LocateFixedIcon size={15} /></button>
         <span className="wl-cam-sep" />
         <button className={holo ? "on" : ""} aria-pressed={holo} aria-label={t("Stats")} title={`${t("Stats")} (S)`} onClick={flipHolo}><GaugeIcon size={15} /></button>
+        {onFlipTheme && (
+          <button aria-pressed={!day} aria-label={day ? t("Dark") : t("Light")} title={day ? t("Dark") : t("Light")} onClick={onFlipTheme}>
+            {day ? <MoonIcon size={15} /> : <SunIcon size={15} />}
+          </button>
+        )}
       </div>
       <div className="wl-corner">
         <Hud view={view} data={data} on={holo} />
