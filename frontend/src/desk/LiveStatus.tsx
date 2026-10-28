@@ -1,13 +1,54 @@
 import { Hive, LinkedAgent, elapsed, oneLine, short } from "../canvas/data";
 import type { CodingRun } from "../canvas/tiles";
 import { machine } from "../lib/machine";
+import { useEffect, useState } from "react";
+import { HiveWorkers } from "../../wailsjs/go/app/App";
+
+type Worker = { name: string; kind: string; host: string; state: string; up: boolean };
+
+/** A SuperAI on its own: no hive members, but the agents that work for it
+ *  here (signed-in CLIs, named agents), the same count the status bar has. */
+function OwnWorkers({ runs, now }: { runs: CodingRun[]; now: Date }) {
+  const [list, setList] = useState<Worker[] | null>(null);
+  useEffect(() => {
+    let alive = true;
+    const pull = () => HiveWorkers().then((w) => { if (alive) setList((w ?? []) as Worker[]); }).catch(() => { if (alive) setList([]); });
+    pull();
+    const t = window.setInterval(pull, 10000);
+    return () => { alive = false; window.clearInterval(t); };
+  }, []);
+  if (list === null) return null;
+  if (!list.length) return <div className="dk-live-empty"><b>No workers yet</b><span>This {machine} is on its own.</span></div>;
+  const busy = (w: Worker) => runs.filter((r) => r.state === "running" && (r.agent === w.name || r.agent === w.name.split(".")[0])).length;
+  return (
+    <div className="dk-status">
+      <div className="dk-status-sum">
+        <div><b>{list.filter((w) => w.up).length}</b><span>of {list.length} up</span></div>
+        <div><b>{runs.filter((r) => r.state === "running").length}</b><span>working</span></div>
+      </div>
+      <div className="dk-status-rows">
+        {list.map((w) => {
+          const n = busy(w);
+          return (
+            <div key={w.name} className={!w.up ? "dk-st lost" : n ? "dk-st busy" : "dk-st"}>
+              <i />
+              <b>{w.name}</b>
+              <span className="dk-st-what">{!w.up ? "Not answering" : n ? `${n} run${n > 1 ? "s" : ""} going` : `${w.kind} on ${w.host}`}</span>
+              <em>{w.state}</em>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 const ago = (iso: string | undefined, now: Date) => (iso ? `${elapsed(iso, now.getTime())} ago` : "");
 
 /** Every member of the hive, one row each: up or not, what it is doing, when
  *  it was last heard from and how long it has been running. */
 export default function LiveStatus({ hive, now, agents, runs }: { hive: Hive; now: Date; agents: LinkedAgent[]; runs: CodingRun[] }) {
-  if (!hive.role) return <div className="dk-live-empty"><b>No hive here</b><span>This {machine} is on its own.</span></div>;
+  if (!hive.role) return <OwnWorkers runs={runs} now={now} />;
   const running = new Map(hive.tasks.filter((t) => t.state === "running").map((t) => [t.worker, t]));
   const workers = hive.members.filter((m) => !/queen/.test(m.name));
   const live = workers.filter((m) => m.state === "live").length;

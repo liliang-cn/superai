@@ -550,8 +550,10 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
       {/* Folded, the pane is simply gone; its toggle stays in the shell's
           toolbar, top right. */}
       {!folded && (
-      <section className="dk-live">
-        <div className="dk-tabs">
+      <section className={tabs.length > fixed.length ? "dk-live" : "dk-live bare"}>
+        {/* Tabs only when there is something to switch to: a run or a
+            dashboard opened beside the fixed panes. */}
+        {tabs.length > fixed.length && <div className="dk-tabs">
           {tabs.map((k) => {
             const r = runOf(k);
             const on = k === current;
@@ -565,7 +567,7 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
             );
           })}
           <button className="dk-icon" title="Open a coding run" onClick={() => navigate(PATHS.coding)}><PlusIcon size={17} /></button>
-        </div>
+        </div>}
         <div className={current === "hive" ? "dk-screen see-world" : "cv-glass dk-screen"}>
           <div className="dk-in">
             {/* The hive tab is a window onto the world behind the app. */}

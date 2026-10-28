@@ -163,6 +163,7 @@
 
 /* The live pane: a framed screen and who is driving it. */
 .dk-live { grid-column: 3; grid-row: 1; margin: -42px 14px 12px 0; display: flex; flex-direction: column; min-height: 0; }
+.dk-live.bare { margin-top: 0; }
 /* The screen is a pane of glass like the others; what it shows sits on it. */
 .dk-screen { flex: 1; min-height: 0; position: relative; overflow: hidden; border-radius: calc(22px * var(--rs)); }
 .dk-in { position: absolute; inset: 0; overflow: hidden; }
@@ -517,6 +518,7 @@ html[data-desk] body { background: transparent; }
   .dk { position: relative; }
   .dk:not(.folded) { grid-template-columns: var(--dk-side-width, 252px) minmax(0, 1fr) 0; }
   .dk:not(.folded) > .dk-live { position: absolute; grid-column: 1 / -1; z-index: 6; top: -42px; right: 14px; bottom: 12px; width: min(460px, 64%); margin: 0; }
+  .dk:not(.folded) > .dk-live.bare { top: 0; }
   .dk:not(.folded) > .dk-live .dk-screen { background: rgba(var(--glass-rgb), .94); box-shadow: 0 18px 50px rgba(40, 30, 10, .18); }
 }
 
