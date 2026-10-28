@@ -367,7 +367,7 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
   ]).size;
   useEffect(() => { setBusy(busyWorkers > 0); }, [busyWorkers, setBusy]);
   useEffect(() => () => setBusy(false), [setBusy]);
-  const status = !hive.loaded ? t("Finding the hive…") : !hive.role ? t("This {machine} on its own", { machine: t(machine) }) : `${workerList.up} of ${workerList.list.length} workers up, ${busyWorkers} busy`;
+  const status = !hive.loaded ? t("Finding the hive…") : !hive.role ? t("This {machine}", { machine: t(machine) }) : `${workerList.up} of ${workerList.list.length} workers up, ${busyWorkers} busy`;
   const title = onQueen ? queenTitle(queen) : recents.find((s) => s.id === chat.sessionId)?.title || t("Conversation");
 
   return (
@@ -434,8 +434,8 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
           <button className="dk-link" onClick={() => openSwitcher()} title={t("Switch backend")}>
             <span className="dk-qhex small">{link.linked ? "Q" : "M"}</span>
             <span>
-              {link.linked ? (link.url || "").replace(/^https?:\/\//, "") : t("This {machine} only", { machine: t(machine) })}
-              <small><i className={link.live ? "dk-ok" : "dk-off"} />{link.linked ? (link.live ? t("Linked") : t("Reconnecting")) : t("Not in a hive")}</small>
+              {link.linked ? (link.url || "").replace(/^https?:\/\//, "") : t("This {machine}", { machine: t(machine) })}
+              {link.linked && <small><i className={link.live ? "dk-ok" : "dk-off"} />{link.live ? t("Linked") : t("Reconnecting")}</small>}
             </span>
           </button>
         </div>

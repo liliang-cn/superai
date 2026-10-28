@@ -325,6 +325,7 @@
  "Trace": "Traza",
  "Ask the queen, or give the hive an order. @ for an agent or a worker": "Pregunta a la reina o da una orden a la colmena. Usa @ para un agente o un trabajador",
  "This {machine} only": "Solo esta {machine}",
+ "This {machine}": "Este {machine}",
  "Linked": "Vinculado",
  "Reconnecting": "Reconectando",
  "Not in a hive": "Fuera de la colmena",
