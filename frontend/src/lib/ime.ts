@@ -62,3 +62,27 @@ export function useImeGuard(): ImeGuard {
 
   return { composing, handlers: { onCompositionStart, onCompositionEnd } };
 }
+
+/**
+ * installImeEnterGuard keeps every Enter that belongs to an IME composition
+ * away from the page, for every input at once.
+ *
+ * useImeGuard only protects the boxes that remember to use it, and a plain
+ * <form> submits on Enter with no handler at all. Listening on window in the
+ * capture phase runs before React's own listener, so stopping the event there
+ * means no onKeyDown sees it, and preventDefault stops the form's implicit
+ * submission. Composition is tracked the same way as useImeGuard, with the
+ * same settle window for WKWebView's late keydown.
+ */
+export function installImeEnterGuard(): void {
+  let active = false;
+  let endedAt = 0;
+  window.addEventListener("compositionstart", () => { active = true; }, true);
+  window.addEventListener("compositionend", () => { active = false; endedAt = Date.now(); }, true);
+  window.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter") return;
+    if (!(active || e.isComposing || e.keyCode === legacyImeKeyCode || Date.now() - endedAt < imeSettleMs)) return;
+    e.preventDefault();
+    e.stopPropagation();
+  }, true);
+}

@@ -14,6 +14,9 @@ import {HiveLinkStatus, OnboardingNeeded, TitleBarDoubleClick} from '../wailsjs/
 import {installHiveBridge, installTitleBarDoubleClick} from './lib/hivelink'
 import Onboarding from './components/Onboarding'
 import {SETUP_EVENT} from './lib/ready'
+import {installImeEnterGuard} from './lib/ime'
+
+installImeEnterGuard()
 
 /**
  * The password box, and only then the app.
