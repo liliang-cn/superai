@@ -13,6 +13,9 @@ import {
   RemoteAgentNames,
   FollowUpCLIRun,
   StartCLIRun,
+  CodingSessions,
+  CodingSessionLog,
+  ReplyToCodingSession,
 } from "../../wailsjs/go/app/App";
 import { app } from "../../wailsjs/go/models";
 import { EventsOn } from "../../wailsjs/runtime";
@@ -26,6 +29,9 @@ import { mdComponents } from "../components/Transcript";
 // Plain shapes: what arrives over events is JSON, not the generated classes.
 type Ev = Omit<app.CLIRunEvent, "convertValues">;
 type Run = Omit<app.CLIRun, "convertValues" | "events"> & { events?: Ev[] };
+/** A conversation somebody started in a terminal (CodingSessions). */
+type Term = { machine?: string; cli: string; session?: string; source: string; project?: string; state: string; tool?: string; at: string; readable: boolean; replyable: boolean };
+const termKey = (t: Term) => `term:${t.machine ?? ""}|${t.cli}|${t.session ?? ""}`;
 
 /** A conversation with one CLI: the first run and its follow-ups. */
 interface Thread {
@@ -102,6 +108,15 @@ export default function AgentsView() {
   const [events, setEvents] = useState<Record<string, Ev[]>>({});
   // Every coding CLI this core can start: its own ("claude") and each agent's ("claude.mac").
   const [choices, setChoices] = useState<string[] | null>(null);
+  // Terminal sessions on every machine, kept current while the page is open.
+  const [terms, setTerms] = useState<Term[]>([]);
+  useEffect(() => {
+    let alive = true;
+    const pull = () => CodingSessions().then((l) => { if (alive) setTerms(((l ?? []) as unknown as Term[]).filter((x) => x.source === "terminal")); }).catch(() => {});
+    pull();
+    const t = window.setInterval(pull, 5000);
+    return () => { alive = false; window.clearInterval(t); };
+  }, []);
 
   const load = useCallback(async () => {
     const [list, st, names] = await Promise.all([CLIRuns(), ExternalAgentsStatus(), RemoteAgentNames().catch(() => [])]);
@@ -146,6 +161,7 @@ export default function AgentsView() {
 
   const threads = useMemo(() => threadsOf(runs), [runs]);
   const thread = threads.find((t) => t.id === selected) ?? null;
+  const term = terms.find((x) => termKey(x) === selected) ?? null;
 
   // Load each run of the open thread once; live events extend it after.
   useEffect(() => {
@@ -173,7 +189,20 @@ export default function AgentsView() {
           </button>
         </div>
         <div className="cd-list">
-          {threads.length === 0 && <div className="cd-none">Runs you start, and ones the queen starts, show up here.</div>}
+          {threads.length === 0 && terms.length === 0 && <div className="cd-none">Runs you start, and ones the queen starts, show up here.</div>}
+          {terms.length > 0 && <div className="cd-group">{t("In terminals")}</div>}
+          {terms.map((x) => (
+            <button key={termKey(x)} className={`cd-item${termKey(x) === selected ? " on" : ""}`} onClick={() => setSelected(termKey(x))} data-testid="term-session">
+              <span className="cd-item-top">
+                <i className={`cd-dot ${x.state === "working" ? "running" : x.state === "waiting" ? "waiting" : "done"}`} />
+                <b>{x.cli}</b>
+                <span>{x.machine || "core"}</span>
+                <time>{fromNow(parseTime(x.at) ?? new Date())}</time>
+              </span>
+              <span className="cd-item-p">{x.project || x.session}{x.tool ? ` · ${x.tool}` : ""}</span>
+            </button>
+          ))}
+          {threads.length > 0 && terms.length > 0 && <div className="cd-group">{t("Started by SuperAI")}</div>}
           {threads.map((t) => {
             const { cli, host } = partsOf(t.agent);
             return (
@@ -192,7 +221,9 @@ export default function AgentsView() {
         </div>
       </aside>
       <main className="cd-main">
-        {thread ? (
+        {term ? (
+          <TermView key={termKey(term)} term={term} />
+        ) : thread ? (
           <ThreadView thread={thread} events={events} />
         ) : (
           <Start
@@ -486,6 +517,95 @@ function ThreadView({ thread, events }: { thread: Thread; events: Record<string,
               </button>
             ) : undefined
           }
+        />
+      </div>
+    </div>
+  );
+}
+
+/** A session somebody started in a terminal: its log, read from the machine
+ *  it runs on every couple of seconds while open, and a box that types an
+ *  answer into its terminal. */
+function TermView({ term }: { term: Term }) {
+  const { t } = useI18n();
+  const [evs, setEvs] = useState<Ev[] | null>(null);
+  const [err, setErr] = useState("");
+  const [reply, setReply] = useState("");
+  const [sending, setSending] = useState(false);
+  const end = useRef<HTMLDivElement>(null);
+  const stick = useRef(true);
+  const log = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    let alive = true;
+    const pull = () =>
+      CodingSessionLog(term.machine ?? "", term.cli, term.session ?? "")
+        .then((l) => { if (alive) { setEvs(((l as { events?: Ev[] }).events ?? []) as Ev[]); setErr(""); } })
+        .catch((e) => { if (alive) setErr(String(e instanceof Error ? e.message : e)); });
+    pull();
+    const timer = window.setInterval(pull, 2500);
+    return () => { alive = false; window.clearInterval(timer); };
+  }, [term.machine, term.cli, term.session]);
+  const n = evs?.length ?? 0;
+  useEffect(() => { if (stick.current) end.current?.scrollIntoView({ block: "end" }); }, [n]);
+
+  const send = async () => {
+    const text = reply.trim();
+    if (!text || sending) return;
+    setSending(true);
+    try {
+      const d = (await ReplyToCodingSession(term.machine ?? "", term.cli, term.session ?? "", text)) as { via?: string; note?: string };
+      setReply("");
+      stick.current = true;
+      if (d?.note) toast.success(d.note);
+    } catch (e) {
+      toast.error(String(e instanceof Error ? e.message : e));
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const shown = evs ?? [];
+  const results = new Map<string, Ev>();
+  for (const e of shown) if (e.kind === "result" && e.callId) results.set(e.callId, e);
+  return (
+    <div className="cd-thread">
+      <div className="cd-thread-h">
+        <TerminalIcon size={15} />
+        <b>{term.cli}</b>
+        <span>{t("on {host}", { host: term.machine || "core" })}</span>
+        <span className="cd-path">{term.project}</span>
+        <span className="cd-meta">{t(term.state)}</span>
+      </div>
+      <div className="cd-log" ref={log} onScroll={(e) => { const el = e.currentTarget; stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60; }}>
+        <div className="cd-log-in">
+          {evs === null && !err && <div className="cd-none">{t("Reading…")}</div>}
+          {err && <div className="agents-note bad">{err}</div>}
+          <div className="agents-run" data-testid="term-log">
+            {shown.filter((e) => !(e.kind === "result" && e.callId && results.has(e.callId) && shown.some((c) => c.kind === "tool" && c.callId === e.callId))).map((e) =>
+              e.kind === "you" ? (
+                <div key={e.seq} className="agents-you">{e.text}</div>
+              ) : e.kind === "tool" ? (
+                <ToolStep key={e.seq} call={e} result={e.callId ? results.get(e.callId) : undefined} />
+              ) : e.kind === "result" ? (
+                <ToolStep key={e.seq} call={{ ...e, kind: "tool", detail: "" } as Ev} result={e} />
+              ) : (
+                <div key={e.seq} className="agents-text md">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>{e.text ?? ""}</ReactMarkdown>
+                </div>
+              ),
+            )}
+          </div>
+          <div ref={end} />
+        </div>
+      </div>
+      <div className="cd-follow">
+        <Composer
+          value={reply}
+          onChange={setReply}
+          placeholder={term.replyable ? t("Reply to {cli}", { cli: term.cli }) : t("This session has ended")}
+          onSend={send}
+          sendable={term.replyable && !sending && !!reply.trim()}
+          disabled={!term.replyable}
         />
       </div>
     </div>

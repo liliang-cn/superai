@@ -289,6 +289,12 @@ func cliHook(cli string, argv []string) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), ccActivityBudget)
 	defer cancel()
+	// A prompt also says which terminal it came from, for typing an answer
+	// back into it (agent_sessions.go).
+	if name == "UserPromptSubmit" || name == "SessionStart" {
+		ev.TTY = controllingTTY(ctx)
+		ev.Pane = os.Getenv("TMUX_PANE")
+	}
 	tellCCHook(ctx, ccHookSockets(), ev)
 }
 

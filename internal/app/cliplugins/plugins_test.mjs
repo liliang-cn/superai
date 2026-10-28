@@ -61,10 +61,10 @@ test("opencode hooks reach the socket in order, without arguments", async () => 
   await until(4)
   const pid = process.pid
   assert.deepEqual(got.map((g) => g.body), [
-    { cli: "opencode", pid, event: "UserPromptSubmit", session: "s1", cwd: "superai" },
-    { cli: "opencode", pid, event: "PreToolUse", session: "s1", cwd: "superai", tool: "bash" },
-    { cli: "opencode", pid, event: "PostToolUse", session: "s1", tool: "bash" },
-    { cli: "opencode", pid, session: "s1", cwd: "superai", event: "Stop" },
+    { cli: "opencode", pid, pane: process.env.TMUX_PANE || "", event: "UserPromptSubmit", session: "s1", cwd: "superai" },
+    { cli: "opencode", pid, pane: process.env.TMUX_PANE || "", event: "PreToolUse", session: "s1", cwd: "superai", tool: "bash" },
+    { cli: "opencode", pid, pane: process.env.TMUX_PANE || "", event: "PostToolUse", session: "s1", tool: "bash" },
+    { cli: "opencode", pid, pane: process.env.TMUX_PANE || "", session: "s1", cwd: "superai", event: "Stop" },
   ])
   assert.ok(got.every((g) => g.url === "/cc/hook"))
   assert.ok(!JSON.stringify(got).includes("SECRET") && !JSON.stringify(got).includes("/Users/me"))

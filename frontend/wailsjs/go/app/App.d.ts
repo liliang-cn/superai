@@ -66,6 +66,10 @@ export function CheckRemoteAgents():Promise<Array<app.RemoteAgentStatus>>;
 
 export function ClearNotifications():Promise<Record<string, any>>;
 
+export function CodingSessionLog(arg1:string,arg2:string,arg3:string):Promise<app.SessionLog>;
+
+export function CodingSessions():Promise<Array<app.CodingSession>>;
+
 export function CreateIntegrationToken(arg1:string):Promise<app.NewIntegrationToken>;
 
 export function CreateQueenToken(arg1:string):Promise<app.NewIntegrationToken>;
@@ -281,6 +285,8 @@ export function RemoveSkill(arg1:string):Promise<string>;
 export function RenameDashboard(arg1:string,arg2:string):Promise<Record<string, any>>;
 
 export function ReplyToCCSession(arg1:app.CCReplyRequest):Promise<app.CCDelivery>;
+
+export function ReplyToCodingSession(arg1:string,arg2:string,arg3:string,arg4:string):Promise<app.CCDelivery>;
 
 export function ReplyToSession(arg1:string,arg2:string):Promise<app.CCDelivery>;
 

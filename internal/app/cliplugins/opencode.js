@@ -59,7 +59,7 @@ function send(ev) {
     if (!ev || !ev.session || queued > 64) return
     const sock = pick()
     if (!sock) return
-    const body = JSON.stringify({ cli: CLI, pid: process.pid, ...ev })
+    const body = JSON.stringify({ cli: CLI, pid: process.pid, pane: process.env.TMUX_PANE || "", ...ev })
     queued++
     chain = chain.then(() => post(sock, body)).catch(() => {}).then(() => { queued-- })
   } catch {}

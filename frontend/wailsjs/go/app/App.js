@@ -122,6 +122,14 @@ export function ClearNotifications() {
   return window['go']['app']['App']['ClearNotifications']();
 }
 
+export function CodingSessionLog(arg1, arg2, arg3) {
+  return window['go']['app']['App']['CodingSessionLog'](arg1, arg2, arg3);
+}
+
+export function CodingSessions() {
+  return window['go']['app']['App']['CodingSessions']();
+}
+
 export function CreateIntegrationToken(arg1) {
   return window['go']['app']['App']['CreateIntegrationToken'](arg1);
 }
@@ -552,6 +560,10 @@ export function RenameDashboard(arg1, arg2) {
 
 export function ReplyToCCSession(arg1) {
   return window['go']['app']['App']['ReplyToCCSession'](arg1);
+}
+
+export function ReplyToCodingSession(arg1, arg2, arg3, arg4) {
+  return window['go']['app']['App']['ReplyToCodingSession'](arg1, arg2, arg3, arg4);
 }
 
 export function ReplyToSession(arg1, arg2) {

@@ -359,6 +359,7 @@ func (a *App) sendCLIActivity(cli string, act *CLIActivity) {
 // observeCLIActivity moves this machine's record of one CLI for one plugin
 // event.
 func observeCLIActivity(ev ccHookEvent) {
+	cliReachState().observe(ev)
 	t := cliTrackerState()
 	if cli, changed := t.observe(ev, time.Now()); changed {
 		t.kick(cli)
