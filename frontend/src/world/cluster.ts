@@ -180,6 +180,14 @@ function flowRoutes(dt: number, t: number, reduced: boolean) {
 
 type Screen = ReturnType<typeof screen>;
 
+// At night a hologram is pale light over the dark floor, so every screen is
+// painted again whenever day turns to night or back.
+let holoNight = false;
+function setHoloNight(root: THREE.Object3D, on: boolean) {
+  holoNight = on;
+  root.traverse((o) => { if (o.userData.holo) o.userData.repaint?.(); });
+}
+
 /** Paints a computer's screen: who it is, what it is doing, the last lines
  *  of the work, and a cursor while it is busy. */
 function paint(s: Screen, title: string, status: string, lines: string[], busy: boolean, _blink = true) {
@@ -189,26 +197,31 @@ function paint(s: Screen, title: string, status: string, lines: string[], busy: 
   // so blinking it never repaints this. On a hologram everything is blue
   // light: deep enough to read against the white world, with a soft halo
   // round each letter.
+  s.mesh.userData.repaint = () => paint(s, title, status, lines, busy, _blink);
   const holo = !!s.mesh.userData.holo;
+  const night = holo && holoNight;
   let caret: { x: number; y: number; w: number; h: number; color: string } | null = null;
   s.draw((c, w, h) => {
     const k = w / 768; // laid out on the phone's 768-wide screen
-    const blue = holo ? "#2f6bff" : "#5b8dff";
-    const ink = holo ? "#1d4ed8" : "rgba(255,255,255,0.95)";
-    const text = holo ? "rgba(31,63,153,0.92)" : "rgba(255,255,255,0.86)";
-    const dim = holo ? "rgba(47,107,255,0.62)" : "rgba(255,255,255,0.5)";
-    const rule = holo ? "rgba(47,107,255,0.28)" : "rgba(255,255,255,0.09)";
-    const idle = holo ? "rgba(47,107,255,0.25)" : "rgba(255,255,255,0.22)";
+    const blue = night ? "#8fb0ff" : holo ? "#2f6bff" : "#5b8dff";
+    const ink = night ? "#eef3ff" : holo ? "#1d4ed8" : "rgba(255,255,255,0.95)";
+    const text = night ? "rgba(222,232,255,0.94)" : holo ? "rgba(31,63,153,0.92)" : "rgba(255,255,255,0.86)";
+    const dim = night ? "rgba(178,200,255,0.82)" : holo ? "rgba(47,107,255,0.62)" : "rgba(255,255,255,0.5)";
+    const rule = night ? "rgba(143,176,255,0.32)" : holo ? "rgba(47,107,255,0.28)" : "rgba(255,255,255,0.09)";
+    const idle = night ? "rgba(143,176,255,0.32)" : holo ? "rgba(47,107,255,0.25)" : "rgba(255,255,255,0.22)";
     const pad = 36 * k, lineH = 46 * k, top = 150 * k;
     const bg = c.createLinearGradient(0, 0, 0, h);
     if (holo) {
       // The pane: brightest where the beam comes in at the bottom, thinning
       // upward, with fine scan lines.
-      bg.addColorStop(0, "rgba(91,141,255,0.05)"); bg.addColorStop(1, "rgba(91,141,255,0.17)");
+      // At night the pane is deep blue glass, so its pale type reads over
+      // the lit floor as well as the dark.
+      if (night) { bg.addColorStop(0, "rgba(10,24,66,0.62)"); bg.addColorStop(1, "rgba(24,52,130,0.72)"); }
+      else { bg.addColorStop(0, "rgba(91,141,255,0.05)"); bg.addColorStop(1, "rgba(91,141,255,0.17)"); }
       c.fillStyle = bg; c.fillRect(0, 0, w, h);
       c.fillStyle = "rgba(47,107,255,0.05)";
       for (let y = 0; y < h; y += 6 * k) c.fillRect(0, y, w, 2 * k);
-      c.shadowColor = "rgba(91,141,255,0.75)";
+      c.shadowColor = night ? "rgba(70,120,255,0.9)" : "rgba(91,141,255,0.75)";
       c.shadowBlur = 14 * k;
     } else {
       bg.addColorStop(0, "#17212c"); bg.addColorStop(1, "#0c131b");
@@ -614,6 +627,7 @@ export const cluster: District<WorldData> = {
     const hostLayer = new THREE.Group();
     g.add(hostLayer);
     ctx.night(setLinesNight);
+    ctx.night((on) => setHoloNight(g, on));
     let hostSig = "";
     let hostMode = false;
     let plan: HostPlan | null = null;
