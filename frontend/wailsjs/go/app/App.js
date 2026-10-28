@@ -722,6 +722,10 @@ export function ToolApprovalInfo(arg1) {
   return window['go']['app']['App']['ToolApprovalInfo'](arg1);
 }
 
+export function ToolStats(arg1) {
+  return window['go']['app']['App']['ToolStats'](arg1);
+}
+
 export function TraceCall(arg1, arg2) {
   return window['go']['app']['App']['TraceCall'](arg1, arg2);
 }

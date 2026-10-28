@@ -1720,6 +1720,64 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
 .cr-trace-detail { margin: 2px 10px 8px 74px; padding: 8px 10px; border: 1px solid var(--cr-line); border-radius: 7px; background: var(--cr-panel); font-family: var(--cr-mono); font-size: 11px; line-height: 1.55; color: var(--cr-text); white-space: pre-wrap; word-break: break-word; max-height: 60vh; overflow: auto; }
 pre.cr-trace-detail { margin-top: 2px; }
 .cr-trace-meta { color: var(--cr-dim); margin-bottom: 6px; }
+.cr-trace-detail.bad { color: var(--cr-rose); }
+/* The trace's three views, switched in its header. */
+.cr-trace-views { display: inline-flex; gap: 4px; }
+.cr-trace-views + .cr-trace-x { margin-left: auto; }
+/* Waterfall: one run on a shared time axis. Fine vertical rules at every tick
+   run down the whole column, so a bar's start can be read against the axis
+   from any row; overlap is bars over the same stretch of it. */
+.cr-wf { display: flex; flex-direction: column; gap: 8px; flex: 1; min-height: 0; }
+.cr-wf-grow { flex: 1; }
+.cr-wf-run { flex: 0 1 320px; min-width: 0; font-family: var(--cr-mono); font-size: 11px; background: var(--cr-bg); color: var(--cr-text); border: 1px solid var(--cr-line-2); border-radius: 7px; padding: 5px 8px; }
+.cr-wf-legend { display: inline-flex; flex-wrap: wrap; gap: 12px; margin-left: auto; font-family: var(--cr-mono); font-size: 10px; color: var(--cr-dim); }
+.cr-wf-legend > span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.cr-wf-legend .sw { width: 14px; height: 7px; border-radius: 2px; display: inline-block; }
+.cr-wf .sw.model, .cr-wf-row.model .cr-wf-span { background: var(--cr-cyan); }
+.cr-wf .sw.aux, .cr-wf-row.model.aux .cr-wf-span { background: rgba(var(--cr-cyan-rgb), .18); box-shadow: inset 0 0 0 1px var(--cr-cyan); }
+.cr-wf .sw.tool, .cr-wf-row.tool .cr-wf-span { background: var(--cr-lime); }
+.cr-wf .sw.failed, .cr-wf-row.tool.failed .cr-wf-span { background: var(--cr-rose); }
+.cr-wf .sw.lint { width: 7px; background: var(--cr-rose); transform: rotate(45deg); }
+.cr-wf-body { flex: 1; min-height: 0; overflow: auto; border: 1px solid var(--cr-line); border-radius: 8px; background: var(--cr-bg); padding: 0 0 6px; }
+.cr-wf-row { display: grid; grid-template-columns: 210px minmax(0, 1fr); align-items: center; min-height: 19px; padding: 0 10px; font-family: var(--cr-mono); font-size: 10.5px; color: var(--cr-dim); cursor: pointer; }
+.cr-wf-row:not(.head):hover { background: var(--cr-panel-2); }
+.cr-wf-row.sel { background: rgba(var(--cr-cyan-rgb), .08); }
+.cr-wf-row.head { position: sticky; top: 0; z-index: 2; cursor: default; min-height: 24px; background: var(--cr-bg); border-bottom: 1px solid var(--cr-line); color: var(--cr-mute); font-size: 9px; letter-spacing: .06em; text-transform: uppercase; margin-bottom: 3px; }
+.cr-wf-label { display: flex; align-items: baseline; gap: 6px; min-width: 0; overflow: hidden; white-space: nowrap; padding-right: 10px; }
+.cr-wf-label b { font-weight: 500; color: var(--cr-text); overflow: hidden; text-overflow: ellipsis; }
+.cr-wf-row.model.aux .cr-wf-label b { color: var(--cr-dim); }
+.cr-wf-row.tool .cr-wf-label b { padding-left: 12px; }
+.cr-wf-row.failed .cr-wf-label b, .cr-wf-row.lint .cr-wf-label b { color: var(--cr-rose); }
+.cr-wf-label i { font-style: normal; color: var(--cr-mute); }
+.cr-wf-par { font-style: normal; font-size: 9.5px; color: var(--cr-cyan); border: 1px solid rgba(var(--cr-cyan-rgb), .45); border-radius: 3px; padding: 0 3px; line-height: 1.3; }
+.cr-wf-legend .cr-wf-par { padding: 0 3px; }
+.cr-wf-track { position: relative; align-self: stretch; min-height: 19px;
+  background: linear-gradient(90deg, var(--cr-line) 1px, transparent 1px) 0 0 / var(--wf-step) 100% repeat-x; }
+.cr-wf-row.head .cr-wf-track { background: none; }
+.cr-wf-tick { position: absolute; bottom: 4px; transform: translateX(-1px); padding-left: 3px; border-left: 1px solid var(--cr-line-2); white-space: nowrap; text-transform: none; letter-spacing: 0; }
+.cr-wf-span { position: absolute; top: 5px; height: 9px; min-width: 2px; border-radius: 2px; }
+.cr-wf-row.linted .cr-wf-span { box-shadow: 0 0 0 1.5px var(--cr-rose); }
+.cr-wf-row.open .cr-wf-span { background-image: repeating-linear-gradient(90deg, transparent 0 4px, rgba(255,255,255,.55) 4px 6px); }
+.cr-wf-row.derived .cr-wf-span { border-top-left-radius: 0; border-bottom-left-radius: 0; }
+.cr-wf-row.sel .cr-wf-span { outline: 1px solid var(--cr-text); outline-offset: 1px; }
+.cr-wf-mark { position: absolute; top: 5px; width: 9px; height: 9px; margin-left: -4.5px; background: var(--cr-rose); transform: rotate(45deg); }
+.cr-wf-dur { position: absolute; top: 2px; font-size: 9.5px; color: var(--cr-dim); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.cr-wf-detail { max-height: 38vh; overflow: auto; }
+.cr-wf-detail .cr-trace-detail { margin: 0 0 6px; max-height: none; }
+/* Per-tool figures across every trace. */
+.cr-ts-sum { margin-left: auto; font-family: var(--cr-mono); font-size: 10.5px; color: var(--cr-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cr-ts-sum b { color: var(--cr-text); font-weight: 600; }
+.cr-ts-sum b.rose { color: var(--cr-rose); }
+.cr-trace-bar .cr-tag { margin-left: 0; }
+.cr-ts { padding: 0 8px 6px; }
+.cr-ts .cr-table th { cursor: pointer; user-select: none; background: var(--cr-bg); padding-top: 8px; }
+.cr-ts .cr-table th.on { color: var(--cr-text); }
+.cr-ts .cr-table th.num { text-align: right; }
+.cr-ts .cr-table td.name { color: var(--cr-text); }
+.cr-ts .cr-table tr.bad td.rate, .cr-ts .cr-table tr.bad td.name { color: var(--cr-rose); }
+.cr-ts .cr-table td.when { color: var(--cr-dim); }
+.cr-ts .cr-table tbody tr:hover td { background: var(--cr-panel-2); }
+.cr-ts .cr-note { padding: 14px 4px; }
 .cr-msg { padding: 6px 0; border-top: 1px solid var(--cr-line); }
 .cr-msg:first-of-type { border-top: none; }
 .cr-msg pre { margin: 2px 0 0; white-space: pre-wrap; word-break: break-word; font: inherit; }

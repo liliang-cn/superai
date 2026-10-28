@@ -1,6 +1,8 @@
 package app
 
 import (
+	"time"
+
 	"github.com/liliang-cn/superleo/internal/backend"
 )
 
@@ -26,4 +28,18 @@ func (a *App) TraceLines(taskID string, limit int) []string {
 // model_end line with that span id in the trace id names, as raw JSON.
 func (a *App) TraceCall(id, spanID string) string {
 	return backend.TraceCall(backend.TracesDir(), id, spanID)
+}
+
+// ToolStats is every tool's calls over the last days days, across every trace
+// on disk: how often, how often it failed, and how long it took. 0 means a
+// week.
+//
+// Like TraceLines it reads the directory, not a.svc — the week it covers
+// spans restarts and settings saves, and none of the processes that wrote it
+// need to be the one asking.
+func (a *App) ToolStats(days int) backend.ToolStatsReport {
+	if days <= 0 {
+		days = 7
+	}
+	return backend.ToolStats(backend.TracesDir(), time.Now().AddDate(0, 0, -days))
 }

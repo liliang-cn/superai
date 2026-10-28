@@ -3,6 +3,8 @@ import { TraceCall, TraceLines, TurnTrace, TurnTraces } from "../../wailsjs/go/a
 import { EventsOn } from "../../wailsjs/runtime";
 import { useImeGuard } from "@/lib/ime";
 import { ChevronDown, ChevronRight, RotateCw, ScrollText, X } from "lucide-react";
+import TraceWaterfall from "./TraceWaterfall";
+import ToolStatsPanel from "./ToolStatsPanel";
 
 /**
  * One task's or one conversation's JSONL trace, a row per event.
@@ -20,9 +22,13 @@ import { ChevronDown, ChevronRight, RotateCw, ScrollText, X } from "lucide-react
  * A row opens. A model call shows what the model was sent, every message and
  * the tools offered, fetched whole only then (the list carries its size); a
  * tool call shows its arguments or its result.
+ *
+ * Two more views sit on the same header: the loaded run as a waterfall, which
+ * shows what overlapped, and every tool's figures across all traces, which
+ * says whether a slow or failed call here is the usual for that tool.
  */
 
-interface TraceRow {
+export interface TraceRow {
   ts?: string;
   event?: string;
   round?: number;
@@ -47,6 +53,8 @@ interface TraceRow {
   segment_index?: number;
   segment_total?: number;
   span_id?: string;
+  call_id?: string;
+  run_id?: string;
   model?: string;
   purpose?: string;
   args?: Record<string, unknown>;
@@ -71,6 +79,13 @@ interface TraceMessage {
 }
 
 const PAGES = [200, 600, 2000];
+
+type View = "rows" | "waterfall" | "tools";
+const VIEWS: { k: View; label: string }[] = [
+  { k: "rows", label: "Rows" },
+  { k: "waterfall", label: "Waterfall" },
+  { k: "tools", label: "Tools" },
+];
 
 const hms = (ts?: string) => {
   if (!ts) return "--:--:--";
@@ -209,6 +224,7 @@ export default function RunTracePanel({
   const [filter, setFilter] = useState("");
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState<string>("");
+  const [view, setView] = useState<View>("rows");
   const ime = useImeGuard();
 
   const load = useCallback(async () => {
@@ -234,6 +250,21 @@ export default function RunTracePanel({
     return () => window.clearInterval(t);
   }, [live, load]);
 
+  // The waterfall reads every loaded line: a filter that dropped a call's
+  // start line would move its bar, and one that dropped its peers would hide
+  // the overlap the view is for.
+  const all = useMemo(() => {
+    const out: TraceRow[] = [];
+    for (const l of lines) {
+      try {
+        out.push(JSON.parse(l) as TraceRow);
+      } catch {
+        /* an unparsed line has no time to place it at */
+      }
+    }
+    return out;
+  }, [lines]);
+
   const rows = useMemo(() => {
     const q = filter.trim().toLowerCase();
     const out: TraceRow[] = [];
@@ -253,92 +284,112 @@ export default function RunTracePanel({
       <div className="cr-trace" onClick={(e) => e.stopPropagation()}>
         <div className="cr-panel-h">
           <ScrollText size={13} />
-          <span className="cr-eyebrow">Trace · {taskId}</span>
-          <span className="cr-tag">{rows.length} / {lines.length}</span>
+          <span className="cr-eyebrow">Trace · {view === "tools" ? "every tool" : taskId}</span>
+          <span className="cr-trace-views">
+            {VIEWS.map((v) => (
+              <button key={v.k} className={`cr-btn tiny${view === v.k ? " primary" : ""}`} onClick={() => setView(v.k)}>
+                {v.label}
+              </button>
+            ))}
+          </span>
+          {view !== "tools" && <span className="cr-tag">{rows.length} / {lines.length}</span>}
           <button className="cr-trace-x" onClick={onClose} aria-label="Close trace">
             <X size={14} />
           </button>
         </div>
 
-        <TurnsStrip session={taskId} live={live} />
+        {view === "tools" && <ToolStatsPanel />}
 
-        <div className="cr-trace-bar">
-          <input
-            className="input"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            onCompositionStart={ime.handlers.onCompositionStart}
-            onCompositionEnd={ime.handlers.onCompositionEnd}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !ime.composing(e)) {
-                e.preventDefault();
-                load();
-              }
-            }}
-            placeholder="filter — fs_read, lint, error, model_end…"
-            autoComplete="off"
-          />
-          {PAGES.map((n) => (
-            <button
-              key={n}
-              className={`cr-btn tiny${limit === n ? " primary" : ""}`}
-              onClick={() => setLimit(n)}
-            >
-              {n}
+        {view !== "tools" && <TurnsStrip session={taskId} live={live} />}
+
+        {view !== "tools" && (
+          <div className="cr-trace-bar">
+            {view === "rows" && (
+              <input
+                className="input"
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+                onCompositionStart={ime.handlers.onCompositionStart}
+                onCompositionEnd={ime.handlers.onCompositionEnd}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !ime.composing(e)) {
+                    e.preventDefault();
+                    load();
+                  }
+                }}
+                placeholder="filter — fs_read, lint, error, model_end…"
+                autoComplete="off"
+              />
+            )}
+            {view === "waterfall" && <span className="cr-wf-grow" />}
+            {PAGES.map((n) => (
+              <button
+                key={n}
+                className={`cr-btn tiny${limit === n ? " primary" : ""}`}
+                onClick={() => setLimit(n)}
+              >
+                {n}
+              </button>
+            ))}
+            <button className="cr-btn tiny" onClick={load} disabled={busy}>
+              <RotateCw size={10} />
+              {busy ? "…" : "Reload"}
             </button>
-          ))}
-          <button className="cr-btn tiny" onClick={load} disabled={busy}>
-            <RotateCw size={10} />
-            {busy ? "…" : "Reload"}
-          </button>
-        </div>
-
-        <div className="cr-trace-rows">
-          <div className="cr-trace-row head">
-            <span>time</span>
-            <span>event</span>
-            <span>r</span>
-            <span>subject</span>
-            <span>took</span>
-            <span>tokens</span>
-            <span>detail</span>
           </div>
-          {rows.length === 0 && (
-            <div className="cr-note">
-              {lines.length === 0
-                ? "No trace yet. Every model call and tool call is written here as the run goes."
-                : "Nothing matches that filter."}
+        )}
+
+        {view === "waterfall" && (
+          <TraceWaterfall rows={all} renderDetail={(rs) => rs.map((r, i) => <TraceDetail key={`${r.event}:${i}`} id={taskId} row={r} />)} />
+        )}
+
+        {view === "rows" && (
+          <div className="cr-trace-rows">
+            <div className="cr-trace-row head">
+              <span>time</span>
+              <span>event</span>
+              <span>r</span>
+              <span>subject</span>
+              <span>took</span>
+              <span>tokens</span>
+              <span>detail</span>
             </div>
-          )}
-          {rows.map((r, i) => {
-            const key = `${i}:${r.span_id ?? ""}:${r.ts ?? ""}`;
-            const can = opens(r);
-            const isOpen = open === key;
-            return (
-            <div key={key} className="cr-trace-item">
-            <div
-              className={`cr-trace-row ${r.event ?? ""}${r.error ? " bad" : ""}${can ? " opens" : ""}`}
-              onClick={can ? () => setOpen(isOpen ? "" : key) : undefined}
-            >
-              <span className="t">{hms(r.ts)}</span>
-              <span className="e">
-                {can ? (isOpen ? <ChevronDown size={10} /> : <ChevronRight size={10} />) : null}
-                {r.event ?? "?"}
-              </span>
-              <span className="r">{r.round ?? ""}</span>
-              <span className="s" title={subject(r)}>{subject(r)}</span>
-              <span className="d">{dur(r.duration_ms)}</span>
-              <span className="k" title={r.tokens?.cached ? `${r.tokens.cached} cached` : undefined}>
-                {tok(r.tokens?.total)}
-                {r.tokens?.cached ? <i> ·{tok(r.tokens.cached)}c</i> : null}
-              </span>
-              <span className="x" title={detail(r)}>{detail(r) || sent(r)}</span>
-            </div>
-            {isOpen && <TraceDetail id={taskId} row={r} />}
-            </div>
-            );
-          })}
-        </div>
+            {rows.length === 0 && (
+              <div className="cr-note">
+                {lines.length === 0
+                  ? "No trace yet. Every model call and tool call is written here as the run goes."
+                  : "Nothing matches that filter."}
+              </div>
+            )}
+            {rows.map((r, i) => {
+              const key = `${i}:${r.span_id ?? ""}:${r.ts ?? ""}`;
+              const can = opens(r);
+              const isOpen = open === key;
+              return (
+              <div key={key} className="cr-trace-item">
+              <div
+                className={`cr-trace-row ${r.event ?? ""}${r.error ? " bad" : ""}${can ? " opens" : ""}`}
+                onClick={can ? () => setOpen(isOpen ? "" : key) : undefined}
+              >
+                <span className="t">{hms(r.ts)}</span>
+                <span className="e">
+                  {can ? (isOpen ? <ChevronDown size={10} /> : <ChevronRight size={10} />) : null}
+                  {r.event ?? "?"}
+                </span>
+                <span className="r">{r.round ?? ""}</span>
+                <span className="s" title={subject(r)}>{subject(r)}</span>
+                <span className="d">{dur(r.duration_ms)}</span>
+                <span className="k" title={r.tokens?.cached ? `${r.tokens.cached} cached` : undefined}>
+                  {tok(r.tokens?.total)}
+                  {r.tokens?.cached ? <i> ·{tok(r.tokens.cached)}c</i> : null}
+                </span>
+                <span className="x" title={detail(r)}>{detail(r) || sent(r)}</span>
+              </div>
+              {isOpen && <TraceDetail id={taskId} row={r} />}
+              </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -373,7 +424,11 @@ function TraceDetail({ id, row }: { id: string; row: TraceRow }) {
     return <pre className="cr-trace-detail">{JSON.stringify(row.args, null, 2)}</pre>;
   }
   if (row.event === "tool_end") {
-    return <pre className="cr-trace-detail">{row.result}</pre>;
+    return <pre className={`cr-trace-detail${row.error ? " bad" : ""}`}>{row.error ?? row.result}</pre>;
+  }
+  // A lint, or any other line the waterfall hands over: what it says.
+  if (row.event !== "model_end" || !row.span_id) {
+    return <pre className="cr-trace-detail">{[row.event, row.lint ?? row.tool, row.verdict, detail(row)].filter(Boolean).join(" · ")}</pre>;
   }
   if (failed) return <div className="cr-trace-detail cr-note">This call is no longer in the trace.</div>;
   if (!call) return <div className="cr-trace-detail cr-note">Loading…</div>;
