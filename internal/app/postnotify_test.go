@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/liliang-cn/superai/internal/apns"
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/apns"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // noAPNs makes sure nothing in the environment configures pushes.
@@ -47,7 +47,7 @@ func (e *noticeEvents) list() []map[string]any {
 // home with no agent built: a reminder must not need the model to be up.
 func postServer(t *testing.T) (http.Handler, *credentials, *App, *noticeEvents) {
 	t.Helper()
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	noAPNs(t)
 	c := testCreds(t, "hunter2")
 	var err error
@@ -355,7 +355,7 @@ func waitDone(t *testing.T, done <-chan struct{}) {
 }
 
 func TestPushedNoticesReachEveryPhone(t *testing.T) {
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	store := pairedWithPush(t)
 	dead := strings.Repeat("bb", 32)
 	p := &fakeAlerts{dead: map[string]bool{dead: true}}
@@ -516,7 +516,7 @@ func TestNotifyUserReachesThePhones(t *testing.T) {
 // The app icon's number goes with every push, counted with the new notice
 // filed, so it is right while the app is closed.
 func TestPushesCarryTheUnreadBadge(t *testing.T) {
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	store := pairedWithPush(t)
 	box := backend.OpenInbox()
 	p := &fakeAlerts{}

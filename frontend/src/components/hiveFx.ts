@@ -51,7 +51,7 @@ export interface StageHandle {
 export interface StageWorker {
   name: string;
   state: "live" | "lost";
-  /** What is behind it when it is not a SuperAI, e.g. "cli · claude". */
+  /** What is behind it when it is not a SuperLeo, e.g. "cli · claude". */
   engine?: string;
 }
 
@@ -69,7 +69,7 @@ export interface StageProps {
 export const QUEEN = "\u0000queen";
 export const SELF = "\u0000self";
 
-export const short = (n: string) => n.replace(/^superai-/, "");
+export const short = (n: string) => n.replace(/^superleo-/, "");
 export const ease = (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
 
 /** Something travelling between two nodes. `size` is relative: 1 is an order. */

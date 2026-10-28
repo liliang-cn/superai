@@ -19,9 +19,9 @@ import (
 // depends on the model emitting code the runtime accepts — so this drives the
 // real service against the real provider and looks at what came back.
 //
-// Gated behind SUPERAI_PTC_TEST=1 because it spends tokens:
+// Gated behind SUPERLEO_PTC_TEST=1 because it spends tokens:
 //
-//	SUPERAI_PTC_TEST=1 go test ./backend/ -run TestPTCLive -v -count=1 -timeout 10m
+//	SUPERLEO_PTC_TEST=1 go test ./backend/ -run TestPTCLive -v -count=1 -timeout 10m
 
 // ptcTask needs three tool calls in sequence, which is exactly where PTC is
 // supposed to pay off.
@@ -55,9 +55,9 @@ func prepareLiveHome(t *testing.T) string {
 			t.Fatalf("copy credential: %v", werr)
 		}
 	}
-	t.Setenv("SUPERAI_HOME", home)
+	t.Setenv("SUPERLEO_HOME", home)
 	// Chrome costs ~1s per NewService and no test here browses.
-	t.Setenv("SUPERAI_NO_BROWSER", "1")
+	t.Setenv("SUPERLEO_NO_BROWSER", "1")
 	return home
 }
 
@@ -122,7 +122,7 @@ func runPTCTask(t *testing.T, ptcOn bool) ptcOutcome {
 
 	start := time.Now()
 	final, err := svc.Stream(ctx, "ptc-test", ptcTask, nil, func(ev *agent.Event) {
-		if os.Getenv("SUPERAI_PTC_TRACE") == "1" {
+		if os.Getenv("SUPERLEO_PTC_TRACE") == "1" {
 			c := strings.ReplaceAll(truncate(strings.TrimSpace(ev.Content), 160), "\n", " ⏎ ")
 			t.Logf("  EV %-14s tool=%-20s debug=%-10s %s", ev.Type, ev.ToolName, ev.DebugType, c)
 		}
@@ -183,8 +183,8 @@ func report(t *testing.T, label string, o ptcOutcome) {
 // TestPTCLive answers "does PTC work" by running the same task with it on, and
 // checking the model's code actually drove the tools.
 func TestPTCLive(t *testing.T) {
-	if os.Getenv("SUPERAI_PTC_TEST") != "1" {
-		t.Skip("set SUPERAI_PTC_TEST=1 to run the live PTC test")
+	if os.Getenv("SUPERLEO_PTC_TEST") != "1" {
+		t.Skip("set SUPERLEO_PTC_TEST=1 to run the live PTC test")
 	}
 	o := runPTCTask(t, true)
 	report(t, "PTC ON", o)
@@ -220,8 +220,8 @@ func TestPTCLive(t *testing.T) {
 // job gets done, and reports the round counts so the trade-off is visible
 // instead of assumed.
 func TestPTCLiveComparison(t *testing.T) {
-	if os.Getenv("SUPERAI_PTC_TEST") != "1" {
-		t.Skip("set SUPERAI_PTC_TEST=1 to run the live PTC comparison")
+	if os.Getenv("SUPERLEO_PTC_TEST") != "1" {
+		t.Skip("set SUPERLEO_PTC_TEST=1 to run the live PTC comparison")
 	}
 	on := runPTCTask(t, true)
 	report(t, "PTC ON ", on)

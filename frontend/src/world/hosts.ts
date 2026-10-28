@@ -42,7 +42,7 @@ export const isHost = (h: Host, name?: string) => {
   return !!n && (h.id === n || h.name.toLowerCase() === n || (h.hostname ?? "").toLowerCase() === n);
 };
 
-/** A SuperAI that is this core: the queen, or a core in no hive. */
+/** A SuperLeo that is this core: the queen, or a core in no hive. */
 export const isCore = (a: HostAgent) => a.kind === "superai" && (a.role === "queen" || a.role === "standalone");
 /** An HA service's agent on a host it is not running on now. */
 export const isStandby = (a: HostAgent) => a.state === "standby" || a.state === "standby-unready";
@@ -54,16 +54,16 @@ export interface Plot {
   host: Host;
   /** Hosts inside it, at any depth: its pods. */
   pods: Host[];
-  /** What its SuperAI is drawn as: a desk (machine agent), a laptop (a Mac),
+  /** What its SuperLeo is drawn as: a desk (machine agent), a laptop (a Mac),
    *  a pad (a relay, kept for its named agents), or nothing. */
   station: "desk" | "laptop" | "pad" | "";
   /** A desk with no crew at it: drawn smaller. */
   small: boolean;
-  /** The SuperAI there that runs its CLIs and agents for core. */
+  /** The SuperLeo there that runs its CLIs and agents for core. */
   via: string;
   /** The CLIs and named agents at its station, best known first. */
   crew: HostAgent[];
-  /** Agents standing on the plot itself: SuperAIs that are not its machine
+  /** Agents standing on the plot itself: SuperLeos that are not its machine
    *  agent, named agents with no station, and HA standbys (as ghosts). */
   loose: HostAgent[];
   w: number;

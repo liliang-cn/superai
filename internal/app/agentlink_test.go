@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	agentlinkpb "github.com/liliang-cn/superai/internal/agentlink/pb"
-	"github.com/liliang-cn/superai/internal/backend"
+	agentlinkpb "github.com/liliang-cn/superleo/internal/agentlink/pb"
+	"github.com/liliang-cn/superleo/internal/backend"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"

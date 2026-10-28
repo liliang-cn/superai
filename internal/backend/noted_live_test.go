@@ -13,18 +13,18 @@ import (
 // TestNotedLive runs against a real noted MCP endpoint — a local `noted serve`
 // with a throwaway user, never the production one:
 //
-//	SUPERAI_NOTED_LIVE_URL=http://127.0.0.1:<mcp port>/mcp NOTED_TOKEN=<token> \
+//	SUPERLEO_NOTED_LIVE_URL=http://127.0.0.1:<mcp port>/mcp NOTED_TOKEN=<token> \
 //	  go test ./internal/backend/ -run TestNotedLive -v
 //
 // It checks both routes into noted: the agent's (agent-go reading the
 // resolved mcpServers.json, bearer header from ${NOTED_TOKEN}) and the
 // buttons' (MCPActions). It creates one task and deletes it again.
 func TestNotedLive(t *testing.T) {
-	url := os.Getenv("SUPERAI_NOTED_LIVE_URL")
+	url := os.Getenv("SUPERLEO_NOTED_LIVE_URL")
 	if url == "" || os.Getenv("NOTED_TOKEN") == "" {
-		t.Skip("set SUPERAI_NOTED_LIVE_URL and NOTED_TOKEN to run against a local noted")
+		t.Skip("set SUPERLEO_NOTED_LIVE_URL and NOTED_TOKEN to run against a local noted")
 	}
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	writeMCPConfig(t, NotedServer, url)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
@@ -63,7 +63,7 @@ func TestNotedLive(t *testing.T) {
 	// The buttons' route.
 	m := NewMCPActions(func() []string { return []string{NotedServer} })
 	defer m.Close()
-	created := m.Call(ctx, NotedServer, "create_task", map[string]any{"title": "superai live test"}, MCPCallOptions{Quiet: true})
+	created := m.Call(ctx, NotedServer, "create_task", map[string]any{"title": "superleo live test"}, MCPCallOptions{Quiet: true})
 	if !created.OK {
 		t.Fatalf("create_task: %+v", created)
 	}

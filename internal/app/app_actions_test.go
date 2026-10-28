@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -80,7 +80,7 @@ func rpc(t *testing.T, srv *httptest.Server, method, args string) (int, []byte) 
 }
 
 func TestCallToolRPC(t *testing.T) {
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	t.Setenv("NOTED_TOKEN", "sekrit")
 	configureNoted(t, fakeNotedServer(t, "sekrit"))
 	app, _, srv := serveTestApp(t)
@@ -149,7 +149,7 @@ func TestCallToolRPC(t *testing.T) {
 }
 
 func TestNotedReadRPCs(t *testing.T) {
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	app, _, srv := serveTestApp(t)
 	t.Cleanup(func() { app.actionsV.Close() })
 

@@ -85,7 +85,7 @@ function Bubble({ msg }: { msg: ChatMessage }) {
           {!isUser && (
             <div className="msg-byline-wrap">
               <div className="msg-byline">
-                <span className="msg-byline-name">SuperAI</span>
+                <span className="msg-byline-name">SuperLeo</span>
               </div>
               {engineByline(msg) && <span className="msg-byline-engine">{engineByline(msg)}</span>}
             </div>

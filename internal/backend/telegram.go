@@ -317,7 +317,7 @@ func (b *TelegramBridge) handle(ctx context.Context, u telegramUpdate) {
 
 	switch {
 	case text == "/start":
-		b.send(ctx, chat, "SuperAI is listening. Send anything; /new starts a fresh conversation.")
+		b.send(ctx, chat, "SuperLeo is listening. Send anything; /new starts a fresh conversation.")
 		return
 	case text == "/new":
 		b.mu.Lock()

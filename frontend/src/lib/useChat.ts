@@ -21,7 +21,7 @@ import { visibleAnswer } from "./format";
  * reload used to open an empty new session, so a long task looked lost and the
  * only way back was to recognise your own question in the history list.
  */
-const LAST_SESSION_KEY = "superai.lastSession";
+const LAST_SESSION_KEY = "superleo.lastSession";
 
 function rememberSession(id: string): void {
   try {
@@ -252,7 +252,7 @@ function lintRetryLine(content: string | undefined): string {
   const applyEvent = useCallback(
     (askId: string, ev: ChatEvent) => {
       if (ev.standInFor) {
-        // No engine could take it: SuperAI's own agent answers.
+        // No engine could take it: SuperLeo's own agent answers.
         const standInFor = ev.standInFor;
         patchMessage(askId, (m) => (m.standInFor === standInFor ? m : { ...m, engine: undefined, standInFor }));
       } else if (ev.engine) {

@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-// The notification centre: what SuperAI said while you were not looking.
+// The notification centre: what SuperLeo said while you were not looking.
 //
 // Every message already goes through Notices (notice.go), and until now every
 // surface it reached was a surface you had to be watching. A toast fades. The
@@ -304,6 +304,6 @@ func (b *Inbox) writeLocked(items []Notification) error {
 // file it would be worse than one that quietly loses a row.
 func logInboxError(err error) {
 	if err != nil {
-		log.Printf("superai: notification centre: %v", err)
+		log.Printf("superleo: notification centre: %v", err)
 	}
 }

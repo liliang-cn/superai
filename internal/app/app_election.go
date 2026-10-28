@@ -3,8 +3,8 @@ package app
 // The app's side of electing a queen (backend/hive_election.go): a worker
 // that is picked takes over, a queen that is passed over steps down.
 //
-// Elections are on where $SUPERAI_ELECTION is set: the hive's pods. There a
-// queen also wears a label on her pod, $SUPERAI_QUEEN_LABEL (with her term in
+// Elections are on where $SUPERLEO_ELECTION is set: the hive's pods. There a
+// queen also wears a label on her pod, $SUPERLEO_QUEEN_LABEL (with her term in
 // the annotation beside it), and the services the world reaches the queen by
 // select on it — so whichever pod is queen is where ai.superleo.cn, the
 // agent link and the workers' join address lead, with nothing to forward.
@@ -26,23 +26,23 @@ import (
 	"sync"
 	"time"
 
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 const (
 	// queenLabelEvery is how often a queen checks who wears the label.
 	queenLabelEvery = 10 * time.Second
 	// queenTermAnnotation carries a labelled queen's term on her pod.
-	queenTermAnnotation = "superai/queen-term"
+	queenTermAnnotation = "superleo/queen-term"
 )
 
 // electionOn is whether this instance takes part in electing a queen.
-func electionOn() bool { return strings.TrimSpace(os.Getenv("SUPERAI_ELECTION")) != "" }
+func electionOn() bool { return strings.TrimSpace(os.Getenv("SUPERLEO_ELECTION")) != "" }
 
 // electionJoinURL is where a queen that steps down goes to find the queen
-// after her: $SUPERAI_QUEEN_URL, the address that always leads to whoever is
+// after her: $SUPERLEO_QUEEN_URL, the address that always leads to whoever is
 // queen (in k3s the service on the label).
-func electionJoinURL() string { return strings.TrimSpace(os.Getenv("SUPERAI_QUEEN_URL")) }
+func electionJoinURL() string { return strings.TrimSpace(os.Getenv("SUPERLEO_QUEEN_URL")) }
 
 // promoteToQueen makes this worker the queen it was elected, under term.
 func (a *App) promoteToQueen(term int64) {
@@ -59,7 +59,7 @@ func (a *App) promoteToQueen(term int64) {
 	saveTerm(term)
 	// A worker's settings say nothing of growing the hive; a queen's do.
 	if next.Hive.Spawner == nil {
-		if set := strings.TrimSpace(os.Getenv("SUPERAI_WORKER_STATEFULSET")); set != "" {
+		if set := strings.TrimSpace(os.Getenv("SUPERLEO_WORKER_STATEFULSET")); set != "" {
 			ns := strings.TrimSpace(os.Getenv("POD_NAMESPACE"))
 			next.Hive.Spawner = &backend.SpawnerSettings{Kind: "kubectl", Namespace: ns, StatefulSet: set, MaxWorkers: backend.DefaultMaxWorkers}
 		}
@@ -84,7 +84,7 @@ func (a *App) promoteToQueen(term int64) {
 func (a *App) stepDown(why string) {
 	join := electionJoinURL()
 	if join == "" {
-		log.Printf("hive: should step down (%s) but $SUPERAI_QUEEN_URL says nowhere to go", why)
+		log.Printf("hive: should step down (%s) but $SUPERLEO_QUEEN_URL says nowhere to go", why)
 		return
 	}
 	a.mu.Lock()
@@ -129,7 +129,7 @@ func kubectl(ctx context.Context, args ...string) (string, error) {
 // queenLabel is the label a queen's pod wears, and this pod's name; empty
 // outside a pod set up for it.
 func queenLabel() (label, pod string) {
-	return strings.TrimSpace(os.Getenv("SUPERAI_QUEEN_LABEL")), strings.TrimSpace(os.Getenv("POD_NAME"))
+	return strings.TrimSpace(os.Getenv("SUPERLEO_QUEEN_LABEL")), strings.TrimSpace(os.Getenv("POD_NAME"))
 }
 
 // wearQueenLabel puts the queen's label and term on this pod.
@@ -149,7 +149,7 @@ func (a *App) wearQueenLabel(ctx context.Context, term int64) {
 // labelledQueens is every pod wearing the queen's label, with its term.
 func labelledQueens(ctx context.Context, label string) (map[string]int64, error) {
 	out, err := kubectl(ctx, "get", "pods", "-l", label+"=yes", "-o",
-		`jsonpath={range .items[*]}{.metadata.name}{" "}{.metadata.annotations.superai/queen-term}{"\n"}{end}`)
+		`jsonpath={range .items[*]}{.metadata.name}{" "}{.metadata.annotations.superleo/queen-term}{"\n"}{end}`)
 	if err != nil {
 		return nil, err
 	}

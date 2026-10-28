@@ -30,7 +30,7 @@ func buildVersion() string {
 }
 
 // agentLinkFlags are the flags that link a process to core as an agent, the
-// same for `superai agent` and `superai serve`. Each has an environment
+// same for `superleo agent` and `superleo serve`. Each has an environment
 // variable too, for a service unit or a container.
 type agentLinkFlags struct {
 	core, token, name *string
@@ -39,10 +39,10 @@ type agentLinkFlags struct {
 
 func addAgentLinkFlags(fl *flag.FlagSet) agentLinkFlags {
 	return agentLinkFlags{
-		core:  fl.String("core", os.Getenv("SUPERAI_CORE"), "core's agent link, host:port, to connect to as an agent (env SUPERAI_CORE)"),
-		token: fl.String("core-token", os.Getenv("SUPERAI_CORE_TOKEN"), "a token core accepts: its own, or a paired device's (env SUPERAI_CORE_TOKEN)"),
-		name:  fl.String("name", os.Getenv("SUPERAI_AGENT_NAME"), "the name core knows this agent by; the host name when empty (env SUPERAI_AGENT_NAME)"),
-		tls:   fl.Bool("core-tls", os.Getenv("SUPERAI_CORE_TLS") == "1", "dial core with TLS (env SUPERAI_CORE_TLS=1)"),
+		core:  fl.String("core", os.Getenv("SUPERLEO_CORE"), "core's agent link, host:port, to connect to as an agent (env SUPERLEO_CORE)"),
+		token: fl.String("core-token", os.Getenv("SUPERLEO_CORE_TOKEN"), "a token core accepts: its own, or a paired device's (env SUPERLEO_CORE_TOKEN)"),
+		name:  fl.String("name", os.Getenv("SUPERLEO_AGENT_NAME"), "the name core knows this agent by; the host name when empty (env SUPERLEO_AGENT_NAME)"),
+		tls:   fl.Bool("core-tls", os.Getenv("SUPERLEO_CORE_TLS") == "1", "dial core with TLS (env SUPERLEO_CORE_TLS=1)"),
 	}
 }
 
@@ -53,7 +53,7 @@ func (f agentLinkFlags) options() (AgentLinkOptions, bool) {
 	token := strings.TrimSpace(*f.token)
 	// Or from a file only its owner can read, so the token is not in a unit
 	// file or a launchd plist for everyone on the machine to see.
-	if p := strings.TrimSpace(os.Getenv("SUPERAI_CORE_TOKEN_FILE")); token == "" && p != "" {
+	if p := strings.TrimSpace(os.Getenv("SUPERLEO_CORE_TOKEN_FILE")); token == "" && p != "" {
 		if b, err := os.ReadFile(p); err == nil {
 			token = strings.TrimSpace(string(b))
 		} else {
@@ -64,7 +64,7 @@ func (f agentLinkFlags) options() (AgentLinkOptions, bool) {
 		TLS: *f.tls, Version: buildVersion()}, true
 }
 
-// AgentMain is `superai agent`: this machine as an agent of a core, with no
+// AgentMain is `superleo agent`: this machine as an agent of a core, with no
 // web surface of its own — it dials core and does what core asks of it.
 func AgentMain(argv []string) {
 	if len(argv) > 0 && (argv[0] == "join" || argv[0] == "leave") {
@@ -89,14 +89,14 @@ func AgentMain(argv []string) {
 		o, ok = joinedOptions()
 	}
 	if !ok {
-		fmt.Fprintln(os.Stderr, "superai agent: -core host:port is required (or SUPERAI_CORE), or join first: superai agent join <core address> <code>")
+		fmt.Fprintln(os.Stderr, "superleo agent: -core host:port is required (or SUPERLEO_CORE), or join first: superleo agent join <core address> <code>")
 		os.Exit(2)
 	}
 	if o.Token == "" {
-		fmt.Fprintln(os.Stderr, "superai agent: -core-token is required (or SUPERAI_CORE_TOKEN, or SUPERAI_CORE_TOKEN_FILE)")
+		fmt.Fprintln(os.Stderr, "superleo agent: -core-token is required (or SUPERLEO_CORE_TOKEN, or SUPERLEO_CORE_TOKEN_FILE)")
 		os.Exit(2)
 	}
-	log.SetPrefix("superai-agent ")
+	log.SetPrefix("superleo-agent ")
 
 	app := NewApp()
 	app.startupHeadless()
@@ -108,5 +108,5 @@ func AgentMain(argv []string) {
 	go autoUpgradeCCHooks()
 	go autoInstallCLIHooks()
 	app.RunAgentLink(ctx, o)
-	fmt.Fprintln(os.Stderr, "superai-agent: stopped")
+	fmt.Fprintln(os.Stderr, "superleo-agent: stopped")
 }

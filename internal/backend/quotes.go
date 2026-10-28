@@ -114,13 +114,13 @@ type chartData struct {
 }
 
 // NewQuoteService talks to base (empty: Yahoo). Requests go through
-// SUPERAI_QUOTE_PROXY when it is set, else the usual proxy environment.
+// SUPERLEO_QUOTE_PROXY when it is set, else the usual proxy environment.
 func NewQuoteService(base string) *QuoteService {
 	if base == "" {
 		base = "https://query1.finance.yahoo.com"
 	}
 	tr := http.DefaultTransport.(*http.Transport).Clone()
-	if p := strings.TrimSpace(os.Getenv("SUPERAI_QUOTE_PROXY")); p != "" {
+	if p := strings.TrimSpace(os.Getenv("SUPERLEO_QUOTE_PROXY")); p != "" {
 		if u, err := url.Parse(p); err == nil {
 			tr.Proxy = http.ProxyURL(u)
 		}

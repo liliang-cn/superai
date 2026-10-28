@@ -32,12 +32,12 @@ func TestAndroidReleaseIsServedToPairedDevices(t *testing.T) {
 		t.Errorf("no release: %d", rec.Code)
 	}
 
-	manifest := `{"versionCode":2,"versionName":"0.2.0","url":"superai-0.2.0.apk","sha256":"ab","notes":"闹钟"}`
+	manifest := `{"versionCode":2,"versionName":"0.2.0","url":"superleo-0.2.0.apk","sha256":"ab","notes":"闹钟"}`
 	if err := os.WriteFile(filepath.Join(dir, "latest.json"), []byte(manifest), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	apk := strings.Repeat("PK", 1000)
-	if err := os.WriteFile(filepath.Join(dir, "superai-0.2.0.apk"), []byte(apk), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "superleo-0.2.0.apk"), []byte(apk), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(filepath.Dir(dir), "secret.apk"), []byte("x"), 0o644); err != nil {
@@ -60,7 +60,7 @@ func TestAndroidReleaseIsServedToPairedDevices(t *testing.T) {
 		t.Errorf("latest.json cache %q", cc)
 	}
 
-	rec = call(gated, http.MethodGet, "/api/android/superai-0.2.0.apk", claim.Token, "")
+	rec = call(gated, http.MethodGet, "/api/android/superleo-0.2.0.apk", claim.Token, "")
 	if rec.Code != http.StatusOK || rec.Body.Len() != len(apk) {
 		t.Fatalf("apk: %d, %d bytes", rec.Code, rec.Body.Len())
 	}
@@ -69,7 +69,7 @@ func TestAndroidReleaseIsServedToPairedDevices(t *testing.T) {
 	}
 
 	// A cut-off download resumes.
-	r := httptest.NewRequest(http.MethodGet, "/api/android/superai-0.2.0.apk", nil)
+	r := httptest.NewRequest(http.MethodGet, "/api/android/superleo-0.2.0.apk", nil)
 	r.Header.Set("Authorization", "Bearer "+claim.Token)
 	r.Header.Set("Range", "bytes=1000-")
 	ranged := httptest.NewRecorder()

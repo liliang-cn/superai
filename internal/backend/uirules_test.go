@@ -7,7 +7,7 @@ import (
 )
 
 func TestUIRulesRoundTrip(t *testing.T) {
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 
 	if got := LoadUIRules(); got != "" {
 		t.Fatalf("fresh install should have no rules, got %q", got)
@@ -64,7 +64,7 @@ func TestUIRulesRoundTrip(t *testing.T) {
 	if strings.Contains(persona, "```chart") {
 		t.Error("the full rendering rules went into the prompt")
 	}
-	if !strings.Contains(persona, "You are SuperAI") {
+	if !strings.Contains(persona, "You are SuperLeo") {
 		t.Error("persona must keep its original instructions")
 	}
 }

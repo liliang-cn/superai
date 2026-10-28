@@ -1,4 +1,4 @@
-# A hive of SuperAI workers sharing one CortexDB.
+# A hive of SuperLeo workers sharing one CortexDB.
 #
 # One queen commands the others. What makes it queen is its settings:
 # they list the workers as remote agents, and the hive_command tool appears only
@@ -12,7 +12,7 @@
 # keys, so they never live in this file.
 apiVersion: v1
 kind: Namespace
-metadata: {name: superai}
+metadata: {name: superleo}
 ---
 # What the agent may do to the cluster it lives in. The pod's ServiceAccount
 # token is the only credential kubectl has, so this Role *is* the limit.
@@ -25,11 +25,11 @@ metadata: {name: superai}
 # Widen it deliberately, not by default.
 apiVersion: v1
 kind: ServiceAccount
-metadata: {name: superai, namespace: superai}
+metadata: {name: superleo, namespace: superleo}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
-metadata: {name: superai-operator}
+metadata: {name: superleo-operator}
 rules:
   # Listed one by one: "*" in the core group includes secrets.
   - apiGroups: [""]
@@ -54,13 +54,13 @@ rules:
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
-metadata: {name: superai-operator}
-subjects: [{kind: ServiceAccount, name: superai, namespace: superai}]
-roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: superai-operator}
+metadata: {name: superleo-operator}
+subjects: [{kind: ServiceAccount, name: superleo, namespace: superleo}]
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: superleo-operator}
 ---
 apiVersion: v1
 kind: Service
-metadata: {name: superai-queen, namespace: superai}
+metadata: {name: superai-queen, namespace: superleo}
 spec:
   clusterIP: None
   selector: {app: superai-queen}
@@ -68,7 +68,7 @@ spec:
 ---
 apiVersion: apps/v1
 kind: StatefulSet
-metadata: {name: superai-queen, namespace: superai}
+metadata: {name: superai-queen, namespace: superleo}
 spec:
   serviceName: superai-queen
   replicas: 1
@@ -76,9 +76,9 @@ spec:
   template:
     metadata: {labels: {app: superai-queen}}
     spec:
-      serviceAccountName: superai
+      serviceAccountName: superleo
       containers:
-        - name: superai
+        - name: superleo
           image: superai:hive
           imagePullPolicy: IfNotPresent
           ports: [{containerPort: 43117}, {containerPort: 43120, name: agent}]
@@ -92,46 +92,46 @@ spec:
             # The brain is Gemini behind CPA: web_search must ask for Google
             # Search by its own field, or the call answers without searching.
             - {name: SEARCH_NATIVE, value: google_search}
-            - {name: SUPERAI_TOKEN, valueFrom: {secretKeyRef: {name: superai-hive, key: token}}}
-            - {name: SUPERAI_PASSWORD_HASH, valueFrom: {secretKeyRef: {name: superai-hive, key: password_hash, optional: true}}}
-            - {name: SUPERAI_USER, valueFrom: {secretKeyRef: {name: superai-hive, key: user, optional: true}}}
+            - {name: SUPERLEO_TOKEN, valueFrom: {secretKeyRef: {name: superai-hive, key: token}}}
+            - {name: SUPERLEO_PASSWORD_HASH, valueFrom: {secretKeyRef: {name: superai-hive, key: password_hash, optional: true}}}
+            - {name: SUPERLEO_USER, valueFrom: {secretKeyRef: {name: superai-hive, key: user, optional: true}}}
             - {name: POD_NAME, valueFrom: {fieldRef: {fieldPath: metadata.name}}}
-            - {name: SUPERAI_NODE, valueFrom: {fieldRef: {fieldPath: spec.nodeName}}}
-            - {name: SUPERAI_ADVERTISE_URL, value: "http://$(POD_NAME).superai-queen.superai.svc.cluster.local:43117"}
+            - {name: SUPERLEO_NODE, valueFrom: {fieldRef: {fieldPath: spec.nodeName}}}
+            - {name: SUPERLEO_ADVERTISE_URL, value: "http://$(POD_NAME).superai-queen.superleo.svc.cluster.local:43117"}
             # Any pod may be elected queen (internal/app/app_election.go): the
-            # queen wears the superai/queen label, superai-leader and the
+            # queen wears the superleo/queen label, superleo-leader and the
             # NodePorts follow it, and a member steps up when she goes quiet.
             - {name: POD_NAMESPACE, valueFrom: {fieldRef: {fieldPath: metadata.namespace}}}
-            - {name: SUPERAI_ELECTION, value: "1"}
-            - {name: SUPERAI_QUEEN_LABEL, value: superai/queen}
-            - {name: SUPERAI_QUEEN_URL, value: "http://superai-leader.superai.svc.cluster.local:43117"}
-            - {name: SUPERAI_WORKER_STATEFULSET, value: superai-worker}
+            - {name: SUPERLEO_ELECTION, value: "1"}
+            - {name: SUPERLEO_QUEEN_LABEL, value: superleo/queen}
+            - {name: SUPERLEO_QUEEN_URL, value: "http://superleo-leader.superleo.svc.cluster.local:43117"}
+            - {name: SUPERLEO_WORKER_STATEFULSET, value: superai-worker}
             # Once another pod is queen, this one is an agent of hers like any worker.
-            - {name: SUPERAI_CORE, value: "superai-leader.superai.svc.cluster.local:43120"}
-            - {name: SUPERAI_CORE_TOKEN, valueFrom: {secretKeyRef: {name: superai-hive, key: token}}}
-            - {name: SUPERAI_AGENT_NAME, value: "$(POD_NAME)"}
+            - {name: SUPERLEO_CORE, value: "superleo-leader.superleo.svc.cluster.local:43120"}
+            - {name: SUPERLEO_CORE_TOKEN, valueFrom: {secretKeyRef: {name: superai-hive, key: token}}}
+            - {name: SUPERLEO_AGENT_NAME, value: "$(POD_NAME)"}
             # Where machines other than the queen reach her API: a queen engine
             # on a linked machine (claude.mac) calls /mcp here. The default for
             # hive.public_url; one set from a client (/data/queenengine.json) wins.
-            - {name: SUPERAI_PUBLIC_URL, value: "https://ai.superleo.cn"}
+            - {name: SUPERLEO_PUBLIC_URL, value: "https://ai.superleo.cn"}
             # Core: agents dial in here over gRPC (proto/agentlink/v1).
-            - {name: SUPERAI_AGENT_PORT, value: "43120"}
+            - {name: SUPERLEO_AGENT_PORT, value: "43120"}
             # Where agents outside reach it (the NodePort below): a machine
             # that joins with a pairing code learns it from the claim.
-            - {name: SUPERAI_AGENT_ADVERTISE, value: "192.168.123.214:31744,192.168.123.215:31744,192.168.123.216:31744"}
+            - {name: SUPERLEO_AGENT_ADVERTISE, value: "192.168.123.214:31744,192.168.123.215:31744,192.168.123.216:31744"}
             - {name: CORTEXDB_GRPC_TOKEN, valueFrom: {secretKeyRef: {name: superai-hive, key: cortexdb_token}}}
-            - {name: SUPERAI_SETTINGS_JSON, valueFrom: {secretKeyRef: {name: superai-hive, key: settings-queen.json}}}
+            - {name: SUPERLEO_SETTINGS_JSON, valueFrom: {secretKeyRef: {name: superai-hive, key: settings-queen.json}}}
             # The shared brain's MCP server (knowledge graph, ontologies, graph
-            # search). Its endpoint is written in the entry so SuperAI sees it is
+            # search). Its endpoint is written in the entry so SuperLeo sees it is
             # the store its memory already uses and withholds the duplicate memory
             # tools; the token comes from CORTEXDB_GRPC_TOKEN above.
-            - {name: SUPERAI_MCP_JSON, value: '{"mcpServers":{"cortexdb":{"type":"stdio","command":"cortexdb-mcp-stdio","env":{"CORTEXDB_REMOTE":"192.168.123.253:47821"}},"noted":{"type":"http","url":"http://192.168.123.65:43638/mcp","headers":{"Authorization":"Bearer ${NOTED_TOKEN}"}},"vita":{"type":"http","url":"http://192.168.123.65:43671/mcp","headers":{"Authorization":"Bearer ${VITA_TOKEN}"}},"haify":{"type":"http","url":"http://192.168.123.251:43871/mcp","headers":{"Authorization":"Bearer ${HAIFY_MCP_TOKEN}"}}}}'}
+            - {name: SUPERLEO_MCP_JSON, value: '{"mcpServers":{"cortexdb":{"type":"stdio","command":"cortexdb-mcp-stdio","env":{"CORTEXDB_REMOTE":"192.168.123.253:47821"}},"noted":{"type":"http","url":"http://192.168.123.65:43638/mcp","headers":{"Authorization":"Bearer ${NOTED_TOKEN}"}},"vita":{"type":"http","url":"http://192.168.123.65:43671/mcp","headers":{"Authorization":"Bearer ${VITA_TOKEN}"}},"haify":{"type":"http","url":"http://192.168.123.251:43871/mcp","headers":{"Authorization":"Bearer ${HAIFY_MCP_TOKEN}"}}}}'}
             # noted (to-dos, calendar, notes, goals, time, holdings): the queen's
             # data layer, also what the app's cards and tiles read through.
             - {name: NOTED_TOKEN, valueFrom: {secretKeyRef: {name: superai-hive, key: noted_token, optional: true}}}
             # Vita (daily health summaries from the iPhone app, on the apps VM
             # beside noted). Optional like noted: without vita_token the
-            # server is left out and SuperAI knows nothing of health.
+            # server is left out and SuperLeo knows nothing of health.
             - {name: VITA_TOKEN, valueFrom: {secretKeyRef: {name: superai-hive, key: vita_token, optional: true}}}
             # haify's MCP, read-only (a token of role read): the queen sees HA,
             # storage and nodes. Moving a service goes through hive_ha_move,
@@ -142,10 +142,10 @@ spec:
             # to turn it down without touching the Secret.
             # auto: the queen answers small things herself (a calendar look-up
             # went 46s -> one round) and hands real work to workers.
-            - {name: SUPERAI_HIVE_DELEGATION, value: auto}
+            - {name: SUPERLEO_HIVE_DELEGATION, value: auto}
             # The quote feed (home widgets, Quotes RPC) reaches Yahoo Finance
             # through dell's proxy; pods have no route of their own.
-            - {name: SUPERAI_QUOTE_PROXY, value: "http://192.168.123.61:43127"}
+            - {name: SUPERLEO_QUOTE_PROXY, value: "http://192.168.123.61:43127"}
             # APNs: the silent push that tells the iOS app its alarms changed.
             # The .p8 key's PEM text and its id; team and topic default to
             # NUDL4XSA6J and cn.superleo.superai.ios. Without them the queen
@@ -162,8 +162,8 @@ spec:
             # SDS nodes; its REST API says where each runs and what stands by,
             # for the hive's hosts and HA services. Without the token the
             # services are simply not shown.
-            - {name: SUPERAI_HAIFY_URL, value: "http://192.168.123.251:3375"}
-            - {name: SUPERAI_HAIFY_TOKEN, valueFrom: {secretKeyRef: {name: superai-hive, key: haify_token, optional: true}}}
+            - {name: SUPERLEO_HAIFY_URL, value: "http://192.168.123.251:3375"}
+            - {name: SUPERLEO_HAIFY_TOKEN, valueFrom: {secretKeyRef: {name: superai-hive, key: haify_token, optional: true}}}
           readinessProbe:
             httpGet: {path: /api/session, port: 43117}
           volumeMounts: [{name: data, mountPath: /data}]
@@ -178,20 +178,20 @@ spec:
         storageClassName: haify-drbd-remote
         resources: {requests: {storage: 2Gi}}
 ---
-# Whoever is queen now: the pod wearing the superai/queen label, which the
+# Whoever is queen now: the pod wearing the superleo/queen label, which the
 # elected queen puts on herself (internal/app/app_election.go). superai-queen
 # above stays the governing service of the queen StatefulSet, so its pod
 # keeps its own name when it is no longer queen.
 apiVersion: v1
 kind: Service
-metadata: {name: superai-leader, namespace: superai}
+metadata: {name: superleo-leader, namespace: superleo}
 spec:
-  selector: {superai/queen: "yes"}
+  selector: {superleo/queen: "yes"}
   ports: [{name: http, port: 43117}, {name: agent, port: 43120}]
 ---
 apiVersion: v1
 kind: Service
-metadata: {name: superai-worker, namespace: superai}
+metadata: {name: superai-worker, namespace: superleo}
 spec:
   clusterIP: None
   selector: {app: superai-worker}
@@ -199,7 +199,7 @@ spec:
 ---
 apiVersion: apps/v1
 kind: StatefulSet
-metadata: {name: superai-worker, namespace: superai}
+metadata: {name: superai-worker, namespace: superleo}
 spec:
   serviceName: superai-worker
   # No replicas here on purpose. The queen resizes this set (hive_spawn,
@@ -209,7 +209,7 @@ spec:
   template:
     metadata: {labels: {app: superai-worker}}
     spec:
-      serviceAccountName: superai
+      serviceAccountName: superleo
       # One worker per node while there are nodes to spare: a node going down
       # takes one worker with it, not three. Preferred, not required, so the
       # queen can still grow the hive past the node count.
@@ -221,7 +221,7 @@ spec:
                 topologyKey: kubernetes.io/hostname
                 labelSelector: {matchLabels: {app: superai-worker}}
       containers:
-        - name: superai
+        - name: superleo
           image: superai:hive
           imagePullPolicy: IfNotPresent
           ports: [{containerPort: 43117}, {containerPort: 43120, name: agent}]
@@ -235,28 +235,28 @@ spec:
             # The brain is Gemini behind CPA: web_search must ask for Google
             # Search by its own field, or the call answers without searching.
             - {name: SEARCH_NATIVE, value: google_search}
-            - {name: SUPERAI_TOKEN, valueFrom: {secretKeyRef: {name: superai-hive, key: token}}}
-            - {name: SUPERAI_PASSWORD_HASH, valueFrom: {secretKeyRef: {name: superai-hive, key: password_hash, optional: true}}}
-            - {name: SUPERAI_USER, valueFrom: {secretKeyRef: {name: superai-hive, key: user, optional: true}}}
+            - {name: SUPERLEO_TOKEN, valueFrom: {secretKeyRef: {name: superai-hive, key: token}}}
+            - {name: SUPERLEO_PASSWORD_HASH, valueFrom: {secretKeyRef: {name: superai-hive, key: password_hash, optional: true}}}
+            - {name: SUPERLEO_USER, valueFrom: {secretKeyRef: {name: superai-hive, key: user, optional: true}}}
             - {name: POD_NAME, valueFrom: {fieldRef: {fieldPath: metadata.name}}}
-            - {name: SUPERAI_NODE, valueFrom: {fieldRef: {fieldPath: spec.nodeName}}}
-            - {name: SUPERAI_ADVERTISE_URL, value: "http://$(POD_NAME).superai-worker.superai.svc.cluster.local:43117"}
+            - {name: SUPERLEO_NODE, valueFrom: {fieldRef: {fieldPath: spec.nodeName}}}
+            - {name: SUPERLEO_ADVERTISE_URL, value: "http://$(POD_NAME).superai-worker.superleo.svc.cluster.local:43117"}
             # Any pod may be elected queen (internal/app/app_election.go): the
-            # queen wears the superai/queen label, superai-leader and the
+            # queen wears the superleo/queen label, superleo-leader and the
             # NodePorts follow it, and a member steps up when she goes quiet.
             - {name: POD_NAMESPACE, valueFrom: {fieldRef: {fieldPath: metadata.namespace}}}
-            - {name: SUPERAI_ELECTION, value: "1"}
-            - {name: SUPERAI_QUEEN_LABEL, value: superai/queen}
-            - {name: SUPERAI_QUEEN_URL, value: "http://superai-leader.superai.svc.cluster.local:43117"}
-            - {name: SUPERAI_WORKER_STATEFULSET, value: superai-worker}
+            - {name: SUPERLEO_ELECTION, value: "1"}
+            - {name: SUPERLEO_QUEEN_LABEL, value: superleo/queen}
+            - {name: SUPERLEO_QUEEN_URL, value: "http://superleo-leader.superleo.svc.cluster.local:43117"}
+            - {name: SUPERLEO_WORKER_STATEFULSET, value: superai-worker}
             # Each worker is also an agent of the queen, over the agent link.
-            - {name: SUPERAI_CORE, value: "superai-leader.superai.svc.cluster.local:43120"}
-            - {name: SUPERAI_CORE_TOKEN, valueFrom: {secretKeyRef: {name: superai-hive, key: token}}}
-            - {name: SUPERAI_AGENT_NAME, value: "$(POD_NAME)"}
+            - {name: SUPERLEO_CORE, value: "superleo-leader.superleo.svc.cluster.local:43120"}
+            - {name: SUPERLEO_CORE_TOKEN, valueFrom: {secretKeyRef: {name: superai-hive, key: token}}}
+            - {name: SUPERLEO_AGENT_NAME, value: "$(POD_NAME)"}
             - {name: CORTEXDB_GRPC_TOKEN, valueFrom: {secretKeyRef: {name: superai-hive, key: cortexdb_token}}}
-            - {name: SUPERAI_SETTINGS_JSON, valueFrom: {secretKeyRef: {name: superai-hive, key: settings-worker.json}}}
+            - {name: SUPERLEO_SETTINGS_JSON, valueFrom: {secretKeyRef: {name: superai-hive, key: settings-worker.json}}}
             # The shared brain's MCP server (knowledge graph, ontologies, graph
-            # search). Its endpoint is written in the entry so SuperAI sees it is
+            # search). Its endpoint is written in the entry so SuperLeo sees it is
             # the store its memory already uses and withholds the duplicate memory
             # tools; the token comes from CORTEXDB_GRPC_TOKEN above.
             # noted as on the queen: in max delegation (hive.delegation) the queen
@@ -264,13 +264,13 @@ spec:
             # cluster's file rather than synced from the queen's, so it is here
             # from the first start; the abilities sync skips a server a worker
             # already configures, so there is never a second copy.
-            - {name: SUPERAI_MCP_JSON, value: '{"mcpServers":{"cortexdb":{"type":"stdio","command":"cortexdb-mcp-stdio","env":{"CORTEXDB_REMOTE":"192.168.123.253:47821"}},"noted":{"type":"http","url":"http://192.168.123.65:43638/mcp","headers":{"Authorization":"Bearer ${NOTED_TOKEN}"}},"vita":{"type":"http","url":"http://192.168.123.65:43671/mcp","headers":{"Authorization":"Bearer ${VITA_TOKEN}"}},"haify":{"type":"http","url":"http://192.168.123.251:43871/mcp","headers":{"Authorization":"Bearer ${HAIFY_MCP_TOKEN}"}}}}'}
+            - {name: SUPERLEO_MCP_JSON, value: '{"mcpServers":{"cortexdb":{"type":"stdio","command":"cortexdb-mcp-stdio","env":{"CORTEXDB_REMOTE":"192.168.123.253:47821"}},"noted":{"type":"http","url":"http://192.168.123.65:43638/mcp","headers":{"Authorization":"Bearer ${NOTED_TOKEN}"}},"vita":{"type":"http","url":"http://192.168.123.65:43671/mcp","headers":{"Authorization":"Bearer ${VITA_TOKEN}"}},"haify":{"type":"http","url":"http://192.168.123.251:43871/mcp","headers":{"Authorization":"Bearer ${HAIFY_MCP_TOKEN}"}}}}'}
             # Optional: without it the worker leaves noted out (and tells the
             # queen so, which keeps noted work off it).
             - {name: NOTED_TOKEN, valueFrom: {secretKeyRef: {name: superai-hive, key: noted_token, optional: true}}}
             # Vita (daily health summaries from the iPhone app, on the apps VM
             # beside noted). Optional like noted: without vita_token the
-            # server is left out and SuperAI knows nothing of health.
+            # server is left out and SuperLeo knows nothing of health.
             - {name: VITA_TOKEN, valueFrom: {secretKeyRef: {name: superai-hive, key: vita_token, optional: true}}}
             # The model the CortexDB tools think with (graph_update, global search,
             # multi-hop, query rewriting); without it they fall back to their
@@ -279,16 +279,16 @@ spec:
             - {name: CORTEXDB_LLM_MODEL, valueFrom: {secretKeyRef: {name: superai-hive, key: cortexdb_llm_model, optional: true}}}
             - {name: CORTEXDB_LLM_API_KEY, valueFrom: {secretKeyRef: {name: superai-hive, key: cortexdb_llm_key, optional: true}}}
             # What a queen needs, for the day this worker is elected one.
-            - {name: SUPERAI_PUBLIC_URL, value: "https://ai.superleo.cn"}
-            - {name: SUPERAI_AGENT_PORT, value: "43120"}
-            - {name: SUPERAI_AGENT_ADVERTISE, value: "192.168.123.214:31744,192.168.123.215:31744,192.168.123.216:31744"}
+            - {name: SUPERLEO_PUBLIC_URL, value: "https://ai.superleo.cn"}
+            - {name: SUPERLEO_AGENT_PORT, value: "43120"}
+            - {name: SUPERLEO_AGENT_ADVERTISE, value: "192.168.123.214:31744,192.168.123.215:31744,192.168.123.216:31744"}
             - {name: HAIFY_MCP_TOKEN, valueFrom: {secretKeyRef: {name: superai-hive, key: haify_mcp_token, optional: true}}}
-            - {name: SUPERAI_HIVE_DELEGATION, value: auto}
-            - {name: SUPERAI_QUOTE_PROXY, value: "http://192.168.123.61:43127"}
+            - {name: SUPERLEO_HIVE_DELEGATION, value: auto}
+            - {name: SUPERLEO_QUOTE_PROXY, value: "http://192.168.123.61:43127"}
             - {name: APNS_KEY, valueFrom: {secretKeyRef: {name: superai-hive, key: apns_key, optional: true}}}
             - {name: APNS_KEY_ID, valueFrom: {secretKeyRef: {name: superai-hive, key: apns_key_id, optional: true}}}
-            - {name: SUPERAI_HAIFY_URL, value: "http://192.168.123.251:3375"}
-            - {name: SUPERAI_HAIFY_TOKEN, valueFrom: {secretKeyRef: {name: superai-hive, key: haify_token, optional: true}}}
+            - {name: SUPERLEO_HAIFY_URL, value: "http://192.168.123.251:3375"}
+            - {name: SUPERLEO_HAIFY_TOKEN, valueFrom: {secretKeyRef: {name: superai-hive, key: haify_token, optional: true}}}
           readinessProbe:
             httpGet: {path: /api/session, port: 43117}
           volumeMounts: [{name: data, mountPath: /data}]
@@ -310,25 +310,25 @@ spec:
 # out without Secure.
 apiVersion: v1
 kind: Service
-metadata: {name: superai-queen-web, namespace: superai}
+metadata: {name: superai-queen-web, namespace: superleo}
 spec:
   type: NodePort
-  selector: {superai/queen: "yes"}
+  selector: {superleo/queen: "yes"}
   ports: [{name: http, port: 80, targetPort: 43117, nodePort: 31743}]
 ---
 # Where agents outside the cluster dial in: the Mac, the orange machines, the
 # openclaw nodes. gRPC on any node's 31744; each agent holds its own token.
 apiVersion: v1
 kind: Service
-metadata: {name: superai-queen-agent, namespace: superai}
+metadata: {name: superai-queen-agent, namespace: superleo}
 spec:
   type: NodePort
-  selector: {superai/queen: "yes"}
+  selector: {superleo/queen: "yes"}
   ports: [{name: agent, port: 43120, targetPort: 43120, nodePort: 31744}]
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
-metadata: {name: superai-queen, namespace: superai}
+metadata: {name: superai-queen, namespace: superleo}
 spec:
   rules:
     - http:

@@ -94,7 +94,7 @@ func TestTheMacsProcessesBecomeSessions(t *testing.T) {
 	asked := [][]int{}
 	p.cwdOf = func(pids []int) map[int]string {
 		asked = append(asked, append([]int{}, pids...))
-		return map[int]string{7509: "/Users/me/code/superai", 11332: "/Users/me/code/noted", 17291: "/Users/me/code/pets/", 69169: "/Users/me"}
+		return map[int]string{7509: "/Users/me/code/superleo", 11332: "/Users/me/code/noted", 17291: "/Users/me/code/pets/", 69169: "/Users/me"}
 	}
 	now := time.Date(2026, 10, 17, 20, 0, 0, 0, time.Local)
 	out := p.look(parsePS([]byte(psMac)), now)
@@ -120,7 +120,7 @@ func TestTheMacsProcessesBecomeSessions(t *testing.T) {
 			busy = s
 		}
 	}
-	if busy.State != actWorking || busy.Project != "superai" {
+	if busy.State != actWorking || busy.Project != "superleo" {
 		t.Fatalf("busy claude %+v", busy)
 	}
 	if len(asked) != 1 || len(asked[0]) != 5 {
@@ -179,7 +179,7 @@ func TestOwnRunsAndReusedPIDsAreNotSessions(t *testing.T) {
 	p := newProcPoller(4000)
 	p.cwdOf = func([]int) map[int]string { return nil }
 	// This node (4000) started a coding run through a shell.
-	ps := "4000     1  1.0 05:00 0:30.00 /Users/me/.superai-node/bin/superai agent\n" +
+	ps := "4000     1  1.0 05:00 0:30.00 /Users/me/.superleo-node/bin/superleo agent\n" +
 		"4001  4000  0.0 01:00 0:00.01 /bin/sh -c opencode run\n" +
 		"4002  4001 50.0 01:00 0:20.00 opencode run do-it\n" +
 		"5000     1  0.0 01:00 0:00.10 agy\n"

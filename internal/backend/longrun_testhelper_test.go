@@ -42,7 +42,7 @@ func newTestLongRunService(t *testing.T) *Service {
 	}
 	cfg.ApplyHomeLayout()
 
-	agentSvc, err := agent.New("SuperAI-test").
+	agentSvc, err := agent.New("SuperLeo-test").
 		WithConfig(cfg).
 		WithLLM(scriptedLLM{}).
 		WithObserverPayloads(). // as service.go builds it

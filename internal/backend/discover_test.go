@@ -118,7 +118,7 @@ func TestMatchesAll(t *testing.T) {
 
 func TestSearchSkills(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("SUPERAI_HOME", home)
+	t.Setenv("SUPERLEO_HOME", home)
 	// Point HOME at a temp dir too: the search also looks under ~/.claude, and a
 	// developer's real skills would otherwise decide what this test sees.
 	t.Setenv("HOME", t.TempDir())
@@ -142,7 +142,7 @@ func TestSearchSkills(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(source, "not-a-skill"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("SUPERAI_SKILL_PATH", source)
+	t.Setenv("SUPERLEO_SKILL_PATH", source)
 
 	all := SearchSkills("", 0)
 	names := make([]string, 0, len(all))
@@ -233,8 +233,8 @@ func TestCopySkillDir(t *testing.T) {
 // the point is to catch the registry changing shape under us, which a mocked
 // response can never do.
 func TestSearchMCPServersLive(t *testing.T) {
-	if os.Getenv("SUPERAI_NET_TEST") != "1" {
-		t.Skip("set SUPERAI_NET_TEST=1 to query the live MCP registry")
+	if os.Getenv("SUPERLEO_NET_TEST") != "1" {
+		t.Skip("set SUPERLEO_NET_TEST=1 to query the live MCP registry")
 	}
 	got, err := SearchMCPServers(context.Background(), "filesystem", 5)
 	if err != nil {

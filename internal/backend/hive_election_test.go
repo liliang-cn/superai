@@ -40,7 +40,7 @@ func TestEveryMemberDrawsTheSameQueen(t *testing.T) {
 	}
 }
 
-// member is one SuperAI in a test hive: a worker announcing, which becomes a
+// member is one SuperLeo in a test hive: a worker announcing, which becomes a
 // queen with its own roster when it is elected.
 type member struct {
 	name string

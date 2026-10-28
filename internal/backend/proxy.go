@@ -1,6 +1,6 @@
 package backend
 
-// The proxy SuperAI's own requests go through: model calls, web search and
+// The proxy SuperLeo's own requests go through: model calls, web search and
 // fetch, MCP servers reached by URL, quotes, and the agent CLIs it starts.
 //
 // Four modes (Settings → Runtime → Proxy):
@@ -267,7 +267,7 @@ func systemProxy() sysProxy {
 	return sysCache.val
 }
 
-// readSystemProxy asks the OS. Only macOS has a system proxy SuperAI reads;
+// readSystemProxy asks the OS. Only macOS has a system proxy SuperLeo reads;
 // elsewhere "system" is the environment, which is how a Linux desktop or a
 // Windows service usually hands one out.
 func readSystemProxy() sysProxy {
@@ -367,7 +367,7 @@ func systemCacheReset() {
 	sysCache.mu.Unlock()
 }
 
-// ProxyEnv is the proxy variables a program SuperAI starts (Claude Code,
+// ProxyEnv is the proxy variables a program SuperLeo starts (Claude Code,
 // Codex, an MCP server) is given, so it takes the same way out. Nil leaves
 // the program the environment it would get anyway (mode ""); "off" clears
 // them.

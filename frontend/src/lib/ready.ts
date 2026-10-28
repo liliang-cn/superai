@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from "react";
 import { EventsOn } from "../../wailsjs/runtime";
 
-// Whether this SuperAI has something to think with: a model, or an engine
+// Whether this SuperLeo has something to think with: a model, or an engine
 // such as Claude Code. App's status poll sets it; the bars read it so a
 // message is not sent into a backend that can only fail, and the setup
 // banner and the first start's model step open from anywhere.
@@ -25,9 +25,9 @@ export function useReady(): boolean | null {
   );
 }
 
-export const SETUP_EVENT = "superai:setup";
+export const SETUP_EVENT = "superleo:setup";
 
-/** Opens the first start's "choose how SuperAI thinks" step. */
+/** Opens the first start's "choose how SuperLeo thinks" step. */
 export function requestSetup() {
   window.dispatchEvent(new Event(SETUP_EVENT));
 }

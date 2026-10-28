@@ -7,16 +7,16 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // The engine, the fallback and the public URL set over /api/rpc survive the
 // hive's entrypoint writing settings.json from the Secret on the next start,
-// and going back to SuperAI's own agent leaves nothing that shadows the Secret.
+// and going back to SuperLeo's own agent leaves nothing that shadows the Secret.
 func TestTheQueenEngineSurvivesTheEntrypointRewritingSettings(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("SUPERAI_HOME", home)
-	t.Setenv("SUPERAI_PUBLIC_URL", "")
+	t.Setenv("SUPERLEO_HOME", home)
+	t.Setenv("SUPERLEO_PUBLIC_URL", "")
 	bin, _ := fakeClaude(t, "", 0)
 	a := NewApp()
 	s, err := backend.LoadSettings()
@@ -68,7 +68,7 @@ func TestTheQueenEngineSurvivesTheEntrypointRewritingSettings(t *testing.T) {
 		t.Fatalf("operator's public_url: %+v", got.Hive)
 	}
 
-	// Back to SuperAI with the fallback on: the file goes, and the Secret's
+	// Back to SuperLeo with the fallback on: the file goes, and the Secret's
 	// word is the only one again.
 	// The Secret leaves the proxy at its default (on); off here, or saving
 	// starts the real CLIProxyAPI and its own data race fails -race.

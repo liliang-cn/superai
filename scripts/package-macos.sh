@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Build a universal (arm64 + Intel) SuperAI.app and wrap it in a drag-to-install
-# .dmg. Output: build/bin/SuperAI.app and build/bin/SuperAI.dmg.
+# Build a universal (arm64 + Intel) SuperLeo.app and wrap it in a drag-to-install
+# .dmg. Output: build/bin/SuperLeo.app and build/bin/SuperLeo.dmg.
 #
 # Optional code signing + notarization (needs an Apple Developer account):
 #   SIGN_ID="Developer ID Application: Your Name (TEAMID)" \
@@ -18,8 +18,8 @@ cd "$(dirname "$0")/.."
 echo "==> wails build (darwin/universal)"
 wails build -clean -platform darwin/universal
 
-APP="build/bin/SuperAI.app"
-DMG="build/bin/SuperAI.dmg"
+APP="build/bin/SuperLeo.app"
+DMG="build/bin/SuperLeo.dmg"
 
 # notarize submits a file and waits for Apple's answer; false when no
 # credentials are set.
@@ -42,7 +42,7 @@ if [[ -n "${SIGN_ID:-}" ]]; then
   codesign --verify --strict --verbose=2 "$APP"
   if can_notarize; then
     echo "==> notarize + staple the app"
-    ZIP="$(mktemp -d)/SuperAI.zip"
+    ZIP="$(mktemp -d)/SuperLeo.zip"
     ditto -c -k --keepParent "$APP" "$ZIP"
     notarize "$ZIP"
     rm -f "$ZIP"
@@ -55,7 +55,7 @@ STAGE="$(mktemp -d)"
 cp -R "$APP" "$STAGE/"
 ln -s /Applications "$STAGE/Applications"
 rm -f "$DMG"
-hdiutil create -volname "SuperAI" -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null
+hdiutil create -volname "SuperLeo" -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null
 rm -rf "$STAGE"
 
 if [[ -n "${SIGN_ID:-}" ]]; then
@@ -69,4 +69,4 @@ fi
 
 echo "==> done: $DMG"
 hdiutil verify "$DMG" | tail -1
-lipo -archs "$APP/Contents/MacOS/SuperAI"
+lipo -archs "$APP/Contents/MacOS/SuperLeo"

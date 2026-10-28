@@ -19,9 +19,9 @@ import (
 	"github.com/google/uuid"
 )
 
-// Workers: SuperAI instances commanding one another.
+// Workers: SuperLeo instances commanding one another.
 //
-// A worker is a SuperAI serving over HTTP, and the one that holds a list of them
+// A worker is a SuperLeo serving over HTTP, and the one that holds a list of them
 // is the queen. The command runs one way only, and that is enforced by
 // the data rather than by a rule: a RemoteAgent with a URL is a worker, and only
 // an instance whose settings list workers can command any. A worker's settings

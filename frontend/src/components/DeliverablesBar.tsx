@@ -54,7 +54,7 @@ function viewerKind(path: string): ViewerKind {
   return "binary";
 }
 
-const OPEN_KEY = "superai-deliverables-open";
+const OPEN_KEY = "superleo-deliverables-open";
 
 /**
  * The files the current conversation produced, with a preview modal. Scoped to

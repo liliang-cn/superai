@@ -5,7 +5,7 @@ import { app } from "../../wailsjs/go/models";
 import { toast } from "../lib/toasts";
 
 /**
- * Pairing the SuperAI phone app with this server.
+ * Pairing the SuperLeo phone app with this server.
  *
  * A code is asked for here, by someone already signed in, and shown two ways:
  * as six digits to type, and as a QR code that also carries this page's
@@ -88,10 +88,10 @@ export default function PairPhoneCard() {
 
   return (
     <div className="card">
-      <div className="card-title">Phones and other SuperAIs</div>
+      <div className="card-title">Phones and other SuperLeos</div>
       <div className="card-desc">
-        Pair the SuperAI iPhone app — scan the code with the phone's camera — or another SuperAI,
-        which enters this address and the six digits under Other SuperAIs. Each gets its own key
+        Pair the SuperLeo iPhone app — scan the code with the phone's camera — or another SuperLeo,
+        which enters this address and the six digits under Other SuperLeos. Each gets its own key
         and can be unpaired here.
       </div>
 

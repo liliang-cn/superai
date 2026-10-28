@@ -10,7 +10,7 @@ import (
 func TestAnOutsideQueenReadsTheQueensOwnPrompt(t *testing.T) {
 	s := &Settings{QueenName: "小蜂", Hive: HiveSettings{Role: HiveRoleQueen, Name: "q"}}
 	got := ExternalQueenPrompt(s)
-	for _, part := range []string{queenSection(s.Hive), queenNameSection(s), answerLanguageRule, "superai_hive_x"} {
+	for _, part := range []string{queenSection(s.Hive), queenNameSection(s), answerLanguageRule, "superleo_hive_x"} {
 		if part == "" || !strings.Contains(got, part) {
 			t.Fatalf("missing %q in\n%s", part, got)
 		}
@@ -27,7 +27,7 @@ func TestAnOutsideQueenReadsTheQueensOwnPrompt(t *testing.T) {
 
 func TestAnEngineIsHandedTheServerWithItsSecretOutOfTheEntry(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("SUPERAI_HOME", home)
+	t.Setenv("SUPERLEO_HOME", home)
 	t.Setenv("NOTED_TOKEN", "n-secret")
 	cfg := `{"mcpServers":{
 	  "noted":{"type":"streamable-http","url":"https://noted.example/mcp","headers":{"Authorization":"Bearer ${NOTED_TOKEN}"}},

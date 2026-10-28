@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/liliang-cn/superai/internal/alarmplan"
+	"github.com/liliang-cn/superleo/internal/alarmplan"
 )
 
 // holidayTTL is how long a year's calendar is used before noted is asked

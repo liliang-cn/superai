@@ -279,7 +279,7 @@ func TestTelegramErrorsCarryTheAPIsOwnReason(t *testing.T) {
 }
 
 func TestTwoBridgesDoNotBothPoll(t *testing.T) {
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 
 	first, err := AcquireFileLock(telegramLockName)
 	if err != nil || first == nil {

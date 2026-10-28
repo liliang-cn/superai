@@ -14,7 +14,7 @@ import (
 // expected "enabled but not logged in yet" state.
 func TestCLIProxyLifecycle(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("SUPERAI_HOME", home)
+	t.Setenv("SUPERLEO_HOME", home)
 
 	p, err := StartCLIProxy(43519)
 	if err != nil {
@@ -25,8 +25,8 @@ func TestCLIProxyLifecycle(t *testing.T) {
 	if got, want := p.BaseURL(), "http://127.0.0.1:43519/v1"; got != want {
 		t.Errorf("BaseURL = %q, want %q", got, want)
 	}
-	if !strings.HasPrefix(p.Key(), "superai-") {
-		t.Errorf("Key = %q, want a generated superai- key", p.Key())
+	if !strings.HasPrefix(p.Key(), "superleo-") {
+		t.Errorf("Key = %q, want a generated superleo- key", p.Key())
 	}
 
 	models, err := p.Models(context.Background())

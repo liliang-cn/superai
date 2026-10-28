@@ -3,7 +3,7 @@ package app
 import (
 	"strings"
 
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // The queen's name and aliases (backend/queen_name.go), as clients read and

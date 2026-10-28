@@ -3,7 +3,7 @@ package app
 import (
 	"context"
 
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // Doctor inspects this install and reports what it found.

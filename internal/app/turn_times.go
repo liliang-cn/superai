@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // When each ask in a conversation was made and how long its answer took.
@@ -25,8 +25,8 @@ import (
 // transcript can lose turns to compaction or gain ones the agent injected, and
 // a position would then point at the wrong message.
 //
-// The line also says who answered, when it was not SuperAI's own agent: the
-// queen engine's name, what that turn cost, and — for a turn SuperAI's agent
+// The line also says who answered, when it was not SuperLeo's own agent: the
+// queen engine's name, what that turn cost, and — for a turn SuperLeo's agent
 // took because the engine could not — which engine it stood in for.
 type turnTime struct {
 	Hash      string    `json:"h"`
@@ -35,7 +35,7 @@ type turnTime struct {
 	turnBy
 }
 
-// turnBy is who answered a turn; the zero value is SuperAI's own agent.
+// turnBy is who answered a turn; the zero value is SuperLeo's own agent.
 type turnBy struct {
 	Engine     string  `json:"e,omitempty"`
 	CostUSD    float64 `json:"c,omitempty"`

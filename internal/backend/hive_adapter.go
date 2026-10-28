@@ -20,12 +20,12 @@ import (
 	"github.com/google/uuid"
 )
 
-// Workers that are not SuperAI.
+// Workers that are not SuperLeo.
 //
 // The hive asks two things of a worker: that it announce itself (hive.go) and
-// that it take an order and report back the way a SuperAI does — one POST to
+// that it take an order and report back the way a SuperLeo does — one POST to
 // start a turn, an event stream for its progress and its end. Nothing in that
-// needs to be SuperAI. This is a small server that says those things on behalf
+// needs to be SuperLeo. This is a small server that says those things on behalf
 // of any agent, so a Claude Code, a Codex, a script or a model behind an API
 // can be a worker in the hive and be commanded, scheduled and drawn like any
 // other.

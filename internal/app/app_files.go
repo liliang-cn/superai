@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 

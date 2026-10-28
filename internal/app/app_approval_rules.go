@@ -5,7 +5,7 @@ package app
 // backend/approval_rules.go; this is where they meet the cards.
 
 import (
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // approvalRules is the store for this app's data directory.

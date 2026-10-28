@@ -1,7 +1,7 @@
 // Phones reaching the desktop app.
 //
 // The companion server (companion.go) is loopback only, so a phone has nothing
-// to connect to on a computer that runs SuperAI as an app. The phone link is
+// to connect to on a computer that runs SuperLeo as an app. The phone link is
 // that something: the same handler, served over TLS on the local network and
 // through the relay (internal/relay) for a phone that is somewhere else. Both
 // end in this process, with this computer's own certificate; the phone pins
@@ -9,7 +9,7 @@
 // cannot read.
 //
 // It starts when a phone is paired and, after that, whenever the app starts
-// with a paired phone. SUPERAI_RELAY names another relay (host or host:port),
+// with a paired phone. SUPERLEO_RELAY names another relay (host or host:port),
 // or "off" for the local network only.
 package app
 
@@ -38,8 +38,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/liliang-cn/superai/internal/backend"
-	"github.com/liliang-cn/superai/internal/relay"
+	"github.com/liliang-cn/superleo/internal/backend"
+	"github.com/liliang-cn/superleo/internal/relay"
 )
 
 // phoneLinkPort is tried first so a phone's saved address survives restarts.
@@ -84,7 +84,7 @@ func loadOrCreatePhoneIdentity(dir string) (*phoneIdentity, error) {
 	serial, _ := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 62))
 	tmpl := &x509.Certificate{
 		SerialNumber: serial,
-		Subject:      pkix.Name{CommonName: "SuperAI"},
+		Subject:      pkix.Name{CommonName: "SuperLeo"},
 		NotBefore:    time.Now().Add(-24 * time.Hour),
 		NotAfter:     time.Now().AddDate(20, 0, 0),
 		KeyUsage:     x509.KeyUsageDigitalSignature,
@@ -137,7 +137,7 @@ func certFingerprint(der []byte) string {
 
 // relayAddr is the relay to use, host:port, or "" for none.
 func relayAddr() string {
-	v := strings.TrimSpace(os.Getenv("SUPERAI_RELAY"))
+	v := strings.TrimSpace(os.Getenv("SUPERLEO_RELAY"))
 	switch {
 	case v == "":
 		v = relay.DefaultHost

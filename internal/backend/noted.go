@@ -3,7 +3,7 @@ package backend
 // noted is where the person's own data lives: to-dos, calendar, notes,
 // projects, goals and objectives, time logging and investment holdings. It is
 // an MCP server like any other (mcpServers.json, usually remote over HTTP with
-// "Authorization": "Bearer ${NOTED_TOKEN}"), and SuperAI draws its answers —
+// "Authorization": "Bearer ${NOTED_TOKEN}"), and SuperLeo draws its answers —
 // in chat with card / timeline / stat blocks, on the home screen through the
 // Noted* RPCs.
 

@@ -1,4 +1,4 @@
-# SuperAI — Design Spec
+# SuperLeo — Design Spec
 
 Date: 2026-06-21
 Status: approved, in implementation
@@ -8,15 +8,15 @@ Status: approved, in implementation
 A cross-platform (macOS + Windows) **Wails v2** desktop app that is a full
 showcase of the AgentGo framework: a single-user local assistant whose backend
 is a maximally-configured `agent.Service` — sandbox + browser + vision +
-autonomy + deliverables + graph memory + skills + the SuperAI life-assistant
+autonomy + deliverables + graph memory + skills + the SuperLeo life-assistant
 tools + CortexDB data import — driven by a fresh, modern sidebar UI.
 
-It also exposes an **avatar-driver interface**: SuperAI does NOT render a 3D/2D
+It also exposes an **avatar-driver interface**: SuperLeo does NOT render a 3D/2D
 character itself, but broadcasts emotion + agent-lifecycle events over a local
 protocol so any external 2D/3D renderer (Live2D / VRM / Unity / web) can be
 driven by it.
 
-Standalone repo at `~/Things/projects/ai/superai`, depending on the
+Standalone repo at `~/Things/projects/ai/superleo`, depending on the
 published `github.com/liliang-cn/agent-go/v3` (currently v2.89.0) and
 `cortexdb/v2` (v2.24.1). No Go workspace entanglement — it pins released
 versions.
@@ -26,16 +26,16 @@ versions.
 - **Wails v2** (v2.12) — Go backend + React + Vite + TypeScript frontend, native
   webview on both macOS (WKWebView) and Windows (WebView2).
 - Backend: AgentGo `agent.Service` + cortexdb + cortexbridge.
-- Data dir: `~/.superai/` (cortex.db, workspace/, settings.json).
+- Data dir: `~/.superleo/` (cortex.db, workspace/, settings.json).
 - Cross-platform: no OS-specific code in our layer; agent-go's sandbox already
   has unix/other build tags, chromedp + WebView2/WKWebView work on both.
 
 ## Backend: maximally-configured Service (`backend/agentsvc`)
 
 ```go
-agent.New("SuperAI").
+agent.New("SuperLeo").
     WithLLM(providerFromSettings).
-    WithSandbox(sandbox.NewLocal(WithWorkspace(~/.superai/workspace))).
+    WithSandbox(sandbox.NewLocal(WithWorkspace(~/.superleo/workspace))).
     WithBrowser(browser.NewChromedp(headless)).
     WithVision(true).
     WithAutonomy(agent.AutonomyProfile{MaxRounds: 40, Scratchpad: true}).
@@ -44,14 +44,14 @@ agent.New("SuperAI").
     WithSkills().
     Build()
 // + RegisterFetchURLTool
-// + life-assistant tools ported from examples/superai (add_schedule, list_schedules,
+// + life-assistant tools ported from examples/superleo (add_schedule, list_schedules,
 //   add_record, search_records, upsert_person, set_reminder, list_reminders)
 // + cortexbridge.RegisterImportFlow + connectorbridge.Register (data import)
-// + proactive reminder scheduler (port from superai)
+// + proactive reminder scheduler (port from superleo)
 ```
 
 No-embedder fallback to file memory (chat-only proxies still work), mirroring
-examples/superai.
+examples/superleo.
 
 ## Wails bridge (Go ⇆ JS)
 
@@ -76,7 +76,7 @@ A small package `backend/avatar`:
 type AvatarEvent struct {
     Type    string `json:"type"`    // "state" | "emotion" | "speech"
     State   string `json:"state,omitempty"`   // idle | thinking | working | speaking
-    Emotion string `json:"emotion,omitempty"` // neutral|happy|sad|thinking|excited|... (from SuperAI persona tags)
+    Emotion string `json:"emotion,omitempty"` // neutral|happy|sad|thinking|excited|... (from SuperLeo persona tags)
     Text    string `json:"text,omitempty"`    // for speech/talking + optional viseme hints later
     Tool    string `json:"tool,omitempty"`    // current tool when state=working
     Ts      int64  `json:"ts"`
@@ -90,7 +90,7 @@ type AvatarDriver interface { Emit(AvatarEvent) }
   agnostic: any external Live2D/VRM/Unity/web renderer connects and reacts.
 - The runtime maps to events: run start → `state:thinking`; each tool_call →
   `state:working` (+tool); final answer streaming → `state:speaking` (+text);
-  done → `state:idle`. SuperAI's emotion tags (情绪: ...) → `emotion` events.
+  done → `state:idle`. SuperLeo's emotion tags (情绪: ...) → `emotion` events.
 - A `NoopDriver` when no avatar is attached. The protocol (event schema + port)
   is documented in `docs/avatar-protocol.md` so third parties can implement it.
 - v1 ships the protocol + server + a tiny reference HTML page that shows a 2D

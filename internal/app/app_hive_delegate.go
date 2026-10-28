@@ -16,7 +16,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/liliang-cn/agent-go/v3/pkg/agent"
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // chatRequestKey carries the request id of the turn a tool runs in, so a tool
@@ -75,7 +75,7 @@ func (a *App) delegateCandidates(needs []string) []string {
 		name  string
 		load  int
 		known bool
-		// rank orders peers at the same load: a SuperAI, then a named agent,
+		// rank orders peers at the same load: a SuperLeo, then a named agent,
 		// then a coding CLI; one a piece names among its needs comes first.
 		rank int
 	}
@@ -190,7 +190,7 @@ func (a *App) registerDelegateTool(inner *agent.Service, mode string) {
 			" what to do, absolute dates and times, ids, what to report. Several independent tasks in one call run at the"+
 			" same time on different workers, idle ones first; split a request that has independent parts. Set needs to"+
 			" the MCP servers a task's tools come from (\"noted\") so it goes to a worker that has them."+
-			"\n\nEvery agent that can work is a worker, and they are peers: a SuperAI worker, a named agent (\"openclaw\","+
+			"\n\nEvery agent that can work is a worker, and they are peers: a SuperLeo worker, a named agent (\"openclaw\","+
 			" \"hermes\", \"pi\"), and a signed-in coding CLI on a machine (\"claude.mac\", \"codex.sds-e\"). Name a coding"+
 			" CLI in needs (\"codex\") for coding work and it does the task itself; set worker to hand a task to one of them"+
 			" by name. A coding CLI takes one task at a time. hive_members lists who there is."+
@@ -281,7 +281,7 @@ func checkDelegateTasks(tasks []backend.DelegateTask) error {
 
 // delegate runs one delegation: each piece to the best worker, another on a
 // failure, the queen herself when nobody can. hive_delegate in her own run and
-// superai_hive_delegate on /mcp both come here. Every tool event goes on the
+// superleo_hive_delegate on /mcp both come here. Every tool event goes on the
 // turn's stream (when there is a turn) and to any trace already on ctx;
 // onAssign, when set, is told who takes each piece.
 func (a *App) delegate(ctx context.Context, tasks []backend.DelegateTask, onAssign func(i int, worker string, fallback bool)) ([]backend.DelegateResult, error) {

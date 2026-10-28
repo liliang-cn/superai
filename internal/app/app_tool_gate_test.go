@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // The gate, end to end, against the service the app actually builds.
@@ -75,8 +75,8 @@ func startToolCallingLLM(t *testing.T, command string) string {
 func gateTestApp(t *testing.T, command string, disable bool) (*App, string) {
 	t.Helper()
 	home := t.TempDir()
-	t.Setenv("SUPERAI_HOME", home)
-	t.Setenv("SUPERAI_NO_BROWSER", "1")
+	t.Setenv("SUPERLEO_HOME", home)
+	t.Setenv("SUPERLEO_NO_BROWSER", "1")
 
 	a := NewApp()
 	a.emitFn = func(string, map[string]any) {}

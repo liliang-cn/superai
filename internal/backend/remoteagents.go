@@ -57,7 +57,7 @@ const remoteProbeTimeout = 6 * time.Second
 // call an extra round trip for an event that happens a few times a year.
 const remoteHostTTL = 2 * time.Minute
 
-// RemoteAgents configures the agents SuperAI can reach over the network.
+// RemoteAgents configures the agents SuperLeo can reach over the network.
 //
 // Off by zero value, like ExternalAgents and for the same reason: it runs
 // commands on other machines under someone's credentials.
@@ -73,7 +73,7 @@ type RemoteAgents struct {
 type RemoteAgent struct {
 	// What it is, in one line. Shown in the picker and given to the model.
 	About string `json:"about,omitempty"`
-	// URL, when set, makes this a worker: another SuperAI serving over HTTP,
+	// URL, when set, makes this a worker: another SuperLeo serving over HTTP,
 	// commanded through its own API instead of over SSH. Token is the bearer
 	// it accepts. See hive_call.go. Hosts and Command are ignored for a worker.
 	URL   string `json:"url,omitempty"`

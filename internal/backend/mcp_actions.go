@@ -302,7 +302,7 @@ func (m *MCPActions) session(ctx context.Context, server string) (*actionSession
 	if err != nil {
 		return nil, err
 	}
-	client := mcp.NewClient(&mcp.Implementation{Name: "superai-actions", Version: "1"}, nil)
+	client := mcp.NewClient(&mcp.Implementation{Name: "superleo-actions", Version: "1"}, nil)
 	cs, err := client.Connect(ctx, transport, nil)
 	if err != nil {
 		return nil, fmt.Errorf("connect: %w", err)

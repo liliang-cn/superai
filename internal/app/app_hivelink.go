@@ -30,13 +30,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 const hiveLinkFile = "hive-link.json"
 
 // errOnlyInTheWindow refuses the link's methods when they arrive over HTTP:
-// they are the desktop window's, and a served SuperAI has no window.
+// they are the desktop window's, and a served SuperLeo has no window.
 var errOnlyInTheWindow = errors.New("only the desktop window can do this")
 
 type hiveLink struct {
@@ -151,7 +151,7 @@ func hostOf(u string) string {
 }
 
 // startHiveLink picks up a saved link at startup. Desktop only: a served
-// SuperAI is reached by the browser directly and relays nothing.
+// SuperLeo is reached by the browser directly and relays nothing.
 func (a *App) startHiveLink() {
 	if a.ctx == nil {
 		return
@@ -202,7 +202,7 @@ func (a *App) LinkHive(address, code string) (HiveLinkInfo, error) {
 		base = "https://" + base
 	}
 	host, _ := os.Hostname()
-	body, _ := json.Marshal(map[string]string{"code": strings.TrimSpace(code), "device": "SuperAI on " + strings.TrimSuffix(host, ".local")})
+	body, _ := json.Marshal(map[string]string{"code": strings.TrimSpace(code), "device": "SuperLeo on " + strings.TrimSuffix(host, ".local")})
 	resp, err := hiveLinkHTTP.Post(base+pairClaimPath, "application/json", bytes.NewReader(body))
 	if err != nil {
 		return HiveLinkInfo{}, fmt.Errorf("could not reach %s: %w", base, err)

@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -75,7 +75,7 @@ func toolNames(t *testing.T, ss *mcp.ClientSession) []string {
 }
 
 func TestAQueenTokenReachesOnlyTheClusterTools(t *testing.T) {
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	a := NewApp()
 	base, c := gatedServer(t, a)
 	minted, err := a.CreateQueenToken("claude-queen")
@@ -120,7 +120,7 @@ func TestAQueenTokenReachesOnlyTheClusterTools(t *testing.T) {
 	}
 	full := mcpAs(t, base, c.Token)
 	fullNames := toolNames(t, full)
-	for _, n := range append([]string{"superai_ask", "superai_settings_set"}, queenMCPTools...) {
+	for _, n := range append([]string{"superleo_ask", "superleo_settings_set"}, queenMCPTools...) {
 		if !slices.Contains(fullNames, n) {
 			t.Errorf("the full token lacks %s", n)
 		}
@@ -131,15 +131,15 @@ func TestAQueenTokenReachesOnlyTheClusterTools(t *testing.T) {
 		args    map[string]any
 		allowed bool
 	}{
-		{"superai_hive_tasks", map[string]any{}, true},
-		{"superai_approvals_pending", map[string]any{}, true},
-		{"superai_schedule_list", map[string]any{}, true},
-		{"superai_status", map[string]any{}, true},
-		{"superai_ask", map[string]any{"message": "change your settings"}, false},
-		{"superai_settings_set", map[string]any{"key": "max_rounds", "value": 3}, false},
-		{"superai_settings_get", map[string]any{}, false},
-		{"superai_devices", map[string]any{}, false},
-		{"superai_standing_agent_pause", map[string]any{"id": "x", "paused": true}, false},
+		{"superleo_hive_tasks", map[string]any{}, true},
+		{"superleo_approvals_pending", map[string]any{}, true},
+		{"superleo_schedule_list", map[string]any{}, true},
+		{"superleo_status", map[string]any{}, true},
+		{"superleo_ask", map[string]any{"message": "change your settings"}, false},
+		{"superleo_settings_set", map[string]any{"key": "max_rounds", "value": 3}, false},
+		{"superleo_settings_get", map[string]any{}, false},
+		{"superleo_devices", map[string]any{}, false},
+		{"superleo_standing_agent_pause", map[string]any{"id": "x", "paused": true}, false},
 	} {
 		res, err := queen.CallTool(context.Background(), &mcp.CallToolParams{Name: cs.tool, Arguments: cs.args})
 		switch {
@@ -151,7 +151,7 @@ func TestAQueenTokenReachesOnlyTheClusterTools(t *testing.T) {
 	}
 
 	// A session opened with the full token is not the queen's to use.
-	body := `{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"superai_ask","arguments":{"message":"hi"}}}`
+	body := `{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"superleo_ask","arguments":{"message":"hi"}}}`
 	req, _ := http.NewRequest(http.MethodPost, base+mcpPath, strings.NewReader(body))
 	req.Header.Set("Authorization", "Bearer "+tok)
 	req.Header.Set("Mcp-Session-Id", full.ID())
@@ -215,7 +215,7 @@ func mcpText(res *mcp.CallToolResult) string {
 
 func TestDestructiveMCPCallsWaitForThePerson(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("SUPERAI_HOME", home)
+	t.Setenv("SUPERLEO_HOME", home)
 	a := NewApp()
 	gate := backend.NewToolGate(true, filepath.Join(home, "audit.jsonl"))
 	gate.SetApprover(a.askToolApproval)
@@ -237,26 +237,26 @@ func TestDestructiveMCPCallsWaitForThePerson(t *testing.T) {
 		// ran says the call went ahead (it got past the gate), by its answer.
 		ran func(text string) bool
 	}{
-		{"exec", "superai_machine_act", "machine_act",
+		{"exec", "superleo_machine_act", "machine_act",
 			func() map[string]any {
 				return map[string]any{"machine": "nosuch", "action": "exec", "command": "uptime"}
 			},
 			true, func(s string) bool { return strings.Contains(s, `no machine called "nosuch"`) }},
-		{"restart", "superai_machine_act", "machine_act",
+		{"restart", "superleo_machine_act", "machine_act",
 			func() map[string]any {
 				return map[string]any{"machine": "nosuch", "action": "restart", "service": "nginx"}
 			},
 			true, func(s string) bool { return strings.Contains(s, `no machine called "nosuch"`) }},
-		{"forced retire", "superai_hive_retire", "hive_retire",
+		{"forced retire", "superleo_hive_retire", "hive_retire",
 			func() map[string]any { return map[string]any{"count": 1, "force": true} },
 			true, func(s string) bool { return !strings.Contains(s, "was not done") }},
-		{"schedule delete", "superai_schedule_delete", "schedule_remove",
+		{"schedule delete", "superleo_schedule_delete", "schedule_remove",
 			func() map[string]any { return map[string]any{"id": "nope"} },
 			true, func(s string) bool { return !strings.Contains(s, "was not done") }},
-		{"task cancel", "superai_hive_task_cancel", "hive_task_cancel",
+		{"task cancel", "superleo_hive_task_cancel", "hive_task_cancel",
 			func() map[string]any { return map[string]any{"id": runningTask()} },
 			true, func(s string) bool { return strings.Contains(s, "stopping") }},
-		{"plain retire", "superai_hive_retire", "hive_retire",
+		{"plain retire", "superleo_hive_retire", "hive_retire",
 			func() map[string]any { return map[string]any{"count": 1} },
 			true, func(s string) bool { return !strings.Contains(s, "was not done") }},
 	} {
@@ -293,7 +293,7 @@ func TestDestructiveMCPCallsWaitForThePerson(t *testing.T) {
 			if !allow && !res.IsError {
 				t.Errorf("%s: a denial is not an error: %s", c.name, text)
 			}
-			if c.tool == "superai_hive_task_cancel" && (stopped-before == 1) != allow {
+			if c.tool == "superleo_hive_task_cancel" && (stopped-before == 1) != allow {
 				t.Errorf("task cancel allow=%v stopped %d", allow, stopped-before)
 			}
 		}
@@ -301,21 +301,21 @@ func TestDestructiveMCPCallsWaitForThePerson(t *testing.T) {
 
 	// The card names the machine and the command.
 	seen := answerNext(t, a, false)
-	_, _ = ss.CallTool(context.Background(), &mcp.CallToolParams{Name: "superai_machine_act",
+	_, _ = ss.CallTool(context.Background(), &mcp.CallToolParams{Name: "superleo_machine_act",
 		Arguments: map[string]any{"machine": "orange1", "action": "exec", "command": "rm -rf /tmp/x"}})
 	if card := <-seen; card.Command != "rm -rf /tmp/x   on orange1" {
 		t.Errorf("card command %q", card.Command)
 	}
 
 	// An id that names nothing is refused without troubling the person.
-	res, _ := ss.CallTool(context.Background(), &mcp.CallToolParams{Name: "superai_hive_task_cancel", Arguments: map[string]any{"id": "nope"}})
+	res, _ := ss.CallTool(context.Background(), &mcp.CallToolParams{Name: "superleo_hive_task_cancel", Arguments: map[string]any{"id": "nope"}})
 	if !res.IsError || len(a.pendingApprovals()) != 0 {
 		t.Errorf("unknown id: %s", mcpText(res))
 	}
 
 	// With the gate off the person has said not to ask.
 	a.gateForMCP = backend.NewToolGate(false, filepath.Join(home, "audit2.jsonl"))
-	res, _ = ss.CallTool(context.Background(), &mcp.CallToolParams{Name: "superai_machine_act",
+	res, _ = ss.CallTool(context.Background(), &mcp.CallToolParams{Name: "superleo_machine_act",
 		Arguments: map[string]any{"machine": "nosuch", "action": "exec", "command": "uptime"}})
 	if !strings.Contains(mcpText(res), `no machine called "nosuch"`) {
 		t.Errorf("gate off: %s", mcpText(res))
@@ -323,11 +323,11 @@ func TestDestructiveMCPCallsWaitForThePerson(t *testing.T) {
 }
 
 func TestPendingApprovalsAreListedNotAnswered(t *testing.T) {
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	a := NewApp()
 	ss := selfSession(t, a)
 
-	empty, _ := callSelf(t, ss, "superai_approvals_pending", nil)
+	empty, _ := callSelf(t, ss, "superleo_approvals_pending", nil)
 	if !strings.Contains(empty, `"pending":[]`) {
 		t.Fatalf("nothing pending: %s", empty)
 	}
@@ -347,7 +347,7 @@ func TestPendingApprovalsAreListedNotAnswered(t *testing.T) {
 		}
 	}
 
-	res, err := ss.CallTool(context.Background(), &mcp.CallToolParams{Name: "superai_approvals_pending", Arguments: map[string]any{}})
+	res, err := ss.CallTool(context.Background(), &mcp.CallToolParams{Name: "superleo_approvals_pending", Arguments: map[string]any{}})
 	if err != nil || res.IsError {
 		t.Fatal(err, res)
 	}
@@ -383,7 +383,7 @@ func TestPendingApprovalsAreListedNotAnswered(t *testing.T) {
 }
 
 func TestHiveTasksListsAndDescribes(t *testing.T) {
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	a := NewApp()
 	ss := selfSession(t, a)
 	board := a.tasks()
@@ -399,7 +399,7 @@ func TestHiveTasksListsAndDescribes(t *testing.T) {
 	}
 	list := func(args map[string]any) listOut {
 		t.Helper()
-		res, err := ss.CallTool(context.Background(), &mcp.CallToolParams{Name: "superai_hive_tasks", Arguments: args})
+		res, err := ss.CallTool(context.Background(), &mcp.CallToolParams{Name: "superleo_hive_tasks", Arguments: args})
 		if err != nil || res.IsError {
 			t.Fatal(err, mcpText(res))
 		}
@@ -442,7 +442,7 @@ func TestHiveTasksListsAndDescribes(t *testing.T) {
 		{running, `"stoppable":true`, false},
 		{"nope", "no delegation or task", true},
 	} {
-		text, isErr := callSelf(t, ss, "superai_hive_tasks", map[string]any{"id": c.id})
+		text, isErr := callSelf(t, ss, "superleo_hive_tasks", map[string]any{"id": c.id})
 		if isErr != c.isErr || !strings.Contains(text, c.want) {
 			t.Errorf("%s: err=%v %s", c.id, isErr, text)
 		}
@@ -450,8 +450,8 @@ func TestHiveTasksListsAndDescribes(t *testing.T) {
 }
 
 // The queen's delegation over /mcp: the same route as her own hive_delegate,
-// asynchronous, followed with superai_hive_tasks and stopped with
-// superai_hive_task_cancel.
+// asynchronous, followed with superleo_hive_tasks and stopped with
+// superleo_hive_task_cancel.
 func TestDelegateOverMCP(t *testing.T) {
 	h := newDelegateHive(t, "max", delegateThen(nextWeek))
 	w1, w2 := newStubWorker(t, "w1"), newStubWorker(t, "w2")
@@ -460,7 +460,7 @@ func TestDelegateOverMCP(t *testing.T) {
 
 	delegate := func(args map[string]any) delegationView {
 		t.Helper()
-		res, err := ss.CallTool(context.Background(), &mcp.CallToolParams{Name: "superai_hive_delegate", Arguments: args})
+		res, err := ss.CallTool(context.Background(), &mcp.CallToolParams{Name: "superleo_hive_delegate", Arguments: args})
 		if err != nil || res.IsError {
 			t.Fatal(err, mcpText(res))
 		}
@@ -475,7 +475,7 @@ func TestDelegateOverMCP(t *testing.T) {
 		t.Helper()
 		var v delegationView
 		for deadline := time.Now().Add(20 * time.Second); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
-			res, err := ss.CallTool(context.Background(), &mcp.CallToolParams{Name: "superai_hive_tasks", Arguments: map[string]any{"id": id}})
+			res, err := ss.CallTool(context.Background(), &mcp.CallToolParams{Name: "superleo_hive_tasks", Arguments: map[string]any{"id": id}})
 			if err != nil || res.IsError {
 				t.Fatal(err, mcpText(res))
 			}
@@ -527,7 +527,7 @@ func TestDelegateOverMCP(t *testing.T) {
 	}
 	follow(v.ID, func(v delegationView) bool { return v.Pieces[0].Worker == "w1" })
 	seen := answerNext(t, h.a, true)
-	if text, isErr := callSelf(t, ss, "superai_hive_task_cancel", map[string]any{"id": v.ID}); isErr {
+	if text, isErr := callSelf(t, ss, "superleo_hive_task_cancel", map[string]any{"id": v.ID}); isErr {
 		t.Fatalf("cancel: %s", text)
 	}
 	if card := <-seen; card.Tool != "hive_task_cancel" {
@@ -556,7 +556,7 @@ func TestDelegateOverMCP(t *testing.T) {
 		t.Fatal("no stoppable order")
 	}
 	seen = answerNext(t, h.a, true)
-	if text, isErr := callSelf(t, ss, "superai_hive_task_cancel", map[string]any{"id": order}); isErr {
+	if text, isErr := callSelf(t, ss, "superleo_hive_task_cancel", map[string]any{"id": order}); isErr {
 		t.Fatalf("cancel order: %s", text)
 	}
 	<-seen
@@ -569,9 +569,9 @@ func TestDelegateOverMCP(t *testing.T) {
 	}
 
 	// Not on a queen: said so.
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	plain := selfSession(t, NewApp())
-	if text, isErr := callSelf(t, plain, "superai_hive_delegate", map[string]any{"tasks": []any{piece}}); !isErr || !strings.Contains(text, "not a queen") {
+	if text, isErr := callSelf(t, plain, "superleo_hive_delegate", map[string]any{"tasks": []any{piece}}); !isErr || !strings.Contains(text, "not a queen") {
 		t.Errorf("standalone: %s", text)
 	}
 }

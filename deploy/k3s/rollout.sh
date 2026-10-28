@@ -8,14 +8,14 @@
 # into each node's containerd. The tag stays superai:hive with
 # imagePullPolicy IfNotPresent, so a restart is what picks the new one up.
 set -euo pipefail
-IMAGE="${SUPERAI_IMAGE:-superai:hive}"
-NODES="${SUPERAI_NODES:-orange1 orange2 orange3}"
-KUBE="${SUPERAI_KUBE:-orange1}"
-NS=superai
+IMAGE="${SUPERLEO_IMAGE:-superai:hive}"
+NODES="${SUPERLEO_NODES:-orange1 orange2 orange3}"
+KUBE="${SUPERLEO_KUBE:-orange1}"
+NS=superleo
 cd "$(dirname "$0")/../.."
 
 docker build --platform linux/amd64 -t "$IMAGE" .
-tar="$(mktemp -t superai-image.XXXXXX)"
+tar="$(mktemp -t superleo-image.XXXXXX)"
 trap 'rm -f "$tar"' EXIT
 docker save "$IMAGE" -o "$tar"
 for n in $NODES; do

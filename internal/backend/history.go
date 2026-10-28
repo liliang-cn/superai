@@ -46,11 +46,11 @@ type ChatTurn struct {
 	At        string `json:"at,omitempty"`
 	ElapsedMs int64  `json:"elapsed_ms,omitempty"`
 	// Engine is the agent CLI that thought for the queen in this answer
-	// ("claude", "claude.mac"); empty is SuperAI's own agent. CostUSD is what
+	// ("claude", "claude.mac"); empty is SuperLeo's own agent. CostUSD is what
 	// that turn cost, when the CLI said. Filled in by the app layer.
 	Engine  string  `json:"engine,omitempty"`
 	CostUSD float64 `json:"cost_usd,omitempty"`
-	// StandInFor is the queen engine SuperAI's own agent answered for, when
+	// StandInFor is the queen engine SuperLeo's own agent answered for, when
 	// it could not.
 	StandInFor string `json:"stand_in_for,omitempty"`
 }

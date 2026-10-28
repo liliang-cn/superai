@@ -1,6 +1,6 @@
 package app
 
-// The machine's side of the Claude Code relay: the socket `superai hook`
+// The machine's side of the Claude Code relay: the socket `superleo hook`
 // talks to, what this machine knows about its terminal sessions, and typing
 // an answer from the phone into the right one.
 //
@@ -36,7 +36,7 @@ import (
 	"github.com/liliang-cn/agentexec/reach"
 	"github.com/liliang-cn/agentexec/replies"
 	"github.com/liliang-cn/agentexec/tmux"
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // ccHookPath is the one route on the hook socket.
@@ -134,7 +134,7 @@ func (l *ccLocal) observe(ev *ccHookEvent, now time.Time) string {
 		l.sessions[ev.Session] = s
 	}
 	s.Seen = now
-	// superai-cchook sends only the directory's last element; the full one
+	// superleo-cchook sends only the directory's last element; the full one
 	// comes with the session's other events.
 	if ev.Cwd != "" && (!ccActivityOnly[ev.Event] || s.Cwd == "") {
 		s.Cwd = ev.Cwd
@@ -197,7 +197,7 @@ type CCDelivery struct {
 
 // Errors a reply can meet, said for the person who sent it.
 var (
-	errCCUnknown = errors.New("this machine has not heard from that Claude Code session since SuperAI started; it may have ended")
+	errCCUnknown = errors.New("this machine has not heard from that Claude Code session since SuperLeo started; it may have ended")
 	errCCEnded   = errors.New("that Claude Code session has ended")
 )
 
@@ -312,7 +312,7 @@ type ccReport struct {
 // ccAwayAfter is how long without input means nobody is at the machine.
 const ccAwayAfter = 3 * time.Minute
 
-// handleCCHook takes one event from `superai hook`, answers with any parked
+// handleCCHook takes one event from `superleo hook`, answers with any parked
 // reply at once, and sends the event on afterwards: the hook is holding a
 // terminal and must not wait for the network.
 func (a *App) handleCCHook(w http.ResponseWriter, r *http.Request) {
@@ -342,7 +342,7 @@ func (a *App) handleCCHook(w http.ResponseWriter, r *http.Request) {
 }
 
 // forwardCCEvent sends the event to core over the agent link, or, on a
-// SuperAI that is not linked to one, raises it here.
+// SuperLeo that is not linked to one, raises it here.
 func (a *App) forwardCCEvent(ev ccHookEvent) {
 	host, _ := os.Hostname()
 	idle := ccIdleSeconds()
@@ -362,7 +362,7 @@ func (a *App) forwardCCEvent(ev ccHookEvent) {
 	a.noteCCSession("", string(raw))
 }
 
-// serveCCHookSocket listens for `superai hook` on a unix socket in the data
+// serveCCHookSocket listens for `superleo hook` on a unix socket in the data
 // directory until ctx ends. Owner-only: the socket is how a terminal session
 // reports, and an answer parked for it comes back the same way.
 func (a *App) serveCCHookSocket(ctx context.Context) {
@@ -370,7 +370,7 @@ func (a *App) serveCCHookSocket(ctx context.Context) {
 	if _, err := os.Stat(path); err == nil {
 		if c, err := net.DialTimeout("unix", path, time.Second); err == nil {
 			c.Close()
-			log.Printf("cc relay: another SuperAI already listens on %s; hooks go there", path)
+			log.Printf("cc relay: another SuperLeo already listens on %s; hooks go there", path)
 			return
 		}
 		_ = os.Remove(path) // left behind by a process that is gone

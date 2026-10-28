@@ -13,7 +13,7 @@ import { useHosts, type Host, type HostAgent } from "../canvas/data";
 import PodConfirm, { type PodChange } from "../components/PodConfirm";
 import { cliName, isCore, isStandby, kindLabel } from "../world/hosts";
 
-const short = (n: string) => n.replace(/^superai-/, "");
+const short = (n: string) => n.replace(/^superleo-/, "");
 const fmtK = (n: number) => (n >= 1e6 ? (n / 1e6).toFixed(2) + "M" : n >= 1e3 ? (n / 1e3).toFixed(1) + "k" : String(Math.round(n)));
 
 /** The conversations' titles by id, read now and every half minute. A bee's
@@ -298,7 +298,7 @@ export default function HiveView() {
               <div className="card">
                 <div className="card-title">Workers</div>
                 {members.length === 0 ? (
-                  <div className="hive-dim">No workers yet. + Worker starts one; a SuperAI set to join this queen joins by itself.</div>
+                  <div className="hive-dim">No workers yet. + Worker starts one; a SuperLeo set to join this queen joins by itself.</div>
                 ) : (
                   <div className="hive-roster" role="table">
                     {members.map((m) => {
@@ -438,7 +438,7 @@ function nest(hosts: Host[]): { h: Host; depth: number }[] {
   return out;
 }
 
-const agentRole = (a: HostAgent) => a.kind === "cli" ? "cli" : a.kind === "agent" ? "agent" : a.role === "machine" ? "machine agent" : a.role || "superai";
+const agentRole = (a: HostAgent) => a.kind === "cli" ? "cli" : a.kind === "agent" ? "agent" : a.role === "machine" ? "machine agent" : a.role || "superleo";
 
 /** The hive by host: each host a row, its agents under it, pods under
  *  their node; HA services after, with where each runs. */
@@ -465,7 +465,7 @@ function HostsCard({ hosts, services, sel }: { hosts: Host[]; services: { name: 
             {h.agents.map((a) => (
               <button key={a.kind + a.name} className={`hive-host-agent${isStandby(a) ? " ghost" : ""}`} onClick={() => focusAgent(h, a)} title={[a.about, a.mcp?.length ? `MCP: ${a.mcp.join(", ")}` : ""].filter(Boolean).join("\n") || undefined}>
                 <span className={`hive-live-dot ${dot(a.state)}`} />
-                {a.kind === "cli" ? cliName(a) : a.name.replace(/^superai-/, "")}
+                {a.kind === "cli" ? cliName(a) : a.name.replace(/^superleo-/, "")}
                 <small>{agentRole(a)}{a.state !== "live" && a.state !== "installed" ? ` · ${a.state.replace("-unready", ", not ready")}` : ""}</small>
               </button>
             ))}

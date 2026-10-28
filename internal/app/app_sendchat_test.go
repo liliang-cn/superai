@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // chatEvent is one payload SendChat handed to the frontend.
@@ -126,9 +126,9 @@ func startMarkerLLM(t *testing.T, delay time.Duration) string {
 func newChatApp(t *testing.T, delay time.Duration) (*App, *eventLog) {
 	t.Helper()
 	home := t.TempDir()
-	t.Setenv("SUPERAI_HOME", home)
+	t.Setenv("SUPERLEO_HOME", home)
 	// Chrome costs ~1s per NewService and no test here browses.
-	t.Setenv("SUPERAI_NO_BROWSER", "1")
+	t.Setenv("SUPERLEO_NO_BROWSER", "1")
 
 	log := &eventLog{}
 	a := NewApp()

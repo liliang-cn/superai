@@ -13,14 +13,14 @@ import (
 
 // TestSmokeLive drives the real backend.Service (the exact code the desktop app
 // uses) against a live LLM, for a chat turn and an autonomous task. It is gated
-// behind SUPERAI_SMOKE=1 so normal `go test` skips it. Configure the LLM via
+// behind SUPERLEO_SMOKE=1 so normal `go test` skips it. Configure the LLM via
 // LLM_BASE / LLM_KEY / LLM_MODEL (or DASHSCOPE_API_KEY).
 //
-//	SUPERAI_SMOKE=1 LLM_BASE=... LLM_KEY=... LLM_MODEL=gpt-5.5 \
-//	  SUPERAI_HOME=/tmp/superai-smoke go test ./backend/ -run TestSmokeLive -v -count=1 -timeout 15m
+//	SUPERLEO_SMOKE=1 LLM_BASE=... LLM_KEY=... LLM_MODEL=gpt-5.5 \
+//	  SUPERLEO_HOME=/tmp/superleo-smoke go test ./backend/ -run TestSmokeLive -v -count=1 -timeout 15m
 func TestSmokeLive(t *testing.T) {
-	if os.Getenv("SUPERAI_SMOKE") != "1" {
-		t.Skip("set SUPERAI_SMOKE=1 to run the live backend smoke test")
+	if os.Getenv("SUPERLEO_SMOKE") != "1" {
+		t.Skip("set SUPERLEO_SMOKE=1 to run the live backend smoke test")
 	}
 	s, err := LoadSettings()
 	if err != nil {
@@ -63,7 +63,7 @@ func TestSmokeLive(t *testing.T) {
 	// 2) autonomous task: write + verify a file in the sandbox workspace
 	ctx2, cancel2 := context.WithTimeout(context.Background(), 6*time.Minute)
 	defer cancel2()
-	task := "在你的工作区写一个文件 note.md，内容是一句话：SuperAI 可用。然后读回确认。"
+	task := "在你的工作区写一个文件 note.md，内容是一句话：SuperLeo 可用。然后读回确认。"
 	final, err := svc.Stream(ctx2, "smoke-agent", task, nil, trace("agent"))
 	if err != nil {
 		t.Fatalf("agent stream: %v", err)

@@ -92,7 +92,7 @@ func newTestActions(t *testing.T, allowed ...string) *MCPActions {
 }
 
 func TestMCPActionsCallsThroughWithStructuredContent(t *testing.T) {
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	t.Setenv("NOTED_TOKEN", "sekrit")
 	url, calls := fakeNoted(t, "sekrit")
 	writeMCPConfig(t, "noted", url)
@@ -139,7 +139,7 @@ func TestMCPActionsCallsThroughWithStructuredContent(t *testing.T) {
 }
 
 func TestMCPActionsRefusals(t *testing.T) {
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	t.Setenv("NOTED_TOKEN", "sekrit")
 	url, calls := fakeNoted(t, "sekrit")
 	writeMCPConfig(t, "noted", url)
@@ -174,7 +174,7 @@ func TestMCPActionsRefusals(t *testing.T) {
 }
 
 func TestMCPActionsNotConfigured(t *testing.T) {
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	m := newTestActions(t, "noted")
 	res := m.Call(context.Background(), "noted", "list_holdings", nil, MCPCallOptions{})
 	if res.Code != ActionNotConfigured || !strings.Contains(res.Error, "not configured") {
@@ -198,7 +198,7 @@ func TestMCPActionsNotConfigured(t *testing.T) {
 // The config handed to agent-go has the secret filled in; the file the queen
 // syncs to her workers does not.
 func TestResolveMCPConfigExpandsEnv(t *testing.T) {
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	writeMCPConfig(t, "noted", "https://noted.example/mcp")
 	src := mcpConfigPath()
 	env := map[string]string{"NOTED_TOKEN": "sekrit"}
@@ -246,7 +246,7 @@ func TestResolveMCPConfigExpandsEnv(t *testing.T) {
 }
 
 func TestApplyAbilitiesSkipsServersMissingEnv(t *testing.T) {
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	t.Setenv("NOTED_TOKEN", "")
 	ab := HiveAbilities{MCP: map[string]any{
 		"noted": map[string]any{"type": "http", "url": "https://n/mcp", "headers": map[string]any{"Authorization": "Bearer ${NOTED_TOKEN}"}},
@@ -297,7 +297,7 @@ func TestNotedSectionOnlyWhenConfigured(t *testing.T) {
 
 func TestAWorkerWithoutNotedSaysItCannotSeeTheSchedule(t *testing.T) {
 	if notedSectionFor(false, "") != "" || notedSectionFor(false, HiveRoleQueen) != "" {
-		t.Error("a SuperAI of its own, or a queen, without noted is told about noted")
+		t.Error("a SuperLeo of its own, or a queen, without noted is told about noted")
 	}
 	s := notedSectionFor(false, HiveRoleWorker)
 	for _, want := range []string{"not connected on this worker", "never say there is nothing", "the queen"} {

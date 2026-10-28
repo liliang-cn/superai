@@ -29,7 +29,7 @@ func installedCLIs(overrides map[string]string) []agentexec.Installed {
 	return out
 }
 
-// retiredCLIs are coding CLIs SuperAI no longer offers, installed or not:
+// retiredCLIs are coding CLIs SuperLeo no longer offers, installed or not:
 // the Gemini CLI went with Gemini (Antigravity is Google's sign-in now).
 var retiredCLIs = map[string]bool{"gemini": true}
 

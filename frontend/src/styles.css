@@ -3558,7 +3558,7 @@ body.desktop-shell .sidebar.collapsed .nav-key { display: none; }
   white-space: nowrap;
 }
 /* "Claude Code" under the name, when the queen's answer came from an engine
-   other than SuperAI's own agent. */
+   other than SuperLeo's own agent. */
 .msg-byline-wrap { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .msg-byline-engine {
   align-self: flex-start;

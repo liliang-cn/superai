@@ -36,7 +36,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 const (

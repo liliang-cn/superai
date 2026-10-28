@@ -72,7 +72,7 @@ const codexHooksJSON = `{
 `
 
 func TestCodexHooksJoinTheOthersAtTheEnd(t *testing.T) {
-	const bin, slim = "/Users/me/.superai-node/bin/superai", "/Users/me/.superai-node/bin/superai-cchook"
+	const bin, slim = "/Users/me/.superleo-node/bin/superleo", "/Users/me/.superleo-node/bin/superleo-cchook"
 	next, added, err := mergeCodexHooks([]byte(codexHooksJSON), bin, slim)
 	if err != nil {
 		t.Fatal(err)
@@ -108,7 +108,7 @@ func TestCodexHooksJoinTheOthersAtTheEnd(t *testing.T) {
 			t.Fatalf("again with %q: %v %v", s, more, err)
 		}
 	}
-	// Without superai-cchook, superai itself.
+	// Without superleo-cchook, superleo itself.
 	fresh, _, _ := mergeCodexHooks(nil, bin, "")
 	if !strings.Contains(string(fresh), `"command": "`+bin+` hook --cli codex PreToolUse"`) {
 		t.Fatalf("fresh %s", fresh)
@@ -119,7 +119,7 @@ func TestCodexHooksJoinTheOthersAtTheEnd(t *testing.T) {
 }
 
 // An opencode with its own config, packages and plugins, a pi and a codex:
-// SuperAI adds its file or entries, leaves the rest, keeps what it changes,
+// SuperLeo adds its file or entries, leaves the rest, keeps what it changes,
 // and a second run changes nothing.
 func TestCLIHooksInstallBesideTheirConfig(t *testing.T) {
 	root := t.TempDir()
@@ -142,22 +142,22 @@ func TestCLIHooksInstallBesideTheirConfig(t *testing.T) {
 		filepath.Join(pi, "extensions", "hello.ts"):     "export default function () {}\n",
 		filepath.Join(cx, "config.toml"):                "model = \"gpt\"\n[features]\nhooks = true\n",
 		filepath.Join(cx, "hooks.json"):                 codexHooksJSON,
-		filepath.Join(oc, "plugins", "superai-old.txt"): "not ours to touch",
+		filepath.Join(oc, "plugins", "superleo-old.txt"): "not ours to touch",
 	}
 	for p, s := range others {
 		write(p, s)
 	}
-	tg := cliHookTargets{Opencode: oc, Pi: pi, Codex: cx, Bin: "/n/bin/superai", Slim: "/n/bin/superai-cchook", Socket: "/n/cc-hook.sock"}
+	tg := cliHookTargets{Opencode: oc, Pi: pi, Codex: cx, Bin: "/n/bin/superleo", Slim: "/n/bin/superleo-cchook", Socket: "/n/cc-hook.sock"}
 	done, errs := installCLIHooks(tg)
 	if len(errs) != 0 || len(done) != 3 {
 		t.Fatalf("done %v, errs %v", done, errs)
 	}
 	plugin, err := os.ReadFile(filepath.Join(oc, "plugins", cliPluginFile))
-	if err != nil || !strings.Contains(string(plugin), `const INSTALLED = "/n/cc-hook.sock"`) || !strings.Contains(string(plugin), `export default { id: "superai-activity"`) {
+	if err != nil || !strings.Contains(string(plugin), `const INSTALLED = "/n/cc-hook.sock"`) || !strings.Contains(string(plugin), `export default { id: "superleo-activity"`) {
 		t.Fatalf("opencode plugin: %v", err)
 	}
 	ext, err := os.ReadFile(filepath.Join(pi, "extensions", cliPluginFile))
-	if err != nil || !strings.Contains(string(ext), `const INSTALLED = "/n/cc-hook.sock"`) || !strings.Contains(string(ext), "export default function superaiActivity") {
+	if err != nil || !strings.Contains(string(ext), `const INSTALLED = "/n/cc-hook.sock"`) || !strings.Contains(string(ext), "export default function superleoActivity") {
 		t.Fatalf("pi extension: %v", err)
 	}
 	for p, s := range others {
@@ -168,7 +168,7 @@ func TestCLIHooksInstallBesideTheirConfig(t *testing.T) {
 			t.Errorf("%s changed", p)
 		}
 	}
-	if b, _ := os.ReadFile(filepath.Join(cx, "hooks.json.superai.bak")); string(b) != codexHooksJSON {
+	if b, _ := os.ReadFile(filepath.Join(cx, "hooks.json.superleo.bak")); string(b) != codexHooksJSON {
 		t.Error("the old hooks.json was not kept")
 	}
 	// Run again: nothing changes, nothing is kept again.
@@ -180,11 +180,11 @@ func TestCLIHooksInstallBesideTheirConfig(t *testing.T) {
 		t.Fatal("a second run changed files")
 	}
 	// A newer build's plugin replaces the old one, and keeps it.
-	write(filepath.Join(oc, "plugins", cliPluginFile), "// an older superai-activity\n")
+	write(filepath.Join(oc, "plugins", cliPluginFile), "// an older superleo-activity\n")
 	if done, _ := installCLIHooks(tg); len(done) != 1 || !strings.HasPrefix(done[0], "opencode plugin") {
 		t.Fatalf("upgrade: %v", done)
 	}
-	if b, _ := os.ReadFile(filepath.Join(oc, "plugins", cliPluginFile+".superai.bak")); string(b) != "// an older superai-activity\n" {
+	if b, _ := os.ReadFile(filepath.Join(oc, "plugins", cliPluginFile+".superleo.bak")); string(b) != "// an older superleo-activity\n" {
 		t.Fatal("the older plugin was not kept")
 	}
 	// A CLI whose directory is not there is left alone.

@@ -164,7 +164,7 @@ func signES256(key *ecdsa.PrivateKey, header, claims map[string]any) (string, er
 }
 
 // Wake sends one device a silent background push carrying data under the
-// "superai" key. env is "sandbox" or "production"; empty takes the config's.
+// "superai" key (what the phone apps read). env is "sandbox" or "production"; empty takes the config's.
 func (c *Client) Wake(ctx context.Context, deviceToken, env string, data any) error {
 	payload, err := json.Marshal(map[string]any{
 		"aps":     map[string]any{"content-available": 1},
@@ -200,7 +200,7 @@ type Alert struct {
 	CollapseID string
 	// Badge is the number on the app's icon; nil leaves it as it is.
 	Badge *int
-	// Data goes under the "superai" key, for the app to act on when tapped.
+	// Data goes under the "superai" key (what the phone apps read), for the app to act on when tapped.
 	Data any
 	// Category names the notification category the app registered for this
 	// kind of notification: the buttons and the text field it gets on the

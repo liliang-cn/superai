@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { FIN, box, contact, cyl, damp, mat, ownMat, rbox } from "./kit";
 
-// The agents: every agent in SuperAI is a robot, and only agents are. The
+// The agents: every agent in SuperLeo is a robot, and only agents are. The
 // machines they run on stay machines. A robot says what it is doing with its
 // body — arms, eyes, antenna — so its state reads without a word.
 

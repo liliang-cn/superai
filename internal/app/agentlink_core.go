@@ -3,7 +3,7 @@ package app
 // Core's side of the agent link (proto/agentlink/v1). Agents dial in and hold
 // a stream; core keeps them in a registry and, through each stream, calls the
 // agent's methods and hears its events. Everything core already does with
-// another SuperAI over HTTP — coding runs on its CLIs, the agents it can reach
+// another SuperLeo over HTTP — coding runs on its CLIs, the agents it can reach
 // — it can then do with an agent it could never have dialled itself.
 
 import (
@@ -22,8 +22,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	agentlinkpb "github.com/liliang-cn/superai/internal/agentlink/pb"
-	"github.com/liliang-cn/superai/internal/backend"
+	agentlinkpb "github.com/liliang-cn/superleo/internal/agentlink/pb"
+	"github.com/liliang-cn/superleo/internal/backend"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/keepalive"
@@ -127,7 +127,7 @@ func (c *agentConn) subscribe() (<-chan *agentlinkpb.Event, func()) {
 }
 
 // eventStream renders the agent's events as the SSE lines /api/events
-// writes, so the code that mirrors a run from another SuperAI over HTTP reads
+// writes, so the code that mirrors a run from another SuperLeo over HTTP reads
 // a linked agent's run without knowing the difference.
 func (c *agentConn) eventStream(ctx context.Context) io.ReadCloser {
 	events, cancel := c.subscribe()
@@ -427,7 +427,7 @@ type LinkedAgent struct {
 	Machine bool   `json:"machine"`
 	Role    string `json:"role"`
 	// Activity is what the machine's interactive Claude Code sessions are
-	// doing — the ones people run in its terminals, not SuperAI's own runs;
+	// doing — the ones people run in its terminals, not SuperLeo's own runs;
 	// absent when it has none.
 	Activity *CCActivity `json:"activity,omitempty"`
 	// CLIActivity is what every coding CLI running on it is doing, by CLI

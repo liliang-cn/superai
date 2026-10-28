@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// The view SuperAI is proxying to, standing in for liveview.
+// The view SuperLeo is proxying to, standing in for liveview.
 func fakeView(t *testing.T) *httptest.Server {
 	t.Helper()
 	mux := http.NewServeMux()
@@ -37,7 +37,7 @@ func fakeView(t *testing.T) *httptest.Server {
 }
 
 // The whole point: a browser that cannot reach the loopback view reaches it
-// through SuperAI, which runs on the same host and does have a front door.
+// through SuperLeo, which runs on the same host and does have a front door.
 func TestProxyServesThePage(t *testing.T) {
 	view := fakeView(t)
 	h := NewGraphProxy(func() string { return view.URL })

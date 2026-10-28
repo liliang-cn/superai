@@ -16,8 +16,8 @@ import (
 	"strings"
 	"time"
 
-	agentlinkpb "github.com/liliang-cn/superai/internal/agentlink/pb"
-	"github.com/liliang-cn/superai/internal/backend"
+	agentlinkpb "github.com/liliang-cn/superleo/internal/agentlink/pb"
+	"github.com/liliang-cn/superleo/internal/backend"
 	"google.golang.org/grpc"
 	grpccreds "google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
@@ -168,8 +168,8 @@ func (a *App) agentHello(o AgentLinkOptions) *agentlinkpb.Hello {
 	if cfg.Enabled {
 		for _, n := range cfg.Names() {
 			ra := cfg.Agents[n]
-			// Only what this machine runs itself; another SuperAI it reaches by
-			// URL is that SuperAI's business, not something to pass on.
+			// Only what this machine runs itself; another SuperLeo it reaches by
+			// URL is that SuperLeo's business, not something to pass on.
 			if ra.URL != "" {
 				continue
 			}

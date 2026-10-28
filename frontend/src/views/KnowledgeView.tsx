@@ -12,7 +12,7 @@ import { useImeGuard } from "@/lib/ime";
 import { useDaylight } from "../lib/useDaylight";
 
 /**
- * One page for what SuperAI knows.
+ * One page for what SuperLeo knows.
  *
  * Recall and the graph used to be two entries in the sidebar, and they read the
  * same CortexDB — one asks it by name, the other shows the whole thing. Kept
@@ -51,7 +51,7 @@ function normalize(raw: Record<string, any> | null): GraphStatus {
 /**
  * Where to point the frame.
  *
- * CortexDB binds the live view to 127.0.0.1 of the machine SuperAI runs on, and
+ * CortexDB binds the live view to 127.0.0.1 of the machine SuperLeo runs on, and
  * there is deliberately no option to widen that — the page is the whole brain
  * with no authentication in front of it.
  *
@@ -62,11 +62,11 @@ function normalize(raw: Record<string, any> | null): GraphStatus {
  *
  * This used to be handled by not drawing a frame at all and explaining the
  * situation, which is honest and is not the feature working — and served over
- * a domain is how SuperAI is actually used. So SuperAI proxies the view
+ * a domain is how SuperLeo is actually used. So SuperLeo proxies the view
  * instead: it runs on that host, it can reach loopback, and it has the front
  * door the view has none of. See backend/graphproxy.go.
  */
-const SERVED = Boolean((window as unknown as Record<string, unknown>).superaiServed);
+const SERVED = Boolean((window as unknown as Record<string, unknown>).superleoServed);
 // Same origin as this page, so the session cookie rides along and the proxy's
 // authentication applies to the frame exactly as it does to everything else.
 
@@ -129,7 +129,7 @@ export default function KnowledgeView() {
    * Light the query up on the graph.
    *
    * Sent as a message rather than by reaching into the frame's DOM: the frame
-   * is a different origin over HTTP (SuperAI proxies it), so touching its
+   * is a different origin over HTTP (SuperLeo proxies it), so touching its
    * document would throw. The view ignores messages it does not understand, so
    * an older CortexDB simply does not highlight — the recall still works.
    */
@@ -140,7 +140,7 @@ export default function KnowledgeView() {
   // about"; sending the query's most distinctive word is what makes that true.
   //
   // Longest word, because that is the one carrying the meaning: "AI Agent" ->
-  // "Agent", "what do I know about superai" -> "superai". A query with no
+  // "Agent", "what do I know about superleo" -> "superleo". A query with no
   // spaces (any CJK one, and most single terms) is already its own best term
   // and goes through unchanged.
   const highlightTerm = (q: string) => {
@@ -199,7 +199,7 @@ export default function KnowledgeView() {
       <div>
         <div className="view-title">{translate("Knowledge")}</div>
         <div className="view-desc">
-          Everything SuperAI knows, as one graph it reads on every turn.
+          Everything SuperLeo knows, as one graph it reads on every turn.
         </div>
       </div>
       {status?.url && (
@@ -265,7 +265,7 @@ export default function KnowledgeView() {
             <div className="card-desc" style={{ marginTop: 12 }}>
               {status.backend === "shared"
                 ? "The shared brain is configured under Settings → Memory. Check the endpoint is right and the CortexDB server is running and new enough to answer graph_list_all."
-                : "The local brain lives in this machine's SuperAI data directory. If it will not open, another process may be holding it."}
+                : "The local brain lives in this machine's SuperLeo data directory. If it will not open, another process may be holding it."}
             </div>
             <div style={{ marginTop: 14 }}>
               <button className="btn" onClick={load} disabled={loading}>
@@ -347,7 +347,7 @@ export default function KnowledgeView() {
 
         {status?.nodes === 0 && (
           <div className="graph-note">
-            {brain} has no entities yet, so the scene is empty. It fills in on its own as SuperAI
+            {brain} has no entities yet, so the scene is empty. It fills in on its own as SuperLeo
             saves memories and draws relations.
           </div>
         )}
@@ -374,7 +374,7 @@ export default function KnowledgeView() {
           <span>
             {status?.activity
               ? "Tool calls light up the nodes they name."
-              : "Structure only — SuperAI's tool calls do not feed this view's ticker."}
+              : "Structure only — SuperLeo's tool calls do not feed this view's ticker."}
           </span>
           <button className="link-btn" onClick={() => status?.url && openExternal(status.url)}>
             Not drawing? Open it in a browser ↗

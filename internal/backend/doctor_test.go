@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-// SuperAI's brain lives in settings.json, not in agentgo.db, so a home whose
+// SuperLeo's brain lives in settings.json, not in agentgo.db, so a home whose
 // settings name a provider is healthy even though the framework's own
 // provider table is empty.
 func TestDoctorTrustsTheSettingsProvider(t *testing.T) {
@@ -135,7 +135,7 @@ func TestDoctorWarnsRatherThanFailsWhenNoAgentCLIIsInstalled(t *testing.T) {
 	// happen to have installed reported "npx is not on PATH" and failed a test
 	// about agent CLIs. Pointing the whole data directory at the temp home is
 	// what makes this hermetic.
-	t.Setenv("SUPERAI_HOME", home)
+	t.Setenv("SUPERLEO_HOME", home)
 	report := doctorReportFor(context.Background(), home)
 	if report.Fail != 0 || !report.Healthy {
 		t.Fatalf("no agent CLIs made the install unhealthy: fail=%d healthy=%v", report.Fail, report.Healthy)

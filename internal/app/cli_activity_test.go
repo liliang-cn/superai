@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	agentlinkpb "github.com/liliang-cn/superai/internal/agentlink/pb"
-	"github.com/liliang-cn/superai/internal/backend"
+	agentlinkpb "github.com/liliang-cn/superleo/internal/agentlink/pb"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // resetCLI gives the test a fresh CLI tracker.
@@ -141,9 +141,9 @@ func TestOtherCLIsShowOnCoreAndTheirPromptsDoNot(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { os.RemoveAll(home) })
-	t.Setenv("SUPERAI_HOME", home)
-	t.Setenv("SUPERAI_HOOK_SOCKET", filepath.Join(home, ccHookSocketName))
-	t.Setenv("SUPERAI_CLI_RUN", "")
+	t.Setenv("SUPERLEO_HOME", home)
+	t.Setenv("SUPERLEO_HOOK_SOCKET", filepath.Join(home, ccHookSocketName))
+	t.Setenv("SUPERLEO_CLI_RUN", "")
 
 	var mu sync.Mutex
 	var told []string
@@ -201,10 +201,10 @@ func TestOtherCLIsShowOnCoreAndTheirPromptsDoNot(t *testing.T) {
 			t.Fatalf("socket refused %+v", ev)
 		}
 	}
-	plugin(ccHookEvent{Event: "SessionStart", Session: "ses_a", Cwd: "superai"})
-	plugin(ccHookEvent{Event: "UserPromptSubmit", Session: "ses_a", Cwd: "superai"})
+	plugin(ccHookEvent{Event: "SessionStart", Session: "ses_a", Cwd: "superleo"})
+	plugin(ccHookEvent{Event: "UserPromptSubmit", Session: "ses_a", Cwd: "superleo"})
 	plugin(ccHookEvent{Event: "PreToolUse", Session: "ses_a", Tool: "bash"})
-	// codex's hooks, through `superai hook --cli codex`.
+	// codex's hooks, through `superleo hook --cli codex`.
 	hook := func(argv []string, payload string) {
 		t.Helper()
 		inR, inW, _ := os.Pipe()
@@ -224,7 +224,7 @@ func TestOtherCLIsShowOnCoreAndTheirPromptsDoNot(t *testing.T) {
 	hook([]string{"--cli", "codex", "UserPromptSubmit"}, `{"session_id":"cx1","turn_id":"t","cwd":"/Users/me/code/noted","hook_event_name":"UserPromptSubmit","prompt":"PROMPT-SECRET ship"}`)
 	hook([]string{"--cli", "codex", "PreToolUse"}, `{"session_id":"cx1","turn_id":"t","cwd":"/Users/me/code/noted","hook_event_name":"PreToolUse","tool_name":"exec_command","tool_input":{"cmd":"echo ARG-SECRET"}}`)
 	// And Claude Code's own hooks, for claude's entry.
-	hook([]string{"UserPromptSubmit"}, `{"session_id":"cc1","cwd":"/Users/me/code/superai","prompt":"PROMPT-SECRET two"}`)
+	hook([]string{"UserPromptSubmit"}, `{"session_id":"cc1","cwd":"/Users/me/code/superleo","prompt":"PROMPT-SECRET two"}`)
 
 	waitFor(t, "the plugins on core", func() bool {
 		m := mac().CLIActivity
@@ -234,7 +234,7 @@ func TestOtherCLIsShowOnCoreAndTheirPromptsDoNot(t *testing.T) {
 			cl.Source == cliSourcePlugin && cl.Working == 1
 	})
 	la := mac()
-	if s := la.CLIActivity["opencode"].Sessions[0]; s.ID != "ses_a" || s.Project != "superai" {
+	if s := la.CLIActivity["opencode"].Sessions[0]; s.ID != "ses_a" || s.Project != "superleo" {
 		t.Fatalf("opencode session %+v", s)
 	}
 	if s := la.CLIActivity["codex"].Sessions[0]; s.Project != "noted" {

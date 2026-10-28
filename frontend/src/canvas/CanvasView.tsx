@@ -31,7 +31,7 @@ const TITLES: Record<Kind, string> = {
   inFlight: "In flight", machines: "Machines", today: "Today", stats: "Stats", bees: "Bees", later: "Later", coding: "Coding runs", queen: "The queen", generated: "Made for you",
 };
 
-const LAYOUT_KEY = "superai-canvas-layout";
+const LAYOUT_KEY = "superleo-canvas-layout";
 const DEFAULT: Tile[] = [
   { id: "t-inflight", kind: "inFlight", span: 4 },
   { id: "t-today", kind: "today", span: 2 },
@@ -48,20 +48,20 @@ function loadLayout(): Tile[] {
     if (!Array.isArray(t) || !t.length) return DEFAULT;
     // Later and Coding runs came after the first layouts were saved: they are
     // offered once, before the queen, and stay gone if removed after that.
-    if (!localStorage.getItem("superai-canvas-v2")) {
-      localStorage.setItem("superai-canvas-v2", "1");
+    if (!localStorage.getItem("superleo-canvas-v2")) {
+      localStorage.setItem("superleo-canvas-v2", "1");
       const add = DEFAULT.filter((d) => (d.kind === "later" || d.kind === "coding") && !t.some((x) => x.kind === d.kind));
       const q = t.findIndex((x) => x.kind === "queen");
       return q < 0 ? [...t, ...add] : [...t.slice(0, q), ...add, ...t.slice(q)];
     }
     // Bees came off the defaults (Later lists them): taken off once.
-    if (!localStorage.getItem("superai-canvas-v3")) {
-      localStorage.setItem("superai-canvas-v3", "1");
+    if (!localStorage.getItem("superleo-canvas-v3")) {
+      localStorage.setItem("superleo-canvas-v3", "1");
       return t.filter((x) => x.kind !== "bees");
     }
     // Stats came later still: offered once, the same way.
-    if (!localStorage.getItem("superai-canvas-v4")) {
-      localStorage.setItem("superai-canvas-v4", "1");
+    if (!localStorage.getItem("superleo-canvas-v4")) {
+      localStorage.setItem("superleo-canvas-v4", "1");
       if (t.some((x) => x.kind === "stats")) return t;
       const q = t.findIndex((x) => x.kind === "queen");
       const add = DEFAULT.filter((d) => d.kind === "stats");

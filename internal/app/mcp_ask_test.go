@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -36,7 +36,7 @@ func (q *stubQueen) install(a *App, script func(emit func(string, map[string]any
 func askResult(t *testing.T, res *mcp.CallToolResult) askOut {
 	t.Helper()
 	if res.IsError {
-		t.Fatalf("superai_ask failed: %v", res.Content)
+		t.Fatalf("superleo_ask failed: %v", res.Content)
 	}
 	var out askOut
 	raw, _ := json.Marshal(res.StructuredContent)
@@ -46,8 +46,8 @@ func askResult(t *testing.T, res *mcp.CallToolResult) askOut {
 	return out
 }
 
-func TestSuperaiAskReturnsTheAnswer(t *testing.T) {
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+func TestSuperleoAskReturnsTheAnswer(t *testing.T) {
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	app := NewApp()
 	q := &stubQueen{}
 	q.install(app, func(emit func(string, map[string]any), id, session string) {
@@ -69,7 +69,7 @@ func TestSuperaiAskReturnsTheAnswer(t *testing.T) {
 	})
 	ss := selfSession(t, app)
 
-	res, err := ss.CallTool(context.Background(), &mcp.CallToolParams{Name: "superai_ask", Arguments: map[string]any{"message": "今天有什么安排"}})
+	res, err := ss.CallTool(context.Background(), &mcp.CallToolParams{Name: "superleo_ask", Arguments: map[string]any{"message": "今天有什么安排"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +86,7 @@ func TestSuperaiAskReturnsTheAnswer(t *testing.T) {
 	}
 
 	// Continuing passes the same conversation to the queen.
-	res, err = ss.CallTool(context.Background(), &mcp.CallToolParams{Name: "superai_ask", Arguments: map[string]any{"message": "第二件几点？", "conversation": out.Conversation}})
+	res, err = ss.CallTool(context.Background(), &mcp.CallToolParams{Name: "superleo_ask", Arguments: map[string]any{"message": "第二件几点？", "conversation": out.Conversation}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -95,8 +95,8 @@ func TestSuperaiAskReturnsTheAnswer(t *testing.T) {
 	}
 }
 
-func TestSuperaiAskTimesOutPendingAndReportsApprovals(t *testing.T) {
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+func TestSuperleoAskTimesOutPendingAndReportsApprovals(t *testing.T) {
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	app := NewApp()
 	(&stubQueen{}).install(app, func(emit func(string, map[string]any), id, session string) {
 		emit("chat:event", map[string]any{"requestId": id, "type": "partial", "content": "我先查一下"})
@@ -124,7 +124,7 @@ func TestSuperaiAskTimesOutPendingAndReportsApprovals(t *testing.T) {
 	}
 	t.Cleanup(func() { ss.Close() })
 
-	params := &mcp.CallToolParams{Name: "superai_ask", Arguments: map[string]any{"message": "清理一下构建目录", "timeout_seconds": 1}}
+	params := &mcp.CallToolParams{Name: "superleo_ask", Arguments: map[string]any{"message": "清理一下构建目录", "timeout_seconds": 1}}
 	params.SetProgressToken("tok-1")
 	start := time.Now()
 	res, err := ss.CallTool(context.Background(), params)
@@ -155,15 +155,15 @@ func TestSuperaiAskTimesOutPendingAndReportsApprovals(t *testing.T) {
 	}
 }
 
-func TestSuperaiAskReportsErrors(t *testing.T) {
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+func TestSuperleoAskReportsErrors(t *testing.T) {
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	app := NewApp()
 	(&stubQueen{}).install(app, func(emit func(string, map[string]any), id, _ string) {
 		emit("chat:event", map[string]any{"requestId": id, "type": "partial", "content": "写到一半"})
 		emit("chat:error", map[string]any{"requestId": id, "error": "model unavailable"})
 	})
 	ss := selfSession(t, app)
-	res, err := ss.CallTool(context.Background(), &mcp.CallToolParams{Name: "superai_ask", Arguments: map[string]any{"message": "hi"}})
+	res, err := ss.CallTool(context.Background(), &mcp.CallToolParams{Name: "superleo_ask", Arguments: map[string]any{"message": "hi"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -171,15 +171,15 @@ func TestSuperaiAskReportsErrors(t *testing.T) {
 	if out.Status != "error" || out.Error != "model unavailable" || out.Answer != "写到一半" || out.Pending {
 		t.Errorf("error answer = %+v", out)
 	}
-	if text, isErr := callSelf(t, ss, "superai_ask", map[string]any{"message": "  "}); !isErr || !strings.Contains(text, "empty") {
+	if text, isErr := callSelf(t, ss, "superleo_ask", map[string]any{"message": "  "}); !isErr || !strings.Contains(text, "empty") {
 		t.Errorf("blank message: %q %v", text, isErr)
 	}
 }
 
-func TestSuperaiAskWithNoBackendSaysSo(t *testing.T) {
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+func TestSuperleoAskWithNoBackendSaysSo(t *testing.T) {
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	ss := selfSession(t, NewApp()) // the real SendChat, nothing built
-	res, err := ss.CallTool(context.Background(), &mcp.CallToolParams{Name: "superai_ask", Arguments: map[string]any{"message": "hi", "timeout_seconds": 5}})
+	res, err := ss.CallTool(context.Background(), &mcp.CallToolParams{Name: "superleo_ask", Arguments: map[string]any{"message": "hi", "timeout_seconds": 5}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -212,12 +212,12 @@ func TestHistoryAndConversationsShaping(t *testing.T) {
 		t.Errorf("limit 500 gave %d", n)
 	}
 
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	ss := selfSession(t, NewApp())
-	if text, isErr := callSelf(t, ss, "superai_chat_history", map[string]any{}); !isErr || !strings.Contains(text, "required") {
+	if text, isErr := callSelf(t, ss, "superleo_chat_history", map[string]any{}); !isErr || !strings.Contains(text, "required") {
 		t.Errorf("history without conversation: %q", text)
 	}
-	if text, isErr := callSelf(t, ss, "superai_conversations", map[string]any{"limit": 5}); isErr || !strings.Contains(text, "conversations") {
+	if text, isErr := callSelf(t, ss, "superleo_conversations", map[string]any{"limit": 5}); isErr || !strings.Contains(text, "conversations") {
 		t.Errorf("conversations: %q %v", text, isErr)
 	}
 }

@@ -177,7 +177,7 @@ func resolveMCPConfig(src string, lookup func(string) (string, bool)) (string, e
 	for name, entry := range f.MCPServers {
 		resolved, missing := expandMCPEntry(entry, lookup)
 		if len(missing) > 0 {
-			log.Printf("superai: mcp server %s (%s) left out: %s not set", name, src, strings.Join(missing, ", "))
+			log.Printf("superleo: mcp server %s (%s) left out: %s not set", name, src, strings.Join(missing, ", "))
 			continue
 		}
 		// An npx server runs from its installed package (mcp_npx.go).

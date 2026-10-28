@@ -7,7 +7,7 @@
 # but embeddings.
 apiVersion: apps/v1
 kind: Deployment
-metadata: {name: embed, namespace: superai}
+metadata: {name: embed, namespace: superleo}
 spec:
   replicas: 0
   selector: {matchLabels: {app: embed}}
@@ -39,7 +39,7 @@ spec:
 ---
 apiVersion: v1
 kind: Service
-metadata: {name: embed, namespace: superai}
+metadata: {name: embed, namespace: superleo}
 spec:
   type: NodePort
   selector: {app: embed}

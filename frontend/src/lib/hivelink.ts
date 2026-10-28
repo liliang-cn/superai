@@ -28,17 +28,17 @@ type Bound = Record<string, (...args: unknown[]) => Promise<unknown>>;
 
 /** Which shell this window draws. The desktop one, in the Wails window and in
  *  a browser tab alike; only a phone-width tab keeps the web layout, the one
- *  built for a screen that narrow. `localStorage["superai-client"]` set to
+ *  built for a screen that narrow. `localStorage["superleo-client"]` set to
  *  "desktop" or "web" overrides it. */
 export function clientKind(): "desktop" | "web" {
   const w = window as unknown as Record<string, unknown>;
   try {
-    const forced = localStorage.getItem("superai-client");
+    const forced = localStorage.getItem("superleo-client");
     if (forced === "desktop" || forced === "web") return forced;
   } catch {
     /* no storage: go by the window */
   }
-  if (!w.superaiServed) return "desktop";
+  if (!w.superleoServed) return "desktop";
   return window.matchMedia("(max-width: 640px)").matches ? "web" : "desktop";
 }
 
@@ -67,7 +67,7 @@ export const isBridged = () => bridged;
  *  forwards to the queen. Null means "ask GraphView for a local address". */
 export function graphSrc(): string | null {
   const w = window as unknown as Record<string, unknown>;
-  return w.superaiServed || bridged ? "/graph/" : null;
+  return w.superleoServed || bridged ? "/graph/" : null;
 }
 
 export interface HiveLinkInfo {
@@ -86,10 +86,10 @@ export interface HiveLinkEntry {
 }
 
 /** Asks anything on screen that shows the backend switcher to open it. */
-export const openSwitcher = () => window.dispatchEvent(new Event("superai:switcher"));
+export const openSwitcher = () => window.dispatchEvent(new Event("superleo:switcher"));
 
 /** "Use this Mac on its own" — remembered so the question is asked once. */
-const ALONE_KEY = "superai-desktop-alone";
+const ALONE_KEY = "superleo-desktop-alone";
 export const wantsAlone = () => {
   try { return localStorage.getItem(ALONE_KEY) === "1"; } catch { return false; }
 };

@@ -228,7 +228,7 @@ export default function WhenPicker({
         ) : preview.kind === "invalid" ? (
           <span className="hint err">{preview.why}</span>
         ) : preview.kind === "unknown" ? (
-          <span className="wp-next">SuperAI works out the next run when you save this.</span>
+          <span className="wp-next">SuperLeo works out the next run when you save this.</span>
         ) : (
           <>
             <span className="wp-next">

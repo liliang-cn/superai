@@ -1,13 +1,13 @@
 package app
 
-// Claude Code's permission prompts, answered through SuperAI's approval cards.
+// Claude Code's permission prompts, answered through SuperLeo's approval cards.
 //
 // claude --permission-prompt-tool names an MCP tool that Claude calls with
 // {tool_name, input} whenever it would otherwise ask at the terminal, and that
 // answers {"behavior":"allow","updatedInput":…} or {"behavior":"deny",…}. This
 // file serves that tool on a loopback port, one URL per run carrying a secret,
 // and turns each call into askToolApproval — the same card, the same phone
-// prompt, the same audit as SuperAI's own tools.
+// prompt, the same audit as SuperLeo's own tools.
 
 import (
 	"context"
@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -90,10 +90,10 @@ func (a *App) cliApproveURL(runID string) (string, error) {
 }
 
 func (a *App) cliApproveHandler(runID string) http.Handler {
-	s := mcp.NewServer(&mcp.Implementation{Name: "superai", Version: "1"}, nil)
+	s := mcp.NewServer(&mcp.Implementation{Name: "superleo", Version: "1"}, nil)
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "approve",
-		Description: "Asks the SuperAI user whether a tool call may run.",
+		Description: "Asks the SuperLeo user whether a tool call may run.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in cliApproveIn) (*mcp.CallToolResult, any, error) {
 		return a.cliApprove1(ctx, runID, in), nil, nil
 	})
@@ -168,5 +168,5 @@ func (a *App) cliApprove1(ctx context.Context, runID string, in cliApproveIn) *m
 		why = "nobody answered in time"
 	}
 	a.addCLIEvent(run, CLIRunEvent{Kind: "note", Tool: in.ToolName, Text: "denied: " + why, Failed: true})
-	return answer(map[string]any{"behavior": "deny", "message": "Denied by the SuperAI user (" + why + "). Do not retry the same call; ask what to do instead or try something else."})
+	return answer(map[string]any{"behavior": "deny", "message": "Denied by the SuperLeo user (" + why + "). Do not retry the same call; ask what to do instead or try something else."})
 }

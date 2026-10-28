@@ -14,6 +14,8 @@
 // Over the stream core calls the agent's own methods (the same ones a browser
 // reaches at /api/rpc/<Method>, as far as the agent allows), and the agent
 // sends back the replies and everything its event bus says.
+// The package is wire protocol (the gRPC path every agent dials), so it keeps
+// the name the project had when agents first spoke it.
 
 package agentlinkpb
 

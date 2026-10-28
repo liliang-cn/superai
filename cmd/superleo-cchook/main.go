@@ -1,30 +1,31 @@
-// superai-cchook is Claude Code's hook for the events that fire on every
+// superleo-cchook is Claude Code's hook for the events that fire on every
 // prompt and every tool call: UserPromptSubmit, PreToolUse, PostToolUse.
 //
 // Claude Code waits for a PreToolUse hook before it runs the tool, and runs
 // PostToolUse after, so the hook's own cost is paid twice per tool call in
-// every session. `superai hook` is the whole SuperAI binary, and starting it
+// every session. `superleo hook` is the whole SuperLeo binary, and starting it
 // is most of 50 ms before it reads a byte; this one imports the standard
 // library's JSON and a socket, and nothing else.
 //
 // It reads the payload, keeps the session id, the working directory's last
 // element and the tool's name — never the prompt, the tool's arguments or
-// its result — and hands them to the SuperAI serving on this machine over its
+// its result — and hands them to the SuperLeo serving on this machine over its
 // unix socket (internal/app/cchook_local.go), giving up after a short while.
 // It prints nothing and exits 0 whatever happens: a hook that fails must not
 // cost the session anything but the event.
 //
 // The rest of the hook events (SessionStart, Stop, Notification,
-// PermissionRequest, ...) stay with `superai hook`: they are rare, and some of
+// PermissionRequest, ...) stay with `superleo hook`: they are rare, and some of
 // them read a transcript or wait on the phone.
 //
-// `superai-cchook --cli codex <Event>` is the same for another CLI whose
+// `superleo-cchook --cli codex <Event>` is the same for another CLI whose
 // hooks take Claude Code's shape (codex's hooks.json): every event it has
 // goes this way, since for that CLI they only move its activity record.
 package main
 
 import (
 	"encoding/json"
+	_ "github.com/liliang-cn/superleo/internal/brand" // the old SuperAI names keep working
 	"io"
 	"net"
 	"os"
@@ -110,9 +111,9 @@ func parseFor(cli, name string, in []byte) (event, bool) {
 	return ev, true
 }
 
-// sockets are where a serving SuperAI may listen, in the order `superai hook`
-// tries them: an explicit socket, $SUPERAI_HOME, the node install this
-// binary sits in (~/.superai-node/bin/superai-cchook → ~/.superai-node), then
+// sockets are where a serving SuperLeo may listen, in the order `superleo hook`
+// tries them: an explicit socket, $SUPERLEO_HOME, the node install this
+// binary sits in (~/.superleo-node/bin/superleo-cchook → ~/.superleo-node), then
 // the two usual homes.
 func sockets() []string {
 	var out []string
@@ -127,8 +128,8 @@ func sockets() []string {
 		}
 		out = append(out, p)
 	}
-	add(strings.TrimSpace(os.Getenv("SUPERAI_HOOK_SOCKET")))
-	if h := strings.TrimSpace(os.Getenv("SUPERAI_HOME")); h != "" {
+	add(strings.TrimSpace(os.Getenv("SUPERLEO_HOOK_SOCKET")))
+	if h := strings.TrimSpace(os.Getenv("SUPERLEO_HOME")); h != "" {
 		if strings.HasPrefix(h, "~/") {
 			if home, err := os.UserHomeDir(); err == nil {
 				h = filepath.Join(home, h[2:])
@@ -140,8 +141,8 @@ func sockets() []string {
 		add(filepath.Join(filepath.Dir(filepath.Dir(exe)), socketName))
 	}
 	if home, err := os.UserHomeDir(); err == nil {
-		add(filepath.Join(home, ".superai-node", socketName))
-		add(filepath.Join(home, ".superai", socketName))
+		add(filepath.Join(home, ".superleo-node", socketName))
+		add(filepath.Join(home, ".superleo", socketName))
 	}
 	return out
 }
@@ -155,7 +156,7 @@ func send(socks []string, ev event, deadline time.Time) bool {
 	if err != nil {
 		return false
 	}
-	req := "POST " + hookPath + " HTTP/1.1\r\nHost: superai\r\nContent-Type: application/json\r\nContent-Length: " +
+	req := "POST " + hookPath + " HTTP/1.1\r\nHost: superleo\r\nContent-Type: application/json\r\nContent-Length: " +
 		strconv.Itoa(len(body)) + "\r\nConnection: close\r\n\r\n" + string(body)
 	var wg sync.WaitGroup
 	var took atomic.Bool
@@ -195,8 +196,8 @@ func post(sock, req string, deadline time.Time) bool {
 
 // run is the whole hook; main only supplies the process.
 func run(args []string, stdin io.Reader) {
-	// A run SuperAI started itself already reports through cli:run.
-	if os.Getenv("SUPERAI_CLI_RUN") != "" {
+	// A run SuperLeo started itself already reports through cli:run.
+	if os.Getenv("SUPERLEO_CLI_RUN") != "" {
 		return
 	}
 	cli := ""

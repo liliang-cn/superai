@@ -19,8 +19,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/liliang-cn/superai/internal/apns"
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/apns"
+	"github.com/liliang-cn/superleo/internal/backend"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -136,7 +136,7 @@ func nextAlarmsEvent(t *testing.T, ch <-chan []byte) map[string]any {
 }
 
 func TestAlarmWatcherAnnouncesAndPushesChanges(t *testing.T) {
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	t.Setenv("NOTED_TOKEN", "sekrit")
 	var version atomic.Int64
 	version.Store(1)
@@ -228,7 +228,7 @@ func TestAlarmWatcherAnnouncesAndPushesChanges(t *testing.T) {
 }
 
 func TestAlarmWatcherWithoutPushConfigStillAnnounces(t *testing.T) {
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	t.Setenv("NOTED_TOKEN", "sekrit")
 	for _, k := range []string{"APNS_KEY", "APNS_KEY_PATH", "APNS_KEY_ID"} {
 		t.Setenv(k, "")
@@ -256,7 +256,7 @@ func TestAlarmWatcherWithoutPushConfigStillAnnounces(t *testing.T) {
 }
 
 func TestAlarmWatcherSkipsAnUnconfiguredNoted(t *testing.T) {
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	app := NewApp()
 	if v, ok := app.notedAlarmsVersion(context.Background()); ok || v != "" {
 		t.Errorf("version without noted = %q, %v", v, ok)
@@ -264,7 +264,7 @@ func TestAlarmWatcherSkipsAnUnconfiguredNoted(t *testing.T) {
 }
 
 func TestAlarmPusherFromEnvironment(t *testing.T) {
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	_, p8 := testP8(t)
 	t.Setenv("APNS_KEY_PATH", "")
 	t.Setenv("APNS_KEY", string(p8))
@@ -308,7 +308,7 @@ func TestTouchesAlarms(t *testing.T) {
 }
 
 func TestNotedAlarmsAndHolidaysRPCs(t *testing.T) {
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	app, _, srv := serveTestApp(t)
 	t.Cleanup(func() { app.actionsV.Close() })
 

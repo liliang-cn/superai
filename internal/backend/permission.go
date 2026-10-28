@@ -5,7 +5,7 @@ package backend
 // agent-go has had an authorization seam since v3 (pkg/agent/permission.go):
 // every tool dispatch runs through Service.authorizeTool before the tool
 // handler is reached. The seam is inert until somebody installs a handler —
-// authorizeTool opens with `if handler == nil { return nil }` — and SuperAI
+// authorizeTool opens with `if handler == nil { return nil }` — and SuperLeo
 // never installed one. The practical consequence was that `bash` ran whatever
 // the model wrote, with no prompt and no record.
 //
@@ -35,7 +35,7 @@ import (
 // Two minutes is a compromise between two failure modes. Too short and a user
 // who stepped away to read the command in another window comes back to a run
 // that already gave up. Too long and an unattended run — a 3am schedule, a
-// `superai` invocation from a shell script — parks a turn for as long as the
+// `superleo` invocation from a shell script — parks a turn for as long as the
 // LLM timeout allows while nobody is ever going to answer. Two minutes is long
 // enough to read a shell command and think about it, short enough that an
 // unattended run fails fast and says why.
@@ -68,14 +68,14 @@ type ApprovalRequest struct {
 	Args      map[string]any `json:"args,omitempty"`
 	SessionID string         `json:"sessionId,omitempty"`
 	AgentID   string         `json:"agentId,omitempty"`
-	// By names who is asking, when it is not SuperAI itself: a standing
+	// By names who is asking, when it is not SuperLeo itself: a standing
 	// agent, a Claude Code run on another machine.
 	By      string    `json:"by,omitempty"`
 	AskedAt time.Time `json:"askedAt"`
 	// ExpiresAt lets the UI show a countdown, so the user knows the prompt is
 	// on a clock rather than wondering why the card vanished.
 	ExpiresAt time.Time `json:"expiresAt"`
-	// Machine is where the call would run, when that is not this SuperAI: the
+	// Machine is where the call would run, when that is not this SuperLeo: the
 	// remote node a coding run is on. Remembered rules are scoped by it.
 	Machine string `json:"machine,omitempty"`
 	// Workdir is the run's working directory, when there is one; a "files
@@ -429,7 +429,7 @@ func (g *ToolGate) decide(ctx context.Context, req agent.PermissionRequest) (*ag
 		return g.answer(ask, ApprovalDecision{
 			By: DecidedByNoApprover,
 			Reason: fmt.Sprintf("%s needs approval and this process has no way to ask "+
-				"(no window, no browser session). Run it from the SuperAI app, or turn the "+
+				"(no window, no browser session). Run it from the SuperLeo app, or turn the "+
 				"approval gate off in Settings if you meant this to be unattended.", req.ToolName),
 		})
 	}

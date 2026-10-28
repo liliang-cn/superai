@@ -12,7 +12,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/liliang-cn/agentexec"
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // queenTestKit is a kit as queenKitFor makes one: the hive by URL with its
@@ -22,7 +22,7 @@ func queenTestKit() *QueenKit {
 		SystemPrompt: "In the hive you are q, the queen. Say \"hi\".\nSecond line.",
 		Servers: map[string]any{
 			"hive": map[string]any{"type": "http", "url": "http://127.0.0.1:43999/mcp",
-				"headers": map[string]any{"Authorization": "Bearer ${SUPERAI_QUEEN_TOKEN}"}},
+				"headers": map[string]any{"Authorization": "Bearer ${SUPERLEO_QUEEN_TOKEN}"}},
 			"noted": map[string]any{"command": "/opt/noted", "args": []any{"mcp"},
 				"env": map[string]any{"NOTED_TOKEN": "${NOTED_TOKEN}", "NOTED_MODE": "stdio"}},
 		},
@@ -147,8 +147,8 @@ func TestCodexTakesAServerOnlyAsItCanBeWritten(t *testing.T) {
 	}
 }
 
-func TestPiIsHandedTheQueenThroughSuperAIsExtension(t *testing.T) {
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+func TestPiIsHandedTheQueenThroughSuperLeosExtension(t *testing.T) {
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	const approve = "http://127.0.0.1:1/approve/r/s"
 	spec, req := buildQueen(t, "pi", agentexec.NewPi(agentexec.WithBinary("pi")), true, approve)
 	var exts []string
@@ -157,7 +157,7 @@ func TestPiIsHandedTheQueenThroughSuperAIsExtension(t *testing.T) {
 			exts = append(exts, spec.Argv[i+1])
 		}
 	}
-	// pi's own MCP support, named again after --no-extensions, and SuperAI's.
+	// pi's own MCP support, named again after --no-extensions, and SuperLeo's.
 	if len(exts) != 4 || !slices.Contains(exts, "builtin:mcp") || !slices.Contains(exts, "builtin:tool-search") {
 		t.Fatalf("extensions %q", exts)
 	}
@@ -166,7 +166,7 @@ func TestPiIsHandedTheQueenThroughSuperAIsExtension(t *testing.T) {
 	if err != nil || !strings.Contains(string(src), "registerMcpServer") || !strings.HasPrefix(ext, backend.DataDir()) {
 		t.Fatalf("extension %q: %v", ext, err)
 	}
-	// Only SuperAI's extension: none of the person's, nor their skills,
+	// Only SuperLeo's extension: none of the person's, nor their skills,
 	// templates, AGENTS.md or project files.
 	for _, want := range []string{"--no-extensions", "--no-skills", "--no-prompt-templates", "--no-context-files", "--no-approve", "--print"} {
 		if !slices.Contains(spec.Argv, want) {
@@ -184,7 +184,7 @@ func TestPiIsHandedTheQueenThroughSuperAIsExtension(t *testing.T) {
 	if hive["url"] != "http://127.0.0.1:43999/mcp" || hive["exposure"] != "direct" || servers["noted"]["exposure"] != "deferred" {
 		t.Fatalf("servers %v", servers)
 	}
-	if h, _ := hive["headers"].(map[string]any); h["Authorization"] != "Bearer ${SUPERAI_QUEEN_TOKEN}" {
+	if h, _ := hive["headers"].(map[string]any); h["Authorization"] != "Bearer ${SUPERLEO_QUEEN_TOKEN}" {
 		t.Fatalf("the hive's token is not left to the extension: %v", hive)
 	}
 	if req.Env[piApproveEnv] != approve || req.Env[piAllowedEnv] != "mcp__hive" || req.Env[queenTokenEnv] != "sai_secret_q" {
@@ -198,7 +198,7 @@ func TestPiIsHandedTheQueenThroughSuperAIsExtension(t *testing.T) {
 }
 
 func TestHermesIsHandedTheQueensServersInAHomeOfItsOwn(t *testing.T) {
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	own := t.TempDir()
 	t.Setenv("HERMES_HOME", own)
 	spec, req := buildQueen(t, "hermes", agentexec.NewHermes(agentexec.WithBinary("hermes")), true, "")
@@ -247,17 +247,17 @@ func TestEveryCLIsEventsReadTheSame(t *testing.T) {
 		t.Fatalf("pi delta %+v", got)
 	}
 	// pi's call and its end.
-	norm(agentexec.Event{Type: agentexec.EventToolCall, Payload: map[string]any{"id": "c1", "name": "mcp__hive__superai_hive_members", "input": map[string]any{}}})
-	got := norm(agentexec.Event{Type: agentexec.EventToolResult, Payload: map[string]any{"id": "c1", "name": "mcp__hive__superai_hive_members",
+	norm(agentexec.Event{Type: agentexec.EventToolCall, Payload: map[string]any{"id": "c1", "name": "mcp__hive__superleo_hive_members", "input": map[string]any{}}})
+	got := norm(agentexec.Event{Type: agentexec.EventToolResult, Payload: map[string]any{"id": "c1", "name": "mcp__hive__superleo_hive_members",
 		"output": map[string]any{"content": []any{map[string]any{"type": "text", "text": "q, w1"}}}, "is_error": false}})
-	if len(got) != 1 || got[0].Kind != "result" || got[0].Text != "q, w1" || got[0].Tool != "mcp__hive__superai_hive_members" || got[0].Failed {
+	if len(got) != 1 || got[0].Kind != "result" || got[0].Text != "q, w1" || got[0].Tool != "mcp__hive__superleo_hive_members" || got[0].Failed {
 		t.Fatalf("pi result %+v", got)
 	}
 	// Codex's MCP call, reported once with what came back.
 	got = norm(agentexec.Event{Type: agentexec.EventAgentMessage, Payload: map[string]any{"role": "mcp_tool_call", "raw": map[string]any{
-		"id": "i1", "type": "mcp_tool_call", "server": "hive", "tool": "superai_hive_members", "arguments": map[string]any{"x": 1.0},
+		"id": "i1", "type": "mcp_tool_call", "server": "hive", "tool": "superleo_hive_members", "arguments": map[string]any{"x": 1.0},
 		"result": map[string]any{"content": []any{map[string]any{"type": "text", "text": "q, w1"}}}, "status": "completed"}}})
-	if len(got) != 2 || got[0].Kind != "tool" || shortTool(got[0].Tool) != "superai_hive_members" || got[0].Detail != `{"x":1}` ||
+	if len(got) != 2 || got[0].Kind != "tool" || shortTool(got[0].Tool) != "superleo_hive_members" || got[0].Detail != `{"x":1}` ||
 		got[1].Kind != "result" || got[1].Text != "q, w1" || got[1].Failed {
 		t.Fatalf("codex mcp call %+v", got)
 	}
@@ -284,7 +284,7 @@ d=%q
 n=$(ls "$d" | grep -c '^args\.')
 n=$((n+1))
 for a in "$@"; do printf '%%s\n\036\n' "$a"; done > "$d/args.$n"
-printf '%%s' "$SUPERAI_QUEEN_TOKEN" > "$d/token.$n"
+printf '%%s' "$SUPERLEO_QUEEN_TOKEN" > "$d/token.$n"
 printf '%%s' "$HERMES_MANAGED_DIR" > "$d/managed.$n"
 cat "$d/out"
 `, name, dir)
@@ -307,13 +307,13 @@ func newCLIEngineHarness(t *testing.T, name, out string) *engineHarness {
 
 const fakeCodexTurn = `{"type":"thread.started","thread_id":"th-1"}
 {"type":"turn.started"}
-{"type":"item.completed","item":{"id":"i1","type":"mcp_tool_call","server":"hive","tool":"superai_hive_members","arguments":{},"result":{"content":[{"type":"text","text":"q, w1"}]},"status":"completed"}}
+{"type":"item.completed","item":{"id":"i1","type":"mcp_tool_call","server":"hive","tool":"superleo_hive_members","arguments":{},"result":{"content":[{"type":"text","text":"q, w1"}]},"status":"completed"}}
 {"type":"item.completed","item":{"id":"i2","type":"agent_message","text":"hive 里有两个成员。"}}
 {"type":"turn.completed","usage":{"input_tokens":10,"output_tokens":5}}`
 
 const fakePiTurn = `{"type":"session","id":"pi-1","cwd":"/w"}
-{"type":"tool_execution_start","toolCallId":"c1","toolName":"mcp__hive__superai_hive_members","args":{}}
-{"type":"tool_execution_end","toolCallId":"c1","toolName":"mcp__hive__superai_hive_members","result":{"content":[{"type":"text","text":"q, w1"}]},"isError":false}
+{"type":"tool_execution_start","toolCallId":"c1","toolName":"mcp__hive__superleo_hive_members","args":{}}
+{"type":"tool_execution_end","toolCallId":"c1","toolName":"mcp__hive__superleo_hive_members","result":{"content":[{"type":"text","text":"q, w1"}]},"isError":false}
 {"type":"message_update","assistantMessageEvent":{"type":"text_delta","delta":"hive 里有"}}
 {"type":"message_update","assistantMessageEvent":{"type":"text_delta","delta":"两个成员。"}}
 {"type":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"hive 里有两个成员。"}],"usage":{"input":10,"output":5,"cost":{"total":0.001}},"stopReason":"stop"}}
@@ -345,14 +345,14 @@ func TestCodexPiAndHermesThinkForTheQueen(t *testing.T) {
 				case "partial":
 					streamed += p["content"].(string)
 				case "tool_call":
-					sawTool = p["tool"] == "superai_hive_members"
+					sawTool = p["tool"] == "superleo_hive_members"
 				}
 			}
 			if streamed != "hive 里有两个成员。" || sawTool != c.tool {
 				t.Fatalf("streamed %q, tool %v", streamed, sawTool)
 			}
 			if len(h.owned()) != 0 {
-				t.Fatalf("SuperAI's own model ran: %v", h.owned())
+				t.Fatalf("SuperLeo's own model ran: %v", h.owned())
 			}
 			if tok, _ := os.ReadFile(filepath.Join(h.dir, "token.1")); !strings.HasPrefix(string(tok), queenTokenPrefix) {
 				t.Fatalf("no queen token: %q", tok)
@@ -379,7 +379,7 @@ func TestCodexPiAndHermesThinkForTheQueen(t *testing.T) {
 }
 
 func TestCodexPiAndHermesCanBeTheEngineWhenThere(t *testing.T) {
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	a := &App{settings: &backend.Settings{}}
 	for _, name := range []string{"codex", "pi", "hermes"} {
 		bin, _ := fakeAgent(t, name, "")
@@ -437,8 +437,8 @@ func TestHermesHearsTheConversationWithoutAHistoryToKeepIt(t *testing.T) {
 }
 
 // Hermes prints its failure where its answer would be: a turn it could not
-// take is still SuperAI's to answer, and the failure is not shown as one.
-func TestSuperAIStandsInForAHermesThatFailedAtItsProvider(t *testing.T) {
+// take is still SuperLeo's to answer, and the failure is not shown as one.
+func TestSuperLeoStandsInForAHermesThatFailedAtItsProvider(t *testing.T) {
 	h := newCLIEngineHarness(t, "hermes", "API call failed after 3 retries: HTTP 429")
 	bin := h.a.settings.ExternalAgents.Binaries["hermes"]
 	raw, _ := os.ReadFile(bin)

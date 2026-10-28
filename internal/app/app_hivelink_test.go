@@ -59,7 +59,7 @@ func fakeQueen(t *testing.T) *httptest.Server {
 }
 
 func TestTheDesktopWindowSeesTheHiveOnceLinked(t *testing.T) {
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	queen := fakeQueen(t)
 
 	events := make(chan string, 16)
@@ -109,7 +109,7 @@ func TestTheDesktopWindowSeesTheHiveOnceLinked(t *testing.T) {
 	mw := AssetMiddleware(a)(local)
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/graph/index.js", nil)
-	req.Header.Set("Cookie", "superai_session=x")
+	req.Header.Set("Cookie", "superleo_session=x")
 	mw.ServeHTTP(rec, req)
 	if got := rec.Body.String(); got != "queen graph /graph/index.js" {
 		t.Fatalf("/graph/ answered %q", got)
@@ -140,7 +140,7 @@ func TestTheDesktopWindowSeesTheHiveOnceLinked(t *testing.T) {
 }
 
 func TestTheDesktopWindowSwitchesBetweenHives(t *testing.T) {
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	prev := windowEmit
 	windowEmit = func(context.Context, string, map[string]any) {}
 	t.Cleanup(func() { windowEmit = prev })

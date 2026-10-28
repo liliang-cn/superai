@@ -1,20 +1,20 @@
 package app
 
-// SuperAI's activity hooks for the coding CLIs other than Claude Code that
+// SuperLeo's activity hooks for the coding CLIs other than Claude Code that
 // have a way in (cli_activity.go):
 //
-//   - opencode: a plugin file, <config>/plugins/superai-activity.js, which
+//   - opencode: a plugin file, <config>/plugins/superleo-activity.js, which
 //     opencode loads from its config directory by itself.
-//   - pi: an extension file, <agent dir>/extensions/superai-activity.js,
+//   - pi: an extension file, <agent dir>/extensions/superleo-activity.js,
 //     which pi loads by itself.
 //   - codex: entries in $CODEX_HOME/hooks.json, Claude Code's hook shape,
-//     running superai-cchook --cli codex. Codex runs a new hook only once the
+//     running superleo-cchook --cli codex. Codex runs a new hook only once the
 //     person has trusted it (/hooks in codex); until then codex is seen by
 //     its processes.
 //
-// Each install only adds or replaces SuperAI's own file or entries: other
+// Each install only adds or replaces SuperLeo's own file or entries: other
 // plugins, extensions, hooks and config are left as they were, and a file
-// SuperAI changes is kept beside it first as <name>.superai.bak. Run again,
+// SuperLeo changes is kept beside it first as <name>.superleo.bak. Run again,
 // it changes nothing. A CLI whose config directory is not there and that is
 // not on the PATH is left alone.
 
@@ -31,19 +31,23 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 //go:embed cliplugins/opencode.js cliplugins/pi.js cliplugins/pi_queen.js
 var cliPluginFS embed.FS
 
-// cliPluginFile is the file name SuperAI's plugin goes by in a CLI's
+// cliPluginFile is the file name SuperLeo's plugin goes by in a CLI's
 // plugin directory.
-const cliPluginFile = "superai-activity.js"
+const cliPluginFile = "superleo-activity.js"
+
+// legacyCLIPluginFile is the name it was installed under before the rename;
+// left beside the new one, it would report every session twice.
+const legacyCLIPluginFile = "superai-activity.js"
 
 // cliSocketMark is the placeholder an installed plugin has the node's own
 // hook socket in place of.
-const cliSocketMark = "__SUPERAI_SOCKET__"
+const cliSocketMark = "__SUPERLEO_SOCKET__"
 
 // cliPluginSource is a plugin with this node's socket written in.
 func cliPluginSource(name, socket string) ([]byte, error) {
@@ -74,7 +78,7 @@ func writeKept(path string, content []byte) (bool, error) {
 		if st, err := os.Stat(path); err == nil {
 			mode = st.Mode().Perm()
 		}
-		if err := os.WriteFile(path+".superai.bak", old, mode); err != nil {
+		if err := os.WriteFile(path+".superleo.bak", old, mode); err != nil {
 			return false, fmt.Errorf("keeping the old %s: %w", filepath.Base(path), err)
 		}
 	case errors.Is(err, os.ErrNotExist):
@@ -85,7 +89,7 @@ func writeKept(path string, content []byte) (bool, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return false, err
 	}
-	tmp := path + ".superai.tmp"
+	tmp := path + ".superleo.tmp"
 	if err := os.WriteFile(tmp, content, mode); err != nil {
 		return false, err
 	}
@@ -142,30 +146,33 @@ func codexHome() string {
 	return filepath.Join(h, ".codex")
 }
 
-// installOpencodePlugin puts SuperAI's plugin in opencode's config dir.
+// installOpencodePlugin puts SuperLeo's plugin in opencode's config dir.
 func installOpencodePlugin(dir, socket string) (bool, error) {
 	src, err := cliPluginSource("opencode.js", socket)
 	if err != nil {
 		return false, err
 	}
+	_ = os.Remove(filepath.Join(dir, "plugins", legacyCLIPluginFile))
 	return writeKept(filepath.Join(dir, "plugins", cliPluginFile), src)
 }
 
-// installPiExtension puts SuperAI's extension in pi's agent dir.
+// installPiExtension puts SuperLeo's extension in pi's agent dir.
 func installPiExtension(dir, socket string) (bool, error) {
 	src, err := cliPluginSource("pi.js", socket)
 	if err != nil {
 		return false, err
 	}
+	_ = os.Remove(filepath.Join(dir, "extensions", legacyCLIPluginFile))
 	return writeKept(filepath.Join(dir, "extensions", cliPluginFile), src)
 }
 
-// codexHookEvents are the codex hooks SuperAI sets: every one that says
+// codexHookEvents are the codex hooks SuperLeo sets: every one that says
 // where a session is in its turn.
 var codexHookEvents = []string{"SessionStart", "SessionEnd", "UserPromptSubmit", "PreToolUse", "PostToolUse", "PermissionRequest", "Stop", "Interrupt"}
 
-// codexHookRE finds SuperAI's codex hook for an event in a command.
-var codexHookRE = regexp.MustCompile(`(?:superai-cchook|superai['"]?\s+hook)['"]?\s+--cli\s+codex\s+([A-Za-z]+)`)
+// codexHookRE finds SuperLeo's codex hook for an event in a command.
+// The superai names are those it was installed under before the rename.
+var codexHookRE = regexp.MustCompile(`(?:super(?:leo|ai)-cchook|super(?:leo|ai)['"]?\s+hook)['"]?\s+--cli\s+codex\s+([A-Za-z]+)`)
 
 func isOurCodexHook(command, event string) bool {
 	for _, m := range codexHookRE.FindAllStringSubmatch(command, -1) {
@@ -176,8 +183,8 @@ func isOurCodexHook(command, event string) bool {
 	return false
 }
 
-// codexHookCommand is the command for one event: superai-cchook when there
-// is one beside bin, else superai itself.
+// codexHookCommand is the command for one event: superleo-cchook when there
+// is one beside bin, else superleo itself.
 func codexHookCommand(bin, slim, event string) string {
 	if slim != "" {
 		return hookQuote(slim) + " --cli codex " + event
@@ -185,7 +192,7 @@ func codexHookCommand(bin, slim, event string) string {
 	return hookQuote(bin) + " hook --cli codex " + event
 }
 
-// mergeCodexHooks adds SuperAI's codex hooks missing from a hooks.json's
+// mergeCodexHooks adds SuperLeo's codex hooks missing from a hooks.json's
 // content, each as a new group at the end of its event's list: codex knows
 // a hook's trust by its place, so the groups already there keep theirs.
 // Everything else in the file keeps its value and order.
@@ -257,7 +264,7 @@ func mergeCodexHooks(content []byte, bin, slim string) ([]byte, []string, error)
 	return out.Bytes(), added, nil
 }
 
-// installCodexHooks merges SuperAI's hooks into codex's hooks.json.
+// installCodexHooks merges SuperLeo's hooks into codex's hooks.json.
 func installCodexHooks(home, bin, slim string) ([]string, error) {
 	path := filepath.Join(home, "hooks.json")
 	if real, err := filepath.EvalSymlinks(path); err == nil {
@@ -284,7 +291,7 @@ func installCodexHooks(home, bin, slim string) ([]string, error) {
 // temp dir.
 type cliHookTargets struct {
 	Opencode, Pi, Codex string // config dirs; "" skips one
-	Bin, Slim           string // superai and superai-cchook
+	Bin, Slim           string // superleo and superleo-cchook
 	Socket              string // this node's hook socket
 }
 
@@ -332,9 +339,9 @@ func installCLIHooks(t cliHookTargets) ([]string, []error) {
 }
 
 // autoInstallCLIHooks installs or upgrades the CLI hooks when a node
-// starts. Off with SUPERAI_HOOK_AUTOINSTALL=0.
+// starts. Off with SUPERLEO_HOOK_AUTOINSTALL=0.
 func autoInstallCLIHooks() {
-	if os.Getenv("SUPERAI_HOOK_AUTOINSTALL") == "0" {
+	if os.Getenv("SUPERLEO_HOOK_AUTOINSTALL") == "0" {
 		return
 	}
 	bin := hookBinary()

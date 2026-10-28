@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// fakeProcs stands in for `superai serve`: each start is recorded, and a
+// fakeProcs stands in for `superleo serve`: each start is recorded, and a
 // test can make a running one exit as if it had crashed.
 type fakeProcs struct {
 	mu      sync.Mutex
@@ -176,15 +176,15 @@ func TestLocalSpawnerLetsIdleWorkersGoDownToTheMinimum(t *testing.T) {
 
 func TestLocalWorkerEnvDropsTheQueensOwn(t *testing.T) {
 	env := LocalWorkerEnv([]string{
-		"PATH=/bin", "SUPERAI_HOME=/q", "SUPERAI_SETTINGS_JSON={}", "SUPERAI_CORE=x:1", "NOTED_TOKEN=keep",
+		"PATH=/bin", "SUPERLEO_HOME=/q", "SUPERLEO_SETTINGS_JSON={}", "SUPERLEO_CORE=x:1", "NOTED_TOKEN=keep",
 	}, "/w", "http://127.0.0.1:4000")
 	got := strings.Join(env, "\n")
-	for _, want := range []string{"PATH=/bin", "NOTED_TOKEN=keep", "SUPERAI_HOME=/w", "SUPERAI_ADVERTISE_URL=http://127.0.0.1:4000", ExitWithStdinEnv + "=1"} {
+	for _, want := range []string{"PATH=/bin", "NOTED_TOKEN=keep", "SUPERLEO_HOME=/w", "SUPERLEO_ADVERTISE_URL=http://127.0.0.1:4000", ExitWithStdinEnv + "=1"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("missing %s", want)
 		}
 	}
-	for _, gone := range []string{"SUPERAI_HOME=/q", "SUPERAI_SETTINGS_JSON", "SUPERAI_CORE="} {
+	for _, gone := range []string{"SUPERLEO_HOME=/q", "SUPERLEO_SETTINGS_JSON", "SUPERLEO_CORE="} {
 		if strings.Contains(got, gone) {
 			t.Errorf("kept %s", gone)
 		}

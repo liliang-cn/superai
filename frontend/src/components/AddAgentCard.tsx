@@ -11,7 +11,7 @@ type Join = { code: string; expiresAt: string; commands?: string[]; error?: stri
  * app_agentdoor.go).
  */
 export default function AddAgentCard({ queen, onQueen }: {
-  /** Whether this SuperAI is the queen of the machines that joined it. */
+  /** Whether this SuperLeo is the queen of the machines that joined it. */
   queen?: boolean;
   /** Absent where it cannot be one (a worker). */
   onQueen?: (on: boolean) => void;

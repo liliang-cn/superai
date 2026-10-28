@@ -16,7 +16,7 @@ import {
 import { deeplinkPath } from "../lib/routes";
 
 /**
- * What SuperAI said while you were not looking.
+ * What SuperLeo said while you were not looking.
  *
  * The bell lives in the status bar because that is the one strip on screen in
  * every view, and a notification centre you have to navigate to is one you

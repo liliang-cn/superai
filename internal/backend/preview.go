@@ -77,7 +77,7 @@ func (s *Service) PreviewPrompt(ctx context.Context, sessionID, goal string) Pro
 		Deliverables: []string{},
 	}
 	if s == nil || s.svc == nil {
-		out.Error = "superai: agent service unavailable"
+		out.Error = "superleo: agent service unavailable"
 		return out
 	}
 
@@ -130,7 +130,7 @@ func previewDeliverable(d agent.DeliverableRequirement) string {
 // are independent and run side by side.
 func (s *Service) Warm(ctx context.Context) error {
 	if s == nil || s.svc == nil {
-		return fmt.Errorf("superai: agent service unavailable")
+		return fmt.Errorf("superleo: agent service unavailable")
 	}
 	model := make(chan error, 1)
 	go func() {

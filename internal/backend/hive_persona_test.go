@@ -7,7 +7,7 @@ import (
 	"github.com/liliang-cn/agent-go/v3/pkg/pool"
 )
 
-// Ten workers once each wrote "their" audit record to hive-audit/SuperAI,
+// Ten workers once each wrote "their" audit record to hive-audit/SuperLeo,
 // because nothing in the prompt told them their own name.
 func TestAWorkerIsToldItsNameInTheHive(t *testing.T) {
 	got := hiveSection(HiveSettings{Role: HiveRoleWorker, Name: "superai-worker-3"})

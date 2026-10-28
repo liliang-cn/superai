@@ -31,7 +31,7 @@ export default function ImportPanel({ open: openProp, onOpenChange }: ImportPane
     onOpenChange?.(v);
   };
   // The server-side path of the file to import. Filled by uploading, never
-  // typed: a path is only meaningful on the machine SuperAI runs on, and over
+  // typed: a path is only meaningful on the machine SuperLeo runs on, and over
   // the network the obvious thing to type — a path on your own laptop — is the
   // one thing that cannot work.
   const [path, setPath] = useState("");

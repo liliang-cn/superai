@@ -1,6 +1,6 @@
 // Serve mode: the same app without the window.
 //
-//	superai serve -port 43117
+//	superleo serve -port 43117
 //
 // runs the identical App — same settings, same agent, same schedules out of the
 // same database — behind a plain HTTP server instead of a WKWebView, so the
@@ -26,7 +26,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 	"io"
 	"io/fs"
 	"log"
@@ -362,7 +362,7 @@ func newAPIMux(app *App, hub *eventHub, creds *credentials, handoff *handoffStor
 	// getting nothing — its sprites never loaded and its events never
 	// connected. Behind requireAuth like everything else here.
 	mux.Handle(backend.AvatarProxyPrefix+"/", app.avatarProxy())
-	// SuperAI as an MCP server — see mcp.go for why it lives in this process
+	// SuperLeo as an MCP server — see mcp.go for why it lives in this process
 	// and why it adds no gate of its own.
 	mux.Handle(mcpPath, newMCPHandler(app, mcpServerVersion))
 	spa, err := spaHandler()
@@ -378,16 +378,16 @@ func envInt(name string) int {
 	return n
 }
 
-// serveMain is the `superai serve` entry point.
+// serveMain is the `superleo serve` entry point.
 func ServeMain(argv []string) {
 	fl := flag.NewFlagSet("serve", flag.ExitOnError)
 	port := fl.Int("port", 43117, "listen on <bind>:<port>")
 	bind := fl.String("bind", "127.0.0.1", "address to listen on; anything but loopback exposes the API to the network, so only do it behind the login gate (a container needs 0.0.0.0)")
-	agentPort := fl.Int("agent-port", envInt("SUPERAI_AGENT_PORT"), "listen for agents on <bind>:<agent-port> (gRPC); 0 is off (env SUPERAI_AGENT_PORT)")
+	agentPort := fl.Int("agent-port", envInt("SUPERLEO_AGENT_PORT"), "listen for agents on <bind>:<agent-port> (gRPC); 0 is off (env SUPERLEO_AGENT_PORT)")
 	lf := addAgentLinkFlags(fl)
 	_ = fl.Parse(argv)
 
-	log.SetPrefix("superai-serve ")
+	log.SetPrefix("superleo-serve ")
 	startPprof()
 
 	hub := newEventHub()
@@ -435,7 +435,7 @@ func ServeMain(argv []string) {
 	go autoUpgradeCCHooks()
 	// The coding CLIs' activity hooks: not on a first start that has not yet
 	// been told it may use the agents here (FinishOnboarding installs them
-	// then), so a fresh SuperAI never rewrites another one's plugins.
+	// then), so a fresh SuperLeo never rewrites another one's plugins.
 	if app.mayInstallCLIHooks() {
 		go autoInstallCLIHooks()
 	}
@@ -456,5 +456,5 @@ func ServeMain(argv []string) {
 	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Fatalf("serve: %v", err)
 	}
-	fmt.Fprintln(os.Stderr, "superai-serve: stopped")
+	fmt.Fprintln(os.Stderr, "superleo-serve: stopped")
 }

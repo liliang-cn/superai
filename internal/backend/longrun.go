@@ -113,7 +113,7 @@ func (s *Service) Traces() *TraceStore {
 // flight sees the cancellation directly.
 func (s *Service) StreamLong(ctx context.Context, goal string, o LongRunOptions, emit func(ev *agent.Event)) (*LongRunReport, error) {
 	if s == nil || s.svc == nil {
-		return nil, fmt.Errorf("superai: agent service unavailable")
+		return nil, fmt.Errorf("superleo: agent service unavailable")
 	}
 
 	cfg := agent.LongRunConfig{
@@ -172,7 +172,7 @@ func (s *Service) StreamLong(ctx context.Context, goal string, o LongRunOptions,
 		return nil, out.Err
 	}
 	if out.Result == nil {
-		return nil, fmt.Errorf("superai: long run produced no result")
+		return nil, fmt.Errorf("superleo: long run produced no result")
 	}
 	return &LongRunReport{
 		TaskID:   out.Result.TaskID,

@@ -3,7 +3,7 @@ package app
 import (
 	"context"
 
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // ProxyStatus is what the proxy setting comes to now: the mode, the proxy an

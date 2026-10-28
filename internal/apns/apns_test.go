@@ -123,7 +123,7 @@ func TestWakeSendsASilentPush(t *testing.T) {
 
 	var p struct {
 		APS     map[string]any `json:"aps"`
-		SuperAI map[string]any `json:"superai"`
+		SuperLeo map[string]any `json:"superai"`
 	}
 	if err := json.Unmarshal(body, &p); err != nil {
 		t.Fatalf("payload %s: %v", body, err)
@@ -131,8 +131,8 @@ func TestWakeSendsASilentPush(t *testing.T) {
 	if p.APS["content-available"] != float64(1) || len(p.APS) != 1 {
 		t.Errorf("aps %v: a silent push carries content-available and nothing else", p.APS)
 	}
-	if p.SuperAI["kind"] != "alarms" || p.SuperAI["version"] != "v7" {
-		t.Errorf("superai %v", p.SuperAI)
+	if p.SuperLeo["kind"] != "alarms" || p.SuperLeo["version"] != "v7" {
+		t.Errorf("superleo %v", p.SuperLeo)
 	}
 }
 
@@ -268,7 +268,7 @@ func TestAlertSendsAVisibleNotification(t *testing.T) {
 			ContentAvailable  int               `json:"content-available"`
 			Badge             *int              `json:"badge"`
 		} `json:"aps"`
-		SuperAI map[string]any `json:"superai"`
+		SuperLeo map[string]any `json:"superai"`
 	}
 	if err := json.Unmarshal(body, &p); err != nil {
 		t.Fatalf("%s: %v", body, err)
@@ -285,8 +285,8 @@ func TestAlertSendsAVisibleNotification(t *testing.T) {
 	if p.APS.ContentAvailable != 0 {
 		t.Error("a visible alert is not a background push")
 	}
-	if p.SuperAI["kind"] != "notice" || p.SuperAI["id"] != "n1" {
-		t.Errorf("superai %v", p.SuperAI)
+	if p.SuperLeo["kind"] != "notice" || p.SuperLeo["id"] != "n1" {
+		t.Errorf("superleo %v", p.SuperLeo)
 	}
 }
 
@@ -314,7 +314,7 @@ func TestAQuietAlertHasNoSoundAndLowPriority(t *testing.T) {
 	if alert, _ := p["aps"]["alert"].(map[string]any); alert["title"] != nil || alert["body"] != "fyi" {
 		t.Errorf("alert %s", body)
 	}
-	if _, ok := p["superai"]; ok {
+	if _, ok := p["superleo"]; ok {
 		t.Errorf("no data was given: %s", body)
 	}
 }

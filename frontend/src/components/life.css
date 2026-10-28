@@ -9,7 +9,7 @@
 .ev-foot > span { flex: 1; font-size: 12.5px; color: var(--ink-3, var(--text-3)); }
 .ev-del { background: #d0313f; color: #fff; }
 
-/* What SuperAI knows about you, beside the graph. */
+/* What SuperLeo knows about you, beside the graph. */
 .kn-view { position: relative; }
 .ay { position: absolute; top: 76px; right: 16px; bottom: 16px; width: min(380px, calc(100% - 32px)); z-index: 5; display: flex; flex-direction: column;
   background: var(--popover, var(--bg-1)); border: 1px solid var(--border); border-radius: var(--radius-lg, 18px); box-shadow: 0 18px 48px rgba(20, 20, 30, .14); overflow: hidden; }

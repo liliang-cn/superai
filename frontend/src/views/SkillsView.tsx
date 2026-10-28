@@ -48,7 +48,7 @@ export default function SkillsView() {
       <div className="view-header with-action">
         <div>
           <div className="view-title">{t("Skills")}{skills.length > 0 ? ` (${skills.length})` : ""}</div>
-          <div className="view-desc">{translate("Installed skills SuperAI can activate during a turn.")}</div>
+          <div className="view-desc">{translate("Installed skills SuperLeo can activate during a turn.")}</div>
         </div>
         <div className="vh-actions">
           <button

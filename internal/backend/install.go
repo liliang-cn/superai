@@ -16,7 +16,7 @@ import (
 )
 
 // registerInstallTools exposes chat-callable tools that let the user install
-// skills and MCP servers just by asking SuperAI in conversation:
+// skills and MCP servers just by asking SuperLeo in conversation:
 //
 //	"装一个 filesystem 的 MCP server"          -> add_mcp_server
 //	"给我装上 github.com/foo/bar-skill"        -> install_skill
@@ -70,7 +70,7 @@ func (s *Service) registerInstallTools() {
 	// --- add_mcp_server ---
 	svc.AddToolWithMetadata(
 		"add_mcp_server",
-		"Install/add an MCP server (call it when the user asks in conversation for some MCP tool). It starts immediately over stdio and is written to ~/.superai/mcpServers.json, so it survives a restart.",
+		"Install/add an MCP server (call it when the user asks in conversation for some MCP tool). It starts immediately over stdio and is written to ~/.superleo/mcpServers.json, so it survives a restart.",
 		map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
@@ -146,7 +146,7 @@ func (s *Service) registerInstallTools() {
 	// --- install_skill ---
 	svc.AddToolWithMetadata(
 		"install_skill",
-		"Install a skill from one of three sources: a local path (source_path, paired with search_skills), a git repository (git_url), or SKILL.md content given directly (skill_md). It is installed into ~/.superai/skills/<name> and hot-reloaded; once installed it shows up in the Skills panel.",
+		"Install a skill from one of three sources: a local path (source_path, paired with search_skills), a git repository (git_url), or SKILL.md content given directly (skill_md). It is installed into ~/.superleo/skills/<name> and hot-reloaded; once installed it shows up in the Skills panel.",
 		map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
@@ -230,7 +230,7 @@ func argInt(a map[string]interface{}, k string) int {
 	return 0
 }
 
-// copySkillDir copies a skill directory into the SuperAI skills folder,
+// copySkillDir copies a skill directory into the SuperLeo skills folder,
 // replacing whatever was there. Only regular files are copied: a skill found on
 // this machine may be a git checkout, and its .git is of no use to the copy.
 func copySkillDir(src, dst string) error {

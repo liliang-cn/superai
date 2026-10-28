@@ -56,7 +56,7 @@ export function notifyNow(title: string, body: string): "posted" | "denied" | "u
   if (!notifySupported()) return "unsupported";
   if (Notification.permission !== "granted") return "denied";
   try {
-    const banner = new Notification(title, { body, tag: "superai-test", icon: "/favicon.ico" });
+    const banner = new Notification(title, { body, tag: "superleo-test", icon: "/favicon.ico" });
     banner.onclick = () => {
       window.focus();
       banner.close();

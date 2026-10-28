@@ -21,7 +21,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // ActionOptions is CallTool's fourth argument.

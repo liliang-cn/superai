@@ -26,7 +26,7 @@ func TestAJoinTradesTheCodeAndKeepsWhereToLink(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
-	t.Setenv("SUPERAI_HOME", "")
+	t.Setenv("SUPERLEO_HOME", "")
 	if _, ok := joinedOptions(); ok {
 		t.Fatal("options from a join never made")
 	}
@@ -37,7 +37,7 @@ func TestAJoinTradesTheCodeAndKeepsWhereToLink(t *testing.T) {
 	_ = os.WriteFile(filepath.Join(dir, "agent.json"), []byte(`{"core":"`+link+`","name":"box"}`), 0o600)
 	_ = os.WriteFile(filepath.Join(dir, agentTokenFile), []byte(tok+"\n"), 0o600)
 	o, ok := joinedOptions()
-	if !ok || o.Core != link || o.Token != tok || o.Name != "box" || os.Getenv("SUPERAI_HOME") != dir {
+	if !ok || o.Core != link || o.Token != tok || o.Name != "box" || os.Getenv("SUPERLEO_HOME") != dir {
 		t.Fatalf("joined options: %+v %v", o, ok)
 	}
 }

@@ -24,10 +24,10 @@ const TABS: { key: TabKey; label: string; icon: LucideIcon }[] = [
 ];
 
 const EMPTY_HINT: Record<TabKey, string> = {
-  schedules: "No schedules yet — ask SuperAI in Chat to add one.",
-  notes: "No notes yet — ask SuperAI in Chat to keep notes for you.",
-  persons: "No people yet — mention someone in Chat and SuperAI will remember them.",
-  reminders: "No reminders yet — ask SuperAI in Chat to remind you of something.",
+  schedules: "No schedules yet — ask SuperLeo in Chat to add one.",
+  notes: "No notes yet — ask SuperLeo in Chat to keep notes for you.",
+  persons: "No people yet — mention someone in Chat and SuperLeo will remember them.",
+  reminders: "No reminders yet — ask SuperLeo in Chat to remind you of something.",
 };
 
 // Known display fields, in priority order, for loose map[string]any objects.
@@ -207,7 +207,7 @@ export default function RecordsView({
       <div className="view-header with-action">
         <div>
           <div className="view-title">{t("Records")}</div>
-          <div className="view-desc">{t("Schedules, notes, people and reminders SuperAI keeps for you. Edits happen via Chat.")}</div>
+          <div className="view-desc">{t("Schedules, notes, people and reminders SuperLeo keeps for you. Edits happen via Chat.")}</div>
         </div>
         {/* The Schedules tab reloads itself from the scheduler and has its own
             button. Showing this one too would stack two Refreshes that refresh

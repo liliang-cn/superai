@@ -2,7 +2,7 @@ package app
 
 import (
 	"encoding/json"
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -55,7 +55,7 @@ func TestCheckingAModelListsModelsAndAsksTheChosenOne(t *testing.T) {
 	}
 }
 
-// A fresh SuperAI leaves the coding CLIs' configs alone until it is allowed
+// A fresh SuperLeo leaves the coding CLIs' configs alone until it is allowed
 // to use the agents here; a hive member, set up without a first start, may.
 func TestTheCLIHooksWaitUntilTheAgentsAreAllowed(t *testing.T) {
 	a := NewApp()

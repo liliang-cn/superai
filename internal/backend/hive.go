@@ -20,7 +20,7 @@ import (
 
 // The hive: how workers find each other.
 //
-// hive_call.go is how one SuperAI commands another. This is how the commander comes
+// hive_call.go is how one SuperLeo commands another. This is how the commander comes
 // to know who there is to command — and it replaces a list someone typed into
 // a Secret, which was wrong the moment a pod was rescheduled, a worker was added
 // or one died and nothing said so.
@@ -79,7 +79,7 @@ type HiveSettings struct {
 	// instance's own token, which is right when a hive shares one.
 	JoinToken string `json:"join_token,omitempty"`
 	// AdvertiseURL is where the queen should reach this worker. Empty takes
-	// $SUPERAI_ADVERTISE_URL.
+	// $SUPERLEO_ADVERTISE_URL.
 	AdvertiseURL string `json:"advertise_url,omitempty"`
 	// PeerToken is the bearer other workers accept, when it is not this
 	// instance's own. Empty is right for a hive that shares one token.
@@ -95,7 +95,7 @@ type HiveSettings struct {
 	MaxConcurrentOrders int `json:"max_concurrent_orders,omitempty"`
 	// Delegation is how much of the work a queen hands to her workers:
 	// "max" (the default for a queen), "auto" or "off". See hive_delegate.go.
-	// $SUPERAI_HIVE_DELEGATION, when set, wins: in a cluster the settings
+	// $SUPERLEO_HIVE_DELEGATION, when set, wins: in a cluster the settings
 	// come from a Secret, and turning delegation down should not need one.
 	Delegation string `json:"delegation,omitempty"`
 	// DelegateTimeoutSeconds bounds one delegated piece of work on one worker
@@ -103,34 +103,34 @@ type HiveSettings struct {
 	// DefaultDelegateTimeout.
 	DelegateTimeoutSeconds int `json:"delegate_timeout_seconds,omitempty"`
 	// QueenEngine is who thinks for the queen when a person talks to her: ""
-	// is SuperAI's own agent, a driven agent CLI's name ("claude", or
+	// is SuperLeo's own agent, a driven agent CLI's name ("claude", or
 	// "claude.mac" on a linked machine) hands those turns to it. Schedules,
-	// calls, dashboards and the hive's own traffic stay with SuperAI's agent
+	// calls, dashboards and the hive's own traffic stay with SuperLeo's agent
 	// whatever this says. See app_queen_engine.go.
 	QueenEngine string `json:"queen_engine,omitempty"`
-	// QueenFallback is whether SuperAI's own agent answers a turn the engine
+	// QueenFallback is whether SuperLeo's own agent answers a turn the engine
 	// cannot take (not installed, machine offline, failed before saying
 	// anything), with a note saying so. Nil is on.
 	QueenFallback *bool `json:"queen_fallback,omitempty"`
-	// Standalone is the person saying this SuperAI is not to be a queen:
+	// Standalone is the person saying this SuperLeo is not to be a queen:
 	// a machine that can think joining it (app_agentdoor.go) does not make
 	// it one.
 	Standalone bool `json:"standalone,omitempty"`
 	// PublicURL is where machines other than this one reach its API, e.g.
 	// https://ai.superleo.cn. An engine on a linked machine calls /mcp there;
-	// empty takes $SUPERAI_PUBLIC_URL.
+	// empty takes $SUPERLEO_PUBLIC_URL.
 	PublicURL string `json:"public_url,omitempty"`
 }
 
-// QueenFallsBack reports whether SuperAI's own agent stands in for an engine
+// QueenFallsBack reports whether SuperLeo's own agent stands in for an engine
 // that cannot take a turn.
 func (h HiveSettings) QueenFallsBack() bool { return h.QueenFallback == nil || *h.QueenFallback }
 
-// Public is PublicURL or $SUPERAI_PUBLIC_URL, without a trailing slash.
+// Public is PublicURL or $SUPERLEO_PUBLIC_URL, without a trailing slash.
 func (h HiveSettings) Public() string {
 	u := strings.TrimSpace(h.PublicURL)
 	if u == "" {
-		u = strings.TrimSpace(os.Getenv("SUPERAI_PUBLIC_URL"))
+		u = strings.TrimSpace(os.Getenv("SUPERLEO_PUBLIC_URL"))
 	}
 	return strings.TrimRight(u, "/")
 }
@@ -163,11 +163,11 @@ type HiveHello struct {
 	Token     string    `json:"token,omitempty"`
 	Version   string    `json:"version,omitempty"`
 	StartedAt time.Time `json:"started_at"`
-	// Engine says what is behind this worker when it is not a SuperAI ("cli ·
+	// Engine says what is behind this worker when it is not a SuperLeo ("cli ·
 	// claude"), and About is a line for the roster. Both are only labels.
 	Engine string `json:"engine,omitempty"`
 	About  string `json:"about,omitempty"`
-	// Node is the machine the worker runs on ($SUPERAI_NODE; in k3s the pod's
+	// Node is the machine the worker runs on ($SUPERLEO_NODE; in k3s the pod's
 	// node), so a client can draw workers where they really are.
 	Node string `json:"node,omitempty"`
 	// Kind and Host say what the worker runs in (a pod, a VM...) and that
@@ -393,7 +393,7 @@ type Announcer struct {
 	// and used to authenticate the join when JoinToken is empty.
 	Token   string
 	Version string
-	// Engine and About label a worker that is not a SuperAI. See HiveHello.
+	// Engine and About label a worker that is not a SuperLeo. See HiveHello.
 	Engine string
 	About  string
 	// Capabilities, when set, names the MCP servers this worker can call,
@@ -503,7 +503,7 @@ func (a *Announcer) advertise() string {
 	if u := strings.TrimSpace(a.Settings.AdvertiseURL); u != "" {
 		return u
 	}
-	return strings.TrimSpace(os.Getenv("SUPERAI_ADVERTISE_URL"))
+	return strings.TrimSpace(os.Getenv("SUPERLEO_ADVERTISE_URL"))
 }
 
 // Validate says why this worker cannot announce itself, before the loop starts
@@ -516,7 +516,7 @@ func (a *Announcer) Validate() error {
 		return errors.New("hive.join_url is empty: a worker has to be told where the queen is")
 	}
 	if a.advertise() == "" {
-		return errors.New("no advertise url: set hive.advertise_url or $SUPERAI_ADVERTISE_URL to where the queen can reach this worker")
+		return errors.New("no advertise url: set hive.advertise_url or $SUPERLEO_ADVERTISE_URL to where the queen can reach this worker")
 	}
 	if !hiveName.MatchString(a.Name()) {
 		return fmt.Errorf("worker name %q is not usable", a.Name())
@@ -536,7 +536,7 @@ func (a *Announcer) Once(ctx context.Context) (HiveWelcome, error) {
 	hello := HiveHello{
 		Protocol: HiveProtocol, Name: a.Name(), Role: HiveRoleWorker, URL: a.advertise(),
 		Token: a.Token, Version: a.Version, StartedAt: a.started, Engine: a.Engine, About: a.About,
-		Node: os.Getenv("SUPERAI_NODE"), Kind: host.Kind, Host: host.Name, Term: a.Term(),
+		Node: os.Getenv("SUPERLEO_NODE"), Kind: host.Kind, Host: host.Name, Term: a.Term(),
 	}
 	if a.Capabilities != nil {
 		// Never nil once asked: an empty list is "none", which is not the

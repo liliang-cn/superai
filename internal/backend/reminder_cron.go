@@ -11,7 +11,7 @@ import (
 // Turning a reminder into a schedule.
 //
 // set_reminder used to append a row to a JSON file while its description told
-// the model "SuperAI will remind you when it is due" — so the model promised
+// the model "SuperLeo will remind you when it is due" — so the model promised
 // something nothing implemented. Now that there is a real scheduler, a reminder
 // becomes a scheduled prompt, and the promise holds.
 //

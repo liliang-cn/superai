@@ -12,7 +12,7 @@ export interface GenSpec {
   error?: string;
 }
 
-const KEY = "superai-canvas-generated";
+const KEY = "superleo-canvas-generated";
 
 export function loadSpecs(): Record<string, GenSpec> {
   try {

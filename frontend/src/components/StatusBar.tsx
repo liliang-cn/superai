@@ -6,7 +6,7 @@ import NotificationCenter from "./NotificationCenter";
 import YoloToggle from "./YoloToggle";
 
 // Only the served build has a session to end; the desktop window has no door.
-const served = Boolean((window as unknown as Record<string, unknown>).superaiServed);
+const served = Boolean((window as unknown as Record<string, unknown>).superleoServed);
 
 export default function StatusBar({
   status,
@@ -68,7 +68,7 @@ export default function StatusBar({
             <path d="M16 2.5v5M16 24.5v5M2.5 16h5M24.5 16h5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
             <circle className="status-brand-dot" cx="16" cy="16" r="3.4" />
           </svg>
-          SuperAI
+          SuperLeo
         </span>
         <span className={`status-dot ${dotClass}`} />
         {/* A real element, not a bare text node: text-overflow needs something

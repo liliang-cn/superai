@@ -236,7 +236,7 @@ type SkillCandidate struct {
 
 // skillSearchDirs are where ready-made skills tend to live on a developer's
 // machine. Claude Code keeps its own under ~/.claude, and those are the same
-// SKILL.md format SuperAI loads.
+// SKILL.md format SuperLeo loads.
 func skillSearchDirs() []string {
 	dirs := []string{}
 	if home, err := os.UserHomeDir(); err == nil {
@@ -245,7 +245,7 @@ func skillSearchDirs() []string {
 			filepath.Join(home, ".claude", "plugins"),
 		)
 	}
-	if extra := strings.TrimSpace(os.Getenv("SUPERAI_SKILL_PATH")); extra != "" {
+	if extra := strings.TrimSpace(os.Getenv("SUPERLEO_SKILL_PATH")); extra != "" {
 		dirs = append(dirs, filepath.SplitList(extra)...)
 	}
 	return dirs

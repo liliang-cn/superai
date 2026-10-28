@@ -4,11 +4,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 func TestTurnTimesLandOnTheirAsksAndAnswers(t *testing.T) {
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	const s = "hive-console-test"
 	at := time.Date(2026, 10, 12, 6, 0, 0, 0, time.UTC)
 	recordTurnTime(s, "我的持仓是？", at, 11400*time.Millisecond)

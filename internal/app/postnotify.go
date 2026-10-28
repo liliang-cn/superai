@@ -2,7 +2,7 @@ package app
 
 // Notifications from outside, and the phone as a surface.
 //
-// The reminders that matter most are not raised by SuperAI at all: the 08:30
+// The reminders that matter most are not raised by SuperLeo at all: the 08:30
 // memo, "该出发接三宝了", 起立喝水 and the price alerts are openclaw's cron
 // jobs. PostNotification is how they arrive. Each one becomes an ordinary
 // notice (backend/notice.go), so it reaches the open page as the `notice`
@@ -35,8 +35,8 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/liliang-cn/superai/internal/apns"
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/apns"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // postNotificationPath is the one route an integration token opens.

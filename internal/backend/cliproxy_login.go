@@ -20,7 +20,7 @@ type CLIProxyProvider struct {
 	Note string `json:"note"`
 }
 
-// CLIProxyProviders lists the providers SuperAI can log into. Callback ports are
+// CLIProxyProviders lists the providers SuperLeo can log into. Callback ports are
 // fixed by each provider's registered redirect URI, so they are never overridden.
 func CLIProxyProviders() []CLIProxyProvider {
 	return []CLIProxyProvider{

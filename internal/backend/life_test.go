@@ -65,14 +65,14 @@ func TestAddScheduleRejectsMissingFields(t *testing.T) {
 func TestAddRecordStampsOccurredAt(t *testing.T) {
 	s := testLifeService(t)
 
-	rec, err := s.AddRecord("note", "标题", " 正文 ", []string{"tag", " "}, " superai ")
+	rec, err := s.AddRecord("note", "标题", " 正文 ", []string{"tag", " "}, " superleo ")
 	if err != nil {
 		t.Fatalf("AddRecord: %v", err)
 	}
 	if rec["body"] != "正文" {
 		t.Errorf("body not trimmed: %q", rec["body"])
 	}
-	if rec["project"] != "superai" {
+	if rec["project"] != "superleo" {
 		t.Errorf("project not trimmed: %q", rec["project"])
 	}
 	if got, _ := rec["occurred_at"].(string); got == "" {

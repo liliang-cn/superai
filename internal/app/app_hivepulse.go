@@ -16,7 +16,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // MemberPulse is one member's meter, in brief.

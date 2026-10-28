@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	agentlinkpb "github.com/liliang-cn/superai/internal/agentlink/pb"
-	"github.com/liliang-cn/superai/internal/backend"
+	agentlinkpb "github.com/liliang-cn/superleo/internal/agentlink/pb"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // The openclaw cluster as the settings reach it from a Mac on its own:
@@ -25,7 +25,7 @@ func clusterCore(t *testing.T) *App {
 	core := NewApp()
 	core.settings = &backend.Settings{RemoteAgents: backend.RemoteAgents{Enabled: true, Agents: agents}}
 	addr := startCore(t, core)
-	// sds-e's own SuperAI, with a CLI that works on its own account.
+	// sds-e's own SuperLeo, with a CLI that works on its own account.
 	linkHello(t, core, addr, &agentlinkpb.Hello{Name: "node-e", Host: "sds-e", Os: "linux", Kind: "vm", Clis: []string{"codex"}})
 	return core
 }

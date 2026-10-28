@@ -27,12 +27,12 @@ installImeEnterGuard()
  * would mean a screenful of failed calls and a stream retrying in a loop
  * behind the password box.
  *
- * Only the served build has a door. In the desktop window `superaiServed` is
+ * Only the served build has a door. In the desktop window `superleoServed` is
  * never set and this resolves to the app immediately — the machine is already
  * yours.
  */
 function Root() {
-    const served = Boolean((window as unknown as Record<string, unknown>).superaiServed)
+    const served = Boolean((window as unknown as Record<string, unknown>).superleoServed)
     // The desktop window draws its own title bar (main.go asks for
     // TitleBarHiddenInset), which means the sidebar has to leave a lane clear
     // for the traffic lights and mark it draggable. A browser tab has neither,
@@ -57,7 +57,7 @@ function Root() {
     // from the backend switcher. null = still finding out.
     const [link, setLink] = useState<'linked' | 'alone' | null>(served ? 'alone' : null)
     // The first start's questions not asked yet: those first, the same in a
-    // browser (the agents are those on the machine SuperAI runs on).
+    // browser (the agents are those on the machine SuperLeo runs on).
     const [onboard, setOnboard] = useState(false)
     const [onboardAt, setOnboardAt] = useState<'ask' | 'model'>('ask')
     useEffect(() => {
@@ -96,7 +96,7 @@ function Root() {
 }
 
 // The desktop window's drag strips behave like a Mac title bar.
-if (!(window as unknown as Record<string, unknown>).superaiServed) {
+if (!(window as unknown as Record<string, unknown>).superleoServed) {
     installTitleBarDoubleClick(() => { void TitleBarDoubleClick().catch(() => {}) })
 }
 

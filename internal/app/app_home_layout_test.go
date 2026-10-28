@@ -11,7 +11,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 type homeEvents struct {

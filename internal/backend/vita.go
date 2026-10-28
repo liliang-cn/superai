@@ -6,7 +6,7 @@ package backend
 // the app reports to. Like noted it is an MCP server in mcpServers.json,
 // usually remote over HTTP with "Authorization": "Bearer ${VITA_TOKEN}"; and
 // it is optional the same way: an entry whose token is not set is left out,
-// so a SuperAI without VITA_TOKEN knows nothing of it.
+// so a SuperLeo without VITA_TOKEN knows nothing of it.
 
 // VitaServer is the name Vita is configured under in mcpServers.json.
 const VitaServer = "vita"

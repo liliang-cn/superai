@@ -7,7 +7,7 @@ package app
 // place of every secret, the value in Env), the tool rules she may use
 // unasked. Each CLI takes those its own way, and a queenCLI is that way,
 // applied on the machine the CLI runs on — so a kit sent to another
-// SuperAI works for whichever CLI is there.
+// SuperLeo works for whichever CLI is there.
 //
 //   - claude: --mcp-config as JSON, --append-system-prompt, --allowedTools,
 //     permission prompts through --permission-prompt-tool to the approval
@@ -18,11 +18,11 @@ package app
 //     Resumes with `codex exec resume`. Codex has no prompt to forward in
 //     exec mode: attended, it runs in its workspace-write sandbox, and the
 //     hive server's changes still wait on this app's own approval.
-//   - pi: `pi -p --mode json` with an extension of SuperAI's own
+//   - pi: `pi -p --mode json` with an extension of SuperLeo's own
 //     (cliplugins/pi_queen.js) that registers the servers and sends every
 //     call that is not a read to the approval channel. Streams as it
 //     writes; resumes with --session.
-//   - hermes: `hermes -z` in a hermes home of SuperAI's naming the servers,
+//   - hermes: `hermes -z` in a hermes home of SuperLeo's naming the servers,
 //     with the person's own home laid over it for their model and keys.
 //     One-shot mode prints only the answer, approves everything itself and
 //     keeps no session to resume, so each turn is handed the conversation
@@ -44,7 +44,7 @@ import (
 	"strings"
 
 	"github.com/liliang-cn/agentexec"
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // queenCLI is one agent CLI as the queen's engine.
@@ -102,7 +102,7 @@ func claudeMCPArgs(servers map[string]any, approve string) []string {
 		all[name] = entry
 	}
 	if approve != "" {
-		all["superai"] = map[string]any{"type": "http", "url": approve}
+		all["superleo"] = map[string]any{"type": "http", "url": approve}
 	}
 	cfg, _ := json.Marshal(map[string]any{"mcpServers": all})
 	return []string{"--mcp-config", string(cfg), "--strict-mcp-config"}
@@ -313,12 +313,12 @@ func tomlValue(v any) string {
 
 // The pi extension's environment: what it registers and where it asks.
 const (
-	piServersEnv = "SUPERAI_QUEEN_SERVERS"
-	piAllowedEnv = "SUPERAI_QUEEN_ALLOWED"
-	piApproveEnv = "SUPERAI_APPROVE_URL"
+	piServersEnv = "SUPERLEO_QUEEN_SERVERS"
+	piAllowedEnv = "SUPERLEO_QUEEN_ALLOWED"
+	piApproveEnv = "SUPERLEO_APPROVE_URL"
 )
 
-// piQueen: SuperAI's extension alone, none of the person's (extensions,
+// piQueen: SuperLeo's extension alone, none of the person's (extensions,
 // skills, prompt templates, AGENTS.md or project files); the servers and
 // the approval channel go to it in the environment.
 func piQueen(req *agentexec.Request, kit *QueenKit, _ bool, approve string) error {
@@ -385,7 +385,7 @@ const hermesSafeToolset = "safe"
 
 // hermesQueen: hermes reads its MCP servers only from the config.yaml in
 // HERMES_HOME — one-shot mode starts no MCP at all unless that file names a
-// server — so the run gets a home of SuperAI's own whose config.yaml names
+// server — so the run gets a home of SuperLeo's own whose config.yaml names
 // the queen's, and the person's own hermes home is laid over it as the
 // managed layer (HERMES_MANAGED_DIR): their model, provider and keys
 // (config.yaml and .env) as they set them. Their sessions, memory, SOUL.md,

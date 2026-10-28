@@ -7,14 +7,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // A member takes its queen's paired devices from the hive's credential only,
 // and from then on knows their tokens: a phone paired with the old queen is
 // let in by the new one.
 func TestAMemberTakesTheQueensDevicesAndKnowsThem(t *testing.T) {
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	creds, err := loadOrCreateCredentials()
 	if err != nil {
 		t.Fatal(err)
@@ -48,7 +48,7 @@ func TestAMemberTakesTheQueensDevicesAndKnowsThem(t *testing.T) {
 
 // On a network the devices come with the roster.
 func TestTheRosterBringsTheDevices(t *testing.T) {
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	a := &App{}
 	_, err := a.HiveRoster(LanRoster{Queen: "mac", Key: "k", Devices: []Device{{ID: "d", TokenHash: hashToken("t")}}})
 	if err != nil {

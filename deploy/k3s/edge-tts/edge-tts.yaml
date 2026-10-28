@@ -3,7 +3,7 @@
 # Build and load: see the top of server.py; the image is edge-tts:hive.
 apiVersion: apps/v1
 kind: Deployment
-metadata: {name: edge-tts, namespace: superai}
+metadata: {name: edge-tts, namespace: superleo}
 spec:
   replicas: 1
   selector: {matchLabels: {app: edge-tts}}
@@ -23,7 +23,7 @@ spec:
 ---
 apiVersion: v1
 kind: Service
-metadata: {name: edge-tts, namespace: superai}
+metadata: {name: edge-tts, namespace: superleo}
 spec:
   selector: {app: edge-tts}
   ports: [{name: http, port: 43540, targetPort: 43540}]

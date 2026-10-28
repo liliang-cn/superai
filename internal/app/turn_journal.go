@@ -4,7 +4,7 @@ package app
 //
 // Each turn is taken from the events every client is sent (emit), so no path
 // that answers a person can be missed: the queen's own model, an engine, a
-// SuperAI answering in an engine's place, a worker. Each step is logged as it
+// SuperLeo answering in an engine's place, a worker. Each step is logged as it
 // happens ("turn 1a2b3c4d …"), and the last turns are kept in memory with
 // their timelines for TurnTraces / TurnTrace:
 //
@@ -58,7 +58,7 @@ type TurnTrace struct {
 	// QuietMs is how long since its last step, while it runs.
 	QuietMs int64 `json:"quietMs,omitempty"`
 	// Engines is who was given the turn, in order: an engine, the next one
-	// when it could not, "superai" when SuperAI stood in.
+	// when it could not, "superleo" when SuperLeo stood in.
 	Engines []string `json:"engines,omitempty"`
 	// By is who answered it, as a person reads it.
 	By      string       `json:"by,omitempty"`
@@ -137,7 +137,7 @@ func (j *turnJournal) record(name string, p map[string]any) {
 	engine := str("engine")
 	who := engine
 	if f := str("standInFor"); f != "" {
-		who = queenNowSuperAI
+		who = queenNowSuperLeo
 	}
 	if who != "" && (len(t.Engines) == 0 || t.Engines[len(t.Engines)-1] != who) {
 		t.Engines = append(t.Engines, who)
@@ -157,7 +157,7 @@ func (j *turnJournal) record(name string, p map[string]any) {
 		switch typ {
 		case "partial":
 			c := str("content")
-			// The stand-in note SuperAI opens with is not its answer starting.
+			// The stand-in note SuperLeo opens with is not its answer starting.
 			if str("standInFor") != "" {
 				break
 			}
@@ -274,11 +274,11 @@ func byWhom(engine string) string {
 func turnByline(engine, standInFor string) string {
 	switch {
 	case standInFor != "":
-		return "SuperAI, in place of " + standInFor
+		return "SuperLeo, in place of " + standInFor
 	case engine != "":
 		return engine
 	}
-	return "SuperAI"
+	return "SuperLeo"
 }
 
 // watchQuiet logs a turn that has gone quiet, once each time it does.

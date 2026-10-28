@@ -1,6 +1,6 @@
 package app
 
-// `superai hook <Event>`: Claude Code's hooks, handed to the SuperAI on this
+// `superleo hook <Event>`: Claude Code's hooks, handed to the SuperLeo on this
 // machine so a turn that finished in a terminal reaches the phone, and an
 // answer typed on the phone reaches the terminal.
 //
@@ -18,7 +18,7 @@ package app
 //
 // The hook itself only parses and forwards. Everything with state — which
 // sessions exist, where their terminals are, whether anyone is at the Mac,
-// what is parked for whom — lives in the running `superai serve` / `superai
+// what is parked for whom — lives in the running `superleo serve` / `superleo
 // agent`, reached over a unix socket in its data directory (cchook_local.go).
 
 import (
@@ -37,19 +37,19 @@ import (
 	"time"
 
 	"github.com/liliang-cn/agentexec/hooks"
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // hookBudget is everything the hook may spend, reading the transcript
 // included. Claude Code is waiting on it.
 const hookBudget = 3 * time.Second
 
-// ccHookSocketName is the socket a serving SuperAI listens for hooks on, in
+// ccHookSocketName is the socket a serving SuperLeo listens for hooks on, in
 // its data directory.
 const ccHookSocketName = "cc-hook.sock"
 
 // ccHookEvent is one Claude Code hook event, distilled: what the hook sends
-// to the local SuperAI.
+// to the local SuperLeo.
 type ccHookEvent struct {
 	// CLI is the coding CLI the event is from when it is not Claude Code:
 	// opencode's plugin, pi's extension, codex's hooks (cli_activity.go).
@@ -98,7 +98,7 @@ var ccNotificationKinds = map[string]bool{"permission_prompt": true, "idle_promp
 const maxCCText = 4000
 
 // ccEventFromHook turns a parsed hook payload into the event to forward, or
-// false when this event is not one SuperAI forwards. readTurn reads a
+// false when this event is not one SuperLeo forwards. readTurn reads a
 // transcript's text for the turn just finished.
 func ccEventFromHook(name string, hev hooks.HookEvent, readTurn func(path string) string) (ccHookEvent, bool) {
 	if name == "" {
@@ -202,21 +202,21 @@ func clipFront(s string, max int) string {
 	return "…" + strings.TrimSpace(string(r[len(r)-max+1:]))
 }
 
-// HookMain is `superai hook <Event>`. It never fails and never blocks for
+// HookMain is `superleo hook <Event>`. It never fails and never blocks for
 // long: an error only means the phone does not hear about this event.
 func HookMain(argv []string) {
 	defer func() { _ = recover() }() // a hook must not crash the agent's turn
-	// `superai hook install`: the person setting the hooks up, not Claude
+	// `superleo hook install`: the person setting the hooks up, not Claude
 	// Code running one (cchook_install.go).
 	if len(argv) > 0 && argv[0] == "install" {
 		HookInstallMain(argv[1:])
 		return
 	}
-	// A run SuperAI started itself already reports through cli:run.
-	if os.Getenv("SUPERAI_CLI_RUN") != "" {
+	// A run SuperLeo started itself already reports through cli:run.
+	if os.Getenv("SUPERLEO_CLI_RUN") != "" {
 		return
 	}
-	// `superai hook --cli codex <Event>`: another CLI's hooks, in Claude
+	// `superleo hook --cli codex <Event>`: another CLI's hooks, in Claude
 	// Code's shape; they only move that CLI's activity record.
 	if len(argv) >= 2 && argv[0] == "--cli" {
 		cliHook(argv[1], argv[2:])
@@ -265,7 +265,7 @@ var cliHookEvents = map[string]string{
 	"Stop": "Stop", "Interrupt": "Stop",
 }
 
-// cliHook hands one event of another CLI's hooks to the local SuperAI: the
+// cliHook hands one event of another CLI's hooks to the local SuperLeo: the
 // session, the project, the tool's name. Nothing printed.
 func cliHook(cli string, argv []string) {
 	cli = cliName(cli)
@@ -298,7 +298,7 @@ func cliHook(cli string, argv []string) {
 	tellCCHook(ctx, ccHookSockets(), ev)
 }
 
-// activityHook is a prompt or a tool call: hand the local SuperAI the
+// activityHook is a prompt or a tool call: hand the local SuperLeo the
 // session, the project and the tool's name, and get out of the way. No
 // transcript, no reply, nothing printed. A prompt also says which terminal
 // it came from (one ps), which a reply from the phone needs; a tool call
@@ -346,9 +346,9 @@ func transcriptTurn(ctx context.Context) func(string) string {
 	}
 }
 
-// ccHookSockets lists where a serving SuperAI may be listening, most specific
+// ccHookSockets lists where a serving SuperLeo may be listening, most specific
 // first: an explicit socket, this data directory, the node install this
-// binary belongs to (~/.superai-node/bin/superai → ~/.superai-node), then the
+// binary belongs to (~/.superleo-node/bin/superleo → ~/.superleo-node), then the
 // two usual homes.
 func ccHookSockets() []string {
 	var out []string
@@ -363,7 +363,7 @@ func ccHookSockets() []string {
 		}
 		out = append(out, p)
 	}
-	add(strings.TrimSpace(os.Getenv("SUPERAI_HOOK_SOCKET")))
+	add(strings.TrimSpace(os.Getenv("SUPERLEO_HOOK_SOCKET")))
 	add(filepath.Join(backend.DataDir(), ccHookSocketName))
 	if exe, err := os.Executable(); err == nil {
 		if real, err := filepath.EvalSymlinks(exe); err == nil {
@@ -375,13 +375,13 @@ func ccHookSockets() []string {
 		}
 	}
 	if h, err := os.UserHomeDir(); err == nil {
-		add(filepath.Join(h, ".superai-node", ccHookSocketName))
-		add(filepath.Join(h, ".superai", ccHookSocketName))
+		add(filepath.Join(h, ".superleo-node", ccHookSocketName))
+		add(filepath.Join(h, ".superleo", ccHookSocketName))
 	}
 	return out
 }
 
-// sendCCHook hands the event to every SuperAI listening on this machine and
+// sendCCHook hands the event to every SuperLeo listening on this machine and
 // returns the reply parked for this session in any of them.
 func sendCCHook(ctx context.Context, sockets []string, ev ccHookEvent) string {
 	var mu sync.Mutex
@@ -420,7 +420,7 @@ func broadcastCCHook(sockets []string, post func(sock string)) {
 	wg.Wait()
 }
 
-// tellCCHook hands an activity event to every SuperAI listening here.
+// tellCCHook hands an activity event to every SuperLeo listening here.
 func tellCCHook(ctx context.Context, sockets []string, ev ccHookEvent) {
 	broadcastCCHook(sockets, func(sock string) {
 		var out struct{}
@@ -440,7 +440,7 @@ func postCCHook(ctx context.Context, sockets []string, path string, ev ccHookEve
 			continue
 		}
 		client := ccHookClient(sock)
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://superai"+path, bytes.NewReader(body))
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://superleo"+path, bytes.NewReader(body))
 		if err != nil {
 			return false
 		}

@@ -6,8 +6,8 @@ import (
 	"strings"
 )
 
-// Kinds of host a SuperAI process can run on. A host is the box an agent
-// lives in; the agents on it (this SuperAI, openclaw, a coding CLI) are
+// Kinds of host a SuperLeo process can run on. A host is the box an agent
+// lives in; the agents on it (this SuperLeo, openclaw, a coding CLI) are
 // something else, and one host can carry several.
 const (
 	HostKindPod       = "pod"
@@ -25,7 +25,7 @@ type HostIdentity struct {
 	OS   string `json:"os"`
 	Arch string `json:"arch"`
 	// Parent is the host this one runs inside, when it knows: a pod's k3s
-	// node ($SUPERAI_NODE). Empty for a top-level host.
+	// node ($SUPERLEO_NODE). Empty for a top-level host.
 	Parent string `json:"parent,omitempty"`
 }
 
@@ -57,20 +57,20 @@ func realProbe() hostProbe {
 	}
 }
 
-// DetectHost says what this process runs on. SUPERAI_HOST_KIND overrides the
-// guess, and SUPERAI_HOST_NAME the name, for a box the guess gets wrong.
+// DetectHost says what this process runs on. SUPERLEO_HOST_KIND overrides the
+// guess, and SUPERLEO_HOST_NAME the name, for a box the guess gets wrong.
 func DetectHost() HostIdentity { return detectHost(realProbe()) }
 
 func detectHost(p hostProbe) HostIdentity {
 	name, _ := p.hostname()
 	h := HostIdentity{Name: name, OS: p.goos, Arch: p.goarch, Kind: hostKind(p)}
 	if h.Kind == HostKindPod {
-		h.Parent = strings.TrimSpace(p.getenv("SUPERAI_NODE"))
+		h.Parent = strings.TrimSpace(p.getenv("SUPERLEO_NODE"))
 	}
-	if k := strings.ToLower(strings.TrimSpace(p.getenv("SUPERAI_HOST_KIND"))); validHostKind(k) {
+	if k := strings.ToLower(strings.TrimSpace(p.getenv("SUPERLEO_HOST_KIND"))); validHostKind(k) {
 		h.Kind = k
 	}
-	if n := strings.TrimSpace(p.getenv("SUPERAI_HOST_NAME")); n != "" {
+	if n := strings.TrimSpace(p.getenv("SUPERLEO_HOST_NAME")); n != "" {
 		h.Name = n
 	}
 	return h

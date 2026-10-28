@@ -12,7 +12,7 @@ func TestAWorkerTakesTheQueensAbilities(t *testing.T) {
 	queen, worker := t.TempDir(), t.TempDir()
 
 	// The queen: one skill with a script beside it, and two MCP servers.
-	t.Setenv("SUPERAI_HOME", queen)
+	t.Setenv("SUPERLEO_HOME", queen)
 	sk := filepath.Join(queen, "skills", "glossary")
 	if err := os.MkdirAll(filepath.Join(sk, "bin"), 0o755); err != nil {
 		t.Fatal(err)
@@ -28,7 +28,7 @@ func TestAWorkerTakesTheQueensAbilities(t *testing.T) {
 	}
 
 	// The worker has a skill of its own, and no some-tool.
-	t.Setenv("SUPERAI_HOME", worker)
+	t.Setenv("SUPERLEO_HOME", worker)
 	mine := filepath.Join(worker, "skills", "mine")
 	os.MkdirAll(mine, 0o755)
 	os.WriteFile(filepath.Join(mine, "SKILL.md"), []byte("mine"), 0o644)

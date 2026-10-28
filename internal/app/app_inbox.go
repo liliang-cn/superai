@@ -1,7 +1,7 @@
 package app
 
 import (
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // The notification centre, from the window's side.

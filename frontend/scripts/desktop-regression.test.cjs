@@ -56,7 +56,7 @@ test('attention links preserve target identity and reminder tab',()=>{
 });
 test('language changes persist and preserve user-written content',()=>{
  i18n.setLanguage('zh-CN');assert.equal(i18n.translate('Extensions'),'扩展');assert.equal(i18n.translate('{count} updates · latest shown',{count:3}),'共 3 条更新 · 显示最新一条');
- assert.equal(stored.get('superai-language'),'zh-CN');assert.equal(document.documentElement.lang,'zh-CN');assert.equal(i18n.translate('A user report'),'A user report');
+ assert.equal(stored.get('superleo-language'),'zh-CN');assert.equal(document.documentElement.lang,'zh-CN');assert.equal(i18n.translate('A user report'),'A user report');
  i18n.setLanguage('en');assert.equal(i18n.translate('Extensions'),'Extensions');
 });
 test('relative reminder dates cross daylight saving correctly and reject invalid timestamps',()=>{

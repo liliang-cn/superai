@@ -203,7 +203,7 @@ func (p *Notices) Raise(ctx context.Context, n Notice) {
 		func(name string, sub Subscriber) {
 			defer func() {
 				if r := recover(); r != nil {
-					log.Printf("superai: notice subscriber %q panicked: %v", name, r)
+					log.Printf("superleo: notice subscriber %q panicked: %v", name, r)
 				}
 			}()
 			sub(ctx, n)

@@ -175,7 +175,7 @@ func TestClearEmptiesIt(t *testing.T) {
 // exactly the one that has been missing what it said.
 func TestTheStoreCanBeOpenedWithoutAService(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("SUPERAI_HOME", home)
+	t.Setenv("SUPERLEO_HOME", home)
 
 	daemon := NewInbox(filepath.Join(home, "data"))
 	raise(daemon, Notice{Message: "raised by the other process"})
@@ -248,8 +248,8 @@ func TestUnreadIncludingCountsTheNewNoticeOnce(t *testing.T) {
 func TestASessionsNoticeCollapsesAndKeepsItsReplyTarget(t *testing.T) {
 	b := testInbox(t)
 	target := &NoticeReply{Agent: "mac", Session: "s-1"}
-	raise(b, Notice{Key: "cc:s-1", Title: "claude · mac · superai", Message: "first turn", Reply: target, At: "2026-10-15T10:00:00+08:00"})
-	raise(b, Notice{Key: "cc:s-1", Title: "claude · mac · superai", Message: "second turn", Reply: target, At: "2026-10-15T10:05:00+08:00"})
+	raise(b, Notice{Key: "cc:s-1", Title: "claude · mac · superleo", Message: "first turn", Reply: target, At: "2026-10-15T10:00:00+08:00"})
+	raise(b, Notice{Key: "cc:s-1", Title: "claude · mac · superleo", Message: "second turn", Reply: target, At: "2026-10-15T10:05:00+08:00"})
 	raise(b, Notice{Key: "cc:s-2", Title: "claude · mac · anywhere", Message: "other", Reply: &NoticeReply{Agent: "mac", Session: "s-2"}})
 	got := b.List(0)
 	if len(got) != 2 {

@@ -1,12 +1,12 @@
-// SuperAI's queen, for pi. SuperAI hands this file to pi with -e when pi
+// SuperLeo's queen, for pi. SuperLeo hands this file to pi with -e when pi
 // thinks for the queen (queen_engine_cli.go); it is not installed anywhere
 // pi loads it from by itself, and does nothing in a pi started otherwise.
 //
-// It registers the MCP servers SuperAI names in SUPERAI_QUEEN_SERVERS, with
+// It registers the MCP servers SuperLeo names in SUPERLEO_QUEEN_SERVERS, with
 // every ${NAME} in them filled in from the environment here, so a token
-// never travels on a command line. When SUPERAI_APPROVE_URL is set the run
+// never travels on a command line. When SUPERLEO_APPROVE_URL is set the run
 // is attended: a call that is not a read, and is not one of the tools
-// SUPERAI_QUEEN_ALLOWED lets through, is put to the person on SuperAI's
+// SUPERLEO_QUEEN_ALLOWED lets through, is put to the person on SuperLeo's
 // approval card first, and blocked when they say no.
 
 import http from "node:http"
@@ -39,8 +39,8 @@ function unasked(tool, allowed) {
   return allowed.some((rule) => tool === rule || tool.startsWith(rule + "__"))
 }
 
-// decide asks SuperAI about one call and resolves to {behavior, message}.
-// No timeout here: the card waits for a person, and SuperAI ends the wait.
+// decide asks SuperLeo about one call and resolves to {behavior, message}.
+// No timeout here: the card waits for a person, and SuperLeo ends the wait.
 function decide(url, tool, input) {
   return new Promise((resolve) => {
     const deny = (message) => resolve({ behavior: "deny", message })
@@ -54,35 +54,35 @@ function decide(url, tool, input) {
         res.on("end", () => {
           const got = parse(text, null)
           if (res.statusCode === 200 && got && got.behavior) resolve(got)
-          else deny("SuperAI could not ask about this call")
+          else deny("SuperLeo could not ask about this call")
         })
-        res.on("error", () => deny("SuperAI could not ask about this call"))
+        res.on("error", () => deny("SuperLeo could not ask about this call"))
       })
-      req.on("error", () => deny("SuperAI could not be reached to ask about this call"))
+      req.on("error", () => deny("SuperLeo could not be reached to ask about this call"))
       req.end(body)
     } catch {
-      deny("SuperAI could not ask about this call")
+      deny("SuperLeo could not ask about this call")
     }
   })
 }
 
-export default function superaiQueen(pi) {
-  const servers = parse(process.env.SUPERAI_QUEEN_SERVERS, {})
+export default function superleoQueen(pi) {
+  const servers = parse(process.env.SUPERLEO_QUEEN_SERVERS, {})
   for (const [name, cfg] of Object.entries(servers)) {
     try { pi.registerMcpServer(name, expand(cfg)) } catch {}
   }
-  const url = (process.env.SUPERAI_APPROVE_URL || "").trim()
+  const url = (process.env.SUPERLEO_APPROVE_URL || "").trim()
   if (!url) return
-  const allowed = (process.env.SUPERAI_QUEEN_ALLOWED || "").split(",").map((s) => s.trim()).filter(Boolean)
+  const allowed = (process.env.SUPERLEO_QUEEN_ALLOWED || "").split(",").map((s) => s.trim()).filter(Boolean)
   pi.on("tool_call", async (event) => {
     const tool = String(event.toolName || "")
     if (unasked(tool, allowed)) return undefined
     const got = await decide(url, tool, event.input)
     if (got.behavior === "allow") return undefined
-    return { block: true, reason: got.message || "Denied by the SuperAI user." }
+    return { block: true, reason: got.message || "Denied by the SuperLeo user." }
   })
 }
 
 // For the tests (cliplugins/plugins_test.mjs).
-superaiQueen.expand = expand
-superaiQueen.unasked = unasked
+superleoQueen.expand = expand
+superleoQueen.unasked = unasked

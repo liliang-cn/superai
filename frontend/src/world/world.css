@@ -465,7 +465,7 @@
 /* Speech bubbles stay white with an ink line: a comic panel reads the same at night. */
 :root[data-theme="dark"] .wl-burn { text-shadow: 0 0 6px rgba(255, 154, 46, 0.8); }
 
-/* A host's card: its agents in groups, an MCP list under a SuperAI. */
+/* A host's card: its agents in groups, an MCP list under a SuperLeo. */
 .wi-host { display: flex; flex-direction: column; gap: 4px; }
 .wi-host .wi-cap { margin-top: 4px; }
 .wi-list li.wi-host-mcp { cursor: default; white-space: normal; padding: 0 4px 4px 18px; background: none; }

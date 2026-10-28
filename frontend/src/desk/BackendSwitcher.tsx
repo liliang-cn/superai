@@ -7,7 +7,7 @@ import LinkHive from "../components/LinkHive";
 import { noDrag } from "./DeskShell";
 import { machine } from "../lib/machine";
 
-const served = Boolean((window as unknown as Record<string, unknown>).superaiServed);
+const served = Boolean((window as unknown as Record<string, unknown>).superleoServed);
 
 /** The window starts over on the backend it now points at: every screen,
  *  every stream, the bridge itself are set up once, at load. */
@@ -36,10 +36,10 @@ export default function BackendSwitcher() {
     load();
     const off = EventsOn("hivelink:state", load);
     const show = () => { load(); setOpen(true); };
-    window.addEventListener("superai:switcher", show);
+    window.addEventListener("superleo:switcher", show);
     return () => {
       if (typeof off === "function") off();
-      window.removeEventListener("superai:switcher", show);
+      window.removeEventListener("superleo:switcher", show);
     };
   }, [load]);
 

@@ -1,15 +1,15 @@
 package app
 
-// `superai node`: this machine as an agent node — the way an ops agent
-// is installed on a host. It runs SuperAI headless as a login service (launchd
+// `superleo node`: this machine as an agent node — the way an ops agent
+// is installed on a host. It runs SuperLeo headless as a login service (launchd
 // on macOS, a systemd user unit on Linux) with External agents on, so another
-// SuperAI — a hive queen, a desktop — can link it with a pairing code and drive
+// SuperLeo — a hive queen, a desktop — can link it with a pairing code and drive
 // the Claude Code and Codex installed here as "claude.<name>".
 //
-//	superai node install [-port 43779] [-roots ~/code,~/work] [-unattended]
-//	superai node pair        a fresh six-digit code
-//	superai node status
-//	superai node uninstall [-purge]
+//	superleo node install [-port 43779] [-roots ~/code,~/work] [-unattended]
+//	superleo node pair        a fresh six-digit code
+//	superleo node status
+//	superleo node uninstall [-purge]
 
 import (
 	"context"
@@ -28,11 +28,11 @@ import (
 	"time"
 
 	"github.com/liliang-cn/agentexec"
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 const (
-	nodeLabel       = "cn.superleo.superai-node"
+	nodeLabel       = "cn.superleo.superleo-node"
 	nodeDefaultPort = 43779
 )
 
@@ -45,12 +45,12 @@ type loginService struct {
 	log   string // file in the home it writes to
 }
 
-var nodeService = loginService{label: nodeLabel, unit: "superai-node.service", about: "SuperAI node", log: "serve.log"}
+var nodeService = loginService{label: nodeLabel, unit: "superleo-node.service", about: "SuperLeo node", log: "serve.log"}
 
-// NodeMain is `superai node …`.
+// NodeMain is `superleo node …`.
 func NodeMain(argv []string) {
 	if len(argv) == 0 {
-		fmt.Fprintln(os.Stderr, "usage: superai node install|pair|status|uninstall")
+		fmt.Fprintln(os.Stderr, "usage: superleo node install|pair|status|uninstall")
 		os.Exit(2)
 	}
 	var err error
@@ -74,7 +74,7 @@ func NodeMain(argv []string) {
 
 func nodeHome() string {
 	h, _ := os.UserHomeDir()
-	return filepath.Join(h, ".superai-node")
+	return filepath.Join(h, ".superleo-node")
 }
 
 // nodeConf is what install chose, so pair and status find the node again.
@@ -86,7 +86,7 @@ type nodeConf struct {
 func readNodeConf() (nodeConf, error) {
 	raw, err := os.ReadFile(filepath.Join(nodeHome(), "node.json"))
 	if err != nil {
-		return nodeConf{}, errors.New("no node installed here; run: superai node install")
+		return nodeConf{}, errors.New("no node installed here; run: superleo node install")
 	}
 	var c nodeConf
 	err = json.Unmarshal(raw, &c)
@@ -111,7 +111,7 @@ func nodeInstall(argv []string) error {
 	if err != nil {
 		return err
 	}
-	bin := filepath.Join(home, "bin", "superai")
+	bin := filepath.Join(home, "bin", "superleo")
 	if err := copyExecutable(self, bin); err != nil {
 		return fmt.Errorf("copying the binary: %w", err)
 	}
@@ -122,7 +122,7 @@ func nodeInstall(argv []string) error {
 	env := loginEnv()
 
 	// Settings: External agents on, each CLI by its full path.
-	_ = os.Setenv("SUPERAI_HOME", home)
+	_ = os.Setenv("SUPERLEO_HOME", home)
 	s, err := backend.LoadSettings()
 	if err != nil {
 		return err
@@ -167,7 +167,7 @@ func nodeInstall(argv []string) error {
 		return fmt.Errorf("installed, but it did not come up: %w (log: %s)", err, filepath.Join(home, "serve.log"))
 	}
 
-	fmt.Println("SuperAI node is running and starts with this login.")
+	fmt.Println("SuperLeo node is running and starts with this login.")
 	names := []string{}
 	for n := range bins {
 		names = append(names, n)
@@ -252,7 +252,7 @@ func (sv loginService) launchdPlist() string {
 }
 
 func (sv loginService) installLaunchd(home string, args []string, env map[string]string) error {
-	env["SUPERAI_HOME"] = home
+	env["SUPERLEO_HOME"] = home
 	var b strings.Builder
 	b.WriteString(`<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -309,11 +309,11 @@ func (sv loginService) systemdUnit() string {
 
 func (sv loginService) installSystemd(home string, args []string, env map[string]string) error {
 	if _, err := exec.LookPath("systemctl"); err != nil {
-		return fmt.Errorf("no systemd here (a container?): start it with your own supervisor:\n  SUPERAI_HOME=%s %s", home, strings.Join(args, " "))
+		return fmt.Errorf("no systemd here (a container?): start it with your own supervisor:\n  SUPERLEO_HOME=%s %s", home, strings.Join(args, " "))
 	}
 	var b strings.Builder
 	fmt.Fprintf(&b, "[Unit]\nDescription=%s\nAfter=network-online.target\n\n[Service]\n", sv.about)
-	fmt.Fprintf(&b, "Environment=SUPERAI_HOME=%s\n", home)
+	fmt.Fprintf(&b, "Environment=SUPERLEO_HOME=%s\n", home)
 	for k, v := range env {
 		fmt.Fprintf(&b, "Environment=%q\n", k+"="+v)
 	}
@@ -385,13 +385,13 @@ func nodePair() error {
 		return err
 	}
 	fmt.Println()
-	fmt.Println("To link this node, on the other SuperAI open Settings › Runtime › Other SuperAIs and enter:")
+	fmt.Println("To link this node, on the other SuperLeo open Settings › Runtime › Other SuperLeos and enter:")
 	for _, a := range lanAddresses(c.Port) {
 		fmt.Printf("  address  %s\n", a)
 	}
 	fmt.Printf("  code     %s %s   (valid until %s)\n", code.Code[:3], code.Code[3:], code.ExpiresAt.Local().Format("15:04"))
 	fmt.Printf("Its agents are then @claude.<name>, @codex.<name> there. A new code: %s node pair\n",
-		filepath.Join(c.Home, "bin", "superai"))
+		filepath.Join(c.Home, "bin", "superleo"))
 	return nil
 }
 

@@ -90,7 +90,7 @@ func TestEachModeTakesItsWay(t *testing.T) {
 	}
 }
 
-// The CLIs SuperAI starts are given the same way out, and the hive's own
+// The CLIs SuperLeo starts are given the same way out, and the hive's own
 // addresses as NO_PROXY; with the setting off they are given none.
 func TestStartedProgramsTakeTheSameWayOut(t *testing.T) {
 	defer ApplyProxy(currentProxy())

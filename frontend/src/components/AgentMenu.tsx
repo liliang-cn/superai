@@ -8,7 +8,7 @@ import { AgentInfo } from "../lib/useAgentMentions";
  * Two pieces because they answer two different questions. The menu answers
  * "who can I ask"; the banner answers "where is this message going", which is
  * the one worth being told before pressing Enter rather than after — a message
- * addressed to another agent never reaches SuperAI at all, and finding that
+ * addressed to another agent never reaches SuperLeo at all, and finding that
  * out from the reply is finding out too late.
  */
 
@@ -44,7 +44,7 @@ export function AgentMenu({
       ))}
       <div className="agent-hint">
         <AtSignIcon className="size-3" />
-        at the start sends the whole message there · anywhere else SuperAI decides
+        at the start sends the whole message there · anywhere else SuperLeo decides
       </div>
     </div>
   );
@@ -53,11 +53,11 @@ export function AgentMenu({
 /**
  * Shown when the message would be routed rather than answered here.
  *
- * It used to say SuperAI would never see the exchange, which was true and is
+ * It used to say SuperLeo would never see the exchange, which was true and is
  * not any more: the question and the answer are filed in this conversation, so
  * a later turn can refer to what the other agent said. What is still true — and
  * the only thing worth warning about before Enter — is that this turn skips
- * SuperAI's own model entirely.
+ * SuperLeo's own model entirely.
  */
 export function AddressedBanner({ agent }: { agent: string }) {
   if (!agent) return null;
@@ -65,7 +65,7 @@ export function AddressedBanner({ agent }: { agent: string }) {
     <div className="agent-addressed">
       <SendHorizontalIcon className="size-3.5" />
       <span>
-        going straight to <b>@{agent}</b> — SuperAI does not answer this one, but keeps it
+        going straight to <b>@{agent}</b> — SuperLeo does not answer this one, but keeps it
       </span>
     </div>
   );

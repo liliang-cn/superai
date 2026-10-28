@@ -1,4 +1,4 @@
-// Package relay lets a phone reach a SuperAI on a computer it shares no
+// Package relay lets a phone reach a SuperLeo on a computer it shares no
 // network with, without the relay being able to read a byte of it.
 //
 // The computer keeps one outbound link open to the relay and proves, by

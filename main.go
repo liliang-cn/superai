@@ -2,9 +2,10 @@ package main
 
 import (
 	"embed"
+	_ "github.com/liliang-cn/superleo/internal/brand" // the old SuperAI names keep working
 	"os"
 
-	"github.com/liliang-cn/superai/internal/app"
+	"github.com/liliang-cn/superleo/internal/app"
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
@@ -22,7 +23,7 @@ var assets embed.FS
 func main() {
 	app.Assets = assets
 
-	// The same binary, minus the window: `superai serve` runs the app
+	// The same binary, minus the window: `superleo serve` runs the app
 	// behind a local HTTP server instead of a WKWebView (see
 	// internal/app/server.go).
 	if len(os.Args) > 1 && os.Args[1] == "serve" {
@@ -41,13 +42,13 @@ func main() {
 		app.IntegrationTokenMain(os.Args[2:])
 		return
 	}
-	// Claude Code's hooks, handed to the SuperAI serving on this machine
+	// Claude Code's hooks, handed to the SuperLeo serving on this machine
 	// (internal/app/cchook.go). Always exits 0, and fast.
 	if len(os.Args) > 1 && os.Args[1] == "hook" {
 		app.HookMain(os.Args[2:])
 		return
 	}
-	// This machine as an agent node another SuperAI drives (internal/app/node.go).
+	// This machine as an agent node another SuperLeo drives (internal/app/node.go).
 	if len(os.Args) > 1 && os.Args[1] == "node" {
 		app.NodeMain(os.Args[2:])
 		return
@@ -64,7 +65,7 @@ func main() {
 
 	// Create application with options
 	err := wails.Run(&options.App{
-		Title:  "SuperAI",
+		Title:  "SuperLeo",
 		Width:  1280,
 		Height: 860,
 		// A floor, because there was none: the window could be dragged to any
@@ -84,7 +85,7 @@ func main() {
 		BackgroundColour: &options.RGBA{R: 244, G: 241, B: 234, A: 1},
 		Menu:             app.AppMenu(a),
 		// The window is part of the design, not a frame the OS wraps around it.
-		// A stock title bar spends 28px of every screen on the word "SuperAI",
+		// A stock title bar spends 28px of every screen on the word "SuperLeo",
 		// which the sidebar already says, in a strip that cannot hold anything
 		// else. Hidden-inset keeps the traffic lights where every Mac user
 		// reaches for them and gives the app the rest of the bar; the sidebar
@@ -98,7 +99,7 @@ func main() {
 			WebviewIsTransparent: false,
 			WindowIsTranslucent:  false,
 			About: &mac.AboutInfo{
-				Title:   "SuperAI",
+				Title:   "SuperLeo",
 				Message: "Your own agent, on your own machine.",
 			},
 		},

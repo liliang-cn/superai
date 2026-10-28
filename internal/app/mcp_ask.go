@@ -1,12 +1,12 @@
 package app
 
-// Talking to SuperAI from another agent.
+// Talking to SuperLeo from another agent.
 //
 // Claude Code or Codex on a laptop can reach this instance's /mcp (the queen,
-// behind the same Bearer token as everything else). superai_ask hands a
-// message to SuperAI exactly as the app's own chat box does — SendChat, same
+// behind the same Bearer token as everything else). superleo_ask hands a
+// message to SuperLeo exactly as the app's own chat box does — SendChat, same
 // conversations, same tools, same approval gate — and waits for the answer.
-// superai_conversations and superai_chat_history read back what was said.
+// superleo_conversations and superleo_chat_history read back what was said.
 //
 // Waiting is bounded. A turn that outlives the caller's timeout keeps running
 // here; the caller gets what has streamed so far, pending: true and the ids to
@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -36,8 +36,8 @@ const (
 )
 
 type askIn struct {
-	Message        string `json:"message" jsonschema:"what to say to SuperAI, as a person would type it in the chat"`
-	Conversation   string `json:"conversation,omitempty" jsonschema:"conversation id to continue (from a previous answer or superai_conversations); omit to start a new one"`
+	Message        string `json:"message" jsonschema:"what to say to SuperLeo, as a person would type it in the chat"`
+	Conversation   string `json:"conversation,omitempty" jsonschema:"conversation id to continue (from a previous answer or superleo_conversations); omit to start a new one"`
 	TimeoutSeconds int    `json:"timeout_seconds,omitempty" jsonschema:"how long to wait for the answer, default 180, at most 600; on timeout the turn keeps running and the answer so far comes back with pending=true"`
 }
 
@@ -63,10 +63,10 @@ type askOut struct {
 	Answer  string `json:"answer"`
 	Pending bool   `json:"pending,omitempty"`
 	Error   string `json:"error,omitempty"`
-	// Tools are the tools SuperAI called for this answer, in order.
+	// Tools are the tools SuperLeo called for this answer, in order.
 	Tools []askTool `json:"tools,omitempty"`
 	// NeedsApproval are tool calls waiting for the person to allow or deny
-	// them in the SuperAI app. Nothing here answers them.
+	// them in the SuperLeo app. Nothing here answers them.
 	NeedsApproval []askApproval `json:"needs_approval,omitempty"`
 }
 
@@ -139,7 +139,7 @@ func (s *askState) apply(ev askEvent) (finished bool, progress string) {
 			s.order = append(s.order, a.ID)
 		}
 		s.approvals[a.ID] = a
-		return false, fmt.Sprintf("waiting for the person to approve %s (approval %s) in the SuperAI app", a.Tool, a.ID)
+		return false, fmt.Sprintf("waiting for the person to approve %s (approval %s) in the SuperLeo app", a.Tool, a.ID)
 	case "tool:approval:closed":
 		delete(s.approvals, str("id"))
 		return false, ""
@@ -200,7 +200,7 @@ func (s *askState) result() askOut {
 // toolResultFailed reads a tool result the way the chat panel does.
 func toolResultFailed(r any) bool { return backend.ToolResultFailed(r) }
 
-// ask runs one superai_ask. progress, when not nil, is told what the turn is
+// ask runs one superleo_ask. progress, when not nil, is told what the turn is
 // doing while it is waited on.
 func (a *App) ask(ctx context.Context, in askIn, progress func(string)) (askOut, error) {
 	msg := strings.TrimSpace(in.Message)
@@ -225,7 +225,7 @@ func (a *App) ask(ctx context.Context, in askIn, progress func(string)) (askOut,
 
 	send := a.askFn
 	if send == nil {
-		// SuperAI's own agent, not the queen engine: whoever asks over MCP is
+		// SuperLeo's own agent, not the queen engine: whoever asks over MCP is
 		// as likely as not that engine's CLI, and would be answering itself.
 		send = func(session, message string) string { return a.sendChat(session, message, nil, true) }
 	}
@@ -261,7 +261,7 @@ func (a *App) ask(ctx context.Context, in askIn, progress func(string)) (askOut,
 }
 
 type historyIn struct {
-	Conversation string `json:"conversation" jsonschema:"conversation id (from superai_conversations or a superai_ask answer)"`
+	Conversation string `json:"conversation" jsonschema:"conversation id (from superleo_conversations or a superleo_ask answer)"`
 	Limit        int    `json:"limit,omitempty" jsonschema:"most recent messages to return, default 20, at most 200"`
 }
 
@@ -272,7 +272,7 @@ type historyMessage struct {
 	Kind string `json:"kind,omitempty"`
 }
 
-// historyForMCP is the last limit visible messages, the memory SuperAI was
+// historyForMCP is the last limit visible messages, the memory SuperLeo was
 // handed before answering left out.
 func historyForMCP(turns []backend.ChatTurn, limit int) []historyMessage {
 	if limit <= 0 {
@@ -307,17 +307,17 @@ func conversationsForMCP(sessions []backend.ChatSessionInfo, limit int) []backen
 	return sessions
 }
 
-// addAskMCPTools puts superai_ask, superai_conversations and
-// superai_chat_history on the MCP server.
+// addAskMCPTools puts superleo_ask, superleo_conversations and
+// superleo_chat_history on the MCP server.
 func addAskMCPTools(s *mcp.Server, app *App) {
 	mcp.AddTool(s, &mcp.Tool{
-		Name:  "superai_ask",
-		Title: "Ask SuperAI",
-		Description: "Say something to SuperAI (the queen) and wait for its answer, exactly as if typed in the SuperAI app: " +
+		Name:  "superleo_ask",
+		Title: "Ask SuperLeo",
+		Description: "Say something to SuperLeo (the queen) and wait for its answer, exactly as if typed in the SuperLeo app: " +
 			"same conversations, tools, memory and approval rules. Returns the answer, the tools it called (name, ok) and the " +
 			"conversation id — pass that back as conversation to continue. Without a conversation a new one is started. " +
 			"If the answer takes longer than timeout_seconds the turn keeps running: you get the text so far with pending=true; " +
-			"read the rest later with superai_chat_history. Tool calls that need the person's approval are listed in " +
+			"read the rest later with superleo_chat_history. Tool calls that need the person's approval are listed in " +
 			"needs_approval; they are approved on the phone, never from here.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in askIn) (*mcp.CallToolResult, any, error) {
 		var progress func(string)
@@ -340,23 +340,23 @@ func addAskMCPTools(s *mcp.Server, app *App) {
 	})
 
 	mcp.AddTool(s, &mcp.Tool{
-		Name:        "superai_conversations",
+		Name:        "superleo_conversations",
 		Title:       "List conversations",
-		Description: "Recent SuperAI conversations, most recent first: id, title, number of messages, last update.",
+		Description: "Recent SuperLeo conversations, most recent first: id, title, number of messages, last update.",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in conversationsIn) (*mcp.CallToolResult, any, error) {
 		return toolOK(map[string]any{"conversations": conversationsForMCP(app.ChatSessions(), in.Limit)})
 	})
 
 	mcp.AddTool(s, &mcp.Tool{
-		Name:        "superai_chat_history",
+		Name:        "superleo_chat_history",
 		Title:       "Read a conversation",
-		Description: "The most recent messages of one SuperAI conversation: role, text, time.",
+		Description: "The most recent messages of one SuperLeo conversation: role, text, time.",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in historyIn) (*mcp.CallToolResult, any, error) {
 		conv := strings.TrimSpace(in.Conversation)
 		if conv == "" {
-			return toolErr("conversation is required; superai_conversations lists them")
+			return toolErr("conversation is required; superleo_conversations lists them")
 		}
 		return toolOK(map[string]any{"conversation": conv, "messages": historyForMCP(app.ChatHistory(conv), in.Limit)})
 	})

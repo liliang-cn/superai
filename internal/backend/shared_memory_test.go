@@ -6,12 +6,12 @@ import (
 	"testing"
 )
 
-// Reads only. Runs against a real shared brain when SUPERAI_TEST_CORTEX names
+// Reads only. Runs against a real shared brain when SUPERLEO_TEST_CORTEX names
 // one (and $CORTEXDB_GRPC_TOKEN holds its token); skipped otherwise.
 func TestReadThroughMemoryStoreFindsDefaultNamespace(t *testing.T) {
-	endpoint := os.Getenv("SUPERAI_TEST_CORTEX")
+	endpoint := os.Getenv("SUPERLEO_TEST_CORTEX")
 	if endpoint == "" {
-		t.Skip("SUPERAI_TEST_CORTEX not set")
+		t.Skip("SUPERLEO_TEST_CORTEX not set")
 	}
 	ctx := context.Background()
 	only, err := newReadThroughMemoryStore(endpoint, "", "hive", nil)

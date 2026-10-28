@@ -21,7 +21,7 @@ import {
 import { ViewKey } from "../lib/types";
 import { useRoom } from "../lib/useViewport";
 
-const served = Boolean((window as unknown as Record<string, unknown>).superaiServed);
+const served = Boolean((window as unknown as Record<string, unknown>).superleoServed);
 
 // The nav used to carry one emoji per row (💬📊🧠🧩🔌🗂️⚙️). On the old slate
 // ground they passed for icons; on warm paper they are seven colour stickers
@@ -165,7 +165,7 @@ export default function Sidebar({
         </svg>
         {labels && (
           <div className="brand-text">
-            <div className="brand-name">SuperAI</div>
+            <div className="brand-name">SuperLeo</div>
           </div>
         )}
       </div>

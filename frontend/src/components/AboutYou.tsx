@@ -18,7 +18,7 @@ function about(info: Row): string {
 }
 
 /**
- * What SuperAI has written down about you — notes and people — beside the
+ * What SuperLeo has written down about you — notes and people — beside the
  * graph it reads them from. Anything wrong can be deleted; everything is added
  * by talking to it.
  */

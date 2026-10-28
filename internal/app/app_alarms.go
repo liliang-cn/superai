@@ -32,8 +32,8 @@ import (
 	"time"
 
 	"github.com/liliang-cn/agent-go/v3/pkg/agent"
-	"github.com/liliang-cn/superai/internal/apns"
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/apns"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 const (

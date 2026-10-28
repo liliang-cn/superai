@@ -1,6 +1,6 @@
 // Integration tokens.
 //
-// Something outside SuperAI that only has news to deliver — openclaw's cron
+// Something outside SuperLeo that only has news to deliver — openclaw's cron
 // jobs, the morning memo, a price alert — needs a credential to post it with.
 // The token in auth.json would do and would be far too much: it is the whole
 // API, the agent, the shell tools, MCP. A paired device's token is the same
@@ -11,12 +11,12 @@
 // A queen token is the same kind with a different door: an agent that runs
 // the queen's thinking from outside (Claude Code, say) commands the cluster
 // through /mcp and nothing else, and on /mcp only through the cluster-command
-// tools (queenMCPTools in mcp_scope.go). It cannot ask SuperAI, change its
+// tools (queenMCPTools in mcp_scope.go). It cannot ask SuperLeo, change its
 // settings, or reach the RPC surface.
 //
 // Kept like the devices are: only the sha256 is on disk, the secret is shown
 // once when minted, and each can be revoked on its own. The file is re-read
-// when it changes, because the ops path is `superai integration-token create`
+// when it changes, because the ops path is `superleo integration-token create`
 // run beside a server that is already up — a token minted that way must work
 // without a restart, and one revoked that way must stop working without one.
 package app
@@ -36,7 +36,7 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 const (
@@ -301,7 +301,7 @@ func (a *App) CreateIntegrationToken(name string) (NewIntegrationToken, error) {
 
 // CreateQueenToken mints a token for an agent that runs the queen from
 // outside: it reaches /mcp and nothing else, and there only the
-// cluster-command tools (no superai_ask, no settings):
+// cluster-command tools (no superleo_ask, no settings):
 //
 //	POST /api/rpc/CreateQueenToken  ["claude-queen"]
 //	→ {"id":"…","name":"claude-queen","scope":"queen","created_at":"…","token":"sai_queen_…"}
@@ -359,21 +359,21 @@ func (a *App) RevokeIntegrationToken(id string) error {
 	return err
 }
 
-// IntegrationTokenMain is `superai integration-token`, for whoever operates
-// the server and has its data directory (SUPERAI_HOME) at hand:
+// IntegrationTokenMain is `superleo integration-token`, for whoever operates
+// the server and has its data directory (SUPERLEO_HOME) at hand:
 //
-//	superai integration-token create <name>           prints the token, once
-//	superai integration-token create --queen <name>   a queen token, likewise
-//	superai integration-token list
-//	superai integration-token revoke <id>
+//	superleo integration-token create <name>           prints the token, once
+//	superleo integration-token create --queen <name>   a queen token, likewise
+//	superleo integration-token list
+//	superleo integration-token revoke <id>
 //
 // It writes the same file the server reads, and the server picks the change
 // up on the next request.
 func IntegrationTokenMain(argv []string) {
 	usage := func() {
-		fmt.Fprintln(os.Stderr, "usage: superai integration-token create [--queen] <name> | list | revoke <id>")
+		fmt.Fprintln(os.Stderr, "usage: superleo integration-token create [--queen] <name> | list | revoke <id>")
 		fmt.Fprintln(os.Stderr, "  --queen mints a token that reaches only /mcp's cluster-command tools")
-		fmt.Fprintln(os.Stderr, "  tokens are kept in", integrationsPath(), "(set SUPERAI_HOME to change)")
+		fmt.Fprintln(os.Stderr, "  tokens are kept in", integrationsPath(), "(set SUPERLEO_HOME to change)")
 		os.Exit(2)
 	}
 	fl := flag.NewFlagSet("integration-token", flag.ExitOnError)
@@ -399,7 +399,7 @@ func IntegrationTokenMain(argv []string) {
 		}
 		t, err := mint(cf.Arg(0))
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "superai:", err)
+			fmt.Fprintln(os.Stderr, "superleo:", err)
 			os.Exit(1)
 		}
 		fmt.Fprintf(os.Stderr, "created %s token %s (%s); %s.\n", t.Scope, t.ID, t.Name, what)
@@ -410,7 +410,7 @@ func IntegrationTokenMain(argv []string) {
 	case "list":
 		tokens, err := a.ListIntegrationTokens()
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "superai:", err)
+			fmt.Fprintln(os.Stderr, "superleo:", err)
 			os.Exit(1)
 		}
 		w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
@@ -428,7 +428,7 @@ func IntegrationTokenMain(argv []string) {
 			usage()
 		}
 		if err := a.RevokeIntegrationToken(args[1]); err != nil {
-			fmt.Fprintln(os.Stderr, "superai:", err)
+			fmt.Fprintln(os.Stderr, "superleo:", err)
 			os.Exit(1)
 		}
 		fmt.Fprintln(os.Stderr, "revoked", args[1])

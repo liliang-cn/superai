@@ -108,16 +108,16 @@ func installNpxPackage(npx, spec, dir string) {
 	go func() {
 		npm := filepath.Join(filepath.Dir(npx), "npm")
 		if err := os.MkdirAll(dir, 0o700); err != nil {
-			log.Printf("superai: mcp package %s: %v", spec, err)
+			log.Printf("superleo: mcp package %s: %v", spec, err)
 			return
 		}
 		cmd := exec.Command(npm, "install", "--prefix", dir, "--no-audit", "--no-fund", "--loglevel=error", spec)
 		if out, err := cmd.CombinedOutput(); err != nil {
 			npxInstalls.Delete(spec) // let a later start try again
-			log.Printf("superai: mcp package %s not installed: %v: %s", spec, err, strings.TrimSpace(string(out)))
+			log.Printf("superleo: mcp package %s not installed: %v: %s", spec, err, strings.TrimSpace(string(out)))
 			return
 		}
-		log.Printf("superai: mcp package %s installed; it starts without npx from now on", spec)
+		log.Printf("superleo: mcp package %s installed; it starts without npx from now on", spec)
 	}()
 }
 

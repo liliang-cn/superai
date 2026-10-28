@@ -72,7 +72,7 @@ export default function MachineHost({ name }: { name: string }) {
         <Gauge label={t("RAM")} value={`${pct(status.memory.used, status.memory.total)}%`} sub={`${num(status.memory.used)} / ${gb(status.memory.total)}`} level={status.memory.used / Math.max(1, status.memory.total)} />
         {disk && <Gauge label={t("Disk")} value={`${pct(disk.used, disk.total)}%`} sub={`${gb(disk.total - disk.used)} ${t("free")}`} level={disk.used / disk.total} />}
       </div>
-      <p className="wi-note">{t("Up {time}", { time: uptime(status.uptimeSeconds) })}{status.kernel ? `, ${status.os} ${status.kernel}` : ""}{status.version ? `, SuperAI ${status.version.split("-")[0]}` : ""}</p>
+      <p className="wi-note">{t("Up {time}", { time: uptime(status.uptimeSeconds) })}{status.kernel ? `, ${status.os} ${status.kernel}` : ""}{status.version ? `, SuperLeo ${status.version.split("-")[0]}` : ""}</p>
       <div className="wi-clis">
         <button type="button" className={tab === "services" ? "on" : ""} onClick={() => setTab(tab === "services" ? "" : "services")}>{t("Services")}</button>
         {status.control && <button type="button" className={tab === "command" ? "on" : ""} onClick={() => setTab(tab === "command" ? "" : "command")}>{t("Command")}</button>}

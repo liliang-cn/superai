@@ -4,7 +4,7 @@ import type { AgentInfo } from "../lib/useAgentMentions";
 /**
  * What the command bar's @ offers from the world: every agent that can take
  * work, by the rule HiveWorkers counts them (the status bar's "n/m workers"):
- * a SuperAI only when it is a worker, every coding CLI, every named agent.
+ * a SuperLeo only when it is a worker, every coding CLI, every named agent.
  *
  * A CLI on this machine is offered by its bare name (@claude), the name the
  * core routes to its own CLI; one on another machine keeps its machine
@@ -12,7 +12,7 @@ import type { AgentInfo } from "../lib/useAgentMentions";
  */
 export function mentionsOf(hosts: Host[] | null | undefined): AgentInfo[] {
   const list = hosts ?? [];
-  // The SuperAI drawn as this core: its CLIs are the local ones.
+  // The SuperLeo drawn as this core: its CLIs are the local ones.
   const self = new Set<string>();
   for (const h of list) for (const a of h.agents ?? []) {
     if (a.kind === "superai" && (a.role === "standalone" || a.role === "queen")) self.add(a.name);

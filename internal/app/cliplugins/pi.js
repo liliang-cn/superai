@@ -1,7 +1,7 @@
-// SuperAI activity for pi. Installed by `superai hook install` (and a
-// SuperAI node on start); SuperAI overwrites this file when it changes.
+// SuperLeo activity for pi. Installed by `superleo hook install` (and a
+// SuperLeo node on start); SuperLeo overwrites this file when it changes.
 //
-// It tells the SuperAI on this machine, over its local socket, what this pi
+// It tells the SuperLeo on this machine, over its local socket, what this pi
 // session is doing: working, waiting for you, or idle, and the name of the
 // tool it is on. Never a prompt, a message, a file, or a tool's arguments:
 // only the session's id, the last element of its directory, and the tool's
@@ -17,17 +17,17 @@ import path from "node:path"
 
 const CLI = "pi"
 // The socket of the node that installed this file; replaced at install.
-const INSTALLED = "__SUPERAI_SOCKET__"
+const INSTALLED = "__SUPERLEO_SOCKET__"
 
 function sockets() {
   const out = []
   const add = (p) => { if (p && !p.startsWith("__") && !out.includes(p)) out.push(p) }
-  add((process.env.SUPERAI_HOOK_SOCKET || "").trim())
-  const home = (process.env.SUPERAI_HOME || "").trim()
+  add((process.env.SUPERLEO_HOOK_SOCKET || "").trim())
+  const home = (process.env.SUPERLEO_HOME || "").trim()
   if (home) add(path.join(home.replace(/^~(?=\/)/, os.homedir()), "cc-hook.sock"))
   add(INSTALLED)
-  add(path.join(os.homedir(), ".superai-node", "cc-hook.sock"))
-  add(path.join(os.homedir(), ".superai", "cc-hook.sock"))
+  add(path.join(os.homedir(), ".superleo-node", "cc-hook.sock"))
+  add(path.join(os.homedir(), ".superleo", "cc-hook.sock"))
   return out
 }
 
@@ -68,7 +68,7 @@ function project(dir) {
   try { return dir ? path.basename(String(dir).replace(/\/+$/, "")) : "" } catch { return "" }
 }
 
-// translate is one pi event in SuperAI's terms, or null.
+// translate is one pi event in SuperLeo's terms, or null.
 function translate(event, ctx) {
   let session = "", cwd = ""
   try { session = String(ctx.sessionManager.getSessionId() || "") } catch {}
@@ -101,8 +101,8 @@ function translate(event, ctx) {
 const EVENTS = ["session_start", "session_shutdown", "agent_start", "tool_execution_start", "tool_execution_end",
   "ui_prompt_start", "ui_prompt_end", "agent_settled"]
 
-export default function superaiActivity(pi) {
-  if (process.env.SUPERAI_CLI_RUN) return // a run SuperAI started reports itself
+export default function superleoActivity(pi) {
+  if (process.env.SUPERLEO_CLI_RUN) return // a run SuperLeo started reports itself
   for (const name of EVENTS) {
     try {
       pi.on(name, (event, ctx) => {
@@ -113,4 +113,4 @@ export default function superaiActivity(pi) {
 }
 
 // For the tests (cliplugins/plugins_test.mjs).
-superaiActivity.translate = translate
+superleoActivity.translate = translate

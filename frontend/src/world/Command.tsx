@@ -64,8 +64,8 @@ export default function Command({ view, onConversation, onTyping, hosts }: {
   const [busy, setBusy] = useState("");
   // The conversation with the queen, the same thread the home screen shows:
   // its last turns stay above the line, and what is typed continues it.
-  // by: who answered for the queen, when not SuperAI's own agent alone
-  // (engineByline): the engine, or SuperAI in its place.
+  // by: who answered for the queen, when not SuperLeo's own agent alone
+  // (engineByline): the engine, or SuperLeo in its place.
   const [lines, setLines] = useState<{ who: "you" | "queen"; text: string; by?: string }[]>([]);
   const [open, setOpen] = useState(false);
   // A pod about to come or go, waiting for the person's yes.

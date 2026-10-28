@@ -3,14 +3,14 @@ package app
 import (
 	"testing"
 
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // TestEffectiveRoutesThroughProxy checks the wiring that actually matters: when
 // the embedded proxy is running, the Service is built against it rather than the
 // user's cloud endpoint — and the user's own settings are left untouched.
 func TestEffectiveRoutesThroughProxy(t *testing.T) {
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 
 	a := NewApp()
 	a.settings = &backend.Settings{

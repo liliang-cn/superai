@@ -1,7 +1,7 @@
 package app
 
 import (
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // TraceLines returns the tail of a task's or a conversation's JSONL trace,

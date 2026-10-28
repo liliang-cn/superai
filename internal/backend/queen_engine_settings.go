@@ -9,11 +9,11 @@ import (
 )
 
 // queenEngineChoice is queenengine.json: what the queen thinks with, set from
-// a client (SetQueenEngine, the settings page, superai_settings_set).
+// a client (SetQueenEngine, the settings page, superleo_settings_set).
 //
 // A file of its own for the reason queen.json and agentlink.json are: in the
 // hive's containers settings.json is rewritten from a Secret on every start,
-// and a queen told to think with claude.mac would be back on SuperAI's own
+// and a queen told to think with claude.mac would be back on SuperLeo's own
 // agent after the next restart, without a word to anyone.
 type queenEngineChoice struct {
 	Engine    string `json:"engine,omitempty"`

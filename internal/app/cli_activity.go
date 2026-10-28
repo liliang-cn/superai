@@ -340,7 +340,7 @@ func (a *App) startCLIActivity(ctx context.Context) {
 }
 
 // sendCLIActivity hands one CLI's snapshot to core, or keeps it here when
-// this SuperAI is not linked.
+// this SuperLeo is not linked.
 func (a *App) sendCLIActivity(cli string, act *CLIActivity) {
 	if tap := a.agentTap.Load(); tap != nil {
 		raw, err := json.Marshal(cliActivityMsg{CLI: cli, Activity: act})

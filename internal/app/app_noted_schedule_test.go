@@ -196,7 +196,7 @@ func fakeScheduleNoted(t *testing.T, old bool, calls *[]string) string {
 func TestScheduleRPCs(t *testing.T) {
 	for _, old := range []bool{false, true} {
 		t.Run(map[bool]string{false: "unified", true: "older noted"}[old], func(t *testing.T) {
-			t.Setenv("SUPERAI_HOME", t.TempDir())
+			t.Setenv("SUPERLEO_HOME", t.TempDir())
 			t.Setenv("NOTED_TOKEN", "x")
 			var calls []string
 			configureNoted(t, fakeScheduleNoted(t, old, &calls))

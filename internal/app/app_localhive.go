@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // spawnerFor is the spawner the settings describe: the running local one, or

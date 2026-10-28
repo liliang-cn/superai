@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -44,7 +44,7 @@ func callSelf(t *testing.T, ss *mcp.ClientSession, name string, args map[string]
 // Every tool the agent has about itself is on /mcp too, prefixed, and the
 // readers say they only read.
 func TestSelfToolsAreServedOverMCP(t *testing.T) {
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	ss := selfSession(t, NewApp())
 	res, err := ss.ListTools(context.Background(), nil)
 	if err != nil {
@@ -55,16 +55,16 @@ func TestSelfToolsAreServedOverMCP(t *testing.T) {
 		got[tool.Name] = tool
 	}
 	for _, st := range selfTools() {
-		tool := got["superai_"+st.Name]
+		tool := got["superleo_"+st.Name]
 		if tool == nil {
-			t.Errorf("superai_%s is not served", st.Name)
+			t.Errorf("superleo_%s is not served", st.Name)
 			continue
 		}
 		if ro := tool.Annotations != nil && tool.Annotations.ReadOnlyHint; ro != st.ReadOnly {
-			t.Errorf("superai_%s read-only hint %v, want %v", st.Name, ro, st.ReadOnly)
+			t.Errorf("superleo_%s read-only hint %v, want %v", st.Name, ro, st.ReadOnly)
 		}
 	}
-	if out, isErr := callSelf(t, ss, "superai_status", nil); isErr || !strings.Contains(out, `"ready"`) {
+	if out, isErr := callSelf(t, ss, "superleo_status", nil); isErr || !strings.Contains(out, `"ready"`) {
 		t.Fatalf("status: %v %s", isErr, out)
 	}
 }
@@ -72,12 +72,12 @@ func TestSelfToolsAreServedOverMCP(t *testing.T) {
 // Reading the settings never shows a secret, and writing them is the
 // whitelist with its ranges.
 func TestSelfSettingsHideSecretsAndKeepTheWhitelist(t *testing.T) {
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	app := NewApp()
 	app.settings = &backend.Settings{LLMModel: "m1", LLMKey: "sk-very-secret", TelegramBotToken: "tg-secret", MaxRounds: 30}
 	ss := selfSession(t, app)
 
-	out, isErr := callSelf(t, ss, "superai_settings_get", nil)
+	out, isErr := callSelf(t, ss, "superleo_settings_get", nil)
 	if isErr || strings.Contains(out, "very-secret") || strings.Contains(out, "tg-secret") {
 		t.Fatalf("settings_get leaked or failed: %v %s", isErr, out)
 	}
@@ -91,7 +91,7 @@ func TestSelfSettingsHideSecretsAndKeepTheWhitelist(t *testing.T) {
 		{"key": "llm_key", "value": "sk-other"},
 		{"key": "max_rounds", "value": 0},
 	} {
-		if out, isErr := callSelf(t, ss, "superai_settings_set", bad); !isErr {
+		if out, isErr := callSelf(t, ss, "superleo_settings_set", bad); !isErr {
 			t.Errorf("settings_set accepted %v: %s", bad, out)
 		}
 	}
@@ -100,20 +100,20 @@ func TestSelfSettingsHideSecretsAndKeepTheWhitelist(t *testing.T) {
 // A change waits while a turn is running — applying it restarts the agent
 // under that turn — and shows as pending meanwhile.
 func TestSelfSettingWaitsForTheTurnToFinish(t *testing.T) {
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	app := NewApp()
 	app.settings = &backend.Settings{LLMModel: "m1", MaxRounds: 30}
 	app.openTurns.Store("turn-1", struct{}{})
 	ss := selfSession(t, app)
 
-	if out, isErr := callSelf(t, ss, "superai_settings_set", map[string]any{"key": "max_rounds", "value": 60}); isErr {
+	if out, isErr := callSelf(t, ss, "superleo_settings_set", map[string]any{"key": "max_rounds", "value": 60}); isErr {
 		t.Fatalf("settings_set: %s", out)
 	}
 	time.Sleep(700 * time.Millisecond)
 	if app.GetSettings().MaxRounds != 30 {
 		t.Fatal("the change was applied under a running turn")
 	}
-	if out, _ := callSelf(t, ss, "superai_settings_get", nil); !strings.Contains(out, `"pending":{"max_rounds":60}`) {
+	if out, _ := callSelf(t, ss, "superleo_settings_get", nil); !strings.Contains(out, `"pending":{"max_rounds":60}`) {
 		t.Fatalf("the waiting change is not shown: %s", out)
 	}
 	app.openTurns.Delete("turn-1")

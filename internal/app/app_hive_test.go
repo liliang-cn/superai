@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
-// An instance that has never heard of the hive must stay a whole SuperAI. The
+// An instance that has never heard of the hive must stay a whole SuperLeo. The
 // hive is something it can join, not something it now depends on.
 
 func TestStandaloneIsNotAHiveAtAll(t *testing.T) {

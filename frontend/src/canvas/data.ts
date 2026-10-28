@@ -32,9 +32,9 @@ export interface Hive {
   name: string;
   members: HiveMember[];
   tasks: HiveTask[];
-  /** Who thinks for the queen in a person's chat ("claude", "claude.mac"); empty is SuperAI's own agent. */
+  /** Who thinks for the queen in a person's chat ("claude", "claude.mac"); empty is SuperLeo's own agent. */
   engine?: string;
-  /** Who took her latest turn: the engine, or "superai" when SuperAI
+  /** Who took her latest turn: the engine, or "superai" when SuperLeo
    *  answered in its place. Kept current by queen:engine. */
   engineNow?: string;
   /** The relay agents (agent_link.relay_only): not machines, but the named
@@ -59,7 +59,7 @@ export function withCLI(m: Record<string, CLIActivity> | undefined, cli: string,
   return next;
 }
 
-/** One agent that can work: a SuperAI with a model, a signed-in coding CLI,
+/** One agent that can work: a SuperLeo with a model, a signed-in coding CLI,
  *  a named agent. Peers; host is where it runs. */
 export interface Worker { name: string; kind: string; host: string; state: string; up: boolean }
 
@@ -77,7 +77,7 @@ export function useWorkers(): { list: Worker[]; up: number; loaded: boolean } {
   return { list: list ?? [], up: (list ?? []).filter((w) => w.up).length, loaded: list !== null };
 }
 
-/** The hive as this SuperAI sees it: polled for the roster, kept current by
+/** The hive as this SuperLeo sees it: polled for the roster, kept current by
  *  hive:task for the orders. */
 export function useHive(): Hive {
   const [hive, setHive] = useState<Hive>({ loaded: false, role: "", name: "", members: [], tasks: [] });
@@ -120,7 +120,7 @@ export function useHive(): Hive {
         ? { ...cur, relays: cur.relays.map((r) => (r.name === p.agent ? { ...r, cliActivity: withCLI(r.cliActivity, p.cli!, p.activity) } : r)) }
         : cur));
     });
-    // SuperAI answered in the engine's place, or the engine is back: shown as it happens.
+    // SuperLeo answered in the engine's place, or the engine is back: shown as it happens.
     const offNow = EventsOn("queen:engine", (p: { engine?: string }) => {
       if (typeof p?.engine === "string") setHive((cur) => ({ ...cur, engineNow: p.engine }));
     });
@@ -245,7 +245,7 @@ export interface LinkedAgent {
   /** machine, worker (a hive worker's pod) or relay (kept for its named agents). */
   role?: string;
   /** What the interactive Claude Code sessions in its terminals are doing —
-   *  not SuperAI's own runs. Absent when it has none. */
+   *  not SuperLeo's own runs. Absent when it has none. */
   activity?: CCActivity | null;
   /** What every coding CLI running on it is doing, by CLI (claude too):
    *  from the CLI's plugin or hooks, or from its processes. A CLI not
@@ -319,14 +319,14 @@ export function useLinkedAgents(): LinkedAgent[] {
 /** "ha" is an HA cluster: the agents an HA service keeps up, together. */
 export type HostKind = "pod" | "container" | "mac" | "vm" | "metal" | "ha" | "";
 
-/** One agent on a host: a SuperAI (queen, worker, machine agent, relay), a
- *  coding CLI ("claude.mac"), or a named agent a SuperAI serves (openclaw). */
+/** One agent on a host: a SuperLeo (queen, worker, machine agent, relay), a
+ *  coding CLI ("claude.mac"), or a named agent a SuperLeo serves (openclaw). */
 export interface HostAgent {
   name: string;
   kind: "superai" | "cli" | "agent";
   role?: "queen" | "worker" | "machine" | "relay" | "standalone" | string;
   about?: string;
-  /** live or lost for a SuperAI; working, waiting, idle or installed for a
+  /** live or lost for a SuperLeo; working, waiting, idle or installed for a
    *  CLI; configured for an agent only the settings know; standby (or
    *  standby-unready) for an HA service's agent on a host it is not on now. */
   state: string;
@@ -334,7 +334,7 @@ export interface HostAgent {
    *  is doing (working, waiting, idle): one agent, seen both ways. */
   activity?: string;
   version?: string;
-  /** The SuperAI on this host that runs it for core. */
+  /** The SuperLeo on this host that runs it for core. */
   via?: string;
   mcp?: string[];
   /** The HA service it belongs to, when one keeps it up. */

@@ -11,7 +11,7 @@ import (
 // QueenEngineServers are this instance's own MCP servers that an agent CLI
 // thinking for the queen is handed too, when they are configured here: the
 // person's data (noted) and the shared brain (cortexdb). The rest stay
-// SuperAI's.
+// SuperLeo's.
 var QueenEngineServers = []string{NotedServer, "cortexdb"}
 
 // EngineMCPServer is one of this instance's MCP servers as an agent CLI is

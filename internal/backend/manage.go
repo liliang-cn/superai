@@ -37,7 +37,7 @@ func (s *Service) InstallMCPServer(ctx context.Context, name, command string, ar
 	return nil
 }
 
-// RemoveMCPServer drops a server from every config this SuperAI keeps. One
+// RemoveMCPServer drops a server from every config this SuperLeo keeps. One
 // that only the hive's queen hands out (hive_abilities.go) cannot be removed
 // here, and says so. The running process is UninstallMCPServer's.
 func RemoveMCPServer(name string) error {
@@ -118,7 +118,7 @@ func removeMCPServerFrom(path, name string) (bool, error) {
 }
 
 // InstallSkillFromPath copies a skill directory found on this machine into
-// SuperAI's skills folder and loads it immediately.
+// SuperLeo's skills folder and loads it immediately.
 func (s *Service) InstallSkillFromPath(ctx context.Context, name, sourcePath string) error {
 	name = sanitizeName(name)
 	if name == "" || sourcePath == "" {
@@ -155,7 +155,7 @@ func (s *Service) ReloadSkills(ctx context.Context) {
 	_ = s.svc.Skills.LoadAll(ctx)
 }
 
-// InstalledSkillDetails lists the skills SuperAI has, with where they came from.
+// InstalledSkillDetails lists the skills SuperLeo has, with where they came from.
 func InstalledSkillNames() []string {
 	entries, err := os.ReadDir(filepath.Join(DataDir(), "skills"))
 	if err != nil {

@@ -10,9 +10,11 @@ syntax = "proto3";
 // Over the stream core calls the agent's own methods (the same ones a browser
 // reaches at /api/rpc/<Method>, as far as the agent allows), and the agent
 // sends back the replies and everything its event bus says.
+// The package is wire protocol (the gRPC path every agent dials), so it keeps
+// the name the project had when agents first spoke it.
 package superai.agentlink.v1;
 
-option go_package = "github.com/liliang-cn/superai/internal/agentlink/pb;agentlinkpb";
+option go_package = "github.com/liliang-cn/superleo/internal/agentlink/pb;agentlinkpb";
 
 service AgentLink {
   // Connect is the agent's one stream. Its first frame is a Hello.

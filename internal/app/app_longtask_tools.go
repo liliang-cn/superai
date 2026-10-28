@@ -14,7 +14,7 @@ import (
 	"strings"
 
 	"github.com/liliang-cn/agent-go/v3/pkg/agent"
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 func (a *App) registerLongTaskTools(svc *backend.Service, cfg *backend.Settings) {

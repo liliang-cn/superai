@@ -157,7 +157,7 @@ func (s *Service) MCPServersWithTools() []string {
 	return out
 }
 
-// NewService builds the full SuperAI agent service from the provided settings.
+// NewService builds the full SuperLeo agent service from the provided settings.
 func NewService(s *Settings) (*Service, error) {
 	if strings.TrimSpace(s.LLMKey) == "" || strings.TrimSpace(s.LLMBaseURL) == "" {
 		return nil, fmt.Errorf("no account yet: add one under Settings → Accounts")
@@ -193,7 +193,7 @@ func NewService(s *Settings) (*Service, error) {
 			BaseURL: s.EmbedBaseURL, APIKey: s.EmbedKey, EmbeddingModel: s.EmbedModel,
 		})
 		if eerr != nil {
-			log.Printf("superai: embedder init failed, falling back to file memory: %v", eerr)
+			log.Printf("superleo: embedder init failed, falling back to file memory: %v", eerr)
 		} else {
 			embedder = ep
 		}
@@ -251,10 +251,10 @@ func NewService(s *Settings) (*Service, error) {
 	// sources. Never fatal — embeddings are an enhancement, and refusing to
 	// start over one would be worse than starting without it.
 	if err := syncEmbeddingProvider(cfg, s); err != nil {
-		log.Printf("superai: embedding settings not applied to the pool: %v", err)
+		log.Printf("superleo: embedding settings not applied to the pool: %v", err)
 	}
 	if err := os.MkdirAll(s.WorkspaceDir, 0o755); err != nil {
-		log.Printf("superai: mkdir workspace: %v", err)
+		log.Printf("superleo: mkdir workspace: %v", err)
 	}
 
 	// --- Sandbox (local workspace). ---
@@ -264,10 +264,10 @@ func NewService(s *Settings) (*Service, error) {
 	}
 
 	// Browser control left the framework in agent-go v3 (pkg/browser is gone).
-	// SuperAI keeps the settings fields so existing config files still parse;
+	// SuperLeo keeps the settings fields so existing config files still parse;
 	// browsing is now expected to come from an MCP server instead.
-	if s.DisableBrowser || strings.TrimSpace(os.Getenv("SUPERAI_NO_BROWSER")) != "" {
-		log.Printf("superai: browser disabled by configuration")
+	if s.DisableBrowser || strings.TrimSpace(os.Getenv("SUPERLEO_NO_BROWSER")) != "" {
+		log.Printf("superleo: browser disabled by configuration")
 	}
 
 	// --- Tool approval gate. ---
@@ -294,7 +294,7 @@ func NewService(s *Settings) (*Service, error) {
 	notedConfigured = notedConfigured && len(notedMissing) == 0
 	_, vitaMissing, _, vitaConfigured := findMCPServer(MCPConfigSources(), VitaServer, os.LookupEnv)
 	vitaConfigured = vitaConfigured && len(vitaMissing) == 0
-	b := agent.New("SuperAI").
+	b := agent.New("SuperLeo").
 		WithPrompt(buildPersona(time.Now(), !s.DisableSelfInstall, s.ExternalAgents.Enabled) + hiveSection(s.Hive) + queenNameSection(s) + homeLayoutSection(s.Hive) + notedSectionFor(notedConfigured, s.Hive.Role) + vitaSection(vitaConfigured) + uiRulesSection()).
 		WithConfig(cfg).
 		WithLLM(brain).
@@ -357,7 +357,7 @@ func NewService(s *Settings) (*Service, error) {
 		b = b.WithMemory(agent.WithMemoryStoreType("file"))
 	}
 
-	// MCP: any user-defined servers, from both files SuperAI has ever read.
+	// MCP: any user-defined servers, from both files SuperLeo has ever read.
 	// Web search does NOT come from here — it is the built-in web_search tool
 	// registered below, so a fresh install with no MCP config can still look
 	// something up.
@@ -365,10 +365,10 @@ func NewService(s *Settings) (*Service, error) {
 	// Two paths, because for a while there were two files and only one of them
 	// was ever written to:
 	//
-	//   ~/.superai/mcpServers.json       ← mcpConfigPath(), where
+	//   ~/.superleo/mcpServers.json       ← mcpConfigPath(), where
 	//     InstallMCPServer writes and RemoveMCPServer deletes, and the path
 	//     the add_mcp_server tool names in its own description
-	//   ~/.superai/data/mcpServers.json  ← cfg.DataDir(), the only one
+	//   ~/.superleo/data/mcpServers.json  ← cfg.DataDir(), the only one
 	//     this function used to read
 	//
 	// So anything installed through the UI or by the agent started, worked for
@@ -392,10 +392,10 @@ func NewService(s *Settings) (*Service, error) {
 		}
 		shared, ferr := serversSharingMemory(src, owned)
 		if ferr != nil {
-			log.Printf("superai: mcp config (%s): %v", src, ferr)
+			log.Printf("superleo: mcp config (%s): %v", src, ferr)
 		}
 		if len(shared) > 0 {
-			log.Printf("superai: memory backend owns %s; MCP server(s) %v share it, their memory tools are withheld",
+			log.Printf("superleo: memory backend owns %s; MCP server(s) %v share it, their memory tools are withheld",
 				owned, shared)
 		}
 		sharedMCP = append(sharedMCP, shared...)
@@ -403,7 +403,7 @@ func NewService(s *Settings) (*Service, error) {
 		// reads an expanded copy (mcp_env.go).
 		path, rerr := resolveMCPConfig(src, os.LookupEnv)
 		if rerr != nil {
-			log.Printf("superai: mcp config (%s): %v", src, rerr)
+			log.Printf("superleo: mcp config (%s): %v", src, rerr)
 			path = src
 		}
 		mcpPaths = append(mcpPaths, path)
@@ -426,7 +426,7 @@ func NewService(s *Settings) (*Service, error) {
 	svc, err := b.Build()
 	if err != nil {
 		_ = sb.Close()
-		return nil, fmt.Errorf("build SuperAI: %w", err)
+		return nil, fmt.Errorf("build SuperLeo: %w", err)
 	}
 
 	out := &Service{
@@ -463,7 +463,7 @@ func NewService(s *Settings) (*Service, error) {
 	searchBase, searchKey, searchModel := s.WebSearch()
 	searchNative, err := domain.ParseNativeWebSearchFormat(s.SearchNative)
 	if err != nil {
-		log.Printf("superai: search_native: %v; sending both search fields", err)
+		log.Printf("superleo: search_native: %v; sending both search fields", err)
 	}
 	// The brain's thinking effort goes along only when the search runs on the
 	// brain's own model; another model may not take the same values.
@@ -476,10 +476,10 @@ func NewService(s *Settings) (*Service, error) {
 		Native: searchNative, ReasoningEffort: searchEffort,
 	})
 
-	// --- Life-assistant store + tools (ported from examples/superai). ---
+	// --- Life-assistant store + tools (ported from examples/superleo). ---
 	out.dashboards = newDashboardStore(filepath.Join(cfg.DataDir(), "dashboards.json"))
 	out.files = newSessionFiles(filepath.Join(cfg.DataDir(), "session-files.json"))
-	out.store = newLifeStore(filepath.Join(cfg.DataDir(), "superai-store.json"))
+	out.store = newLifeStore(filepath.Join(cfg.DataDir(), "superleo-store.json"))
 	out.store.load()
 	out.registerLifeTools()
 	out.registerNotifyTool()
@@ -503,7 +503,7 @@ func NewService(s *Settings) (*Service, error) {
 		}); err != nil {
 			// Not fatal. A machine with no agent CLI installed is a normal
 			// machine, and the rest of the app has nothing to do with this.
-			log.Printf("superai: external agents not registered: %v", err)
+			log.Printf("superleo: external agents not registered: %v", err)
 		}
 	}
 
@@ -517,11 +517,11 @@ func NewService(s *Settings) (*Service, error) {
 
 	// --- CortexDB data-import + graphrag query + connector tools (best-effort). ---
 	if db, derr := cortexdb.Open(cortexdb.DefaultConfig(filepath.Join(cfg.DataDir(), "cortex.db"))); derr != nil {
-		log.Printf("superai: cortexdb disabled (%v)", derr)
+		log.Printf("superleo: cortexdb disabled (%v)", derr)
 	} else {
 		out.cortex = db
 		if _, e := cortexbridge.RegisterImportFlow(svc, cortexbridge.NewImporter(db, brain)); e != nil {
-			log.Printf("superai: import flow tools skipped: %v", e)
+			log.Printf("superleo: import flow tools skipped: %v", e)
 		}
 		// Memory is agent-go's on both backends (WithMemory above), so
 		// Register leaves CortexDB's own memory_* tools out by itself — one
@@ -534,14 +534,14 @@ func NewService(s *Settings) (*Service, error) {
 		// hive, three workers each "saving to the shared brain" into their own
 		// pod. Then the shared one is the only one.
 		if len(sharedMCP) > 0 {
-			log.Printf("superai: knowledge and graph tools come from %v (the shared brain), not the local file", sharedMCP)
+			log.Printf("superleo: knowledge and graph tools come from %v (the shared brain), not the local file", sharedMCP)
 		} else if _, e := cortexbridge.Register(svc, db,
 			cortexbridge.WithArgDefaults(map[string]interface{}{"user_id": singleUserID}),
 		); e != nil {
-			log.Printf("superai: graphrag tools skipped: %v", e)
+			log.Printf("superleo: graphrag tools skipped: %v", e)
 		}
 		if _, e := connectorbridge.Register(svc, db, connector.ToolboxOptions{}); e != nil {
-			log.Printf("superai: connector tools skipped: %v", e)
+			log.Printf("superleo: connector tools skipped: %v", e)
 		}
 	}
 
@@ -950,7 +950,7 @@ func buildPersona(now time.Time, selfInstall, externalAgents bool) string {
 	if externalAgents {
 		delegateHint = delegateSection
 	}
-	return fmt.Sprintf(`You are SuperAI, a warm everyday assistant for life and work. `+answerLanguageRule+`
+	return fmt.Sprintf(`You are SuperLeo, a warm everyday assistant for life and work. `+answerLanguageRule+`
 - Relative times (tomorrow, next Monday, 8 tonight…): work them out from the "Now:" line of the turn and pass RFC 3339 with its offset; resolve_datetime only for something you cannot work out.
 - Tools that do not depend on each other go out together in one reply (the day's events and to-dos: both at once), never one per round — each round is seconds the person waits.
 - Record unprompted, before replying: a plan→add_schedule, a person→upsert_person, work→add_record(work), life→add_record(diary), a note→add_record(note), a habit→add_record(habit).
@@ -963,14 +963,14 @@ func buildPersona(now time.Time, selfInstall, externalAgents bool) string {
 }
 
 // hiveSection tells a member of a hive who it is there. Without it every
-// worker believed it was "SuperAI": asked to save something under its own
+// worker believed it was "SuperLeo": asked to save something under its own
 // name, ten workers wrote to one key and each overwrote the last.
 func hiveSection(h HiveSettings) string {
 	switch h.Role {
 	case HiveRoleWorker:
 		return fmt.Sprintf(`
 
-In the hive you are %[1]s, a worker. The queen's orders arrive as turns. Where a task wants your name or a per-member key, path or label, you are %[1]s, not SuperAI — memory is shared, so another name overwrites someone. To settle what another member found, hive_ask it first and say what it told you. To wait for a message use hive_wait — never sleep, poll hive_inbox or ask whether it was sent.`, h.Self())
+In the hive you are %[1]s, a worker. The queen's orders arrive as turns. Where a task wants your name or a per-member key, path or label, you are %[1]s, not SuperLeo — memory is shared, so another name overwrites someone. To settle what another member found, hive_ask it first and say what it told you. To wait for a message use hive_wait — never sleep, poll hive_inbox or ask whether it was sent.`, h.Self())
 	case HiveRoleQueen:
 		return queenSection(h)
 	}
@@ -986,10 +986,10 @@ func ExternalQueenPrompt(s *Settings) string {
 	if s == nil {
 		s = &Settings{}
 	}
-	out := `You are the queen of SuperAI, answering a person in the SuperAI app: what you write is shown to them as her reply, word by word, and SuperAI keeps the conversation. ` + answerLanguageRule
+	out := `You are the queen of SuperLeo, answering a person in the SuperLeo app: what you write is shown to them as her reply, word by word, and SuperLeo keeps the conversation. ` + answerLanguageRule
 	if s.Hive.Role == HiveRoleQueen {
 		out += `
-The hive is the "hive" MCP server: a tool named hive_x below is superai_hive_x there (hive_task is superai_hive_tasks), superai_linked_agents names the machines and their coding agents, and you work relative dates out yourself. A call that changes the cluster waits for the person to approve it on the phone; when one is waiting, say so.` + queenSection(s.Hive)
+The hive is the "hive" MCP server: a tool named hive_x below is superleo_hive_x there (hive_task is superleo_hive_tasks), superleo_linked_agents names the machines and their coding agents, and you work relative dates out yourself. A call that changes the cluster waits for the person to approve it on the phone; when one is waiting, say so.` + queenSection(s.Hive)
 	}
 	return out + queenNameSection(s)
 }
@@ -1063,7 +1063,7 @@ func uiBlockNames(rules string) []string {
 var uiBlockName = regexp.MustCompile("```([a-z][a-z0-9-]*)|`([a-z][a-z0-9-]*)`（")
 
 // ----------------------------------------------------------------------------
-// Life-assistant store (ported from examples/superai)
+// Life-assistant store (ported from examples/superleo)
 // ----------------------------------------------------------------------------
 
 type lifeStore struct {
@@ -1221,7 +1221,7 @@ func (s *Service) registerLifeTools() {
 		}, write)
 
 	// A reminder is a scheduled prompt. Until the scheduler existed this tool
-	// only appended a row to a JSON file while telling the model "SuperAI will
+	// only appended a row to a JSON file while telling the model "SuperLeo will
 	// remind you when it is due" — a promise nothing kept.
 	svc.AddToolWithMetadata("set_reminder",
 		"Set a reminder that really fires when it comes due (even with the app closed, as long as the background service is resident). Give the time as HH:MM (every day) or RFC3339.",

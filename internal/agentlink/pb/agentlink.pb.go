@@ -14,6 +14,8 @@
 // Over the stream core calls the agent's own methods (the same ones a browser
 // reaches at /api/rpc/<Method>, as far as the agent allows), and the agent
 // sends back the replies and everything its event bus says.
+// The package is wire protocol (the gRPC path every agent dials), so it keeps
+// the name the project had when agents first spoke it.
 
 package agentlinkpb
 
@@ -812,7 +814,7 @@ const file_agentlink_v1_agentlink_proto_rawDesc = "" +
 	"\n" +
 	"at_unix_ms\x18\x01 \x01(\x03R\batUnixMs2]\n" +
 	"\tAgentLink\x12P\n" +
-	"\aConnect\x12 .superai.agentlink.v1.AgentFrame\x1a\x1f.superai.agentlink.v1.CoreFrame(\x010\x01BAZ?github.com/liliang-cn/superai/internal/agentlink/pb;agentlinkpbb\x06proto3"
+	"\aConnect\x12 .superai.agentlink.v1.AgentFrame\x1a\x1f.superai.agentlink.v1.CoreFrame(\x010\x01BBZ@github.com/liliang-cn/superleo/internal/agentlink/pb;agentlinkpbb\x06proto3"
 
 var (
 	file_agentlink_v1_agentlink_proto_rawDescOnce sync.Once

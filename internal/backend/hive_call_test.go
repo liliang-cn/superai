@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-// fakeWorker stands in for a SuperAI: /api/events streams what the test pushes,
+// fakeWorker stands in for a SuperLeo: /api/events streams what the test pushes,
 // /api/rpc/SendChat records the command and replies with a request id.
 type fakeWorker struct {
 	srv       *httptest.Server

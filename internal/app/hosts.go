@@ -8,14 +8,14 @@ import (
 	"time"
 
 	"github.com/liliang-cn/agentexec"
-	agentlinkpb "github.com/liliang-cn/superai/internal/agentlink/pb"
-	"github.com/liliang-cn/superai/internal/backend"
+	agentlinkpb "github.com/liliang-cn/superleo/internal/agentlink/pb"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // Host is a box agents run on: a pod, a container, a Mac, a VM or a bare
-// machine. What runs on it is a list of agents: SuperAI itself (as queen,
+// machine. What runs on it is a list of agents: SuperLeo itself (as queen,
 // worker, machine agent or relay), the coding CLIs installed there, and the
-// named agents (openclaw, hermes, pi) a SuperAI on it serves.
+// named agents (openclaw, hermes, pi) a SuperLeo on it serves.
 //
 // The hive used to be three lists that each knew part of this (the hive
 // roster, the agent link, the configured remote agents), joined by name in
@@ -24,7 +24,7 @@ type Host struct {
 	// ID is unique in the list and is what Parent refers to: the host's own
 	// name, lower case.
 	ID string `json:"id"`
-	// Name is what people call it: the name its SuperAI links with when that
+	// Name is what people call it: the name its SuperLeo links with when that
 	// is a machine agent ("mac", "orange1"), else the host's own name.
 	Name     string `json:"name"`
 	Hostname string `json:"hostname,omitempty"`
@@ -55,9 +55,9 @@ const hostKindHA = "ha"
 
 // What an agent on a host is.
 const (
-	hostAgentSuperAI = "superai" // a SuperAI process: core, a worker, superai agent
+	hostAgentSuperLeo = "superai" // a SuperLeo process: core, a worker, superleo agent
 	hostAgentCLI     = "cli"     // a coding CLI installed there: claude, codex, ...
-	hostAgentNamed   = "agent"   // a named agent a SuperAI serves: openclaw, hermes, pi
+	hostAgentNamed   = "agent"   // a named agent a SuperLeo serves: openclaw, hermes, pi
 )
 
 // HostAgent is one agent on a host.
@@ -66,11 +66,11 @@ type HostAgent struct {
 	// "openclaw".
 	Name string `json:"name"`
 	Kind string `json:"kind"`
-	// Role is a SuperAI's part in the hive: queen, worker, machine, relay,
+	// Role is a SuperLeo's part in the hive: queen, worker, machine, relay,
 	// or standalone for a core that is in no hive.
 	Role  string `json:"role,omitempty"`
 	About string `json:"about,omitempty"`
-	// State is live or lost for a SuperAI; for a CLI working, waiting, idle
+	// State is live or lost for a SuperLeo; for a CLI working, waiting, idle
 	// (a session open) or installed; configured for an agent only the
 	// settings know.
 	State string `json:"state"`
@@ -80,16 +80,16 @@ type HostAgent struct {
 	// are one agent.
 	Activity string `json:"activity,omitempty"`
 	Version  string `json:"version,omitempty"`
-	// Via is the SuperAI on this host that runs it for core: a CLI's or a
+	// Via is the SuperLeo on this host that runs it for core: a CLI's or a
 	// named agent's.
 	Via string `json:"via,omitempty"`
-	// MCP is the MCP servers a SuperAI can call, where it has said.
+	// MCP is the MCP servers a SuperLeo can call, where it has said.
 	MCP []string `json:"mcp,omitempty"`
 	// Service is the HA service it belongs to, when it is kept up as one:
 	// it runs on the service's active host and stands by on the others
 	// (state standby), and is reached at the service's IP.
 	Service string `json:"service,omitempty"`
-	// Unrunnable is a coding CLI seen running on its host that the SuperAI
+	// Unrunnable is a coding CLI seen running on its host that the SuperLeo
 	// there cannot start: not installed for it, or its CLIs switched off.
 	// Someone is using it; core cannot hand it work.
 	Unrunnable bool `json:"unrunnable,omitempty"`
@@ -218,7 +218,7 @@ func (c *Host) joinHA(ag HostAgent) {
 }
 
 // onlyWhatWorks keeps the agents that can do work, and the hosts only as the
-// places they are. A SuperAI with no model of its own (a machine or relay
+// places they are. A SuperLeo with no model of its own (a machine or relay
 // agent) thinks nothing: it is how the queen reaches that machine, to look at
 // it or run what is installed there, not a member. So it is not drawn, and a
 // host with nothing left on it, nor inside it, is not either. The CLIs and
@@ -264,8 +264,8 @@ func onlyWhatWorks(t HiveTopology) HiveTopology {
 }
 
 // canWork is whether an agent on a host is one that can take work.
-//   - A SuperAI that is a machine or a relay agent has no model: no.
-//   - A coding CLI the SuperAI on its host cannot start is no worker, however
+//   - A SuperLeo that is a machine or a relay agent has no model: no.
+//   - A coding CLI the SuperLeo on its host cannot start is no worker, however
 //     busy someone keeps it there.
 //   - A coding CLI that is only installed counts when it is one that can say
 //     it is signed in (claude, codex): a signed-out one is never reported
@@ -274,7 +274,7 @@ func onlyWhatWorks(t HiveTopology) HiveTopology {
 //     running, is a spare address for one running elsewhere: no.
 func canWork(ag HostAgent, running map[string]bool) bool {
 	switch ag.Kind {
-	case hostAgentSuperAI:
+	case hostAgentSuperLeo:
 		return ag.Role != agentRoleMachine && ag.Role != agentRoleRelay
 	case hostAgentCLI:
 		if ag.Unrunnable {
@@ -333,7 +333,7 @@ func (a *App) hostsWith(services []backend.HAService) []Host {
 	if svc := a.svc; svc != nil {
 		mcp = svc.MCPServersWithTools()
 	}
-	b.agent(me, HostAgent{Name: selfName, Kind: hostAgentSuperAI, Role: selfRole, State: "live", Version: buildVersion(), MCP: mcp})
+	b.agent(me, HostAgent{Name: selfName, Kind: hostAgentSuperLeo, Role: selfRole, State: "live", Version: buildVersion(), MCP: mcp})
 	b.clis(me, selfName, cliNames(a.localAgentNames()), a.CLIActivityAll()["core"])
 
 	// Hive workers, by what they said when they joined.
@@ -354,7 +354,7 @@ func (a *App) hostsWith(services []backend.HAService) []Host {
 				x.lost(m.LastSeen)
 			}
 			about := m.Engine
-			b.agent(x, HostAgent{Name: m.Name, Kind: hostAgentSuperAI, Role: backend.HiveRoleWorker, About: about,
+			b.agent(x, HostAgent{Name: m.Name, Kind: hostAgentSuperLeo, Role: backend.HiveRoleWorker, About: about,
 				State: m.State, Version: m.Version, MCP: m.MCP})
 		}
 	}
@@ -367,7 +367,7 @@ func (a *App) hostsWith(services []backend.HAService) []Host {
 		r := role(c.name(), helloRole(hello))
 		x := b.linked(c.name(), hello, r)
 		x.live(time.UnixMilli(c.lastSeen.Load()))
-		b.agent(x, HostAgent{Name: c.name(), Kind: hostAgentSuperAI, Role: r, State: "live", Version: hello.GetVersion()})
+		b.agent(x, HostAgent{Name: c.name(), Kind: hostAgentSuperLeo, Role: r, State: "live", Version: hello.GetVersion()})
 		b.clis(x, c.name(), hello.GetClis(), c.cliActivity())
 		for _, n := range hello.GetAgents() {
 			b.agent(x, HostAgent{Name: n.GetName(), Kind: hostAgentNamed, About: n.GetAbout(), State: "live", Via: c.name()})
@@ -379,7 +379,7 @@ func (a *App) hostsWith(services []backend.HAService) []Host {
 		r := role(name, hub.declaredRole(name))
 		x := b.linked(name, hello, r)
 		x.lost(seen)
-		b.agent(x, HostAgent{Name: name, Kind: hostAgentSuperAI, Role: r, State: "lost", Version: hello.GetVersion()})
+		b.agent(x, HostAgent{Name: name, Kind: hostAgentSuperLeo, Role: r, State: "lost", Version: hello.GetVersion()})
 	}
 
 	// HA services: an agent one of them runs is that service's, live on its
@@ -423,8 +423,8 @@ func (a *App) hostsWith(services []backend.HAService) []Host {
 			ha := haServes(services, n)
 			follows := !ha && ra.FollowsOneHost()
 			for _, h := range ra.Hosts {
-				// Installed beside this SuperAI: on this machine, and up as
-				// long as this SuperAI is.
+				// Installed beside this SuperLeo: on this machine, and up as
+				// long as this SuperLeo is.
 				if backend.IsLocalHost(h) && !me.hasNamed(n) {
 					b.agent(me, HostAgent{Name: n, Kind: hostAgentNamed, About: ra.About, State: "live"})
 				}
@@ -711,7 +711,7 @@ func (b *hostBook) host(hostname, fallback, kind, goos, arch, parent string) *Ho
 	return x
 }
 
-// linked is the host a linked SuperAI runs on. A machine agent's link name is
+// linked is the host a linked SuperLeo runs on. A machine agent's link name is
 // the name people gave that box, so the host goes by it.
 func (b *hostBook) linked(name string, hello *agentlinkpb.Hello, role string) *Host {
 	kind := hello.GetKind()
@@ -761,7 +761,7 @@ func (b *hostBook) agent(x *Host, g HostAgent) {
 func (b *hostBook) clis(x *Host, via string, names []string, act cliMap) {
 	seen := map[string]bool{}
 	add := func(cli string, runnable bool) {
-		// An older agent still reports what SuperAI no longer offers.
+		// An older agent still reports what SuperLeo no longer offers.
 		if seen[cli] || retiredCLIs[cli] {
 			return
 		}

@@ -49,14 +49,14 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // authFileName sits in the data directory, beside settings.json.
 const authFileName = "auth.json"
 
 // sessionCookie is the browser's proof it typed the password.
-const sessionCookie = "superai_session"
+const sessionCookie = "superleo_session"
 
 // sessionLifetime is long on purpose: this is one person's own assistant on
 // their own machine, and being thrown back to a password box every week is
@@ -95,7 +95,7 @@ func loadOrCreateCredentials() (*credentials, error) {
 			return nil, fmt.Errorf("%s has neither a password nor a token", p)
 		}
 		if c.User == "" {
-			c.User = "superai"
+			c.User = "superleo"
 		}
 		if c.devices, err = openDevices(devicesPath()); err != nil {
 			return nil, err
@@ -119,7 +119,7 @@ func loadOrCreateCredentials() (*credentials, error) {
 	}
 
 	password := randomSecret(12)
-	c := &credentials{User: "superai", Token: randomSecret(24), SessionKey: randomSecret(32)}
+	c := &credentials{User: "superleo", Token: randomSecret(24), SessionKey: randomSecret(32)}
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, err
@@ -165,7 +165,7 @@ func randomSecret(nBytes int) string {
 	b := make([]byte, nBytes)
 	if _, err := rand.Read(b); err != nil {
 		// A credential that is not random is not a credential.
-		panic("superai: cannot read random bytes for a credential: " + err.Error())
+		panic("superleo: cannot read random bytes for a credential: " + err.Error())
 	}
 	return hex.EncodeToString(b)
 }

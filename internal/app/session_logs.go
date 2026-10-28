@@ -57,7 +57,7 @@ func sessionLogFile(cli, session string) (string, error) {
 	case "pi":
 		pats = []string{filepath.Join(home, ".pi", "agent", "sessions", "*", "*_"+session+".jsonl")}
 	default:
-		return "", fmt.Errorf("%s keeps no log SuperAI can read", cli)
+		return "", fmt.Errorf("%s keeps no log SuperLeo can read", cli)
 	}
 	var found []string
 	for _, p := range pats {

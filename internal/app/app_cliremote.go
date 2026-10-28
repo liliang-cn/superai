@@ -2,7 +2,7 @@ package app
 
 // Claude Code on another machine, driven from this one.
 //
-// The other machine runs SuperAI too, with External agents on, and is listed
+// The other machine runs SuperLeo too, with External agents on, and is listed
 // here under Remote agents by URL and token. Its CLIs are then addressable as
 // "claude.<name>": the run starts there, through its StartCLIRun, and is
 // mirrored here as a run of this app's own — every event copied over its event
@@ -24,7 +24,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 type cliRemote struct {
@@ -46,7 +46,7 @@ func splitRemoteCLI(name string) (agent, host string, ok bool) {
 	return name[:i], name[i+1:], true
 }
 
-// cliRemotes is every other SuperAI configured by URL, and every agent
+// cliRemotes is every other SuperLeo configured by URL, and every agent
 // connected over the agent link. A connected agent wins over a URL of the
 // same name: it is the one that is certainly there.
 func (a *App) cliRemotes() map[string]cliRemote {
@@ -182,7 +182,7 @@ func (a *App) remoteCLINames() []map[string]string {
 func (a *App) startRemoteCLIRun(o cliStart, host string) (CLIRun, error) {
 	r, ok := a.cliRemotes()[host]
 	if !ok {
-		return CLIRun{}, fmt.Errorf("no SuperAI called %s under Remote agents", host)
+		return CLIRun{}, fmt.Errorf("no SuperLeo called %s under Remote agents", host)
 	}
 	// The stream is opened before the run is started: a run that ends fast
 	// would otherwise finish before anyone here is listening.

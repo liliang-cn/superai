@@ -121,8 +121,8 @@ func (a *App) lastChatRun(chat, agent string, queen bool) *CLIRun {
 }
 
 // isDrivenCLI reports whether a name is an agent CLI the run manager drives —
-// on this machine, or "claude.host" on another SuperAI — rather than an agent
-// reached the older way, by SSH or as a whole SuperAI.
+// on this machine, or "claude.host" on another SuperLeo — rather than an agent
+// reached the older way, by SSH or as a whole SuperLeo.
 func (a *App) isDrivenCLI(name string) bool {
 	if a.isRemoteCLI(name) {
 		return true

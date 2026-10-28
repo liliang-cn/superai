@@ -1,6 +1,6 @@
 package app
 
-// Linking another SuperAI, the way a phone is paired with one: the other side
+// Linking another SuperLeo, the way a phone is paired with one: the other side
 // shows a six-digit code (Settings › Runtime › Pair a device), this side is
 // given its address and the code, and claims a device key of its own. The
 // key goes under Remote agents with the address, and the other machine's CLIs
@@ -21,11 +21,11 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
-// LinkedSuperAI is one other SuperAI this one can drive.
-type LinkedSuperAI struct {
+// LinkedSuperLeo is one other SuperLeo this one can drive.
+type LinkedSuperLeo struct {
 	Name string   `json:"name"`
 	URL  string   `json:"url"`
 	CLIs []string `json:"clis"`
@@ -33,10 +33,10 @@ type LinkedSuperAI struct {
 	Reachable bool `json:"reachable"`
 }
 
-// LinkSuperAI pairs with the SuperAI at address using a code it is showing,
+// LinkSuperLeo pairs with the SuperLeo at address using a code it is showing,
 // and returns the name its CLIs are addressed by ("claude.<name>").
-func (a *App) LinkSuperAI(address, code, name string) (string, error) {
-	base, err := normaliseSuperAIURL(address)
+func (a *App) LinkSuperLeo(address, code, name string) (string, error) {
+	base, err := normaliseSuperLeoURL(address)
 	if err != nil {
 		return "", err
 	}
@@ -63,7 +63,7 @@ func (a *App) LinkSuperAI(address, code, name string) (string, error) {
 	}
 
 	host, _ := os.Hostname()
-	body, _ := json.Marshal(map[string]string{"code": digits, "device": strings.TrimSuffix(host, ".local") + " · SuperAI"})
+	body, _ := json.Marshal(map[string]string{"code": digits, "device": strings.TrimSuffix(host, ".local") + " · SuperLeo"})
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, base+pairClaimPath, bytes.NewReader(body))
@@ -87,12 +87,12 @@ func (a *App) LinkSuperAI(address, code, name string) (string, error) {
 	}
 
 	link := backend.RemoteAgent{
-		About: "SuperAI at " + strings.TrimPrefix(strings.TrimPrefix(base, "http://"), "https://"),
+		About: "SuperLeo at " + strings.TrimPrefix(strings.TrimPrefix(base, "http://"), "https://"),
 		URL:   base, Token: got.Token,
 	}
-	links := backend.LoadLinkedSuperAIs()
+	links := backend.LoadLinkedSuperLeos()
 	links[name] = link
-	if err := backend.SaveLinkedSuperAIs(links); err != nil {
+	if err := backend.SaveLinkedSuperLeos(links); err != nil {
 		return "", err
 	}
 	s := a.GetSettings()
@@ -108,11 +108,11 @@ func (a *App) LinkSuperAI(address, code, name string) (string, error) {
 	return name, nil
 }
 
-// LinkedSuperAIs lists the other SuperAIs and the CLIs each has.
-func (a *App) LinkedSuperAIs() []LinkedSuperAI {
+// LinkedSuperLeos lists the other SuperLeos and the CLIs each has.
+func (a *App) LinkedSuperLeos() []LinkedSuperLeo {
 	a.forgetRemoteCLIs()
 	clis := a.remoteCLIs()
-	out := []LinkedSuperAI{}
+	out := []LinkedSuperLeo{}
 	for name, r := range a.cliRemotes() {
 		_, ok := clis[name]
 		if !ok {
@@ -121,22 +121,22 @@ func (a *App) LinkedSuperAIs() []LinkedSuperAI {
 			ok = r.rpc(ctx, "ExternalAgentsStatus", []any{}, nil) == nil
 			cancel()
 		}
-		out = append(out, LinkedSuperAI{Name: name, URL: r.base, CLIs: clis[name], Reachable: ok})
+		out = append(out, LinkedSuperLeo{Name: name, URL: r.base, CLIs: clis[name], Reachable: ok})
 	}
 	return out
 }
 
-// UnlinkSuperAI forgets another SuperAI here. Its key stays valid there until
+// UnlinkSuperLeo forgets another SuperLeo here. Its key stays valid there until
 // this machine is unpaired on that side.
-func (a *App) UnlinkSuperAI(name string) error {
+func (a *App) UnlinkSuperLeo(name string) error {
 	s := a.GetSettings()
 	if _, ok := s.RemoteAgents.Agents[name]; !ok {
 		return fmt.Errorf("no remote agent called %s", name)
 	}
 	delete(s.RemoteAgents.Agents, name)
-	links := backend.LoadLinkedSuperAIs()
+	links := backend.LoadLinkedSuperLeos()
 	delete(links, name)
-	if err := backend.SaveLinkedSuperAIs(links); err != nil {
+	if err := backend.SaveLinkedSuperLeos(links); err != nil {
 		return err
 	}
 	if err := a.SaveSettings(s); err != nil {
@@ -152,7 +152,7 @@ func (a *App) forgetRemoteCLIs() {
 	a.remoteCLI.mu.Unlock()
 }
 
-func normaliseSuperAIURL(raw string) (string, error) {
+func normaliseSuperLeoURL(raw string) (string, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
 		return "", errors.New("the address is empty")

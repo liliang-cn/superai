@@ -8,7 +8,7 @@ import (
 )
 
 func TestTheQueenIsCalledQueenUntilSomeoneNamesHer(t *testing.T) {
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	s, err := LoadSettings()
 	if err != nil {
 		t.Fatal(err)
@@ -26,7 +26,7 @@ func TestTheQueenIsCalledQueenUntilSomeoneNamesHer(t *testing.T) {
 }
 
 func TestAQueenNameIsSavedAndSurvivesSettingsBeingRewritten(t *testing.T) {
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	s, _ := LoadSettings()
 	s.QueenName = " 小蜂 "
 	s.QueenAliases = []string{"bee", "", "Bee", "小蜂", "queen", "蜂蜂"}

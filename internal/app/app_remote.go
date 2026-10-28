@@ -15,7 +15,7 @@ import (
 	"github.com/liliang-cn/agent-go/v3/pkg/agent"
 	"github.com/liliang-cn/agent-go/v3/pkg/domain"
 	"github.com/liliang-cn/agentexec"
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // Asking another agent, by name.
@@ -25,9 +25,9 @@ import (
 // person typing:
 //
 //   - At the front, it is an address. The message goes to pi and pi's answer
-//     comes back. SuperAI's own model never runs, which is the point: a
+//     comes back. SuperLeo's own model never runs, which is the point: a
 //     forwarded question should not cost a turn of thinking to forward.
-//   - Anywhere else, it is a mention. SuperAI runs the turn and decides, and
+//   - Anywhere else, it is a mention. SuperLeo runs the turn and decides, and
 //     the tools below are how it acts on that — so "let @pi and @hermes each
 //     look and compare" is one turn that makes two calls, rather than a
 //     routing rule that cannot express it.
@@ -237,8 +237,8 @@ func (a *App) RemoteAgentNames() []map[string]string {
 // A method of its own rather than a branch inside SendChat's reply, because
 // the two produce different things. SendChat streams a turn; this returns one
 // answer and never touches the conversation's history — a routed question is
-// addressed to somebody else, and folding its answer into SuperAI's own
-// session would make the next turn read as if SuperAI had said it.
+// addressed to somebody else, and folding its answer into SuperLeo's own
+// session would make the next turn read as if SuperLeo had said it.
 func (a *App) AskRemoteAgent(name, prompt string) backend.RemoteResult {
 	return a.askAgent(context.Background(), name, prompt)
 }
@@ -264,7 +264,7 @@ func (a *App) askAgent(ctx context.Context, name, prompt string) backend.RemoteR
 		return viaLink(c, name)
 	}
 	// One placement of an agent that runs on several hosts, "pi.sds-a": the
-	// SuperAI on that machine when it serves it, else the settings' ssh
+	// SuperLeo on that machine when it serves it, else the settings' ssh
 	// destination that is that machine. Only then any host that has it, so
 	// a name kept from before an HA failover still gets an answer.
 	if bare, machine, ok := splitAddress(name); ok {
@@ -487,7 +487,7 @@ func (a *App) registerRemoteTools(svc *backend.Service, cfg backend.RemoteAgents
 // about a case that differs only in who answered.
 //
 // The exchange is then written into the conversation. It first was not, on the
-// reasoning that another agent's words should not be filed under SuperAI's
+// reasoning that another agent's words should not be filed under SuperLeo's
 // name — but the reply carries its own attribution, and leaving it out meant
 // the answer existed on screen and nowhere else: the next turn could not refer
 // to what @hermes had just said, and reopening the conversation showed a gap
@@ -533,7 +533,7 @@ func (a *App) routeToRemote(requestID, sessionID, name, prompt string) {
 		}
 		// Attributed in the reply itself. The answer is not this app's and a
 		// transcript that presented it unmarked would be putting another
-		// agent's words in SuperAI's mouth.
+		// agent's words in SuperLeo's mouth.
 		reply := fmt.Sprintf("**@%s** · %s · %.1fs\n\n%s", res.Agent, res.Host, float64(res.MS)/1000, res.Text)
 		a.recordRoutedExchange(sessionID, name, prompt, reply)
 		a.emit("chat:done", map[string]any{"requestId": requestID, "final": reply})
@@ -553,7 +553,7 @@ func (a *App) routeToRemote(requestID, sessionID, name, prompt string) {
 // over its bookkeeping would take away the thing that did work.
 func (a *App) recordRoutedExchange(sessionID, name, prompt, reply string) {
 	if err := a.appendExchange(sessionID, "@"+name+" "+prompt, reply); err != nil {
-		log.Printf("superai: could not record the @%s exchange in %s: %v", name, sessionID, err)
+		log.Printf("superleo: could not record the @%s exchange in %s: %v", name, sessionID, err)
 	}
 }
 

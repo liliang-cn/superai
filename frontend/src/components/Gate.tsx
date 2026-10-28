@@ -1,6 +1,6 @@
 // The password box in front of the app.
 //
-// SuperAI in serve mode is one person's agent reachable over the internet, and
+// SuperLeo in serve mode is one person's agent reachable over the internet, and
 // it has shell tools, a workspace and a billing account behind it. Something
 // has to stand at the door.
 //
@@ -61,7 +61,7 @@ export default function Gate({ onEnter }: { onEnter: () => void }) {
         field.current?.focus();
         return;
       }
-      (window as unknown as { superaiStreamKick?: () => void }).superaiStreamKick?.();
+      (window as unknown as { superleoStreamKick?: () => void }).superleoStreamKick?.();
       onEnter();
     } catch {
       setErr("Cannot reach the server.");
@@ -74,7 +74,7 @@ export default function Gate({ onEnter }: { onEnter: () => void }) {
     <div className="cv-root gate2" style={themeVars(theme)}>
       <Sky at={new Date()} lanes={IDLE} base={theme.base} mode={theme.mode} />
       <form className="cv-glass gate2-card" onSubmit={submit}>
-        <h1>SuperAI</h1>
+        <h1>SuperLeo</h1>
         <p>Your hive is behind this door.</p>
         <div className="gate2-field">
           <input

@@ -30,7 +30,7 @@ import (
 // So this sits a counting reverse proxy between the agent and the real provider
 // and measures both.
 //
-//	SUPERAI_PTC_TEST=1 go test ./backend/ -run TestPTCRounds -v -count=1 -timeout 15m
+//	SUPERLEO_PTC_TEST=1 go test ./backend/ -run TestPTCRounds -v -count=1 -timeout 15m
 
 // countingProxy forwards to the real endpoint while recording each call.
 type countingProxy struct {
@@ -187,8 +187,8 @@ func measureRounds(t *testing.T, ptcOn bool) roundStats {
 
 // TestPTCRoundsTradeoff measures the thing PTC is actually supposed to improve.
 func TestPTCRoundsTradeoff(t *testing.T) {
-	if os.Getenv("SUPERAI_PTC_TEST") != "1" {
-		t.Skip("set SUPERAI_PTC_TEST=1 to measure PTC round-trips")
+	if os.Getenv("SUPERLEO_PTC_TEST") != "1" {
+		t.Skip("set SUPERLEO_PTC_TEST=1 to measure PTC round-trips")
 	}
 
 	on := measureRounds(t, true)

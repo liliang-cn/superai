@@ -16,7 +16,7 @@ type HostPort = { postMessage(message: string): void; addEventListener?(type: "m
 declare global {
   interface Window {
     /** Put there by the Android host (WebViewCompat.addWebMessageListener). */
-    SuperAIHost?: HostPort;
+    SuperLeoHost?: HostPort;
     /** For the host's tests and a desktop browser: the same doors by hand. */
     __world?: { receive(message: unknown): void; firePick(kind: string, id: string, title?: string): void; ready: boolean };
   }
@@ -42,10 +42,10 @@ function options(): EngineOptions {
 function send(m: EmbedMessage) {
   const s = JSON.stringify(m);
   try {
-    if (window.SuperAIHost) window.SuperAIHost.postMessage(s);
+    if (window.SuperLeoHost) window.SuperLeoHost.postMessage(s);
     else if (window.parent !== window) window.parent.postMessage(m, "*");
   } catch { /* a host that went away */ }
-  window.dispatchEvent(new CustomEvent("superai:out", { detail: m }));
+  window.dispatchEvent(new CustomEvent("superleo:out", { detail: m }));
 }
 
 /** The whole cluster from the usual corner, wide enough for a tall phone. */
@@ -125,7 +125,7 @@ function start() {
   // The host's messages: posted to the window (WebViewCompat.postWebMessage),
   // or answered on the injected port.
   window.addEventListener("message", (ev) => receive(ev.data));
-  window.SuperAIHost?.addEventListener?.("message", (ev) => receive(ev.data));
+  window.SuperLeoHost?.addEventListener?.("message", (ev) => receive(ev.data));
   // Out of sight in the host (another app in front): nothing to draw.
   document.addEventListener("visibilitychange", () => { if (document.hidden) e.setPaused(true); else e.setPaused(false); });
   window.__world = {

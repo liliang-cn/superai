@@ -7,7 +7,7 @@ package app
 // (integrations.go) is an agent running the queen's thinking from outside, and
 // it gets the cluster-command tools only: the hive, the machines, the
 // schedules, the task board, the pending approvals and the conversations. Not
-// superai_ask (that is asking herself), not settings, not bees or devices.
+// superleo_ask (that is asking herself), not settings, not bees or devices.
 //
 // The two are two MCP servers behind two streamable handlers, picked per
 // request by the scope requireAuth put on the request. Separate handlers mean
@@ -16,7 +16,7 @@ package app
 // filters tools/list and refuses tools/call for anything off its list, so a
 // tool added to the full server later does not quietly become hers.
 //
-// Destructive calls pass SuperAI's approval gate here, whoever makes them,
+// Destructive calls pass SuperLeo's approval gate here, whoever makes them,
 // exactly as the queen's own run passes it (mcpGate below).
 
 import (
@@ -26,7 +26,7 @@ import (
 	"slices"
 
 	"github.com/liliang-cn/agent-go/v3/pkg/agent"
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -46,16 +46,16 @@ func mcpScopeFrom(ctx context.Context) string {
 // queenMCPTools is everything a queen token may call.
 var queenMCPTools = []string{
 	// the hive
-	"superai_hive_members", "superai_hive_spawn", "superai_hive_retire", "superai_hive_map",
-	"superai_hive_command", "superai_hive_send", "superai_hive_inbox", "superai_hive_delegate",
-	"superai_hive_tasks", "superai_hive_task_cancel",
+	"superleo_hive_members", "superleo_hive_spawn", "superleo_hive_retire", "superleo_hive_map",
+	"superleo_hive_command", "superleo_hive_send", "superleo_hive_inbox", "superleo_hive_delegate",
+	"superleo_hive_tasks", "superleo_hive_task_cancel",
 	// the machines, and how the cluster is doing
-	"superai_machine_inspect", "superai_machine_act", "superai_linked_agents", "superai_status", "superai_attention",
+	"superleo_machine_inspect", "superleo_machine_act", "superleo_linked_agents", "superleo_status", "superleo_attention",
 	// schedules
-	"superai_schedule_create", "superai_schedule_list", "superai_schedule_enable",
-	"superai_schedule_delete", "superai_schedule_run_now",
+	"superleo_schedule_create", "superleo_schedule_list", "superleo_schedule_enable",
+	"superleo_schedule_delete", "superleo_schedule_run_now",
 	// approvals, read only, and the conversations
-	"superai_approvals_pending", "superai_conversations", "superai_chat_history",
+	"superleo_approvals_pending", "superleo_conversations", "superleo_chat_history",
 }
 
 // onlyTools is the queen server's enforcement: tools/list shows the allowed
@@ -105,10 +105,10 @@ func (h scopedMCPHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // gate knows it by in the queen's own run, so a remembered rule and the audit
 // log read the same whichever way the call came.
 var mcpGated = map[string]string{
-	"superai_machine_act":      "machine_act",
-	"superai_hive_retire":      "hive_retire",
-	"superai_hive_task_cancel": "hive_task_cancel",
-	"superai_schedule_delete":  "schedule_remove",
+	"superleo_machine_act":      "machine_act",
+	"superleo_hive_retire":      "hive_retire",
+	"superleo_hive_task_cancel": "hive_task_cancel",
+	"superleo_schedule_delete":  "schedule_remove",
 }
 
 type approvalByKey struct{}

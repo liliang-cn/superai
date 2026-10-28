@@ -1,7 +1,7 @@
 package app
 
 // The model's way to the run manager: hand a task to Claude Code or Codex,
-// here or on a linked SuperAI ("claude.mac"), and get its answer back. The run
+// here or on a linked SuperLeo ("claude.mac"), and get its answer back. The run
 // is an ordinary CLI run — on the Agents page, streaming, stoppable — which is
 // what cli_agent_run's blocking call is not; and it reaches other machines,
 // which is how a hive queen with no CLI of her own puts the Mac's Claude Code
@@ -14,7 +14,7 @@ import (
 	"strings"
 
 	"github.com/liliang-cn/agent-go/v3/pkg/agent"
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // registerCodingAgentTools runs inside the build, which holds a.mu: nothing
@@ -40,7 +40,7 @@ func (a *App) registerCodingAgentTools(svc *backend.Service, cfg *backend.Settin
 	}
 
 	inner.AddToolWithMetadata("coding_agent_list",
-		"The coding agents (Claude Code, Codex, …) this app can hand work to: on this machine by name, on a linked SuperAI as name.machine.",
+		"The coding agents (Claude Code, Codex, …) this app can hand work to: on this machine by name, on a linked SuperLeo as name.machine.",
 		map[string]any{"type": "object", "properties": map[string]any{}},
 		func(ctx context.Context, _ map[string]any) (any, error) {
 			b, err := json.Marshal(a.codingAgents())
@@ -50,7 +50,7 @@ func (a *App) registerCodingAgentTools(svc *backend.Service, cfg *backend.Settin
 
 	inner.AddToolWithMetadata("coding_agent_run",
 		"Hand a task to a coding agent — Claude Code, Codex — and wait for its answer."+
-			" On this machine by name (\"claude\"), on a linked SuperAI as name.machine"+
+			" On this machine by name (\"claude\"), on a linked SuperLeo as name.machine"+
 			" (\"claude.mac\"); coding_agent_list says which exist."+
 			"\n\nRight for real work in a code base or a shell on that machine: changes,"+
 			" builds, investigations. The prompt must stand on its own; the agent sees none of"+

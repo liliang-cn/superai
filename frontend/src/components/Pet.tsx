@@ -93,7 +93,7 @@ const MARGIN = 8;
  *  an open window never looks closed while it is sitting there. */
 const STAGE_EVERY = 45000;
 
-const STORAGE_KEY = "superai-pet-char";
+const STORAGE_KEY = "superleo-pet-char";
 
 /**
  * Where the avatar bridge is, from this page.
@@ -104,7 +104,7 @@ const STORAGE_KEY = "superai-pet-char";
  * letting the pet out over the network did nothing at all. There the app
  * proxies /avatar itself, same origin, behind the same session.
  */
-const served = Boolean((window as unknown as Record<string, unknown>).superaiServed);
+const served = Boolean((window as unknown as Record<string, unknown>).superleoServed);
 const avatarBase = (port: number) => (served ? "" : `http://127.0.0.1:${port}`);
 
 type Pos = { x: number; y: number };
@@ -599,7 +599,7 @@ export default function Pet({
           onDoubleClick={onDismiss}
           title={`${state} — click to change, double-click to send away`}
           role="img"
-          aria-label={`SuperAI ${character}, ${state}`}
+          aria-label={`SuperLeo ${character}, ${state}`}
         />
       </div>
     </div>

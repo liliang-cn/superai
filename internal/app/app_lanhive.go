@@ -1,6 +1,6 @@
 package app
 
-// A hive on a local network: machines joined to a SuperAI over the agent
+// A hive on a local network: machines joined to a SuperLeo over the agent
 // link (app_agentdoor.go), and a queen among them. When she goes, the ones
 // that can think pick another among themselves, the way a hive's pods do
 // (backend/hive_election.go), and follow her.
@@ -37,7 +37,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 const (
@@ -78,7 +78,7 @@ type lanHive struct {
 func lanRosterPath() string { return filepath.Join(backend.DataDir(), "lan-hive.json") }
 func hiveKeyPath() string   { return filepath.Join(backend.DataDir(), "hive-key") }
 
-// hiveKey is this hive's key, "" when this SuperAI is in none.
+// hiveKey is this hive's key, "" when this SuperLeo is in none.
 func hiveKey() string {
 	raw, err := os.ReadFile(hiveKeyPath())
 	if err != nil {
@@ -108,10 +108,10 @@ func hiveKeyMatches(tok string) bool {
 }
 
 // doorPorts are the claim and link ports of this app's door:
-// $SUPERAI_AGENT_DOOR_PORT for the link (the claim one below it), else the
+// $SUPERLEO_AGENT_DOOR_PORT for the link (the claim one below it), else the
 // desktop app's.
 func doorPorts() (claim, link int) {
-	if p, err := strconv.Atoi(strings.TrimSpace(os.Getenv("SUPERAI_AGENT_DOOR_PORT"))); err == nil && p > 1 {
+	if p, err := strconv.Atoi(strings.TrimSpace(os.Getenv("SUPERLEO_AGENT_DOOR_PORT"))); err == nil && p > 1 {
 		return p - 1, p
 	}
 	return desktopClaimPort, desktopAgentPort

@@ -3,7 +3,7 @@ import { translate, useI18n } from "../lib/i18n";
 import LanguageSettings from "../components/LanguageSettings";
 import AvatarSection from "./AvatarSection";
 import PairPhoneCard from "../components/PairPhoneCard";
-import LinkSuperAICard from "../components/LinkSuperAICard";
+import LinkSuperLeoCard from "../components/LinkSuperLeoCard";
 import LocalHiveCard from "../components/LocalHiveCard";
 import QueenEngineCard from "../components/QueenEngineCard";
 import ProxyCard from "../components/ProxyCard";
@@ -186,7 +186,7 @@ function QueenNameCard({ name, aliases, onChange, hidden }: {
 
 // Only the desktop window has anywhere to go. Served, this is the tab you are
 // already reading it in, so the card is not rendered at all.
-const served = Boolean((window as unknown as Record<string, unknown>).superaiServed);
+const served = Boolean((window as unknown as Record<string, unknown>).superleoServed);
 
 function OpenInBrowserCard() {
   const [origin, setOrigin] = useState("");
@@ -217,7 +217,7 @@ function OpenInBrowserCard() {
         Serve this running app on localhost and open it in your default browser. Not a copy —
         the same conversations, the same agent, the same runs in flight, seen from a second
         window. The link signs that browser in once and then expires; the server stops when
-        SuperAI quits.
+        SuperLeo quits.
       </div>
       {origin && (
         <div className="url-box" style={{ marginBottom: 14 }}>
@@ -259,12 +259,12 @@ const SECTIONS: { id: SectionID; label: string }[] = [
   { id: "safety", label: "Safety" },
   // Next to Safety, not to Runtime: the decisions on this tab are who else
   // gets to touch this machine, which is the same question the tab before it
-  // asks about SuperAI itself.
+  // asks about SuperLeo itself.
   { id: "agents", label: "External agents" },
   { id: "runtime", label: "Runtime" },
 ];
 
-/** The agent CLIs SuperAI can hand a task to, in the order they are listed. */
+/** The agent CLIs SuperLeo can hand a task to, in the order they are listed. */
 const AGENT_CLIS: { name: string; label: string }[] = [
   { name: "claude", label: "Claude Code" },
   { name: "codex", label: "Codex" },
@@ -315,7 +315,7 @@ function ExternalAgentsCard({
     <div className="card">
       <div className="card-title">External agents</div>
       <div className="card-desc">
-        Let SuperAI hand a task to an agent CLI already installed here. It spends that
+        Let SuperLeo hand a task to an agent CLI already installed here. It spends that
         subscription, not this app's, and the CLI writes files with its own approval prompt
         bypassed — so this is off until you turn it on.
       </div>
@@ -325,7 +325,7 @@ function ExternalAgentsCard({
         <div className="toggle" onClick={() => onChange({ enabled: !ea.enabled })} style={{ cursor: "pointer", marginTop: 2 }}>
           <div className={`switch${ea.enabled ? " on" : ""}`}><div className="knob" /></div>
           <span style={{ fontSize: 13, color: "var(--text-1)" }}>
-            {ea.enabled ? "On — SuperAI may hand work to the CLIs below" : "Off — SuperAI does every task itself"}
+            {ea.enabled ? "On — SuperLeo may hand work to the CLIs below" : "Off — SuperLeo does every task itself"}
           </span>
         </div>
       </div>
@@ -505,7 +505,7 @@ function RemoteAgentsCard({
       <div className="card-desc">
         Ask an agent that is not on this laptop — pi, hermes and openclaw on the cluster.
         They are reached over SSH as the account that already has a key on those nodes, so
-        turning this on lets SuperAI run commands there. Off until you say otherwise.
+        turning this on lets SuperLeo run commands there. Off until you say otherwise.
       </div>
 
       <div className="field">
@@ -554,7 +554,7 @@ function RemoteAgentsCard({
           <span className="hint">
             The hosts are tried in order and the one currently holding the agent wins, because
             the cluster moves it between nodes. Edit them, or add an agent of your own, under
-            <code> remote_agents </code> in <code>~/.superai/settings.json</code>.
+            <code> remote_agents </code> in <code>~/.superleo/settings.json</code>.
           </span>
         </div>
       )}
@@ -864,8 +864,8 @@ export default function SettingsView({
                 <div className={`switch${s.cliproxy_enabled ? " on" : ""}`}><div className="knob" /></div>
                 <span style={{ fontSize: 13, color: "var(--text-1)" }}>
                   {s.cliproxy_enabled
-                    ? "On — SuperAI runs on your signed-in accounts"
-                    : "Off — SuperAI uses the API endpoint set under Advanced"}
+                    ? "On — SuperLeo runs on your signed-in accounts"
+                    : "Off — SuperLeo uses the API endpoint set under Advanced"}
                 </span>
               </div>
             </div>
@@ -875,7 +875,7 @@ export default function SettingsView({
                 {proxy?.running ? (
                   <span className="hint">
                     {proxy.models?.length
-                      ? `${proxy.models.length} models available from your accounts — pick the one SuperAI should think with.`
+                      ? `${proxy.models.length} models available from your accounts — pick the one SuperLeo should think with.`
                       : "No accounts yet — sign in below to see the models you can use."}
                   </span>
                 ) : (
@@ -1174,7 +1174,7 @@ export default function SettingsView({
               label="Webhook URL"
               value={s.webhook_url}
               onChange={(v) => set("webhook_url", v)}
-              placeholder="https://example.com/superai-hook"
+              placeholder="https://example.com/superleo-hook"
               hint="Empty disables it. Serve mode has no desktop notification, so without this a reminder that fires reaches only the log."
             />
             <PasswordField
@@ -1287,7 +1287,7 @@ export default function SettingsView({
           <div className="card" hidden={section !== "runtime"}>
             <div className="card-title">{translate("Runtime")}</div>
             <div className="card-desc">Workspace, agent loop limits, and avatar bridge.</div>
-            <TextField label="Workspace Directory" value={s.workspace_dir} onChange={(v) => set("workspace_dir", v)} placeholder="~/.superai/workspace" hint="Where the agent reads and writes deliverable files." />
+            <TextField label="Workspace Directory" value={s.workspace_dir} onChange={(v) => set("workspace_dir", v)} placeholder="~/.superleo/workspace" hint="Where the agent reads and writes deliverable files." />
             <div className="row2">
               <div className="field">
                 <label>Max Rounds</label>
@@ -1393,7 +1393,7 @@ export default function SettingsView({
             />
           )}
           {section === "runtime" && (
-            <LinkSuperAICard
+            <LinkSuperLeoCard
               onChanged={(fresh) => setS((cur) => (cur ? backend.Settings.createFrom({ ...cur, remote_agents: fresh.remote_agents }) : fresh))}
             />
           )}

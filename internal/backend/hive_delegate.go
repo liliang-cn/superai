@@ -63,7 +63,7 @@ func (h HiveSettings) DelegationMode() string {
 		return DelegationOff
 	}
 	v := strings.ToLower(strings.TrimSpace(h.Delegation))
-	if env := strings.ToLower(strings.TrimSpace(os.Getenv("SUPERAI_HIVE_DELEGATION"))); env != "" {
+	if env := strings.ToLower(strings.TrimSpace(os.Getenv("SUPERLEO_HIVE_DELEGATION"))); env != "" {
 		v = env
 	}
 	switch v {

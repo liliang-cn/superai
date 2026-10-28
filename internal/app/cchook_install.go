@@ -1,18 +1,18 @@
 package app
 
-// `superai hook install`: put SuperAI's Claude Code hooks into the person's
+// `superleo hook install`: put SuperLeo's Claude Code hooks into the person's
 // Claude Code settings, beside whatever else is there.
 //
 // The settings file is shared: other tools keep their own hooks in it (on
 // the Mac: anywhered, Otty, an iTerm2 status script), and the person keeps
 // everything else. So the install only ever adds: one entry per event that
-// has no `superai hook <Event>` yet, at the end of that event's list, with
+// has no `superleo hook <Event>` yet, at the end of that event's list, with
 // every other byte of the file's values left as it was and the keys in their
 // order. Run again it finds its entries and changes nothing. The file before
-// a change is kept beside it as settings.json.superai.bak.
+// a change is kept beside it as settings.json.superleo.bak.
 //
 // A running node also upgrades the hooks on start (autoUpgradeCCHooks), but
-// only in a settings file that already has a SuperAI hook from the same
+// only in a settings file that already has a SuperLeo hook from the same
 // binary: the person opted in once, and a newer build adding the events it
 // has learned to read is that same choice. A file without one is left alone.
 
@@ -29,19 +29,19 @@ import (
 	"strings"
 )
 
-// ccHookSpec is one hook SuperAI wants in Claude Code's settings.
+// ccHookSpec is one hook SuperLeo wants in Claude Code's settings.
 type ccHookSpec struct {
 	Event   string
 	Matcher string // "" for none
 	Args    string // after `hook <Event>`
 	Timeout int    // seconds
 	// Slim is an event that fires on every prompt or tool call: it runs
-	// superai-cchook, the small binary beside superai, when there is one —
-	// starting all of SuperAI for it cost each tool call 50 ms or more.
+	// superleo-cchook, the small binary beside superleo, when there is one —
+	// starting all of SuperLeo for it cost each tool call 50 ms or more.
 	Slim bool
 }
 
-// ccHookSpecs are SuperAI's hooks. The activity-only ones get a short
+// ccHookSpecs are SuperLeo's hooks. The activity-only ones get a short
 // timeout: they return in milliseconds, and Claude Code waits on them.
 var ccHookSpecs = []ccHookSpec{
 	{Event: "SessionStart", Timeout: 5},
@@ -55,14 +55,16 @@ var ccHookSpecs = []ccHookSpec{
 	{Event: "PostToolUse", Matcher: "*", Timeout: 2, Slim: true},
 }
 
-// ccSlimHookName is the small hook binary's name, beside superai
-// (cmd/superai-cchook).
-const ccSlimHookName = "superai-cchook"
+// ccSlimHookName is the small hook binary's name, beside superleo
+// (cmd/superleo-cchook).
+const ccSlimHookName = "superleo-cchook"
 
-// slimHookRE finds `superai-cchook <Event>` in a hook command.
-var slimHookRE = regexp.MustCompile(`(?:^|[/\s'"])superai-cchook['"]?\s+([A-Za-z]+)`)
+// slimHookRE finds `superleo-cchook <Event>` in a hook command — or
+// `superai-cchook`, the name it was installed under before the rename, so an
+// old entry is replaced rather than left beside the new one.
+var slimHookRE = regexp.MustCompile(`(?:^|[/\s'"])super(?:leo|ai)-cchook['"]?\s+([A-Za-z]+)`)
 
-// isOurSlimHook says whether a command is superai-cchook for event.
+// isOurSlimHook says whether a command is superleo-cchook for event.
 func isOurSlimHook(command, event string) bool {
 	for _, m := range slimHookRE.FindAllStringSubmatch(command, -1) {
 		if m[1] == event {
@@ -72,7 +74,7 @@ func isOurSlimHook(command, event string) bool {
 	return false
 }
 
-// slimHookBeside is superai-cchook next to bin, or "" when it is not there.
+// slimHookBeside is superleo-cchook next to bin, or "" when it is not there.
 func slimHookBeside(bin string) string {
 	if bin == "" {
 		return ""
@@ -84,11 +86,12 @@ func slimHookBeside(bin string) string {
 	return ""
 }
 
-// ourHookRE finds `superai hook <Event>` in a hook command, whatever the
-// path to the binary and however it is quoted.
-var ourHookRE = regexp.MustCompile(`(?:^|[/\s'"])superai['"]?\s+hook\s+([A-Za-z]+)`)
+// ourHookRE finds `superleo hook <Event>` in a hook command, whatever the
+// path to the binary and however it is quoted; `superai hook` too, as it
+// was installed before the rename.
+var ourHookRE = regexp.MustCompile(`(?:^|[/\s'"])super(?:leo|ai)['"]?\s+hook\s+([A-Za-z]+)`)
 
-// isOurHook says whether a command is SuperAI's hook for event.
+// isOurHook says whether a command is SuperLeo's hook for event.
 func isOurHook(command, event string) bool {
 	for _, m := range ourHookRE.FindAllStringSubmatch(command, -1) {
 		if m[1] == event {
@@ -107,8 +110,8 @@ func hookQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
-// ccHookCommand is the command line for one spec: superai-cchook for a
-// slim event when slim names it, else `superai hook`.
+// ccHookCommand is the command line for one spec: superleo-cchook for a
+// slim event when slim names it, else `superleo hook`.
 func ccHookCommand(bin, slim string, sp ccHookSpec) string {
 	if sp.Slim && slim != "" {
 		return hookQuote(slim) + " " + sp.Event
@@ -204,7 +207,7 @@ func marshalPlain(v any) []byte {
 	return bytes.TrimRight(b.Bytes(), "\n")
 }
 
-// ccHookGroup is a hook group as SuperAI writes one, its keys in the order
+// ccHookGroup is a hook group as SuperLeo writes one, its keys in the order
 // Claude Code's own docs show them.
 type ccHookGroup struct {
 	Matcher string      `json:"matcher,omitempty"`
@@ -217,7 +220,7 @@ type ccHookCmd struct {
 	Timeout int    `json:"timeout,omitempty"`
 }
 
-// groupsHaveOurHook says whether an event's groups already run SuperAI's
+// groupsHaveOurHook says whether an event's groups already run SuperLeo's
 // hook for it.
 func groupsHaveOurHook(groups []json.RawMessage, event string) bool {
 	_, _, found := findOurHook(groups, event, isOurHook)
@@ -247,8 +250,8 @@ func findOurHook(groups []json.RawMessage, event string, is func(cmd, event stri
 
 // mergeCCHooks adds the specs missing from a settings file's content and
 // returns the new content and what changed, by event; the content is
-// unchanged when nothing did. With slim (superai-cchook's path) a slim
-// event's `superai hook` entry, as an older install wrote it, is moved to
+// unchanged when nothing did. With slim (superleo-cchook's path) a slim
+// event's `superleo hook` entry, as an older install wrote it, is moved to
 // slim in place: only that command string changes, nothing else in its
 // group or the file.
 func mergeCCHooks(content []byte, bin, slim string, specs []ccHookSpec) ([]byte, []string, error) {
@@ -287,7 +290,7 @@ func mergeCCHooks(content []byte, bin, slim string, specs []ccHookSpec) ([]byte,
 		}
 		change := sp.Event
 		if _, _, ok := findOurHook(groups, sp.Event, isOurSlimHook); ok {
-			continue // superai-cchook already, whichever binary is here now
+			continue // superleo-cchook already, whichever binary is here now
 		}
 		if gi, cmd, ok := findOurHook(groups, sp.Event, isOurHook); ok {
 			if !sp.Slim || slim == "" {
@@ -332,14 +335,14 @@ func mergeCCHooks(content []byte, bin, slim string, specs []ccHookSpec) ([]byte,
 	return out.Bytes(), added, nil
 }
 
-// installCCHooks merges SuperAI's hooks into the settings file at path,
+// installCCHooks merges SuperLeo's hooks into the settings file at path,
 // creating it when there is none. It writes only when something was missing,
 // keeping the file as it was beside it first.
 func installCCHooks(path, bin string) ([]string, error) {
 	return installCCHooksWith(path, bin, slimHookBeside(bin))
 }
 
-// installCCHooksWith is installCCHooks with superai-cchook named (or "").
+// installCCHooksWith is installCCHooks with superleo-cchook named (or "").
 func installCCHooksWith(path, bin, slim string) ([]string, error) {
 	if real, err := filepath.EvalSymlinks(path); err == nil {
 		path = real // a settings file kept in a dotfiles repo stays a link
@@ -367,11 +370,11 @@ func installCCHooksWith(path, bin, slim string) ([]string, error) {
 		return nil, err
 	}
 	if old != nil {
-		if err := os.WriteFile(path+".superai.bak", old, mode); err != nil {
+		if err := os.WriteFile(path+".superleo.bak", old, mode); err != nil {
 			return nil, fmt.Errorf("keeping the old settings: %w", err)
 		}
 	}
-	tmp := path + ".superai.tmp"
+	tmp := path + ".superleo.tmp"
 	if err := os.WriteFile(tmp, next, mode); err != nil {
 		return nil, err
 	}
@@ -382,7 +385,7 @@ func installCCHooksWith(path, bin, slim string) ([]string, error) {
 	return added, nil
 }
 
-// settingsHaveOurHook says whether a settings file runs any SuperAI hook
+// settingsHaveOurHook says whether a settings file runs any SuperLeo hook
 // with bin.
 func settingsHaveOurHook(content []byte, bin string) bool {
 	var s struct {
@@ -407,7 +410,7 @@ func settingsHaveOurHook(content []byte, bin string) bool {
 	return false
 }
 
-// hookCommandBinary is the binary a SuperAI hook command runs: what comes
+// hookCommandBinary is the binary a SuperLeo hook command runs: what comes
 // before ` hook <Event>`, unquoted.
 func hookCommandBinary(command string) string {
 	loc := regexp.MustCompile(`['"]?\s+hook\s+[A-Za-z]+`).FindStringIndex(command)
@@ -450,9 +453,9 @@ func hookBinary() string {
 
 // autoUpgradeCCHooks adds the hooks this build reads and the settings lack,
 // in a settings file that already runs this binary's hooks. Off with
-// SUPERAI_HOOK_AUTOINSTALL=0.
+// SUPERLEO_HOOK_AUTOINSTALL=0.
 func autoUpgradeCCHooks() {
-	if os.Getenv("SUPERAI_HOOK_AUTOINSTALL") == "0" {
+	if os.Getenv("SUPERLEO_HOOK_AUTOINSTALL") == "0" {
 		return
 	}
 	bin, path := hookBinary(), claudeSettingsPath()
@@ -472,32 +475,32 @@ func autoUpgradeCCHooks() {
 	}
 }
 
-// HookInstallMain is `superai hook install [-settings path] [-bin path]
+// HookInstallMain is `superleo hook install [-settings path] [-bin path]
 // [-cchook path]`.
 func HookInstallMain(argv []string) {
 	fl := flag.NewFlagSet("hook install", flag.ExitOnError)
 	settings := fl.String("settings", claudeSettingsPath(), "Claude Code's settings file")
-	bin := fl.String("bin", hookBinary(), "the superai binary the hooks run")
-	slim := fl.String("cchook", "", "superai-cchook, for the prompt and tool events; default: the one beside -bin, if there is one")
+	bin := fl.String("bin", hookBinary(), "the superleo binary the hooks run")
+	slim := fl.String("cchook", "", "superleo-cchook, for the prompt and tool events; default: the one beside -bin, if there is one")
 	_ = fl.Parse(argv)
 	if *slim == "" {
 		*slim = slimHookBeside(*bin)
 	}
 	if strings.TrimSpace(*bin) == "" {
-		fmt.Fprintln(os.Stderr, "superai hook install: say which binary the hooks run with -bin")
+		fmt.Fprintln(os.Stderr, "superleo hook install: say which binary the hooks run with -bin")
 		os.Exit(2)
 	}
 	if strings.TrimSpace(*settings) == "" {
-		fmt.Fprintln(os.Stderr, "superai hook install: no home directory; say where the settings are with -settings")
+		fmt.Fprintln(os.Stderr, "superleo hook install: no home directory; say where the settings are with -settings")
 		os.Exit(2)
 	}
 	added, err := installCCHooksWith(*settings, *bin, *slim)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "superai hook install:", err)
+		fmt.Fprintln(os.Stderr, "superleo hook install:", err)
 		os.Exit(1)
 	}
 	if len(added) == 0 {
-		fmt.Printf("%s already has every SuperAI hook\n", *settings)
+		fmt.Printf("%s already has every SuperLeo hook\n", *settings)
 	} else {
 		fmt.Printf("set %s in %s; Claude Code sessions started from now on use them\n", strings.Join(added, ", "), *settings)
 	}
@@ -506,7 +509,7 @@ func HookInstallMain(argv []string) {
 	t.Slim = *slim
 	done, errs := installCLIHooks(t)
 	for _, err := range errs {
-		fmt.Fprintln(os.Stderr, "superai hook install:", err)
+		fmt.Fprintln(os.Stderr, "superleo hook install:", err)
 	}
 	for _, d := range done {
 		fmt.Printf("set %s\n", d)

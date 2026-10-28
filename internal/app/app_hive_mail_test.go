@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/liliang-cn/agent-go/v3/pkg/agent"
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // A small hive over real HTTP: a queen and two workers, each its own App with

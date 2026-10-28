@@ -3,7 +3,7 @@ import { BrowserOpenURL } from "../../wailsjs/runtime";
 // Opening a link the model wrote.
 //
 // Inside the desktop window a plain <a href> is a trap: the WKWebView follows
-// it, SuperAI's own UI is replaced by whatever the page was, and there is no
+// it, SuperLeo's own UI is replaced by whatever the page was, and there is no
 // back button to return from it. So links are opened outside instead — the
 // system browser in the desktop app, a new tab in the served one, which is what
 // each surface's BrowserOpenURL already does.

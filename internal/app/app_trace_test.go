@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // The RPC reads the traces directory this app writes into, and hands back the
@@ -15,7 +15,7 @@ import (
 // over, and after a settings save has rebuilt the service that wrote it.
 func TestTraceLinesReadsTheTailWithoutAService(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("SUPERAI_HOME", home)
+	t.Setenv("SUPERLEO_HOME", home)
 
 	dir := backend.TracesDir()
 	if err := os.MkdirAll(dir, 0o755); err != nil {

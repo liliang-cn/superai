@@ -3,7 +3,7 @@ package app
 import (
 	"testing"
 
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 func TestAStandingAgentsPermissionsAreItsOwn(t *testing.T) {
@@ -56,7 +56,7 @@ func TestOnlyExactForbiddenNamesAreWithheldFromTheModel(t *testing.T) {
 }
 
 func TestAStandingAgentNeedsANameAGoalAndAValidSchedule(t *testing.T) {
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	a := &App{}
 	for _, sp := range []AgentSpec{
 		{Goal: "keep CI green"},

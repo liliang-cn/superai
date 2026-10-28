@@ -59,7 +59,7 @@ interface DashData {
   tasks?: { id: string; goal: string; status: string; brief: string; updatedAt: string; runs: number }[];
 }
 
-const SERVED = Boolean((window as unknown as Record<string, unknown>).superaiServed);
+const SERVED = Boolean((window as unknown as Record<string, unknown>).superleoServed);
 
 
 const fmtK = (n: number) => (n >= 1e6 ? (n / 1e6).toFixed(2) + "M" : n >= 1e3 ? (n / 1e3).toFixed(1) + "k" : String(Math.round(n)));
@@ -222,7 +222,7 @@ export default function StatsView() {
     <div className="cr">
       {/* ── header ── */}
       <header className="cr-head">
-        <div className="cr-brand"><span className={`cr-led ${live ? "on" : ""}`} /><b>SUPERAI</b><span className="cr-eyebrow">control room</span></div>
+        <div className="cr-brand"><span className={`cr-led ${live ? "on" : ""}`} /><b>SUPERLEO</b><span className="cr-eyebrow">control room</span></div>
         <div className="cr-chips">
           <span className="cr-chip"><Cpu size={12} />{dash?.llm?.model || "—"}</span>
           <span className="cr-chip"><Brain size={12} />{brainLabel}</span>

@@ -2,7 +2,7 @@ package app
 
 // What the interactive Claude Code sessions on a machine are doing, for the
 // hive to see. The Mac's claude used to look idle in the 3D world while
-// several terminal sessions were hard at work: only runs SuperAI started
+// several terminal sessions were hard at work: only runs SuperLeo started
 // itself counted. Every hook event now also moves a small per-session
 // record on the machine — working, waiting for the person, idle; the tool it
 // is on — and the machine sends core a snapshot of those records, at most
@@ -417,7 +417,7 @@ func (t *ccActivity) loop(ctx context.Context) {
 // ---- the machine's side: where a snapshot goes
 
 // startCCActivity wires this process's tracker to the agent link, or, on a
-// SuperAI not linked to a core, to its own screens, and keeps it swept until
+// SuperLeo not linked to a core, to its own screens, and keeps it swept until
 // ctx ends.
 func (a *App) startCCActivity(ctx context.Context) {
 	t := ccActivityState()

@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/liliang-cn/agent-go/v3/pkg/agent"
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // The character, and the model's hand on it.
@@ -119,14 +119,14 @@ func (a *App) registerPetTools(svc *backend.Service) {
 
 	look := agent.ToolMetadata{ReadOnly: true, ConcurrencySafe: true}
 	inner.AddToolWithMetadata("pet_where",
-		"What the person is looking at right now: which page of the SuperAI window is open, "+
+		"What the person is looking at right now: which page of the SuperLeo window is open, "+
 			"and the named places on it the pixel character can be sent to. Call this before pet_go — "+
 			"the places differ per page, and the window may not be open at all.",
 		map[string]any{"type": "object", "properties": map[string]any{}},
 		func(ctx context.Context, _ map[string]any) (any, error) {
 			stage, fresh := a.pet.current()
 			if !fresh {
-				return "The SuperAI window is not showing the character right now " +
+				return "The SuperLeo window is not showing the character right now " +
 					"(closed, or it was sent away), so there is nowhere to point at.", nil
 			}
 			out := map[string]any{"page": stage.View, "spots": stage.Spots}
@@ -141,7 +141,7 @@ func (a *App) registerPetTools(svc *backend.Service) {
 	// does survives the window, so it does not meet the approval gate either.
 	act := agent.ToolMetadata{ConcurrencySafe: true}
 	inner.AddToolWithMetadata("pet_go",
-		"Send the pixel character somewhere on the SuperAI window, optionally with a line to say "+
+		"Send the pixel character somewhere on the SuperLeo window, optionally with a line to say "+
 			"and a face to wear. Use it to point at what you are talking about — the button you are "+
 			"describing, the panel where the answer landed. Get the names from pet_where; an unknown "+
 			"name simply makes it wander.",
@@ -204,7 +204,7 @@ func (a *App) petGo(spot, say, emotion string) string {
 
 	stage, fresh := a.pet.current()
 	if !fresh {
-		return "Nothing happened: the SuperAI window is not showing the character."
+		return "Nothing happened: the SuperLeo window is not showing the character."
 	}
 
 	a.mu.Lock()

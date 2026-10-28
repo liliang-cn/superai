@@ -37,7 +37,7 @@ func commandAdapter(t *testing.T, a *Adapter, token string) (*RemoteRunner, *Tas
 	return run, b, &pl
 }
 
-func TestAnAgentThatIsNotSuperAIAnswersAQueen(t *testing.T) {
+func TestAnAgentThatIsNotSuperLeoAnswersAQueen(t *testing.T) {
 	a := &Adapter{Token: "tok", Engine: scriptEngine{func(_ context.Context, p string, emit func(AdapterEvent)) (string, error) {
 		time.Sleep(150 * time.Millisecond) // after the queen has the turn id
 		emit(AdapterEvent{Type: "tool_call", Tool: "Bash"})

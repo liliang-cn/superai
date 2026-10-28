@@ -1,4 +1,4 @@
-module github.com/liliang-cn/superai
+module github.com/liliang-cn/superleo
 
 go 1.26.0
 

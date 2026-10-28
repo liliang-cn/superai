@@ -1,14 +1,14 @@
 #!/bin/sh
-# Installs this machine as a SuperAI agent node: SuperAI runs headless as a
-# login service and another SuperAI links it with a pairing code to drive the
+# Installs this machine as a SuperLeo agent node: SuperLeo runs headless as a
+# login service and another SuperLeo links it with a pairing code to drive the
 # Claude Code / Codex installed here.
 #
-#   curl -fsSL https://raw.githubusercontent.com/liliang-cn/superai/main/scripts/install-node.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/liliang-cn/superleo/main/scripts/install-node.sh | sh
 #
 # Options pass through to `node install`, e.g. `| sh -s -- -roots ~/code`.
 set -eu
 
-repo=liliang-cn/superai
+repo=liliang-cn/superleo
 os=$(uname -s | tr '[:upper:]' '[:lower:]')
 case "$(uname -m)" in
   x86_64 | amd64) arch=amd64 ;;
@@ -20,7 +20,7 @@ case "$os" in
   *) echo "unsupported system: $os" >&2; exit 1 ;;
 esac
 
-asset="superai-$os-$arch"
+asset="superleo-$os-$arch"
 url="https://github.com/$repo/releases/latest/download"
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT

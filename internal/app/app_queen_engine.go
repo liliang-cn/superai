@@ -4,15 +4,15 @@ package app
 //
 // By default that is this app's own model. Settings → Hive → Queen engine can
 // hand it to an agent CLI instead — Claude Code, Codex, pi or Hermes, here
-// ("codex") or on a linked machine ("codex.mac") — and SuperAI keeps
+// ("codex") or on a linked machine ("codex.mac") — and SuperLeo keeps
 // everything around the thinking:
 // the conversation and its history, the stream to every client, approvals,
 // notices, alarms and schedules. Clients see the same chat:event / chat:done
 // they always did, with "engine" on them naming who answered.
 //
 // Only a person's own turns go to the engine. Schedules, dashboards, tiles,
-// the hive's traffic, a voice call (SendCallChat) and superai_ask all stay
-// with SuperAI's agent: they are unattended, or cannot wait for a CLI to
+// the hive's traffic, a voice call (SendCallChat) and superleo_ask all stay
+// with SuperLeo's agent: they are unattended, or cannot wait for a CLI to
 // start, or would have the engine answering itself.
 //
 // Each turn is a run of the CLI (app_cliruns.go) given the queen's prompt
@@ -25,7 +25,7 @@ package app
 //
 // An engine that cannot take a turn — switched off, not installed, its
 // machine asleep, failed before it said or did anything — is stood in for by
-// SuperAI's agent, whose answer opens with a line saying so, unless the
+// SuperLeo's agent, whose answer opens with a line saying so, unless the
 // fallback is switched off; then the turn fails with the reason.
 
 import (
@@ -39,16 +39,16 @@ import (
 	"time"
 
 	"github.com/liliang-cn/agent-go/v3/pkg/agent"
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 const (
 	// queenHiveServer is what the engine calls this app's /mcp: its tools are
-	// mcp__hive__superai_hive_members and so on.
+	// mcp__hive__superleo_hive_members and so on.
 	queenHiveServer = "hive"
 	// queenTokenEnv carries the queen token to the CLI. The MCP config names
 	// it and the CLI fills it in, so the token is never on a command line.
-	queenTokenEnv = "SUPERAI_QUEEN_TOKEN"
+	queenTokenEnv = "SUPERLEO_QUEEN_TOKEN"
 	// queenEngineTokenName is the queen token this app mints for its engine.
 	queenEngineTokenName = "queen engine (automatic)"
 )
@@ -103,8 +103,8 @@ func (a *App) StartQueenCLIRun(r QueenRunRequest) (CLIRun, error) {
 		if url, _ := e["url"].(string); url == "" || e["command"] != nil {
 			return CLIRun{}, fmt.Errorf("MCP server %s is not one reached by URL", name)
 		}
-		if name == "superai" {
-			return CLIRun{}, errors.New("the superai server name is this machine's approval channel")
+		if name == "superai" || name == "superleo" {
+			return CLIRun{}, errors.New("the superleo server name is this machine's approval channel")
 		}
 	}
 	// Only the lean flags and the variables the servers name, or the lean
@@ -155,7 +155,7 @@ func queenEngineRoute(s *backend.Settings, sessionID string, pictures bool) stri
 }
 
 // ownSessionPrefixes mark conversations no person is typing in: the hive's
-// orders and mail, superai_ask's fresh ones, home tiles, terminal Claude Code
+// orders and mail, superleo_ask's fresh ones, home tiles, terminal Claude Code
 // sessions shown in the app.
 var ownSessionPrefixes = []string{backend.HiveSessionPrefix, HiveMailSessionPrefix, askNewConversationPrefix, "tile-", "cc:"}
 
@@ -219,9 +219,9 @@ func (a *App) routeToEngine(requestID, sessionID, engine, message string, fresh 
 			a.emit("chat:error", tag(map[string]any{"error": label + " could not answer: " + reason}))
 			return
 		}
-		a.setQueenNow(queenNowSuperAI)
+		a.setQueenNow(queenNowSuperLeo)
 		a.emit("chat:event", map[string]any{"requestId": requestID, "type": "state_update", "engine": "", "standInFor": engine, "failed": engine,
-			"content": label + " could not take this turn (" + reason + "); SuperAI answers it"})
+			"content": label + " could not take this turn (" + reason + "); SuperLeo answers it"})
 		a.ownTurn(requestID, sessionID, message, nil, engine)
 	}
 
@@ -316,7 +316,7 @@ func (a *App) routeToEngine(requestID, sessionID, engine, message string, fresh 
 			write(answer)
 		}
 		if err := a.appendExchange(sessionID, message, answer); err != nil {
-			log.Printf("superai: could not record the queen engine's answer in %s: %v", sessionID, err)
+			log.Printf("superleo: could not record the queen engine's answer in %s: %v", sessionID, err)
 		}
 		// Claude reports what the whole session has cost so far; this turn's
 		// share is what it added. The others report the turn's own.
@@ -347,9 +347,9 @@ func (a *App) routeToEngine(requestID, sessionID, engine, message string, fresh 
 	}
 }
 
-// queenNowSuperAI is queenEngineNow while SuperAI's own agent answers in
+// queenNowSuperLeo is queenEngineNow while SuperLeo's own agent answers in
 // the engine's place.
-const queenNowSuperAI = "superai"
+const queenNowSuperLeo = "superai" // what the phone apps compare against
 
 // queenNowState is the engine the queen's latest turn went to.
 type queenNowState struct {
@@ -358,7 +358,7 @@ type queenNowState struct {
 }
 
 // setQueenNow notes who takes the queen's turns now and tells every client
-// when that changes, so the 3D queen and the settings show SuperAI
+// when that changes, so the 3D queen and the settings show SuperLeo
 // answering in the engine's place as it happens.
 func (a *App) setQueenNow(engine string) {
 	q := &a.queenNow
@@ -372,7 +372,7 @@ func (a *App) setQueenNow(engine string) {
 }
 
 // queenEngineNow is who took the queen's latest turn: the engine, or
-// queenNowSuperAI when SuperAI answered in its place; "" before any turn or
+// queenNowSuperLeo when SuperLeo answered in its place; "" before any turn or
 // once the engine has been changed.
 func (a *App) queenEngineNow() string {
 	q := &a.queenNow
@@ -385,7 +385,7 @@ func (a *App) queenEngineNow() string {
 		engine = strings.TrimSpace(a.settings.Hive.QueenEngine)
 	}
 	a.mu.Unlock()
-	if engine == "" || (now != queenNowSuperAI && now != engine) {
+	if engine == "" || (now != queenNowSuperLeo && now != engine) {
 		return ""
 	}
 	return now
@@ -399,7 +399,7 @@ func (a *App) queenKitFor(engine string, s *backend.Settings) (*QueenKit, error)
 		// The CLI is on another machine, so this app's loopback is not where
 		// it can reach /mcp.
 		if base = s.Hive.Public(); base == "" {
-			return nil, fmt.Errorf("%s is on another machine and this SuperAI has no public address for it to reach (Settings → Hive → public address)", engine)
+			return nil, fmt.Errorf("%s is on another machine and this SuperLeo has no public address for it to reach (Settings → Hive → public address)", engine)
 		}
 	} else {
 		u, err := a.localQueenURL()
@@ -422,7 +422,7 @@ func (a *App) queenKitFor(engine string, s *backend.Settings) (*QueenKit, error)
 		Env:     map[string]string{queenTokenEnv: tok},
 	}
 	// Claude's lean flags travel with the kit, as they always have, so a
-	// machine on an older SuperAI still runs its Claude lean.
+	// machine on an older SuperLeo still runs its Claude lean.
 	if engineCLI(engine) == "claude" {
 		kit.Args = append([]string(nil), queenLeanArgs...)
 		for k, v := range queenLeanEnv {
@@ -489,9 +489,9 @@ func engineLabel(engine string) string {
 	return name
 }
 
-// standInNote opens an answer SuperAI's model gave in an engine's place.
+// standInNote opens an answer SuperLeo's model gave in an engine's place.
 func standInNote(engine string) string {
-	return "> " + engineLabel(engine) + " 没能接这一条，由 SuperAI 内置的 queen 回答。\n\n"
+	return "> " + engineLabel(engine) + " 没能接这一条，由 SuperLeo 内置的 queen 回答。\n\n"
 }
 
 // queenTokenCache is the engine's queen token, in memory only.
@@ -537,7 +537,7 @@ func (a *App) queenEngineToken() (string, error) {
 
 // QueenEngineChoice is one thing the queen can think with.
 type QueenEngineChoice struct {
-	// Name is what Hive.QueenEngine is set to; "" is SuperAI's own agent.
+	// Name is what Hive.QueenEngine is set to; "" is SuperLeo's own agent.
 	Name  string `json:"name"`
 	Label string `json:"label"`
 	// Online is whether it could take a turn now.
@@ -545,12 +545,12 @@ type QueenEngineChoice struct {
 }
 
 // QueenEngines is what the queen thinks with, who took her latest turn (the
-// engine, or "superai" when SuperAI answered in its place), whether SuperAI
+// engine, or "superleo" when SuperLeo answered in its place), whether SuperLeo
 // stands in for an engine that cannot answer, and every engine there is
 // to choose from:
 //
 //	POST /api/rpc/QueenEngines  []
-//	→ {"engine":"claude","now":"claude","fallback":true,"public_url":"","choices":[{"name":"","label":"SuperAI","online":true},…]}
+//	→ {"engine":"claude","now":"claude","fallback":true,"public_url":"","choices":[{"name":"","label":"SuperLeo","online":true},…]}
 func (a *App) QueenEngines() map[string]any {
 	a.mu.Lock()
 	var s backend.Settings
@@ -558,7 +558,7 @@ func (a *App) QueenEngines() map[string]any {
 		s = *a.settings
 	}
 	a.mu.Unlock()
-	choices := []QueenEngineChoice{{Name: "", Label: "SuperAI", Online: true}}
+	choices := []QueenEngineChoice{{Name: "", Label: "SuperLeo", Online: true}}
 	here := map[string]bool{}
 	for _, c := range a.localAgentNames() {
 		here[c.Name] = true
@@ -588,8 +588,8 @@ func (a *App) QueenEngines() map[string]any {
 	return map[string]any{"engine": cur, "now": a.queenEngineNow(), "fallback": s.Hive.QueenFallsBack(), "public_url": s.Hive.PublicURL, "choices": choices}
 }
 
-// SetQueenEngine picks what the queen thinks with ("" is SuperAI's own agent)
-// and whether SuperAI answers a turn the engine cannot take. Saved like any
+// SetQueenEngine picks what the queen thinks with ("" is SuperLeo's own agent)
+// and whether SuperLeo answers a turn the engine cannot take. Saved like any
 // other settings change.
 func (a *App) SetQueenEngine(engine string, fallback bool) (map[string]any, error) {
 	a.mu.Lock()

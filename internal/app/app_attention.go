@@ -40,7 +40,7 @@ func (a *App) Attention() []AttentionItem {
 	for _, ap := range a.PendingToolApprovals() {
 		who := fmt.Sprint(ap["by"])
 		if who == "" || who == "<nil>" {
-			who = "SuperAI"
+			who = "SuperLeo"
 			// A coding agent's prompt names it in the tool: "claude.mac · Bash".
 			if tool := fmt.Sprint(ap["tool"]); strings.Contains(tool, " · ") {
 				who = strings.SplitN(tool, " · ", 2)[0]
@@ -108,7 +108,7 @@ func (a *App) Attention() []AttentionItem {
 
 	for _, r := range a.CLIRuns() {
 		// A queen run that failed before doing anything was handed to the
-		// next engine or to SuperAI (app_queen_engine.go): there is nothing
+		// next engine or to SuperLeo (app_queen_engine.go): there is nothing
 		// left to do, and the queen's label already says who stands in.
 		if r.Queen && r.Tools == 0 {
 			continue

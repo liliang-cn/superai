@@ -8,15 +8,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // Who can work.
 //
-// A worker is any agent that can take a piece of work and do it: a SuperAI
+// A worker is any agent that can take a piece of work and do it: a SuperLeo
 // with a model of its own, a coding CLI that is signed in, a named agent
 // (openclaw, hermes, pi). They are peers; the host each runs on is where it
-// is, not what it is. A SuperAI with no model is how the queen reaches a
+// is, not what it is. A SuperLeo with no model is how the queen reaches a
 // machine and is no worker, and neither is a CLI that is installed but signed
 // out. The same rule counts a laptop on its own and a hive of machines: alone,
 // the workers are the agents on this one.
@@ -24,21 +24,21 @@ import (
 // HiveWorker is one agent that can work, as the screens count it.
 type HiveWorker struct {
 	Name string `json:"name"`
-	// Kind is superai, cli or agent, as on the host it is on.
+	// Kind is superai (a SuperLeo process; the value clients know), cli or agent, as on the host it is on.
 	Kind string `json:"kind"`
 	// Host is the machine it runs on, by name: where it is, not what it is.
 	Host string `json:"host"`
-	// State is the agent's own: live or lost for a SuperAI; working,
+	// State is the agent's own: live or lost for a SuperLeo; working,
 	// waiting, idle or installed for a CLI; live or configured for a named
 	// agent.
 	State string `json:"state"`
 	// Up is whether it can take work now.
 	Up bool `json:"up"`
-	// Via is the SuperAI that runs a CLI or a named agent for core.
+	// Via is the SuperLeo that runs a CLI or a named agent for core.
 	Via string `json:"via,omitempty"`
 }
 
-// HiveWorkers is every agent that can work, the queen's own SuperAI aside:
+// HiveWorkers is every agent that can work, the queen's own SuperLeo aside:
 // she hands work out, she is not handed it. The same topology the world is
 // drawn from, so a count and a picture never disagree.
 func (a *App) HiveWorkers() []HiveWorker {
@@ -47,7 +47,7 @@ func (a *App) HiveWorkers() []HiveWorker {
 	seen := map[string]bool{}
 	for _, h := range t.Hosts {
 		for _, ag := range h.Agents {
-			if ag.Kind == hostAgentSuperAI && ag.Role != agentRoleWorker {
+			if ag.Kind == hostAgentSuperLeo && ag.Role != agentRoleWorker {
 				continue // the queen, or a core on its own
 			}
 			if seen[ag.Name] {
@@ -115,17 +115,17 @@ func (a *App) withLinkedThinkers(roster map[string]backend.RemoteAgent) map[stri
 		out[n] = ag
 	}
 	for n, t := range thinkers {
-		out[n] = backend.RemoteAgent{About: "SuperAI on " + t.conn.hello.GetHost(), Wire: linkWire{t.conn}}
+		out[n] = backend.RemoteAgent{About: "SuperLeo on " + t.conn.hello.GetHost(), Wire: linkWire{t.conn}}
 	}
 	return out
 }
 
-// agentWorkers are the workers that are not SuperAIs and can take work now:
+// agentWorkers are the workers that are not SuperLeos and can take work now:
 // the named agents and the signed-in coding CLIs.
 func (a *App) agentWorkers() []HiveWorker {
 	var out []HiveWorker
 	for _, w := range a.HiveWorkers() {
-		if w.Kind != hostAgentSuperAI && w.Up {
+		if w.Kind != hostAgentSuperLeo && w.Up {
 			out = append(out, w)
 		}
 	}
@@ -171,7 +171,7 @@ func (a *App) cliRunsGoing(name string) int {
 }
 
 // runOnAgent gives one piece of delegated work to a named agent or a coding
-// CLI and waits for its answer, on the task board like a SuperAI's order so
+// CLI and waits for its answer, on the task board like a SuperLeo's order so
 // the screens show it going out. A named agent is asked; a CLI does it as a
 // coding run, its permission prompts going to the person.
 func (a *App) runOnAgent(ctx context.Context, w HiveWorker, prompt string) backend.RemoteResult {

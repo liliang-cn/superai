@@ -16,7 +16,7 @@ import (
 	"github.com/liliang-cn/agentexec/reach"
 )
 
-// Every coding agent conversation, wherever it runs: the ones SuperAI
+// Every coding agent conversation, wherever it runs: the ones SuperLeo
 // started (CLIRuns, continued with FollowUpCLIRun) and the ones somebody
 // started in a terminal (Claude Code, codex, pi, … as their hooks report
 // them). Each one can be read — its own session log on its machine — and
@@ -28,10 +28,10 @@ type CodingSession struct {
 	// Machine is the linked machine it runs on, "" for this one.
 	Machine string `json:"machine,omitempty"`
 	CLI     string `json:"cli"`
-	// Session is the CLI's own id; Run the newest SuperAI run of a thread.
+	// Session is the CLI's own id; Run the newest SuperLeo run of a thread.
 	Session string `json:"session,omitempty"`
 	Run     string `json:"run,omitempty"`
-	// Source is terminal or superai.
+	// Source is terminal or superleo.
 	Source  string    `json:"source"`
 	Project string    `json:"project,omitempty"`
 	Title   string    `json:"title,omitempty"`
@@ -50,7 +50,7 @@ var sessionLogCLIs = map[string]bool{"claude": true, "codex": true, "pi": true}
 // CodingSessions lists every coding agent conversation, newest first.
 func (a *App) CodingSessions() []CodingSession {
 	out := []CodingSession{}
-	seen := map[string]bool{} // CLI session ids a SuperAI run owns
+	seen := map[string]bool{} // CLI session ids a SuperLeo run owns
 	for _, r := range a.cliThreads() {
 		out = append(out, r)
 		if r.Session != "" {
@@ -97,7 +97,7 @@ func (a *App) CodingSessions() []CodingSession {
 	return out
 }
 
-// cliThreads is SuperAI's own runs, one entry per thread (its newest run).
+// cliThreads is SuperLeo's own runs, one entry per thread (its newest run).
 func (a *App) cliThreads() []CodingSession {
 	newest := map[string]CLIRun{}
 	for _, r := range a.CLIRuns() {

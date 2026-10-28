@@ -1,6 +1,6 @@
 """OpenAI's speech endpoint in front of Microsoft Edge's neural voices.
 
-SuperAI speaks to any text-to-speech service that answers OpenAI's
+SuperLeo speaks to any text-to-speech service that answers OpenAI's
 POST /v1/audio/speech. Edge's voices do not, so this does it for them:
 the request's input goes to Edge through edge-tts, and the MP3 comes back as
 the response. Nothing is stored and no key is needed; it listens only inside
@@ -21,7 +21,7 @@ from aiohttp import web
 DEFAULT_VOICE = os.environ.get("EDGE_TTS_VOICE", "zh-CN-XiaoxiaoNeural")
 PORT = int(os.environ.get("PORT", "43540"))
 # A cap on what one request may ask to be read, so a runaway caller cannot
-# queue minutes of synthesis. SuperAI sends a sentence at a time.
+# queue minutes of synthesis. SuperLeo sends a sentence at a time.
 MAX_CHARS = 2000
 
 

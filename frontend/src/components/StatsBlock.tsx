@@ -54,8 +54,8 @@ export const DEFAULT_FIGURES = ["tokens", "cached", "turns", "calls", "memory", 
 // Which figures the home shows, in order. Kept in this browser, like the
 // home's other choices (its mode, its theme, its tiles); every block on the
 // page reads the same list and hears when it changes.
-const KEY = "superai-home-stats";
-const CHANGED = "superai:home-stats";
+const KEY = "superleo-home-stats";
+const CHANGED = "superleo:home-stats";
 
 function readChoice(): string[] {
   try {

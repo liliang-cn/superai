@@ -1,25 +1,25 @@
 import { useCallback, useEffect, useState } from "react";
-import { GetSettings, LinkSuperAI, LinkedSuperAIs, UnlinkSuperAI } from "../../wailsjs/go/app/App";
+import { GetSettings, LinkSuperLeo, LinkedSuperLeos, UnlinkSuperLeo } from "../../wailsjs/go/app/App";
 import { app, backend } from "../../wailsjs/go/models";
 import { toast } from "../lib/toasts";
 
 /**
- * Other SuperAIs this one drives: their Claude Code and Codex become
+ * Other SuperLeos this one drives: their Claude Code and Codex become
  * "@claude.<name>". Linking is pairing — the other side shows six digits
  * under Pair a device, this side claims a key of its own with them.
  *
  * onChanged hands back the saved settings, so the page's own copy does not
  * overwrite the new link the next time someone presses Save.
  */
-export default function LinkSuperAICard({ onChanged }: { onChanged: (s: backend.Settings) => void }) {
-  const [linked, setLinked] = useState<app.LinkedSuperAI[]>([]);
+export default function LinkSuperLeoCard({ onChanged }: { onChanged: (s: backend.Settings) => void }) {
+  const [linked, setLinked] = useState<app.LinkedSuperLeo[]>([]);
   const [address, setAddress] = useState("");
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
-    setLinked((await LinkedSuperAIs()) || []);
+    setLinked((await LinkedSuperLeos()) || []);
   }, []);
   useEffect(() => {
     void load();
@@ -28,7 +28,7 @@ export default function LinkSuperAICard({ onChanged }: { onChanged: (s: backend.
   const link = async () => {
     setBusy(true);
     try {
-      const n = await LinkSuperAI(address, code, name);
+      const n = await LinkSuperLeo(address, code, name);
       toast.success(`Linked ${n}. Its agents are @claude.${n}, @codex.${n}.`);
       setAddress("");
       setCode("");
@@ -44,7 +44,7 @@ export default function LinkSuperAICard({ onChanged }: { onChanged: (s: backend.
 
   const unlink = async (n: string) => {
     try {
-      await UnlinkSuperAI(n);
+      await UnlinkSuperLeo(n);
       onChanged(await GetSettings());
       await load();
     } catch (e: any) {
@@ -56,7 +56,7 @@ export default function LinkSuperAICard({ onChanged }: { onChanged: (s: backend.
 
   return (
     <div className="card">
-      <div className="card-title">Other SuperAIs</div>
+      <div className="card-title">Other SuperLeos</div>
       <div className="card-desc">
         Use Claude Code or Codex on another machine. On that machine, open Settings › Runtime › Pair a
         device; enter its address and the six digits here.

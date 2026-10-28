@@ -30,9 +30,9 @@ import { AgentsBody } from "./AgentsPanel";
 
 type Tab = "trace" | "dashboards" | "preview" | "activity" | "agents";
 
-const OPEN_KEY = "superai-trace-open";
-const TAB_KEY = "superai-side-tab";
-const WIDTH_KEY = "superai-side-width";
+const OPEN_KEY = "superleo-trace-open";
+const TAB_KEY = "superleo-side-tab";
+const WIDTH_KEY = "superleo-side-width";
 
 /** How wide the panel may be dragged.
  *

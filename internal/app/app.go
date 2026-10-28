@@ -15,7 +15,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/liliang-cn/agent-go/v3/pkg/agent"
 	"github.com/liliang-cn/agent-go/v3/pkg/mcp"
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -55,14 +55,14 @@ type App struct {
 	// abilities is what the last sync of the queen's skills and MCP did.
 	abilities AbilitiesState
 	// taps are in-process listeners on every emitted event, by id. See
-	// mcp_ask.go. askFn starts a turn for superai_ask; nil means SendChat. A
+	// mcp_ask.go. askFn starts a turn for superleo_ask; nil means SendChat. A
 	// test sets it to a stub queen.
 	taps  sync.Map
 	askFn func(sessionID, message string) string
 	// gateForMCP, when set, is the approval gate /mcp's destructive tools
 	// pass instead of the service's (mcp_scope.go); a test sets it.
 	gateForMCP *backend.ToolGate
-	// delegations are superai_hive_delegate's runs (mcp_hive.go).
+	// delegations are superleo_hive_delegate's runs (mcp_hive.go).
 	delegations delegationStore
 	// ownTurnFn, appendFn and turnsFn, when set, stand in for a turn with
 	// this app's model, for writing an exchange into its conversation and for
@@ -482,10 +482,10 @@ func warmUp(svc *backend.Service) {
 	defer cancel()
 	start := time.Now()
 	if err := svc.Warm(ctx); err != nil {
-		log.Printf("superai: warm-up: %v", err)
+		log.Printf("superleo: warm-up: %v", err)
 		return
 	}
-	log.Printf("superai: warmed up in %s", time.Since(start).Round(time.Millisecond))
+	log.Printf("superleo: warmed up in %s", time.Since(start).Round(time.Millisecond))
 }
 
 // restartScheduler rebinds the timers to the current service. Callers must not
@@ -895,7 +895,7 @@ func (a *App) Dashboard() map[string]any {
 }
 
 // GraphView starts the live 3D view of the knowledge graph and reports where it
-// is: a URL on this machine's loopback serving the brain SuperAI actually uses,
+// is: a URL on this machine's loopback serving the brain SuperLeo actually uses,
 // updating itself as the graph changes.
 //
 // Started here rather than at boot. The view is a listener and a poller that
@@ -944,7 +944,7 @@ func (a *App) SendChat(sessionID, message string, imagePaths []string) string {
 	return a.sendChat(sessionID, message, imagePaths, false)
 }
 
-// SendCallChat is SendChat for a turn said in a voice call. SuperAI's own
+// SendCallChat is SendChat for a turn said in a voice call. SuperLeo's own
 // agent answers it whatever the queen engine is: an engine takes seconds to
 // start, and a call cannot wait them out.
 func (a *App) SendCallChat(sessionID, message string, imagePaths []string) string {
@@ -1448,7 +1448,7 @@ func (a *App) RemoveMCPServer(name string) string {
 	return "ok"
 }
 
-// InstallSkill copies a skill found on this machine into SuperAI.
+// InstallSkill copies a skill found on this machine into SuperLeo.
 func (a *App) InstallSkill(name, sourcePath string) string {
 	a.mu.Lock()
 	svc := a.svc
@@ -1534,7 +1534,7 @@ func (a *App) Life() backend.LifeData {
 }
 
 // ForgetLife deletes one calendar entry ("schedule"), note ("record") or
-// person ("person", by name) that SuperAI got wrong.
+// person ("person", by name) that SuperLeo got wrong.
 func (a *App) ForgetLife(kind, key string) error {
 	a.mu.Lock()
 	svc := a.svc

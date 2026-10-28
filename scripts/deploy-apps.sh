@@ -13,18 +13,18 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-HOST="${SUPERAI_DEPLOY_HOST:-ops@192.168.123.65}"
-REMOTE_BIN="${SUPERAI_REMOTE_BIN:-/opt/superai/bin}"
-UNITS="superai superai-daemon"
+HOST="${SUPERLEO_DEPLOY_HOST:-ops@192.168.123.65}"
+REMOTE_BIN="${SUPERLEO_REMOTE_BIN:-/opt/superleo/bin}"
+UNITS="superleo superleo-daemon"
 # The reverse proxy in front of the service on the VM itself.
-HEALTH_URL="${SUPERAI_HEALTH_URL:-http://192.168.123.65:43118/}"
+HEALTH_URL="${SUPERLEO_HEALTH_URL:-http://192.168.123.65:43118/}"
 
 export GOWORK=off
 
 say() { printf '\n=== %s ===\n' "$1"; }
 
 deployed_version() {
-  ssh "$HOST" "stat -c '%y' $REMOTE_BIN/superai 2>/dev/null | cut -d. -f1" || true
+  ssh "$HOST" "stat -c '%y' $REMOTE_BIN/superleo 2>/dev/null | cut -d. -f1" || true
 }
 
 case "${1:-deploy}" in
@@ -42,11 +42,11 @@ case "${1:-deploy}" in
   ssh "$HOST" "
     set -e
     cd $REMOTE_BIN
-    prev=\$(ls -t superai.prev-* 2>/dev/null | head -1)
+    prev=\$(ls -t superleo.prev-* 2>/dev/null | head -1)
     [ -n \"\$prev\" ] || { echo 'no previous build to roll back to'; exit 1; }
-    cp \"\$prev\" superai.rollback && mv superai.rollback superai
-    prevd=\$(ls -t superai-daemon.prev-* 2>/dev/null | head -1)
-    [ -n \"\$prevd\" ] && { cp \"\$prevd\" superai-daemon.rollback && mv superai-daemon.rollback superai-daemon; }
+    cp \"\$prev\" superleo.rollback && mv superleo.rollback superleo
+    prevd=\$(ls -t superleo-daemon.prev-* 2>/dev/null | head -1)
+    [ -n \"\$prevd\" ] && { cp \"\$prevd\" superleo-daemon.rollback && mv superleo-daemon.rollback superleo-daemon; }
     sudo systemctl restart $UNITS
     echo \"rolled back to \$prev\"
   "
@@ -67,12 +67,12 @@ go test ./...
 
 say "cross-compile linux/amd64"
 mkdir -p build/bin
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o build/bin/superai-linux .
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o build/bin/superai-daemon-linux ./cmd/superai-daemon
-ls -la build/bin/superai-*-linux
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o build/bin/superleo-linux .
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o build/bin/superleo-daemon-linux ./cmd/superleo-daemon
+ls -la build/bin/superleo-*-linux
 
 say "upload"
-scp -q build/bin/superai-linux build/bin/superai-daemon-linux "$HOST:/tmp/"
+scp -q build/bin/superleo-linux build/bin/superleo-daemon-linux "$HOST:/tmp/"
 
 say "install and restart"
 # Replacement is a rename, never a copy over the running file: writing into a
@@ -81,15 +81,15 @@ say "install and restart"
 ssh "$HOST" "
   set -e
   ts=\$(date +%Y%m%d%H%M%S)
-  cp $REMOTE_BIN/superai $REMOTE_BIN/superai.prev-\$ts
-  cp $REMOTE_BIN/superai-daemon  $REMOTE_BIN/superai-daemon.prev-\$ts
-  chmod +x /tmp/superai-linux /tmp/superai-daemon-linux
-  mv /tmp/superai-linux $REMOTE_BIN/superai
-  mv /tmp/superai-daemon-linux  $REMOTE_BIN/superai-daemon
+  cp $REMOTE_BIN/superleo $REMOTE_BIN/superleo.prev-\$ts
+  cp $REMOTE_BIN/superleo-daemon  $REMOTE_BIN/superleo-daemon.prev-\$ts
+  chmod +x /tmp/superleo-linux /tmp/superleo-daemon-linux
+  mv /tmp/superleo-linux $REMOTE_BIN/superleo
+  mv /tmp/superleo-daemon-linux  $REMOTE_BIN/superleo-daemon
   sudo systemctl restart $UNITS
   # Keep the three most recent rollback targets; the binaries are ~115MB each.
-  ls -t $REMOTE_BIN/superai.prev-* 2>/dev/null | tail -n +4 | xargs -r rm -f
-  ls -t $REMOTE_BIN/superai-daemon.prev-*  2>/dev/null | tail -n +4 | xargs -r rm -f
+  ls -t $REMOTE_BIN/superleo.prev-* 2>/dev/null | tail -n +4 | xargs -r rm -f
+  ls -t $REMOTE_BIN/superleo-daemon.prev-*  2>/dev/null | tail -n +4 | xargs -r rm -f
 "
 
 say "verify"
@@ -113,7 +113,7 @@ echo "GET $HEALTH_URL -> $code"
 
 # A start that logs a configuration problem is not a successful deploy, even
 # though the port answers.
-if ssh "$HOST" "journalctl -u superai --since '-1 min' --no-pager" | grep -qi "No embedding provider configured"; then
+if ssh "$HOST" "journalctl -u superleo --since '-1 min' --no-pager" | grep -qi "No embedding provider configured"; then
   echo "WARNING: embeddings are not configured — vector memory and RAG are off"
 fi
 

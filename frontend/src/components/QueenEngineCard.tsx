@@ -7,7 +7,7 @@ import { EventsOn } from "../../wailsjs/runtime";
 type Choice = { name: string; label: string; online: boolean };
 
 /**
- * Who thinks for the queen when a person talks to her: SuperAI's own agent,
+ * Who thinks for the queen when a person talks to her: SuperLeo's own agent,
  * or Claude Code here or on a linked machine. Edits the page's copy of the settings, saved with
  * the rest, like the queen's name above it.
  */
@@ -29,7 +29,7 @@ export default function QueenEngineCard({ hidden, engine, fallback, publicURL, o
         setChoices((r?.choices ?? []) as Choice[]);
         setNow(r?.now ?? "");
       })
-      .catch(() => setChoices([{ name: "", label: "SuperAI", online: true }]));
+      .catch(() => setChoices([{ name: "", label: "SuperLeo", online: true }]));
     const off = EventsOn("queen:engine", (p: { engine?: string }) => setNow(p?.engine ?? ""));
     return () => {
       if (typeof off === "function") off();
@@ -42,14 +42,14 @@ export default function QueenEngineCard({ hidden, engine, fallback, publicURL, o
     <div className="card" hidden={hidden}>
       <div className="card-title">{translate("Queen engine")}</div>
       <div className="card-desc">
-        {translate("Who answers when you talk to the queen. Calls, schedules and dashboards stay with SuperAI.")}
+        {translate("Who answers when you talk to the queen. Calls, schedules and dashboards stay with SuperLeo.")}
       </div>
       <div className="field">
         <label>{translate("Engine")}</label>
         <div className="seg" role="radiogroup" aria-label={translate("Engine")} style={{ flexWrap: "wrap", alignSelf: "flex-start" }}>
           {choices.map((c) => (
             <button
-              key={c.name || "superai"}
+              key={c.name || "superleo"}
               type="button"
               role="radio"
               aria-checked={engine === c.name}
@@ -70,7 +70,7 @@ export default function QueenEngineCard({ hidden, engine, fallback, publicURL, o
           <div className="toggle" onClick={() => onChange(engine, !fallback, publicURL)} style={{ cursor: "pointer", marginTop: 2 }}>
             <div className={`switch${fallback ? " on" : ""}`}><div className="knob" /></div>
             <span style={{ fontSize: 13, color: "var(--text-1)" }}>
-              {fallback ? translate("SuperAI answers, and says so") : translate("The turn fails")}
+              {fallback ? translate("SuperLeo answers, and says so") : translate("The turn fails")}
             </span>
           </div>
         </div>
@@ -86,7 +86,7 @@ export default function QueenEngineCard({ hidden, engine, fallback, publicURL, o
             autoComplete="off"
             onChange={(e) => onChange(engine, fallback, e.target.value)}
           />
-          <span className="hint">{translate("Where the other machine reaches this SuperAI's /mcp.")}</span>
+          <span className="hint">{translate("Where the other machine reaches this SuperLeo's /mcp.")}</span>
         </div>
       )}
     </div>

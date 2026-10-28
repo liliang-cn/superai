@@ -7,7 +7,7 @@ let wanted = false;
 
 export function askToCompose() {
   wanted = true;
-  window.dispatchEvent(new Event("superai:compose"));
+  window.dispatchEvent(new Event("superleo:compose"));
 }
 
 /** Whether a request is waiting; taking it clears it. */

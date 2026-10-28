@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/liliang-cn/agentexec"
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 func TestAClaudeToolCallAndItsResultReadAsOneStep(t *testing.T) {
@@ -81,7 +81,7 @@ func TestARunWorksInsideTheWorkspaceOrARootAndNowhereElse(t *testing.T) {
 }
 
 func TestTheNextMentionContinuesTheNewestFinishedSessionOfThatAgentInThatChat(t *testing.T) {
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	a := &App{}
 	s := a.cliStore()
 	now := time.Now()
@@ -142,7 +142,7 @@ func TestALinkAddressIsReadTheWayItIsTyped(t *testing.T) {
 		" https://ai.superleo.cn/ ": "https://ai.superleo.cn",
 		"http://mac2.local:47263/":  "http://mac2.local:47263",
 	} {
-		if got, err := normaliseSuperAIURL(in); err != nil || got != want {
+		if got, err := normaliseSuperLeoURL(in); err != nil || got != want {
 			t.Fatalf("%q → %q %v", in, got, err)
 		}
 	}
@@ -152,7 +152,7 @@ func TestALinkAddressIsReadTheWayItIsTyped(t *testing.T) {
 }
 
 func TestTheModelIsToldWhichCodingAgentsExistWhenItNamesOneThatDoesNot(t *testing.T) {
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	a := &App{settings: &backend.Settings{}}
 	out := a.runCodingAgent(context.Background(), "claude.nowhere", "hi", "", "")
 	if out["ok"] != false || !strings.Contains(out["error"].(string), "no coding agent called") {

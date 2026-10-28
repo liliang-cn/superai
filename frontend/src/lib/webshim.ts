@@ -4,7 +4,7 @@
 //
 // Inside the desktop app Wails injects both before any module script runs, so
 // the `!window.go` gate below never fires there. In a plain browser tab —
-// served by `superai serve` — this shim takes their place:
+// served by `superleo serve` — this shim takes their place:
 //
 //   window.go.app.App.<Method>(...)  ->  POST /api/rpc/<Method>  (JSON array in,
 //                                         JSON out, non-2xx rejects the promise
@@ -60,16 +60,16 @@ function installWebShim() {
     });
 
   // The stream's health, for the status bar and for anyone debugging from the
-  // console (window.superaiStream): a stream that died quietly is a chat that
+  // console (window.superleoStream): a stream that died quietly is a chat that
   // says "Thinking…" forever.
   const health = { state: "connecting" as "connecting" | "open" | "down", since: Date.now(), lastEvent: 0, events: 0, drops: 0 };
-  (window as unknown as Record<string, unknown>).superaiStream = health;
+  (window as unknown as Record<string, unknown>).superleoStream = health;
   const setState = (state: typeof health.state) => {
     if (health.state === state) return;
     health.state = state;
     health.since = Date.now();
     if (state === "down") health.drops++;
-    console.info(`[superai] event stream ${state}`);
+    console.info(`[superleo] event stream ${state}`);
     fire("stream:status", { ...health });
   };
 
@@ -116,7 +116,7 @@ function installWebShim() {
 
   // Signing in makes the stream possible: open it now rather than at the
   // next retry.
-  (window as unknown as Record<string, unknown>).superaiStreamKick = () => {
+  (window as unknown as Record<string, unknown>).superleoStreamKick = () => {
     retry = 1000;
     if (source && source.readyState !== EventSource.CLOSED) return;
     source?.close();
@@ -188,7 +188,7 @@ function installWebShim() {
   w.runtime = runtimeShim;
   // Served over HTTP, which is the only mode with a door on it. The desktop
   // window never sets this, and so never asks for a password.
-  w.superaiServed = true;
+  w.superleoServed = true;
 }
 
 if (!(window as unknown as Record<string, unknown>).go) {

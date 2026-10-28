@@ -31,7 +31,7 @@ func TestPublishAndroidWritesTheReleaseTheRouteServes(t *testing.T) {
 	}
 	raw, _ := os.ReadFile(src)
 	sum := sha256.Sum256(raw)
-	if rel.URL != "superai-0.3.0.apk" || rel.SHA256 != hex.EncodeToString(sum[:]) || rel.Notes != "闹钟准时响" || rel.VersionCode != 3 {
+	if rel.URL != "superleo-0.3.0.apk" || rel.SHA256 != hex.EncodeToString(sum[:]) || rel.Notes != "闹钟准时响" || rel.VersionCode != 3 {
 		t.Fatalf("release: %+v", rel)
 	}
 	var onDisk AndroidRelease
@@ -42,7 +42,7 @@ func TestPublishAndroidWritesTheReleaseTheRouteServes(t *testing.T) {
 
 	mux := http.NewServeMux()
 	androidRoutes(mux, func() string { return dir })
-	for path, want := range map[string]string{"/api/android/latest.json": string(b), "/api/android/superai-0.3.0.apk": string(raw)} {
+	for path, want := range map[string]string{"/api/android/latest.json": string(b), "/api/android/superleo-0.3.0.apk": string(raw)} {
 		rec := httptest.NewRecorder()
 		mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
 		if rec.Code != http.StatusOK || rec.Body.String() != want {
@@ -64,7 +64,7 @@ func TestPublishAndroidWritesTheReleaseTheRouteServes(t *testing.T) {
 	if len(apks) != 3 {
 		t.Errorf("kept %v", apks)
 	}
-	if _, err := os.Stat(filepath.Join(dir, "superai-0.3.0.apk")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(dir, "superleo-0.3.0.apk")); !os.IsNotExist(err) {
 		t.Error("the oldest APK was not pruned")
 	}
 

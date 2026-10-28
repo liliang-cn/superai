@@ -1,7 +1,7 @@
 package app
 
 import (
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -18,7 +18,7 @@ func testCreds(t *testing.T, password string) *credentials {
 		t.Fatal(err)
 	}
 	return &credentials{
-		User:         "superai",
+		User:         "superleo",
 		PasswordHash: string(h),
 		Token:        "token-for-programs",
 		SessionKey:   "0123456789abcdef0123456789abcdef",

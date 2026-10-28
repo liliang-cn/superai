@@ -6,7 +6,7 @@ import { HiveWorkers } from "../../wailsjs/go/app/App";
 
 type Worker = { name: string; kind: string; host: string; state: string; up: boolean };
 
-/** A SuperAI on its own: no hive members, but the agents that work for it
+/** A SuperLeo on its own: no hive members, but the agents that work for it
  *  here (signed-in CLIs, named agents), the same count the status bar has. */
 function OwnWorkers({ runs, now }: { runs: CodingRun[]; now: Date }) {
   const [list, setList] = useState<Worker[] | null>(null);
@@ -64,7 +64,7 @@ export default function LiveStatus({ hive, now, agents, runs }: { hive: Hive; no
         {agents.map((a) => {
           const going = runs.filter((r) => r.remote === a.name && r.state === "running").length;
           const can = [...a.clis, ...(a.agents ?? []).map((x) => x.name)];
-          // Its terminal Claude Code sessions, beside SuperAI's own runs.
+          // Its terminal Claude Code sessions, beside SuperLeo's own runs.
           const cc = a.activity;
           const term = cc?.working ? `claude: ${cc.working} session${cc.working > 1 ? "s" : ""} working` : cc?.waiting ? "claude: waiting for you" : "";
           const what = [going ? `${going} coding run${going > 1 ? "s" : ""}` : "", term].filter(Boolean).join(" · ");

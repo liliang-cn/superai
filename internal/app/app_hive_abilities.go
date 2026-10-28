@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // handleHiveAbilities is GET /api/hive/abilities: the queen's skills and MCP

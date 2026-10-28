@@ -1530,14 +1530,14 @@ export namespace app {
 		    return a;
 		}
 	}
-	export class LinkedSuperAI {
+	export class LinkedSuperLeo {
 	    name: string;
 	    url: string;
 	    clis: string[];
 	    reachable: boolean;
 	
 	    static createFrom(source: any = {}) {
-	        return new LinkedSuperAI(source);
+	        return new LinkedSuperLeo(source);
 	    }
 	
 	    constructor(source: any = {}) {

@@ -21,7 +21,7 @@ func TestDetectHost(t *testing.T) {
 		parent string
 		host   string
 	}{
-		{"pod on a k3s node", probe("linux", map[string]string{"KUBERNETES_SERVICE_HOST": "10.43.0.1", "SUPERAI_NODE": "orange2"}, nil), HostKindPod, "orange2", "box"},
+		{"pod on a k3s node", probe("linux", map[string]string{"KUBERNETES_SERVICE_HOST": "10.43.0.1", "SUPERLEO_NODE": "orange2"}, nil), HostKindPod, "orange2", "box"},
 		{"docker container", probe("linux", nil, map[string]string{"/.dockerenv": ""}), HostKindContainer, "", "box"},
 		{"podman container", probe("linux", nil, map[string]string{"/run/.containerenv": ""}), HostKindContainer, "", "box"},
 		{"mac", probe("darwin", nil, nil), HostKindMac, "", "box"},
@@ -29,8 +29,8 @@ func TestDetectHost(t *testing.T) {
 		{"lima on apple virtualization", probe("linux", nil, map[string]string{"/sys/class/dmi/id/sys_vendor": "Apple Inc.\n", "/sys/class/dmi/id/product_name": "Apple Virtualization Generic Platform\n"}), HostKindVM, "", "box"},
 		{"x86 guest without dmi", probe("linux", nil, map[string]string{"/proc/cpuinfo": "processor\t: 0\nflags\t\t: fpu vme hypervisor lahf_lm\n"}), HostKindVM, "", "box"},
 		{"bare metal", probe("linux", nil, map[string]string{"/sys/class/dmi/id/sys_vendor": "Dell Inc.\n", "/proc/cpuinfo": "flags\t\t: fpu vme\n"}), HostKindMetal, "", "box"},
-		{"override", probe("linux", map[string]string{"SUPERAI_HOST_KIND": "VM", "SUPERAI_HOST_NAME": "orange1"}, nil), HostKindVM, "", "orange1"},
-		{"bad override is ignored", probe("darwin", map[string]string{"SUPERAI_HOST_KIND": "toaster"}, nil), HostKindMac, "", "box"},
+		{"override", probe("linux", map[string]string{"SUPERLEO_HOST_KIND": "VM", "SUPERLEO_HOST_NAME": "orange1"}, nil), HostKindVM, "", "orange1"},
+		{"bad override is ignored", probe("darwin", map[string]string{"SUPERLEO_HOST_KIND": "toaster"}, nil), HostKindMac, "", "box"},
 	}
 	for _, c := range cases {
 		h := detectHost(c.p)

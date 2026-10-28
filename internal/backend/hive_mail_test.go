@@ -48,7 +48,7 @@ func TestAMessageIsANoteNotADocument(t *testing.T) {
 	}
 }
 
-// A peer listed under an address that does not resolve from here — a SuperAI
+// A peer listed under an address that does not resolve from here — a SuperLeo
 // worker's in-cluster name, seen from a worker outside the cluster — is
 // reached through the queen instead.
 func TestAnUnreachablePeerIsReachedThroughTheQueen(t *testing.T) {

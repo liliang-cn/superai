@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // A stand-in for the claude CLI: it answers --version, keeps the arguments
@@ -43,7 +43,7 @@ d=%q
 n=$(ls "$d" | grep -c '^args\.')
 n=$((n+1))
 for a in "$@"; do printf '%%s\n\036\n' "$a"; done > "$d/args.$n"
-printf '%%s' "$SUPERAI_QUEEN_TOKEN" > "$d/token.$n"
+printf '%%s' "$SUPERLEO_QUEEN_TOKEN" > "$d/token.$n"
 printf '%%s' "$CLAUDE_CODE_DISABLE_AUTO_MEMORY" > "$d/lean.$n"
 cat "$d/out.jsonl"
 exit %d
@@ -151,7 +151,7 @@ type engineHarness struct {
 
 func newEngineHarness(t *testing.T, out string, exit int) *engineHarness {
 	t.Helper()
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	bin, dir := fakeClaude(t, out, exit)
 	h := &engineHarness{ev: &engineEvents{}, dir: dir}
 	h.a = &App{settings: &backend.Settings{
@@ -260,12 +260,12 @@ func TestTheQueenEngineAnswersStreamsTaggedAndIsKept(t *testing.T) {
 		t.Fatalf("history %+v", turns[1])
 	}
 	if len(h.owned()) != 0 {
-		t.Fatalf("SuperAI's own model ran too: %v", h.owned())
+		t.Fatalf("SuperLeo's own model ran too: %v", h.owned())
 	}
 
 	args := fakeArgs(t, h.dir, 1)
 	persona := argAfter(args, "--append-system-prompt")
-	if !strings.Contains(persona, "In the hive you are q, the queen.") || !strings.Contains(persona, "superai_hive_x") {
+	if !strings.Contains(persona, "In the hive you are q, the queen.") || !strings.Contains(persona, "superleo_hive_x") {
 		t.Fatalf("persona %q", persona)
 	}
 	for _, want := range []string{"--strict-mcp-config", "--include-partial-messages"} {
@@ -299,7 +299,7 @@ func TestTheQueenEngineAnswersStreamsTaggedAndIsKept(t *testing.T) {
 		t.Fatal(err)
 	}
 	hive := cfg.MCPServers["hive"]
-	if hive.URL != "http://127.0.0.1:43999/mcp" || hive.Headers["Authorization"] != "Bearer ${SUPERAI_QUEEN_TOKEN}" {
+	if hive.URL != "http://127.0.0.1:43999/mcp" || hive.Headers["Authorization"] != "Bearer ${SUPERLEO_QUEEN_TOKEN}" {
 		t.Fatalf("hive server %+v", hive)
 	}
 
@@ -361,7 +361,7 @@ func TestAnAtMentionOfTheSameCLIIsStillAnAtMention(t *testing.T) {
 	}
 }
 
-func TestACallAndSuperAIAskStayWithTheOwnModel(t *testing.T) {
+func TestACallAndSuperLeoAskStayWithTheOwnModel(t *testing.T) {
 	h := newEngineHarness(t, fakeClaudeTurn, 0)
 	h.ev.wait(t, h.a.SendCallChat("c1", "你好", nil))
 	if own := h.owned(); len(own) != 1 || own[0].standIn != "" {
@@ -372,7 +372,7 @@ func TestACallAndSuperAIAskStayWithTheOwnModel(t *testing.T) {
 	}
 }
 
-func TestSuperAIStandsInForAnEngineThatCannotStart(t *testing.T) {
+func TestSuperLeoStandsInForAnEngineThatCannotStart(t *testing.T) {
 	h := newEngineHarness(t, fakeClaudeTurn, 0)
 	h.a.settings.ExternalAgents.Enabled = false
 	id := h.a.SendChat("c1", "你好", nil)
@@ -392,7 +392,7 @@ func TestSuperAIStandsInForAnEngineThatCannotStart(t *testing.T) {
 	}
 }
 
-func TestSuperAIStandsInForAnEngineThatFailsBeforeSayingAnything(t *testing.T) {
+func TestSuperLeoStandsInForAnEngineThatFailsBeforeSayingAnything(t *testing.T) {
 	h := newEngineHarness(t, fakeClaudeLoggedOut, 1)
 	h.ev.wait(t, h.a.SendChat("c1", "你好", nil))
 	if own := h.owned(); len(own) != 1 || own[0].standIn != "claude" {
@@ -432,22 +432,22 @@ func TestTheEnginesTurnIsInTheJournalWithWhoAnswered(t *testing.T) {
 	}
 }
 
-func TestWhenTheEngineFailsSuperAIAnswersAndTheJournalSaysSo(t *testing.T) {
+func TestWhenTheEngineFailsSuperLeoAnswersAndTheJournalSaysSo(t *testing.T) {
 	h := newEngineHarness(t, fakeClaudeLoggedOut, 1)
 	h.ev.wait(t, h.a.SendChat("c1", "你好", nil))
 	if own := h.owned(); len(own) != 1 || own[0].standIn != "claude" {
 		t.Fatalf("own %v", own)
 	}
-	if now := h.a.queenEngineNow(); now != queenNowSuperAI {
+	if now := h.a.queenEngineNow(); now != queenNowSuperLeo {
 		t.Fatalf("now %q", now)
 	}
 	if tr := h.a.TurnTraces(1); len(tr) != 1 || fmt.Sprint(tr[0].Engines) != "[claude superai]" {
 		t.Fatalf("traces %+v", tr)
 	}
-	// SuperAI answered: nothing is left for the person to do about it.
+	// SuperLeo answered: nothing is left for the person to do about it.
 	for _, it := range h.a.Attention() {
 		if it.Kind == "run" {
-			t.Fatalf("a queen run SuperAI answered for still asks for the person: %+v", it)
+			t.Fatalf("a queen run SuperLeo answered for still asks for the person: %+v", it)
 		}
 	}
 }
@@ -461,7 +461,7 @@ func TestWithTheFallbackOffAnEngineThatCannotAnswerFailsTheTurn(t *testing.T) {
 		t.Fatalf("%s %v", name, p)
 	}
 	if len(h.owned()) != 0 {
-		t.Fatal("SuperAI answered with the fallback off")
+		t.Fatal("SuperLeo answered with the fallback off")
 	}
 }
 
@@ -470,14 +470,14 @@ func TestAnAttendedEngineAsksThroughTheApprovalChannel(t *testing.T) {
 	h.a.settings.ExternalAgents.Unattended = false
 	h.ev.wait(t, h.a.SendChat("c1", "你好", nil))
 	args := fakeArgs(t, h.dir, 1)
-	if argAfter(args, "--permission-prompt-tool") != "mcp__superai__approve" {
+	if argAfter(args, "--permission-prompt-tool") != "mcp__superleo__approve" {
 		t.Fatalf("args %q", args)
 	}
 	var cfg struct {
 		MCPServers map[string]any `json:"mcpServers"`
 	}
 	_ = json.Unmarshal([]byte(argAfter(args, "--mcp-config")), &cfg)
-	if cfg.MCPServers["superai"] == nil || cfg.MCPServers["hive"] == nil {
+	if cfg.MCPServers["superleo"] == nil || cfg.MCPServers["hive"] == nil {
 		t.Fatalf("servers %v", cfg.MCPServers)
 	}
 	// The --allowedTools list is never the last flag before the prompt.
@@ -487,7 +487,7 @@ func TestAnAttendedEngineAsksThroughTheApprovalChannel(t *testing.T) {
 }
 
 func TestAQueenRunAsksAboutAToolWhenTheQueenWould(t *testing.T) {
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	a := &App{gateForMCP: backend.NewToolGate(true, filepath.Join(t.TempDir(), "audit.jsonl"))}
 	if !a.queenMayCall("mcp__noted__list_tasks", map[string]any{}) {
 		t.Fatal("a read was asked about")
@@ -501,7 +501,7 @@ func TestAQueenRunAsksAboutAToolWhenTheQueenWould(t *testing.T) {
 }
 
 func TestTheQueenTokenIsMintedOnceAndAgainWhenRevoked(t *testing.T) {
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	a := &App{}
 	first, err := a.queenEngineToken()
 	if err != nil {
@@ -535,7 +535,7 @@ func TestTheQueenTokenIsMintedOnceAndAgainWhenRevoked(t *testing.T) {
 }
 
 func TestAnEngineThatIsThereCanBeTheEngine(t *testing.T) {
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	bin, _ := fakeClaude(t, "", 0)
 	a := &App{settings: &backend.Settings{}}
 	check := func(engine string, ext backend.ExternalAgents, prev string) error {
@@ -569,7 +569,7 @@ func TestAnEngineThatIsThereCanBeTheEngine(t *testing.T) {
 }
 
 func TestAnotherMachineRunsOnlyServersItReachesByURL(t *testing.T) {
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	a := &App{}
 	_, err := a.StartQueenCLIRun(QueenRunRequest{Agent: "claude", Prompt: "hi", Kit: QueenKit{
 		Servers: map[string]any{"x": map[string]any{"command": "/bin/sh", "args": []any{"-c", "id"}}}}})
@@ -579,10 +579,10 @@ func TestAnotherMachineRunsOnlyServersItReachesByURL(t *testing.T) {
 }
 
 func TestAnotherMachineTakesOnlyTheLeanFlagsAndTheServersVariables(t *testing.T) {
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	a := &App{settings: &backend.Settings{}}
 	hive := map[string]any{"hive": map[string]any{"type": "http", "url": "https://core.example/mcp",
-		"headers": map[string]any{"Authorization": "Bearer ${SUPERAI_QUEEN_TOKEN}"}}}
+		"headers": map[string]any{"Authorization": "Bearer ${SUPERLEO_QUEEN_TOKEN}"}}}
 	for _, kit := range []QueenKit{
 		{Servers: hive, Args: []string{"--dangerously-skip-permissions"}},
 		{Servers: hive, Env: map[string]string{"NODE_OPTIONS": "--require /tmp/x.js"}},
@@ -595,7 +595,7 @@ func TestAnotherMachineTakesOnlyTheLeanFlagsAndTheServersVariables(t *testing.T)
 	// The lean kit passes those checks, and then stops at External agents
 	// being off here.
 	_, err := a.StartQueenCLIRun(QueenRunRequest{Agent: "claude", Prompt: "hi", Kit: QueenKit{Servers: hive,
-		Args: queenLeanArgs, Env: map[string]string{"SUPERAI_QUEEN_TOKEN": "t", "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1"}}})
+		Args: queenLeanArgs, Env: map[string]string{"SUPERLEO_QUEEN_TOKEN": "t", "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1"}}})
 	if err == nil || !strings.Contains(err.Error(), "switched off") {
 		t.Fatalf("%v", err)
 	}
@@ -609,7 +609,7 @@ func TestTheEngineIsToldWhatWasSaidWithoutIt(t *testing.T) {
 		{Role: "user", Content: "今天几号"}, {Role: "assistant", Content: "17 号"},
 	}
 
-	// Taking over a conversation SuperAI's agent had: the earlier turns go
+	// Taking over a conversation SuperLeo's agent had: the earlier turns go
 	// first, oldest first, marked as such.
 	h.ev.wait(t, h.a.SendChat("c1", "hive 怎么样", nil))
 	p := fakePrompt(t, h.dir, 1)
@@ -624,7 +624,7 @@ func TestTheEngineIsToldWhatWasSaidWithoutIt(t *testing.T) {
 		t.Fatalf("a continued session was handed history: %q", p)
 	}
 
-	// A turn SuperAI's agent stood in for, and a call: both are news to it.
+	// A turn SuperLeo's agent stood in for, and a call: both are news to it.
 	h.a.mu.Lock()
 	h.a.settings.ExternalAgents.Enabled = false
 	h.a.mu.Unlock()

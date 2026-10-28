@@ -9,15 +9,15 @@ import (
 	"github.com/liliang-cn/agent-go/v3/pkg/store"
 )
 
-// settingsEmbeddingProviderName is the row in agentgo.db that SuperAI owns.
+// settingsEmbeddingProviderName is the row in agentgo.db that SuperLeo owns.
 // A fixed name means repeated syncs update one row instead of accumulating a
 // new provider every launch.
-const settingsEmbeddingProviderName = "superai-settings"
+const settingsEmbeddingProviderName = "superleo-settings"
 
 // syncEmbeddingProvider pushes the embed_* settings into agentgo.db.
 //
 // agent-go builds its embedding pool solely from the embedding_providers table;
-// it never looks at SuperAI's settings.json. The two stores drifted apart the
+// it never looks at SuperLeo's settings.json. The two stores drifted apart the
 // moment anyone configured embeddings through Settings: the value was written,
 // the UI showed it, and the pool started with nothing — announced only by one
 // line on stderr saying no embedding provider was configured. Vector memory and
@@ -46,7 +46,7 @@ func syncEmbeddingProvider(cfg *config.Config, s *Settings) error {
 			if derr := db.DeleteEmbeddingProvider(settingsEmbeddingProviderName); derr != nil {
 				return fmt.Errorf("remove embedding provider: %w", derr)
 			}
-			log.Printf("superai: embeddings not configured in settings; removed %q from the embedding pool",
+			log.Printf("superleo: embeddings not configured in settings; removed %q from the embedding pool",
 				settingsEmbeddingProviderName)
 		}
 		return nil
@@ -74,6 +74,6 @@ func syncEmbeddingProvider(cfg *config.Config, s *Settings) error {
 		}
 	}
 
-	log.Printf("superai: embedding provider %q -> %s (%s)", settingsEmbeddingProviderName, baseURL, model)
+	log.Printf("superleo: embedding provider %q -> %s (%s)", settingsEmbeddingProviderName, baseURL, model)
 	return nil
 }

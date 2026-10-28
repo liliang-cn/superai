@@ -1,7 +1,7 @@
 # The world: an apiary
 
-The whole app is one live 3D world, and that world is SuperAI's own: an apiary.
-Nothing in it is borrowed from another domain. Each SuperAI concept is a thing
+The whole app is one live 3D world, and that world is SuperLeo's own: an apiary.
+Nothing in it is borrowed from another domain. Each SuperLeo concept is a thing
 in the apiary that is really there and moves with the data. Each page of the
 app is one place in the apiary. Opening a page flies the camera there.
 
@@ -17,11 +17,11 @@ Desktop and web draw the world with three.js. iOS draws it with SceneKit.
 The look comes from a logistics "digital twin" (WareTrack): light, isometric,
 low-poly, clean shadows, white floating cards, pill labels over things,
 selection brackets on the ground. Only the look is borrowed; the concepts are
-SuperAI's own.
+SuperLeo's own.
 
 ## What is what
 
-| SuperAI | in the apiary | moves when |
+| SuperLeo | in the apiary | moves when |
 |---|---|---|
 | **You** | the beekeeper; your cottage stands at the edge | — |
 | **The queen** (chat) | the great hive at the centre: a tower of honeycomb with the queen's chamber on top | She is thinking: the chamber glows and bees circle it. A tool call sends a ripple off the top. |

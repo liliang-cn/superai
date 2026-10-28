@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/liliang-cn/agent-go/v3/pkg/agent"
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // The hive, from this instance's side.
@@ -179,9 +179,9 @@ func (a *App) HiveStatus() map[string]any {
 		return out
 	}
 	out["role"] = s.Hive.Role
-	// Who thinks for her in a person's chat; empty is SuperAI's own agent.
+	// Who thinks for her in a person's chat; empty is SuperLeo's own agent.
 	out["queen_engine"] = s.Hive.QueenEngine
-	// Who took her latest turn: the engine, or "superai" when SuperAI
+	// Who took her latest turn: the engine, or "superleo" when SuperLeo
 	// answered in its place.
 	out["queen_engine_now"] = a.queenEngineNow()
 	if s.Hive.Role == backend.HiveRoleWorker {
@@ -197,7 +197,7 @@ func (a *App) HiveStatus() map[string]any {
 		name, _ = os.Hostname()
 	}
 	out["name"] = name
-	out["node"] = os.Getenv("SUPERAI_NODE")
+	out["node"] = os.Getenv("SUPERLEO_NODE")
 	if h != nil {
 		out["members"] = h.Members()
 		out["interval_ms"] = int(s.Hive.Interval() / time.Millisecond)
@@ -408,7 +408,7 @@ func (a *App) startHive() {
 	}
 	ann := &backend.Announcer{Settings: s.Hive, Token: creds.Token}
 	// In an electing hive the queen is whoever wears the label, reached at
-	// $SUPERAI_QUEEN_URL, not a fixed address (app_election.go).
+	// $SUPERLEO_QUEEN_URL, not a fixed address (app_election.go).
 	if electionOn() && electionJoinURL() != "" {
 		ann.Settings.JoinURL = electionJoinURL()
 	}
@@ -591,8 +591,8 @@ func (a *App) registerHiveTools(svc *backend.Service, cfg *backend.Settings) {
 	}
 
 	inner.AddToolWithMetadata("hive_members",
-		"Who can take work right now. members: the SuperAI workers that joined the hive, live or lost, and where each is."+
-			" workers: every agent that can work, peers of each other: SuperAI workers, named agents (openclaw, hermes, pi)"+
+		"Who can take work right now. members: the SuperLeo workers that joined the hive, live or lost, and where each is."+
+			" workers: every agent that can work, peers of each other: SuperLeo workers, named agents (openclaw, hermes, pi)"+
 			" and signed-in coding CLIs by machine (claude.mac), each with its host and whether it is up."+
 			" Look here before commanding or delegating, because a worker that is lost will not answer.",
 		map[string]any{"type": "object", "properties": map[string]any{}},
@@ -604,7 +604,7 @@ func (a *App) registerHiveTools(svc *backend.Service, cfg *backend.Settings) {
 
 	inner.AddToolWithMetadata("hive_hosts",
 		"Every host in the hive and what runs on each: the box (a pod, a container, a Mac, a VM or bare metal, and the"+
-			" VM a pod sits on), whether it answers, and its agents: SuperAI itself with its role (queen, worker, machine,"+
+			" VM a pod sits on), whether it answers, and its agents: SuperLeo itself with its role (queen, worker, machine,"+
 			" relay), the coding CLIs installed there (address one as cli.machine, like claude.mac) and named agents such"+
 			" as openclaw, and the HA services (like openclaw kept up by haify): where each runs now, its standbys and the"+
 			" service IP to reach it at. Look here to know where something can run before sending work there.",
@@ -631,7 +631,7 @@ func (a *App) registerHiveTools(svc *backend.Service, cfg *backend.Settings) {
 		agent.ToolMetadata{Destructive: true})
 
 	inner.AddToolWithMetadata("hive_command",
-		"Command the other workers — SuperAI instances in this hive — to work in parallel and collect what each reports back."+
+		"Command the other workers — SuperLeo instances in this hive — to work in parallel and collect what each reports back."+
 			" A `commands` entry may also name an agent outside the hive — a coding agent on a linked machine (\"codex.mac\","+
 			" from coding_agent_list) or a named agent (\"openclaw\", from remote_agent_list) — and it runs at the same"+
 			" time as the workers; put every part of a job in one call."+

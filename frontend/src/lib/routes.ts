@@ -38,7 +38,7 @@ export function viewOf(pathname: string): ViewKey {
 /** Where a notice's deeplink opens in this app, or "" for nowhere. */
 export function deeplinkPath(link?: string): string {
   if (!link) return "";
-  if (/^superai:\/\/schedule\b/.test(link) || /^noted:\/\/(event|task|alarm)\//.test(link)) return PATHS.schedule;
+  if (/^super(?:ai|leo):\/\/schedule\b/.test(link) || /^noted:\/\/(event|task|alarm)\//.test(link)) return PATHS.schedule;
   return "";
 }
 

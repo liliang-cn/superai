@@ -47,7 +47,7 @@ func TestTheQueenHandsOverHerWorkToolsAndKeepsTheRest(t *testing.T) {
 }
 
 func TestDelegationModes(t *testing.T) {
-	t.Setenv("SUPERAI_HIVE_DELEGATION", "")
+	t.Setenv("SUPERLEO_HIVE_DELEGATION", "")
 	cases := []struct {
 		h    HiveSettings
 		want string
@@ -64,14 +64,14 @@ func TestDelegationModes(t *testing.T) {
 			t.Errorf("%+v: got %q, want %q", c.h, got, c.want)
 		}
 	}
-	t.Setenv("SUPERAI_HIVE_DELEGATION", "off")
+	t.Setenv("SUPERLEO_HIVE_DELEGATION", "off")
 	if got := (HiveSettings{Role: HiveRoleQueen, Delegation: "max"}).DelegationMode(); got != DelegationOff {
 		t.Errorf("the environment did not win: %q", got)
 	}
 }
 
 func TestTheQueensPromptFollowsTheMode(t *testing.T) {
-	t.Setenv("SUPERAI_HIVE_DELEGATION", "")
+	t.Setenv("SUPERLEO_HIVE_DELEGATION", "")
 	max := hiveSection(HiveSettings{Role: HiveRoleQueen, Name: "q"})
 	if !strings.Contains(max, "hive_delegate") || strings.Contains(max, "Answer small questions yourself") {
 		t.Errorf("max: %q", max)
@@ -302,7 +302,7 @@ func TestAWorkerSaysWhatItCanReachAndTheQueenKeepsIt(t *testing.T) {
 
 func TestTheQueensServerIsNotCopiedOverTheWorkersOwn(t *testing.T) {
 	worker := t.TempDir()
-	t.Setenv("SUPERAI_HOME", worker)
+	t.Setenv("SUPERLEO_HOME", worker)
 	t.Setenv("NOTED_TOKEN", "x")
 	// The cluster gave this worker noted already.
 	os.MkdirAll(filepath.Join(worker, "data"), 0o755)

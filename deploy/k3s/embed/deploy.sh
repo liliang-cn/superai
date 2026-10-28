@@ -3,8 +3,8 @@
 # on every orange node (there is no registry) and applies the Deployment and
 # Service. Then: OPENAI_BASE_URL=http://<orange node>:31746/v1 for CortexDB.
 set -euo pipefail
-NODES="${SUPERAI_NODES:-orange1 orange2 orange3}"
-KUBE="${SUPERAI_KUBE:-orange1}"
+NODES="${SUPERLEO_NODES:-orange1 orange2 orange3}"
+KUBE="${SUPERLEO_KUBE:-orange1}"
 cd "$(dirname "$0")"
 src="$HOME/.ollama/models"
 manifest="manifests/registry.ollama.ai/library/embeddinggemma/latest"
@@ -21,4 +21,4 @@ docker save embed:hive -o "$tar"
 for n in $NODES; do ssh "$n" 'sudo k3s ctr images import -' < "$tar" >/dev/null & done
 wait
 scp -q embed.yaml "$KUBE:/tmp/embed.yaml"
-ssh "$KUBE" "sudo k3s kubectl apply -f /tmp/embed.yaml && sudo k3s kubectl -n superai rollout restart deploy/embed >/dev/null && sudo k3s kubectl -n superai rollout status deploy/embed --timeout=300s"
+ssh "$KUBE" "sudo k3s kubectl apply -f /tmp/embed.yaml && sudo k3s kubectl -n superleo rollout restart deploy/embed >/dev/null && sudo k3s kubectl -n superleo rollout status deploy/embed --timeout=300s"

@@ -9,14 +9,14 @@ import (
 
 // TestLinkToARealQueen pairs with a running queen, asks her something, hears
 // her events, and unpairs again — the desktop window's link end to end.
-// Skipped unless SUPERAI_LIVE_QUEEN (her address) and SUPERAI_LIVE_CODE (a
+// Skipped unless SUPERLEO_LIVE_QUEEN (her address) and SUPERLEO_LIVE_CODE (a
 // pairing code she is showing) are set.
 func TestLinkToARealQueen(t *testing.T) {
-	queen, code := os.Getenv("SUPERAI_LIVE_QUEEN"), os.Getenv("SUPERAI_LIVE_CODE")
+	queen, code := os.Getenv("SUPERLEO_LIVE_QUEEN"), os.Getenv("SUPERLEO_LIVE_CODE")
 	if queen == "" || code == "" {
-		t.Skip("SUPERAI_LIVE_QUEEN / SUPERAI_LIVE_CODE not set")
+		t.Skip("SUPERLEO_LIVE_QUEEN / SUPERLEO_LIVE_CODE not set")
 	}
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 
 	heard := make(chan string, 64)
 	prev := windowEmit

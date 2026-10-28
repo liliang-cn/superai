@@ -4,7 +4,7 @@ import { app, backend } from "../../wailsjs/go/models";
 import { toast } from "../lib/toasts";
 
 /**
- * Workers on this machine: more SuperAI processes the queen hands work to, so
+ * Workers on this machine: more SuperLeo processes the queen hands work to, so
  * one machine can do several things at once. Off until turned on, because
  * each worker is a whole process with its own memory and its own MCP servers.
  *
@@ -57,7 +57,7 @@ export default function LocalHiveCard({ onChanged }: { onChanged: (s: backend.Se
     <div className="card">
       <div className="card-title">Workers on this machine</div>
       <div className="card-desc">
-        Run extra SuperAI processes on this computer. The queen hands them pieces of a request, so several
+        Run extra SuperLeo processes on this computer. The queen hands them pieces of a request, so several
         things get done at once. Each worker is its own process: about 60 MB while idle, more while it works.
       </div>
 
@@ -72,7 +72,7 @@ export default function LocalHiveCard({ onChanged }: { onChanged: (s: backend.Se
               <span style={{ fontSize: 13, color: "var(--text-1)" }}>
                 {hive.enabled
                   ? `On: ${hive.live} of ${hive.running} worker${hive.running === 1 ? "" : "s"} ready`
-                  : "Off: SuperAI works alone"}
+                  : "Off: SuperLeo works alone"}
               </span>
             </div>
           </div>

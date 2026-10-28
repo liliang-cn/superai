@@ -91,6 +91,6 @@ func TestAFreeConversationGoesToTheQueenEngine(t *testing.T) {
 		t.Fatalf("%s %v", name, done)
 	}
 	if len(h.owned()) != 0 {
-		t.Fatalf("SuperAI's model answered instead: %v", h.owned())
+		t.Fatalf("SuperLeo's model answered instead: %v", h.owned())
 	}
 }

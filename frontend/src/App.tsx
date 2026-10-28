@@ -41,7 +41,7 @@ import { GetStatus, SetUIRules, SetWindowTheme } from "../wailsjs/go/app/App";
 
 /** Where the sidebar remembers being expanded. Shared with the drawer on a
  *  phone, which is the same state seen through a different layout. */
-const NAV_OPEN_KEY = "superai-sidebar-open";
+const NAV_OPEN_KEY = "superleo-sidebar-open";
 
 export default function App() {
   // Draw every notice the backend publishes. Mounted here so it survives every
@@ -88,13 +88,13 @@ export default function App() {
   }, [navOpen]);
   const [loading, setLoading] = useState(true);
   const [theme, setTheme] = useState<Theme>(
-    () => (localStorage.getItem("superai-theme") as Theme) || "light"
+    () => (localStorage.getItem("superleo-theme") as Theme) || "light"
   );
   // The accent finish. Remembered per browser rather than in settings.json:
   // it changes nothing the agent does, and a preference the backend has to be
   // rebuilt to apply is a preference nobody flips twice.
   const [accent, setAccent] = useState<Accent>(
-    () => (localStorage.getItem("superai-accent") as Accent) || "signal"
+    () => (localStorage.getItem("superleo-accent") as Accent) || "signal"
   );
   // The conversation a run belongs to, handed to the chat view to open. Cleared
   // as soon as it has been taken so asking for the same one twice works.
@@ -133,7 +133,7 @@ export default function App() {
     // On the desktop the shell owns light and dark (the canvas theme).
     if (clientKind() === "desktop") return;
     document.documentElement.dataset.theme = theme;
-    localStorage.setItem("superai-theme", theme);
+    localStorage.setItem("superleo-theme", theme);
     // The window chrome is drawn by the OS, not by this stylesheet. Without
     // this the title bar keeps whatever colour the app started with, and a
     // light page sits under a dark bar looking half-converted. Runs on mount
@@ -145,7 +145,7 @@ export default function App() {
 
   useEffect(() => {
     document.documentElement.dataset.accent = accent;
-    localStorage.setItem("superai-accent", accent);
+    localStorage.setItem("superleo-accent", accent);
   }, [accent]);
 
   // Tell the agent which rich blocks this transcript can render. The rules come

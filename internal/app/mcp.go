@@ -1,14 +1,14 @@
-// SuperAI as an MCP server: its schedules, reachable from any agent.
+// SuperLeo as an MCP server: its schedules, reachable from any agent.
 //
 // The Schedules page is the only way to say "every morning at eight, work out
 // my stock returns and message me" — which means a person has to open a browser
 // to arrange something a sentence describes. These tools let any MCP client say
-// it instead: Claude Code, OpenClaw, another SuperAI, a script.
+// it instead: Claude Code, OpenClaw, another SuperLeo, a script.
 //
 // It is mounted inside the running `serve` process rather than spawned as its
 // own. A second process would mean a second App over the same store, a second
 // scheduler, and two holders of an advisory lock designed for one — the same
-// reason `superai-daemon` waits for the lock instead of taking it.
+// reason `superleo-daemon` waits for the lock instead of taking it.
 //
 // Transport is streamable HTTP at /mcp, behind the same credential gate as the
 // RPC surface (requireAuth in auth.go): a request needs the Bearer token from
@@ -52,7 +52,7 @@ var cronParser = cron.NewParser(
 )
 
 type scheduleCreateIn struct {
-	Prompt       string `json:"prompt" jsonschema:"what SuperAI should do, written exactly as you would type it into chat"`
+	Prompt       string `json:"prompt" jsonschema:"what SuperLeo should do, written exactly as you would type it into chat"`
 	Cron         string `json:"cron" jsonschema:"five-field cron, e.g. '0 8 * * *' for every morning at 08:00, '0 9 * * 1-5' weekdays at 09:00, '0 */4 * * *' every four hours"`
 	Name         string `json:"name,omitempty" jsonschema:"optional label shown in the schedule list; defaults to the prompt"`
 	Conversation string `json:"conversation,omitempty" jsonschema:"optional conversation the runs append to; blank shares one called 'scheduled'"`
@@ -89,11 +89,11 @@ type hiveCommandIn struct {
 }
 
 type scheduleIDIn struct {
-	ID string `json:"id" jsonschema:"schedule id from superai_schedule_list"`
+	ID string `json:"id" jsonschema:"schedule id from superleo_schedule_list"`
 }
 
 type scheduleEnableIn struct {
-	ID      string `json:"id" jsonschema:"schedule id from superai_schedule_list"`
+	ID      string `json:"id" jsonschema:"schedule id from superleo_schedule_list"`
 	Enabled bool   `json:"enabled" jsonschema:"true resumes the schedule, false pauses it without deleting it"`
 }
 
@@ -135,7 +135,7 @@ func streamableMCP(s *mcp.Server) http.Handler {
 // cards say is asking.
 func newMCPServer(app *App, version, caller, instructions string) *mcp.Server {
 	s := mcp.NewServer(
-		&mcp.Implementation{Name: "superai", Title: "SuperAI", Version: version},
+		&mcp.Implementation{Name: "superleo", Title: "SuperLeo", Version: version},
 		&mcp.ServerOptions{Instructions: instructions},
 	)
 	addSelfMCPTools(s, app, caller)
@@ -143,9 +143,9 @@ func newMCPServer(app *App, version, caller, instructions string) *mcp.Server {
 	addHiveMCPTools(s, app, caller)
 
 	mcp.AddTool(s, &mcp.Tool{
-		Name:  "superai_schedule_create",
+		Name:  "superleo_schedule_create",
 		Title: "Schedule a prompt",
-		Description: "Have SuperAI run a prompt on a clock. The cron is validated before anything " +
+		Description: "Have SuperLeo run a prompt on a clock. The cron is validated before anything " +
 			"is saved, and the answer names the next few run times so a wrong hour is visible " +
 			"immediately rather than at the wrong hour.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in scheduleCreateIn) (*mcp.CallToolResult, any, error) {
@@ -167,7 +167,7 @@ func newMCPServer(app *App, version, caller, instructions string) *mcp.Server {
 	})
 
 	mcp.AddTool(s, &mcp.Tool{
-		Name:        "superai_schedule_list",
+		Name:        "superleo_schedule_list",
 		Title:       "List schedules",
 		Description: "Every schedule with its cron, whether it is enabled, and when it next runs.",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
@@ -176,7 +176,7 @@ func newMCPServer(app *App, version, caller, instructions string) *mcp.Server {
 	})
 
 	mcp.AddTool(s, &mcp.Tool{
-		Name:        "superai_schedule_enable",
+		Name:        "superleo_schedule_enable",
 		Title:       "Pause or resume a schedule",
 		Description: "Pausing keeps the schedule and its history; deleting does not.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in scheduleEnableIn) (*mcp.CallToolResult, any, error) {
@@ -187,14 +187,14 @@ func newMCPServer(app *App, version, caller, instructions string) *mcp.Server {
 	})
 
 	mcp.AddTool(s, &mcp.Tool{
-		Name:  "superai_schedule_delete",
+		Name:  "superleo_schedule_delete",
 		Title: "Delete a schedule",
-		Description: "Removes it for good. To stop it temporarily use superai_schedule_enable with enabled=false. " +
-			"Passes SuperAI's approval gate: the person is asked on the phone and the call waits for the answer " +
+		Description: "Removes it for good. To stop it temporarily use superleo_schedule_enable with enabled=false. " +
+			"Passes SuperLeo's approval gate: the person is asked on the phone and the call waits for the answer " +
 			"(denied if nobody answers in time).",
 		Annotations: &mcp.ToolAnnotations{DestructiveHint: ptr(true)},
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in scheduleIDIn) (*mcp.CallToolResult, any, error) {
-		if refused := app.mcpGate(ctx, caller, "superai_schedule_delete", map[string]any{"id": in.ID}); refused != nil {
+		if refused := app.mcpGate(ctx, caller, "superleo_schedule_delete", map[string]any{"id": in.ID}); refused != nil {
 			return refused, nil, nil
 		}
 		if msg := app.DeleteScheduledPrompt(in.ID); msg != "ok" {
@@ -204,7 +204,7 @@ func newMCPServer(app *App, version, caller, instructions string) *mcp.Server {
 	})
 
 	mcp.AddTool(s, &mcp.Tool{
-		Name:  "superai_schedule_run_now",
+		Name:  "superleo_schedule_run_now",
 		Title: "Run a schedule immediately",
 		Description: "Runs it once, right now, without touching its timetable — the way to check " +
 			"that a schedule does what its author meant before waiting until morning.",
@@ -219,7 +219,7 @@ func newMCPServer(app *App, version, caller, instructions string) *mcp.Server {
 	// methods the queen's own agent calls, so what an outside agent can do to a
 	// hive is exactly what the queen can.
 	mcp.AddTool(s, &mcp.Tool{
-		Name:        "superai_hive_members",
+		Name:        "superleo_hive_members",
 		Title:       "List the hive",
 		Description: "Every worker in the hive, whether it is live or lost, and where it is. Only a queen has a roster.",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
@@ -232,7 +232,7 @@ func newMCPServer(app *App, version, caller, instructions string) *mcp.Server {
 	})
 
 	mcp.AddTool(s, &mcp.Tool{
-		Name:  "superai_hive_spawn",
+		Name:  "superleo_hive_spawn",
 		Title: "Make more workers",
 		Description: "Add workers to the hive. Returns when they have joined and are live, or says how many did not. " +
 			"Refused past the queen's cap.",
@@ -245,13 +245,13 @@ func newMCPServer(app *App, version, caller, instructions string) *mcp.Server {
 	})
 
 	mcp.AddTool(s, &mcp.Tool{
-		Name:  "superai_hive_retire",
+		Name:  "superleo_hive_retire",
 		Title: "Retire workers",
 		Description: "Let the highest-numbered workers go. Refuses while one is in the middle of an order, " +
-			"unless force is set. With force the call passes SuperAI's approval gate: the person is asked on the " +
+			"unless force is set. With force the call passes SuperLeo's approval gate: the person is asked on the " +
 			"phone and the call waits for the answer (denied if nobody answers in time).",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in hiveRetireIn) (*mcp.CallToolResult, any, error) {
-		if refused := app.mcpGate(ctx, caller, "superai_hive_retire", map[string]any{"count": in.Count, "force": in.Force}); refused != nil {
+		if refused := app.mcpGate(ctx, caller, "superleo_hive_retire", map[string]any{"count": in.Count, "force": in.Force}); refused != nil {
 			return refused, nil, nil
 		}
 		r := app.HiveRetire(in.Count, in.Force)
@@ -262,7 +262,7 @@ func newMCPServer(app *App, version, caller, instructions string) *mcp.Server {
 	})
 
 	mcp.AddTool(s, &mcp.Tool{
-		Name:  "superai_hive_map",
+		Name:  "superleo_hive_map",
 		Title: "Run many jobs on the hive",
 		Description: "Queue independent jobs and let every worker take the next when it is free, so a list longer than " +
 			"the hive still finishes as fast as the hive can. With spawn_up_to it makes the workers it needs first.",
@@ -275,7 +275,7 @@ func newMCPServer(app *App, version, caller, instructions string) *mcp.Server {
 	})
 
 	mcp.AddTool(s, &mcp.Tool{
-		Name:  "superai_hive_command",
+		Name:  "superleo_hive_command",
 		Title: "Order the workers",
 		Description: "Send one order to the live workers in parallel and get one report back from each. " +
 			"Each worker starts a fresh conversation, so the order must stand on its own.",
@@ -296,7 +296,7 @@ func newMCPServer(app *App, version, caller, instructions string) *mcp.Server {
 	})
 
 	mcp.AddTool(s, &mcp.Tool{
-		Name:  "superai_hive_send",
+		Name:  "superleo_hive_send",
 		Title: "Message a hive member",
 		Description: "Put a short message in a member's inbox — a worker by name, \"queen\", or \"*\" for everyone else — " +
 			"without starting any work there. Unlike an order nothing waits for an answer.",
@@ -309,7 +309,7 @@ func newMCPServer(app *App, version, caller, instructions string) *mcp.Server {
 	})
 
 	mcp.AddTool(s, &mcp.Tool{
-		Name:        "superai_hive_inbox",
+		Name:        "superleo_hive_inbox",
 		Title:       "Read the hive inbox",
 		Description: "The messages hive members sent this instance: the unread ones, marked read by reading; with all, the last 20.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in hiveInboxIn) (*mcp.CallToolResult, any, error) {
@@ -325,35 +325,35 @@ func newMCPServer(app *App, version, caller, instructions string) *mcp.Server {
 
 func ptr[T any](v T) *T { return &v }
 
-const mcpInstructions = `SuperAI is a personal assistant with its own tools, memory and data (to-dos,
-calendar, notes, holdings through noted). superai_ask talks to it as the person
+const mcpInstructions = `SuperLeo is a personal assistant with its own tools, memory and data (to-dos,
+calendar, notes, holdings through noted). superleo_ask talks to it as the person
 would in the app and returns its answer and conversation id; pass the id back
-to continue. superai_conversations and superai_chat_history read what was said.
+to continue. superleo_conversations and superleo_chat_history read what was said.
 
-SuperAI also runs prompts on a clock and keeps the answers in a conversation.
+SuperLeo also runs prompts on a clock and keeps the answers in a conversation.
 
-Use superai_schedule_create for anything of the shape "every <when>, <do something>".
+Use superleo_schedule_create for anything of the shape "every <when>, <do something>".
 Translate the human's words into a five-field cron yourself, then read back the
 next run times the tool returns — if they are not what the person asked for, fix
 the cron rather than explaining it.
 
-A schedule's prompt is an instruction to SuperAI, written the way it would be
+A schedule's prompt is an instruction to SuperLeo, written the way it would be
 typed into chat. It is not a description of a schedule.`
 
-const queenMCPInstructions = `You are the queen of a SuperAI hive, and these tools are how you command it.
-SuperAI carries out every action; dangerous ones (machine_act, forced retire,
+const queenMCPInstructions = `You are the queen of a SuperLeo hive, and these tools are how you command it.
+SuperLeo carries out every action; dangerous ones (machine_act, forced retire,
 task cancel, schedule delete) wait for the person to approve them on the phone.
 
-Hand concrete work to workers with superai_hive_delegate (it returns a
-delegation id; poll superai_hive_tasks with it until the state is not
-running). superai_hive_command and superai_hive_map send orders to many
-workers at once. superai_hive_tasks shows what every worker is doing;
-superai_hive_task_cancel stops one order or delegation.
+Hand concrete work to workers with superleo_hive_delegate (it returns a
+delegation id; poll superleo_hive_tasks with it until the state is not
+running). superleo_hive_command and superleo_hive_map send orders to many
+workers at once. superleo_hive_tasks shows what every worker is doing;
+superleo_hive_task_cancel stops one order or delegation.
 
-superai_machine_inspect and superai_machine_act look after the machines
-(superai_linked_agents names them: the entries with machine true; hive
+superleo_machine_inspect and superleo_machine_act look after the machines
+(superleo_linked_agents names them: the entries with machine true; hive
 workers and relays are listed there too, and are not machines).
-superai_approvals_pending lists what is waiting for the person; you cannot
+superleo_approvals_pending lists what is waiting for the person; you cannot
 answer it, only tell them.`
 
 // nextRuns validates a cron expression and returns its next n occurrences.

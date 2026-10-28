@@ -7,7 +7,7 @@ import { RemoteAgentNames } from "../../wailsjs/go/app/App";
  * Typing @ offers the agents this app can reach, and picking one puts its name
  * in. Where the name lands decides what happens to the message — at the front
  * it is an address and the whole thing goes to that agent, anywhere else it is
- * a mention SuperAI reads — so the composer says which of the two is about to
+ * a mention SuperLeo reads — so the composer says which of the two is about to
  * happen rather than leaving it to be discovered on send. That rule lives in
  * Go (addressedTo in app_remote.go); this only has to describe it.
  *

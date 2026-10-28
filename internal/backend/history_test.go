@@ -9,7 +9,7 @@ import (
 
 func TestVisibleTurnsStripsInjectedContext(t *testing.T) {
 	messages := []domain.Message{
-		{Role: "system", Content: "你是 SuperAI"},
+		{Role: "system", Content: "你是 SuperLeo"},
 		{Role: "user", Content: "[文档附件，可用 read_document 工具读取]\n- uploads/简历.pdf\n\n他有几年工作经验？"},
 		{Role: "user", Content: "<system-reminder>\nToday's date is 2026-07-29.\n</system-reminder>"},
 		{Role: "user", Content: "<skill-discovery>\nSkills relevant…\n</skill-discovery>"},

@@ -1,15 +1,15 @@
 package app
 
-// `superai agent join`: this machine joins a core in one step. A pairing
+// `superleo agent join`: this machine joins a core in one step. A pairing
 // code from the core is traded for a token of the machine's own, the token
-// and where to reach the core are kept in ~/.superai-agent, and `superai
+// and where to reach the core are kept in ~/.superleo-agent, and `superleo
 // agent` is installed as a service of this login. From then on the core sees
 // the machine: its signed-in coding CLIs and the agents it runs are workers,
-// and so is the machine's own SuperAI once it has a model; without one it is
+// and so is the machine's own SuperLeo once it has a model; without one it is
 // only the core's hands there.
 //
-//	superai agent join <core address> <code> [-name n] [-link host:port] [-tls]
-//	superai agent leave
+//	superleo agent join <core address> <code> [-name n] [-link host:port] [-tls]
+//	superleo agent leave
 
 import (
 	"bytes"
@@ -28,22 +28,22 @@ import (
 	"time"
 
 	"github.com/liliang-cn/agentexec"
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
-var agentService = loginService{label: "cn.superleo.superai-agent", unit: "superai-agent.service", about: "SuperAI agent", log: "agent.log"}
+var agentService = loginService{label: "cn.superleo.superleo-agent", unit: "superleo-agent.service", about: "SuperLeo agent", log: "agent.log"}
 
 // agentAdvertiseEnv is where a core says the address agents reach its link
 // at, which it cannot see for itself behind a NodePort or a proxy; a join
 // learns it from the claim.
-const agentAdvertiseEnv = "SUPERAI_AGENT_ADVERTISE"
+const agentAdvertiseEnv = "SUPERLEO_AGENT_ADVERTISE"
 
 func agentHome() string {
 	h, _ := os.UserHomeDir()
-	return filepath.Join(h, ".superai-agent")
+	return filepath.Join(h, ".superleo-agent")
 }
 
-// agentJoinConf is what a join chose, so `superai agent` run with no flags
+// agentJoinConf is what a join chose, so `superleo agent` run with no flags
 // (as the service runs it) links the same way.
 type agentJoinConf struct {
 	Core string `json:"core"`
@@ -54,10 +54,10 @@ type agentJoinConf struct {
 const agentTokenFile = "core-token"
 
 // joinedOptions is how to link from what a join kept, if one was made here:
-// in SUPERAI_HOME, which the service a join installs is given, else in the
+// in SUPERLEO_HOME, which the service a join installs is given, else in the
 // default home (a Windows task is given no environment).
 func joinedOptions() (AgentLinkOptions, bool) {
-	home := strings.TrimSpace(os.Getenv("SUPERAI_HOME"))
+	home := strings.TrimSpace(os.Getenv("SUPERLEO_HOME"))
 	if home == "" {
 		home = agentHome()
 	}
@@ -70,8 +70,8 @@ func joinedOptions() (AgentLinkOptions, bool) {
 		return AgentLinkOptions{}, false
 	}
 	tok, _ := os.ReadFile(filepath.Join(home, agentTokenFile))
-	if os.Getenv("SUPERAI_HOME") == "" {
-		_ = os.Setenv("SUPERAI_HOME", home)
+	if os.Getenv("SUPERLEO_HOME") == "" {
+		_ = os.Setenv("SUPERLEO_HOME", home)
 	}
 	return AgentLinkOptions{Core: c.Core, Token: strings.TrimSpace(string(tok)), Name: c.Name, TLS: c.TLS, Version: buildVersion()}, true
 }
@@ -82,7 +82,7 @@ func agentJoin(argv []string) error {
 	link := fs.String("link", "", "the core's agent link, host:port, when the core does not say it")
 	useTLS := fs.Bool("tls", false, "dial the agent link with TLS")
 	fs.Usage = func() {
-		fmt.Fprintln(os.Stderr, "usage: superai agent join <core address> <pairing code> [-name n] [-link host:port] [-tls]")
+		fmt.Fprintln(os.Stderr, "usage: superleo agent join <core address> <pairing code> [-name n] [-link host:port] [-tls]")
 		fs.PrintDefaults()
 	}
 	// The address and the code first, the flags after, as people type it.
@@ -97,7 +97,7 @@ func agentJoin(argv []string) error {
 		fs.Usage()
 		os.Exit(2)
 	}
-	base, err := normaliseSuperAIURL(pos[0])
+	base, err := normaliseSuperLeoURL(pos[0])
 	if err != nil {
 		return err
 	}
@@ -156,7 +156,7 @@ func agentJoin(argv []string) error {
 	// The coding CLIs, by the full path the login shell finds them at: a
 	// service's PATH is bare.
 	env := loginEnv()
-	_ = os.Setenv("SUPERAI_HOME", home)
+	_ = os.Setenv("SUPERLEO_HOME", home)
 	_ = os.Setenv("PATH", env["PATH"])
 	s, err := backend.LoadSettings()
 	if err != nil {
@@ -197,7 +197,7 @@ func agentJoin(argv []string) error {
 	if len(names) > 0 {
 		fmt.Printf("Coding agents here: %s. The signed-in ones are workers now.\n", strings.Join(names, ", "))
 	}
-	fmt.Println("With a model of its own (set under Settings in", home+"), this machine's SuperAI is a worker too.")
+	fmt.Println("With a model of its own (set under Settings in", home+"), this machine's SuperLeo is a worker too.")
 	return nil
 }
 

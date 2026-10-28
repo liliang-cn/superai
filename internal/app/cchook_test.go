@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/liliang-cn/agentexec/hooks"
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // ---- the hook: what it forwards, and what it leaves alone
@@ -33,8 +33,8 @@ func TestTheHookForwardsOnlyWhatAPhoneShouldHear(t *testing.T) {
 		name, event, payload string
 		want                 *ccHookEvent
 	}{
-		{"stop with the text inline", "Stop", `{"session_id":"s1","cwd":"/w/superai","last_assistant_message":"done: 3 files"}`,
-			&ccHookEvent{Event: "Stop", Session: "s1", Cwd: "/w/superai", Text: "done: 3 files"}},
+		{"stop with the text inline", "Stop", `{"session_id":"s1","cwd":"/w/superleo","last_assistant_message":"done: 3 files"}`,
+			&ccHookEvent{Event: "Stop", Session: "s1", Cwd: "/w/superleo", Text: "done: 3 files"}},
 		{"stop reads the transcript", "Stop", `{"session_id":"s1","transcript_path":"/t.jsonl"}`,
 			&ccHookEvent{Event: "Stop", Session: "s1", Text: "read from the transcript"}},
 		{"the payload names the event", "", `{"hook_event_name":"Stop","session_id":"s1","last_assistant_message":"x"}`,
@@ -282,9 +282,9 @@ func TestOnlyAnAbsentPersonIsInterrupted(t *testing.T) {
 
 func TestANoticeIsAddressedBackToItsSession(t *testing.T) {
 	now := time.Date(2026, 10, 15, 9, 0, 0, 0, time.UTC)
-	r := ccReport{ccHookEvent: ccHookEvent{Event: "Stop", Session: "s-1", Cwd: "/Users/me/superai", Text: "  all green  "}, Host: "mbp"}
+	r := ccReport{ccHookEvent: ccHookEvent{Event: "Stop", Session: "s-1", Cwd: "/Users/me/superleo", Text: "  all green  "}, Host: "mbp"}
 	n := ccNotice("mac", r, "", now)
-	if n.Title != "claude · mac · superai" || n.Key != "cc:s-1" || n.Message != "all green" || !n.Push ||
+	if n.Title != "claude · mac · superleo" || n.Key != "cc:s-1" || n.Message != "all green" || !n.Push ||
 		n.Reply == nil || n.Reply.Agent != "mac" || n.Reply.Session != "s-1" || n.Kind != backend.KindInfo {
 		t.Errorf("stop notice %+v", n)
 	}
@@ -319,12 +319,12 @@ func TestNoticesCollapsePerSessionAndHonourTheAwaySwitch(t *testing.T) {
 		raw, _ := json.Marshal(ccReport{ccHookEvent: ev, Away: away})
 		a.noteCCSession("mac", string(raw))
 	}
-	report(false, ccHookEvent{Event: "SessionStart", Session: "s1", Cwd: "/w/superai"})
+	report(false, ccHookEvent{Event: "SessionStart", Session: "s1", Cwd: "/w/superleo"})
 	report(false, ccHookEvent{Event: "Stop", Session: "s1", Text: "turn one"})
 	if got := a.Notifications(); len(got) != 0 {
 		t.Fatalf("raised while present: %+v", got)
 	}
-	if s := a.CCSessions(); len(s) != 1 || s[0].Project != "superai" || s[0].State != ccFinished || s[0].Text != "turn one" {
+	if s := a.CCSessions(); len(s) != 1 || s[0].Project != "superleo" || s[0].State != ccFinished || s[0].Text != "turn one" {
 		t.Fatalf("session list %+v", s)
 	}
 
@@ -435,7 +435,7 @@ func TestATerminalTurnReachesThePhoneAndTheAnswerComesBack(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { os.RemoveAll(home) })
-	t.Setenv("SUPERAI_HOME", home)
+	t.Setenv("SUPERLEO_HOME", home)
 
 	addr := startCore(t, core)
 	agent := NewApp()
@@ -458,13 +458,13 @@ func TestATerminalTurnReachesThePhoneAndTheAnswerComesBack(t *testing.T) {
 	defer hcancel()
 	stale := filepath.Join(home, "gone.sock")
 	_ = os.WriteFile(stale, nil, 0o600)
-	reply := sendCCHook(hctx, []string{stale, sock}, ccHookEvent{Event: "Stop", Session: "s9", Cwd: "/w/superai", Text: "built and tested", TTY: "/dev/ttys007"})
+	reply := sendCCHook(hctx, []string{stale, sock}, ccHookEvent{Event: "Stop", Session: "s9", Cwd: "/w/superleo", Text: "built and tested", TTY: "/dev/ttys007"})
 	if reply != "" {
 		t.Fatalf("nothing was parked, got %q", reply)
 	}
 	waitFor(t, "the notice on core", func() bool { return len(core.Notifications()) == 1 })
 	n := core.Notifications()[0]
-	if n.Title != "claude · mac · superai" || n.Message != "built and tested" || n.Reply == nil || n.Reply.Agent != "mac" || n.Reply.Session != "s9" {
+	if n.Title != "claude · mac · superleo" || n.Message != "built and tested" || n.Reply == nil || n.Reply.Agent != "mac" || n.Reply.Session != "s9" {
 		t.Fatalf("notice %+v", n)
 	}
 
@@ -499,9 +499,9 @@ func TestHookMainSpeaksOnlyToHandBackAnAnswer(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { os.RemoveAll(home) })
-	t.Setenv("SUPERAI_HOME", home)
-	t.Setenv("SUPERAI_HOOK_SOCKET", filepath.Join(home, ccHookSocketName))
-	t.Setenv("SUPERAI_CLI_RUN", "")
+	t.Setenv("SUPERLEO_HOME", home)
+	t.Setenv("SUPERLEO_HOOK_SOCKET", filepath.Join(home, ccHookSocketName))
+	t.Setenv("SUPERLEO_CLI_RUN", "")
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 	go NewApp().serveCCHookSocket(ctx)
@@ -534,10 +534,10 @@ func TestHookMainSpeaksOnlyToHandBackAnAnswer(t *testing.T) {
 	if err := json.Unmarshal([]byte(out), &got); err != nil || got["decision"] != "block" || got["reason"] != "one more thing" {
 		t.Fatalf("Stop with a parked answer printed %q", out)
 	}
-	// A run SuperAI started itself stays out of it entirely.
+	// A run SuperLeo started itself stays out of it entirely.
 	ccLocalState().queue.Push("h1", "not for a cli run")
-	t.Setenv("SUPERAI_CLI_RUN", "run-1")
+	t.Setenv("SUPERLEO_CLI_RUN", "run-1")
 	if out := run("Stop", `{"session_id":"h1"}`); out != "" {
-		t.Fatalf("a SuperAI run's hook printed %q", out)
+		t.Fatalf("a SuperLeo run's hook printed %q", out)
 	}
 }

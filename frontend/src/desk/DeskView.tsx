@@ -43,7 +43,7 @@ import { machine } from "../lib/machine";
 
 type TabKey = string; // "hive" | "run:<id>" | "dash:<id>"
 
-const served = Boolean((window as unknown as Record<string, unknown>).superaiServed);
+const served = Boolean((window as unknown as Record<string, unknown>).superleoServed);
 
 function useNow(ms = 1000) {
   const [now, setNow] = useState(() => new Date());
@@ -136,7 +136,7 @@ function useLink() {
 const FIXED: TabKey[] = ["hive", "status", "stats"];
 /** Which of the fixed tabs was last in front, so a home left on its figures
  *  opens on them. */
-const TAB_KEY = "superai-desk-live-tab";
+const TAB_KEY = "superleo-desk-live-tab";
 
 const PIN_COLORS = ["dk-a-later", "dk-a-hive", "dk-a-code", "dk-a-bees", "dk-a-know", "dk-a-stats", "dk-a-rec"];
 
@@ -161,12 +161,12 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
   const { folded, fold, setBusy } = useDeskPane();
   const layoutRef = useRef<HTMLDivElement>(null);
   const [sideWidth, setSideWidth] = useState(() => {
-    try { const n = Number(localStorage.getItem("superai-desk-side-width")); return Number.isFinite(n) && n >= 200 ? Math.min(480, n) : 252; } catch { return 252; }
+    try { const n = Number(localStorage.getItem("superleo-desk-side-width")); return Number.isFinite(n) && n >= 200 ? Math.min(480, n) : 252; } catch { return 252; }
   });
   const [resizing, setResizing] = useState(false);
   const clampWidth = (n: number) => Math.round(Math.max(200, Math.min(480, (layoutRef.current?.clientWidth ?? 1200) - (folded || window.matchMedia("(max-width: 1240px)").matches ? 418 : 760), n)));
   const resizeSide = (n: number) => setSideWidth(clampWidth(n));
-  useEffect(() => { try { localStorage.setItem("superai-desk-side-width", String(sideWidth)); } catch { /* private window */ } }, [sideWidth]);
+  useEffect(() => { try { localStorage.setItem("superleo-desk-side-width", String(sideWidth)); } catch { /* private window */ } }, [sideWidth]);
   useEffect(() => {
     const fit = () => setSideWidth((n) => clampWidth(n));
     window.addEventListener("resize", fit);
@@ -264,7 +264,7 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
   // the rest of what needs you, and what is coming up, sits in the sidebar.
   const needs = attention.filter((i) => i.level === "needs").length;
   const feed = attention.filter((i) => i.level === "soon");
-  // 接下来的安排: noted's next items and SuperAI's own meetings and
+  // 接下来的安排: noted's next items and SuperLeo's own meetings and
   // reminders, one list by time.
   const nextRows = useMemo(() => {
     type R = { key: string; at: number; noted?: ScheduleItem; life?: AttentionItem };
@@ -346,8 +346,8 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
       window.setTimeout(() => composerRef.current?.focus(), 80);
     };
     compose();
-    window.addEventListener("superai:compose", compose);
-    return () => window.removeEventListener("superai:compose", compose);
+    window.addEventListener("superleo:compose", compose);
+    return () => window.removeEventListener("superleo:compose", compose);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -374,7 +374,7 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
     <div ref={layoutRef} className={`${folded ? "dk folded" : "dk"}${resizing ? " dk-resizing" : ""}`} style={{ "--dk-side-width": `${sideWidth}px` } as CSSProperties}>
       <aside id="desk-sidebar" className="cv-glass dk-side">
         <div className="dk-ws">
-          <b>SuperAI</b>
+          <b>SuperLeo</b>
           <button className="dk-icon" title={t("New chat")} aria-label={t("New chat")} onClick={() => { chat.newSession(); setOnQueen(false); }}><SquarePenIcon size={17} /></button>
         </div>
         <button className={onQueen ? "dk-row on" : "dk-row"} onClick={() => pickSession(queenId)}><span className="dk-qhex">Q</span>{queenTitle(queen)}</button>
@@ -465,7 +465,7 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
           <span className="dk-qhex big">Q</span>
           <div><b title={title}>{title}</b><small><i className={hive.role ? "dk-ok" : "dk-off"} />{status}</small></div>
           {/* What this conversation's runs sent the model, and what each tool
-              did: kept by SuperAI itself, on the machine the conversation is on. */}
+              did: kept by SuperLeo itself, on the machine the conversation is on. */}
           <button className="dk-icon" title={t("Trace")} aria-label={t("Trace")} onClick={() => setTraceOpen(true)}><ScrollTextIcon size={17} /></button>
         </header>
         {traceOpen && <RunTracePanel taskId={chat.sessionId} live={chat.sending} onClose={() => setTraceOpen(false)} />}

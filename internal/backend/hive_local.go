@@ -21,7 +21,7 @@ import (
 // The cluster's queen makes workers by asking Kubernetes for more pods
 // (hive_spawn.go). A queen on a laptop has no cluster, but it has the same
 // binary and an operating system that starts processes. So here a worker is
-// `superai serve` run as a child: bound to loopback on a port of its own, with
+// `superleo serve` run as a child: bound to loopback on a port of its own, with
 // a data directory of its own under <data>/hive/<name>, told where the queen
 // is, and from then on a worker like any other — it announces itself, takes
 // orders and delegated tools over the same protocol, and the queen's roster is
@@ -61,13 +61,13 @@ func DefaultLocalMaxWorkers() int {
 	return n
 }
 
-// ExitWithStdinEnv tells `superai serve` to shut down when its stdin closes:
+// ExitWithStdinEnv tells `superleo serve` to shut down when its stdin closes:
 // how a local worker learns that its queen is gone.
-const ExitWithStdinEnv = "SUPERAI_EXIT_WITH_STDIN"
+const ExitWithStdinEnv = "SUPERLEO_EXIT_WITH_STDIN"
 
 // LocalHiveSpec is what the queen supplies to run workers.
 type LocalHiveSpec struct {
-	// Exe is the superai binary; empty takes this process's own.
+	// Exe is the superleo binary; empty takes this process's own.
 	Exe string
 	// Dir holds one data directory per worker; empty takes <data>/hive.
 	Dir      string
@@ -294,13 +294,13 @@ func (l *LocalSpawner) retireOneIdle(now time.Time) bool {
 	return true
 }
 
-// startServe runs `superai serve` for one worker.
+// startServe runs `superleo serve` for one worker.
 func (l *LocalSpawner) startServe(name string, port int) (func(), <-chan error, error) {
 	exe := l.spec.Exe
 	if exe == "" {
 		var err error
 		if exe, err = os.Executable(); err != nil {
-			return nil, nil, fmt.Errorf("finding the superai binary: %w", err)
+			return nil, nil, fmt.Errorf("finding the superleo binary: %w", err)
 		}
 	}
 	home := filepath.Join(l.spec.Dir, name)
@@ -356,9 +356,9 @@ func (l *LocalSpawner) startServe(name string, port int) (func(), <-chan error, 
 // the queen keeps her data and settings, who she is in a cluster, and the
 // listeners that would collide.
 var localWorkerDropEnv = []string{
-	"SUPERAI_HOME", "SUPERAI_SETTINGS_JSON", "SUPERAI_ADVERTISE_URL", "SUPERAI_HIVE_DELEGATION",
-	"SUPERAI_CORE", "SUPERAI_CORE_TOKEN", "SUPERAI_CORE_TOKEN_FILE", "SUPERAI_AGENT_PORT", "SUPERAI_AGENT_NAME",
-	"SUPERAI_PPROF", "SUPERAI_HOOK_SOCKET", "SUPERAI_NODE", ExitWithStdinEnv,
+	"SUPERLEO_HOME", "SUPERLEO_SETTINGS_JSON", "SUPERLEO_ADVERTISE_URL", "SUPERLEO_HIVE_DELEGATION",
+	"SUPERLEO_CORE", "SUPERLEO_CORE_TOKEN", "SUPERLEO_CORE_TOKEN_FILE", "SUPERLEO_AGENT_PORT", "SUPERLEO_AGENT_NAME",
+	"SUPERLEO_PPROF", "SUPERLEO_HOOK_SOCKET", "SUPERLEO_NODE", ExitWithStdinEnv,
 }
 
 // LocalWorkerEnv is the environment a local worker runs with: the queen's,
@@ -379,9 +379,9 @@ func LocalWorkerEnv(parent []string, home, advertise string) []string {
 		}
 	}
 	return append(out,
-		"SUPERAI_HOME="+home,
-		"SUPERAI_ADVERTISE_URL="+advertise,
-		"SUPERAI_NO_BROWSER=1",
+		"SUPERLEO_HOME="+home,
+		"SUPERLEO_ADVERTISE_URL="+advertise,
+		"SUPERLEO_NO_BROWSER=1",
 		ExitWithStdinEnv+"=1",
 	)
 }
@@ -389,7 +389,7 @@ func LocalWorkerEnv(parent []string, home, advertise string) []string {
 // LocalWorkerSettings derives a worker's settings from its queen's: the same
 // model, keys, memory and workspace, and none of what only one instance on a
 // machine may hold — the Telegram bot, the phone pushes, the embedded proxy's
-// port, the avatar's port, the links to other SuperAIs.
+// port, the avatar's port, the links to other SuperLeos.
 func LocalWorkerSettings(queen Settings, name, joinURL, joinToken, advertise string) Settings {
 	w := queen
 	w.Hive = HiveSettings{

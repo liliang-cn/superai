@@ -322,8 +322,8 @@ export function LinkHive(arg1, arg2) {
   return window['go']['app']['App']['LinkHive'](arg1, arg2);
 }
 
-export function LinkSuperAI(arg1, arg2, arg3) {
-  return window['go']['app']['App']['LinkSuperAI'](arg1, arg2, arg3);
+export function LinkSuperLeo(arg1, arg2, arg3) {
+  return window['go']['app']['App']['LinkSuperLeo'](arg1, arg2, arg3);
 }
 
 export function LinkedAgents() {
@@ -334,8 +334,8 @@ export function LinkedAgentsAll() {
   return window['go']['app']['App']['LinkedAgentsAll']();
 }
 
-export function LinkedSuperAIs() {
-  return window['go']['app']['App']['LinkedSuperAIs']();
+export function LinkedSuperLeos() {
+  return window['go']['app']['App']['LinkedSuperLeos']();
 }
 
 export function ListApprovalRules() {
@@ -742,8 +742,8 @@ export function UnlinkHive() {
   return window['go']['app']['App']['UnlinkHive']();
 }
 
-export function UnlinkSuperAI(arg1) {
-  return window['go']['app']['App']['UnlinkSuperAI'](arg1);
+export function UnlinkSuperLeo(arg1) {
+  return window['go']['app']['App']['UnlinkSuperLeo'](arg1);
 }
 
 export function UnpairDevice(arg1) {

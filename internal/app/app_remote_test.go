@@ -28,7 +28,7 @@ func TestOnlyALeadingNameIsAnAddress(t *testing.T) {
 		}
 	}
 
-	// Everything here has to reach SuperAI's own model. The last three are the
+	// Everything here has to reach SuperLeo's own model. The last three are the
 	// ones that would hurt: an address in the middle of a sentence, a name
 	// that is not an agent, and text that merely starts with punctuation.
 	for _, in := range []string{

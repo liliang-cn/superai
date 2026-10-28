@@ -64,8 +64,8 @@ export default function Inspector({ picked, data, onClose, open, openDash }: {
 
   // The facts under the title fold to one line, and stay the way they were
   // left on every card.
-  const [facts, setFactsState] = useState(() => { try { return localStorage.getItem("superai.inspector.facts") !== "folded"; } catch { return true; } });
-  const setFacts = (v: boolean) => { setFactsState(v); try { localStorage.setItem("superai.inspector.facts", v ? "open" : "folded"); } catch { /* ignore */ } };
+  const [facts, setFactsState] = useState(() => { try { return localStorage.getItem("superleo.inspector.facts") !== "folded"; } catch { return true; } });
+  const setFacts = (v: boolean) => { setFactsState(v); try { localStorage.setItem("superleo.inspector.facts", v ? "open" : "folded"); } catch { /* ignore */ } };
   const rows: [string, string][] = [];
   let kind = picked.kind;
   let body: React.ReactNode = null;
@@ -98,7 +98,7 @@ export default function Inspector({ picked, data, onClose, open, openDash }: {
       if (p) rows.push(["Tokens", fmt(p.tokens)], ["Tool calls", String(p.calls)]);
       body = (
         <>
-          <Talk who={{ kind: "worker", name: picked.id }} placeholder={t("Talk to {name}…", { name: picked.id.replace(/^superai-/, "") })} />
+          <Talk who={{ kind: "worker", name: picked.id }} placeholder={t("Talk to {name}…", { name: picked.id.replace(/^superleo-/, "") })} />
           {mine.length > 0 && (
             <ul className="wi-list">
               {mine.slice(0, 4).map((x) => (
@@ -294,7 +294,7 @@ export default function Inspector({ picked, data, onClose, open, openDash }: {
         {(() => { const h = data.hosts?.find((x) => x.agents.some(isCore)); return h ? <HostCard host={h} data={data} withControls={false} /> : null; })()}
         <div className="wi-acts">
           <button onClick={() => open(PATHS.settings, true)}>{t("Settings")}</button>
-          <button onClick={() => window.dispatchEvent(new Event("superai:theme"))}>{t("Theme")}</button>
+          <button onClick={() => window.dispatchEvent(new Event("superleo:theme"))}>{t("Theme")}</button>
           <button onClick={() => openSwitcher()}>{t("Switch backend")}</button>
           <button onClick={() => open(PATHS.stats, true)}>{t("Stats")}</button>
         </div>
@@ -333,7 +333,7 @@ export default function Inspector({ picked, data, onClose, open, openDash }: {
     case "node": {
       kind = "Node";
       const on = data.hive.members.filter((m) => (m as any).node === picked.id);
-      rows.push(["Workers", on.map((m) => m.name.replace(/^superai-/, "")).join(", ") || "—"]);
+      rows.push(["Workers", on.map((m) => m.name.replace(/^superleo-/, "")).join(", ") || "—"]);
       body = (
         <ul className="wi-list">
           {on.map((m) => <li key={m.name} onClick={() => focusInWorld("worker", m.name)}><i className={`wi-dot ${m.state === "live" ? "done" : "failed"}`} />{m.name}<em>{m.state}</em></li>)}
@@ -631,8 +631,8 @@ const roleLabel = (r?: string) => (r === "queen" ? "queen" : r === "worker" ? "w
 
 /**
  * A host's agents in three groups, each a click away in the world: the
- * SuperAIs (with their part in the hive and the MCP servers they can call),
- * the coding CLIs, the named agents (with the SuperAI that runs them and the
+ * SuperLeos (with their part in the hive and the MCP servers they can call),
+ * the coding CLIs, the named agents (with the SuperLeo that runs them and the
  * HA service that keeps them up); the hosts inside it; and, for a machine
  * agent's host or the core's, the machine itself to look after.
  */
@@ -662,7 +662,7 @@ function HostCard({ host, data, withControls, onRun, busy }: { host: Host; data:
   return (
     <div className="wi-host">
       {sup.length > 0 && <>
-        <p className="wi-cap">SuperAI</p>
+        <p className="wi-cap">SuperLeo</p>
         <ul className="wi-list">
           {sup.flatMap((a) => [
             row(a, a.name, [t(roleLabel(a.role)), a.version?.split("-")[0]].filter(Boolean).join(" · ")),

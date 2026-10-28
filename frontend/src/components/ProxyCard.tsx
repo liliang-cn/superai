@@ -13,7 +13,7 @@ const MODES: { id: string; label: string }[] = [
 type State = { mode: string; using: string; system?: string; error?: string };
 
 /**
- * The proxy SuperAI's own requests and the CLIs it starts go through. Edits
+ * The proxy SuperLeo's own requests and the CLIs it starts go through. Edits
  * the page's copy of the settings, saved with the rest; the line under it is
  * the setting in use, and Test tries the one on screen without saving it.
  */

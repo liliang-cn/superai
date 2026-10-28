@@ -14,7 +14,7 @@ import (
 
 // Messages, for an agent behind an adapter.
 //
-// A SuperAI worker takes hive messages into its own loop and has hive_send
+// A SuperLeo worker takes hive messages into its own loop and has hive_send
 // and hive_inbox as tools of its own. An agent behind an adapter has neither,
 // so the adapter supplies both halves:
 //
@@ -128,7 +128,7 @@ const InboxStillEmpty = "Still nothing, and nothing has arrived since you last l
 	" hive_wait, which returns the moment the message arrives, or end your turn saying what you are waiting for" +
 	" — the message then starts a new turn for you with it and your last order in front of you."
 
-// HiveWaitDescription is hive_wait's, the same for a SuperAI member and for an
+// HiveWaitDescription is hive_wait's, the same for a SuperLeo member and for an
 // agent behind the adapter.
 const HiveWaitDescription = "Wait for a message from another member of the hive and get it the moment it arrives." +
 	"\n\nThe way to wait on someone — the previous step of a relay, an answer you asked for. It takes no" +
@@ -205,7 +205,7 @@ type adapterNoIn struct{}
 
 // mcpHandler serves the hive tools to the agent behind this adapter.
 func (a *Adapter) mcpHandler() http.Handler {
-	s := mcp.NewServer(&mcp.Implementation{Name: "superai-hive", Title: "SuperAI hive", Version: "1"},
+	s := mcp.NewServer(&mcp.Implementation{Name: "superai-hive", Title: "SuperLeo hive", Version: "1"},
 		&mcp.ServerOptions{Instructions: "You are a worker in a hive of agents led by a queen. hive_peers shows who is in it; " +
 			"hive_send puts a short message in another member's inbox without starting work there, and nothing waits for " +
 			"the answer; hive_inbox reads what was sent to you."})

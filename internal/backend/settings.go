@@ -1,9 +1,10 @@
-// Package backend hosts the AgentGo-powered SuperAI service, the avatar event
-// driver, and the persisted user settings for the SuperAI app.
+// Package backend hosts the AgentGo-powered SuperLeo service, the avatar event
+// driver, and the persisted user settings for the SuperLeo app.
 package backend
 
 import (
 	"encoding/json"
+	_ "github.com/liliang-cn/superleo/internal/brand" // the old SuperAI names keep working
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,7 +15,7 @@ import (
 )
 
 // Settings is the user-editable configuration, persisted as JSON at
-// ~/.superai/settings.json.
+// ~/.superleo/settings.json.
 type Settings struct {
 	// Brain (LLM) — any OpenAI-compatible endpoint.
 	LLMBaseURL string `json:"llm_base_url"`
@@ -32,7 +33,7 @@ type Settings struct {
 	// took 5–8s to its first tool call, 4–4.7s at "low".
 	LLMReasoningEffort string `json:"llm_reasoning_effort,omitempty"`
 
-	// Embeddings (optional). If EmbedKey is empty or "none", SuperAI falls back
+	// Embeddings (optional). If EmbedKey is empty or "none", SuperLeo falls back
 	// to file memory so chat-only proxies still work.
 	EmbedBaseURL string `json:"embed_base_url"`
 	EmbedKey     string `json:"embed_key"`
@@ -80,7 +81,7 @@ type Settings struct {
 	// lacks, which is right for a desktop conversation and wrong for a
 	// one-shot invocation: a run that answers one question should not be
 	// installing software, and the tools cost a schema slot and a tempting
-	// detour on every task that will never use them. cmd/superai sets it.
+	// detour on every task that will never use them. cmd/superleo sets it.
 	DisableSelfInstall bool `json:"disable_self_install"`
 
 	// DisableToolApproval turns off the tool approval gate: shell commands,
@@ -134,7 +135,7 @@ type Settings struct {
 	LongTaskMaxTokens int `json:"long_task_max_tokens,omitempty"`
 
 	// DisableBrowser is retained for settings-file compatibility. agent-go v3
-	// removed pkg/browser, so SuperAI no longer attaches a browser at all;
+	// removed pkg/browser, so SuperLeo no longer attaches a browser at all;
 	// wire an MCP browser server if browsing is needed.
 	DisableBrowser bool `json:"disable_browser"`
 
@@ -174,7 +175,7 @@ type Settings struct {
 	// CLIProxyPort is the local port the embedded proxy binds (loopback only).
 	CLIProxyPort int `json:"cliproxy_port"`
 
-	// Proxy is the network proxy SuperAI's own outside requests and the
+	// Proxy is the network proxy SuperLeo's own outside requests and the
 	// agent CLIs it starts go through (proxy.go): the environment by
 	// default, off, the system's, or a URL.
 	Proxy ProxySettings `json:"proxy,omitempty"`
@@ -242,7 +243,7 @@ type Settings struct {
 	// starting it open to whoever finds the bot.
 	TelegramAllowedChats []int64 `json:"telegram_allowed_chats"`
 
-	// ExternalAgents lets SuperAI hand a task to an agent CLI installed on
+	// ExternalAgents lets SuperLeo hand a task to an agent CLI installed on
 	// this machine. Nested rather than flattened into a dozen top-level keys
 	// so the whole feature is one object a person can read, delete or diff in
 	// settings.json — and so nothing here can be reached by a settings key the
@@ -257,7 +258,7 @@ type Settings struct {
 	// The zero value is a standalone install.
 	Hive HiveSettings `json:"hive"`
 
-	// RemoteAgents lets SuperAI ask an agent on another machine — see
+	// RemoteAgents lets SuperLeo ask an agent on another machine — see
 	// remoteagents.go. Separate from ExternalAgents because the two differ in
 	// what they can hurt: one spends a subscription on this laptop, the other
 	// runs commands on a cluster.
@@ -289,7 +290,7 @@ type Settings struct {
 	HA HASettings `json:"ha,omitzero"`
 }
 
-// Defaults for APNsSettings: the developer team and the SuperAI iOS app.
+// Defaults for APNsSettings: the developer team and the SuperLeo iOS app.
 const (
 	DefaultAPNsTeamID = "NUDL4XSA6J"
 	DefaultAPNsTopic  = "cn.superleo.superai.ios"
@@ -505,17 +506,17 @@ const (
 	DefaultCLIProxyPort = 43517
 )
 
-// DataDir returns the SuperAI data directory (~/.superai),
-// honoring the SUPERAI_HOME environment override.
+// DataDir returns the SuperLeo data directory (~/.superleo),
+// honoring the SUPERLEO_HOME environment override.
 func DataDir() string {
-	if v := strings.TrimSpace(os.Getenv("SUPERAI_HOME")); v != "" {
+	if v := strings.TrimSpace(os.Getenv("SUPERLEO_HOME")); v != "" {
 		return expandHome(v)
 	}
 	home, err := os.UserHomeDir()
 	if err != nil || home == "" {
-		return ".superai"
+		return ".superleo"
 	}
-	return filepath.Join(home, ".superai")
+	return filepath.Join(home, ".superleo")
 }
 
 func expandHome(p string) string {
@@ -531,7 +532,7 @@ func settingsPath() string { return filepath.Join(DataDir(), "settings.json") }
 
 // defaults returns a Settings populated with built-in defaults and environment
 // fallbacks (LLM_BASE / LLM_KEY / LLM_MODEL, EMBED_BASE / EMBED_KEY /
-// EMBED_MODEL). Out of the box SuperAI runs on the embedded CLI proxy, so no
+// EMBED_MODEL). Out of the box SuperLeo runs on the embedded CLI proxy, so no
 // cloud endpoint or API key is assumed.
 func defaults() *Settings {
 	s := &Settings{
@@ -567,7 +568,7 @@ func defaults() *Settings {
 func LoadSettings() (*Settings, error) {
 	s, err := loadSettingsFrom(settingsPath())
 	if s != nil {
-		s.mergeLinked(LoadLinkedSuperAIs())
+		s.mergeLinked(LoadLinkedSuperLeos())
 		s.mergeQueenIdentity()
 		s.mergeAgentLink()
 		s.mergeQueenEngine()
@@ -575,14 +576,14 @@ func LoadSettings() (*Settings, error) {
 	return s, err
 }
 
-// linkedPath holds the other SuperAIs linked from Settings › Other SuperAIs.
+// linkedPath holds the other SuperLeos linked from Settings › Other SuperLeos.
 // A file of its own because settings.json is not always this app's to keep:
 // in the hive's containers the entrypoint rewrites it from a Secret on every
 // start, and a link made in the page would be gone after the next restart.
 func linkedPath() string { return filepath.Join(DataDir(), "linked.json") }
 
-// LoadLinkedSuperAIs reads the links; none is an empty map.
-func LoadLinkedSuperAIs() map[string]RemoteAgent {
+// LoadLinkedSuperLeos reads the links; none is an empty map.
+func LoadLinkedSuperLeos() map[string]RemoteAgent {
 	out := map[string]RemoteAgent{}
 	if raw, err := os.ReadFile(linkedPath()); err == nil {
 		_ = json.Unmarshal(raw, &out)
@@ -590,9 +591,9 @@ func LoadLinkedSuperAIs() map[string]RemoteAgent {
 	return out
 }
 
-// SaveLinkedSuperAIs writes the links, readable by this user only: each
+// SaveLinkedSuperLeos writes the links, readable by this user only: each
 // carries a device key.
-func SaveLinkedSuperAIs(links map[string]RemoteAgent) error {
+func SaveLinkedSuperLeos(links map[string]RemoteAgent) error {
 	raw, err := json.MarshalIndent(links, "", "  ")
 	if err != nil {
 		return err
@@ -689,7 +690,7 @@ func (s *Settings) backfill(def *Settings) {
 	s.normalizeQueen()
 }
 
-// Save writes the settings to ~/.superai/settings.json (creating the
+// Save writes the settings to ~/.superleo/settings.json (creating the
 // data directory if needed).
 // registerWindow tells agent-go how much the brain's model holds, when the
 // settings say.
@@ -733,7 +734,7 @@ func (s *Settings) Save() error {
 
 // WebSearch returns the endpoint the built-in web_search tool should use,
 // defaulting to the brain's own endpoint field by field. Returning the brain is
-// deliberate: it is the one endpoint SuperAI is guaranteed to have credentials
+// deliberate: it is the one endpoint SuperLeo is guaranteed to have credentials
 // for, and a search-grounded model behind it answers a grounded request. A
 // dedicated search endpoint is configured by filling the Search* fields (or
 // SEARCH_BASE / SEARCH_KEY / SEARCH_MODEL).
@@ -747,7 +748,7 @@ func (s *Settings) WebSearch() (baseURL, key, model string) {
 }
 
 // UseEmbeddings reports whether an embedder should be built (graph memory) or
-// SuperAI should fall back to file memory.
+// SuperLeo should fall back to file memory.
 // Speech reports the endpoint, key and model to synthesise with, and whether
 // there is one at all. A missing model means no: see the field comment.
 func (s *Settings) Speech() (baseURL, key, model, voice string, ok bool) {

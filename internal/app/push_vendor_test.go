@@ -9,7 +9,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 type vendorSent struct {
@@ -67,7 +67,7 @@ func withAndroids(t *testing.T) *deviceStore {
 }
 
 func TestNoticesAreDispatchedPerProvider(t *testing.T) {
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	store := withAndroids(t)
 	apple := &fakeAlerts{}
 	vendors := &fakeVendors{}
@@ -116,7 +116,7 @@ func TestNoticesAreDispatchedPerProvider(t *testing.T) {
 }
 
 func TestAlarmWakesReachAndroidWithoutAPNs(t *testing.T) {
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	store := withAndroids(t)
 	vendors := &fakeVendors{}
 	w := newAlarmWatcher()

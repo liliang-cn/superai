@@ -31,7 +31,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/liliang-cn/agentexec"
 	agentexecpty "github.com/liliang-cn/agentexec/pty"
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // CLIRunEvent is one thing a CLI run did, normalised across CLIs.
@@ -70,7 +70,7 @@ type CLIRun struct {
 	// session is the conversation's queen session, apart from any @mention
 	// of the same agent there.
 	Queen bool `json:"queen,omitempty"`
-	// Remote is the SuperAI this run is happening on, by its name in Remote
+	// Remote is the SuperLeo this run is happening on, by its name in Remote
 	// agents; RemoteRun is the run's id there. Empty for a run on this machine.
 	Remote    string        `json:"remote,omitempty"`
 	RemoteRun string        `json:"remoteRun,omitempty"`
@@ -139,7 +139,7 @@ func (s *cliRunStore) load() {
 		// A run that was going when the process died is not going now.
 		if r.State == "running" {
 			r.State = "cancelled"
-			r.Error = "SuperAI stopped while this was running"
+			r.Error = "SuperLeo stopped while this was running"
 		}
 		s.runs[r.ID] = r
 	}
@@ -309,9 +309,9 @@ func (a *App) startCLIRun(o cliStart) (CLIRun, error) {
 	req := agentexec.Request{
 		RunID: id, Prompt: prompt, WorkspacePath: dir, Model: model,
 		ResumeSessionID: session, PermissionMode: agentexec.PermissionBypass,
-		// This run reports through cli:run already; `superai hook` sees this
+		// This run reports through cli:run already; `superleo hook` sees this
 		// and stays out of it (cchook.go).
-		Env: map[string]string{"SUPERAI_CLI_RUN": id},
+		Env: map[string]string{"SUPERLEO_CLI_RUN": id},
 	}
 	// The CLI goes out the way this machine's own requests do (Settings →
 	// Runtime → Proxy); its own servers here stay direct through NO_PROXY.
@@ -349,7 +349,7 @@ func (a *App) startCLIRun(o cliStart) (CLIRun, error) {
 		switch agent {
 		case "claude":
 			req.PermissionMode = agentexec.PermissionDefault
-			req.ExtraArgs = append(req.ExtraArgs, "--permission-prompt-tool", "mcp__superai__approve")
+			req.ExtraArgs = append(req.ExtraArgs, "--permission-prompt-tool", "mcp__superleo__approve")
 			// Claude gives an MCP call a short while and then reports "The
 			// operation timed out": a person reaching for their phone took
 			// longer than that, and Claude gave up on the command. The call

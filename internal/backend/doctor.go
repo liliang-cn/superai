@@ -69,7 +69,7 @@ type DoctorReport struct {
 // config.Config with Home: DataDir(), so that — not the framework's own
 // default — is the install a report about this app has to be about. Desktop
 // and serve mode share it; both boot the same App, and DataDir() honours
-// SUPERAI_HOME in both.
+// SUPERLEO_HOME in both.
 func RunDoctor(ctx context.Context) DoctorReport {
 	return doctorReportFor(ctx, DataDir())
 }
@@ -125,7 +125,7 @@ func (r *DoctorReport) recount() {
 
 // applySettingsProvider corrects the one check the framework cannot get
 // right for this app. agent.Doctor looks for LLM providers in agentgo.db,
-// but SuperAI keeps its brain in settings.json and hands it to the service
+// but SuperLeo keeps its brain in settings.json and hands it to the service
 // through WithLLM — so on a healthy install the framework reports
 // "no LLM provider configured", which is exactly wrong. When settings.json
 // names a provider, that check is replaced with what the app will actually
@@ -171,7 +171,7 @@ func applySettingsProvider(out *DoctorReport, home string) {
 
 // Agent CLIs installed on this machine.
 //
-// SuperAI can hand a task to Claude Code, Codex, Gemini or cursor-agent, and
+// SuperLeo can hand a task to Claude Code, Codex, Gemini or cursor-agent, and
 // the question someone actually has is "will it work", which is not the same
 // question as "is it installed". Measured here on 2026-09-02: all four were
 // installed and only `claude` ran. codex had a revoked refresh token, gemini
@@ -193,7 +193,7 @@ func applySettingsProvider(out *DoctorReport, home string) {
 // costs one externalAgentProbeTimeout at worst rather than four.
 const externalAgentProbeTimeout = 2 * time.Second
 
-// externalAgentCLIs are the agent CLIs SuperAI knows how to delegate to, in
+// externalAgentCLIs are the agent CLIs SuperLeo knows how to delegate to, in
 // the order the settings page lists them.
 var externalAgentCLIs = []string{"claude", "codex", "cursor-agent"}
 
@@ -215,7 +215,7 @@ type ExternalAgentStatus struct {
 	Overridden bool `json:"overridden"`
 }
 
-// ExternalAgentStatuses probes every agent CLI SuperAI can delegate to.
+// ExternalAgentStatuses probes every agent CLI SuperLeo can delegate to.
 // overrides is Settings.ExternalAgents.Binaries — a path from there is used
 // instead of a PATH lookup, which is the escape hatch for a GUI launch whose
 // inherited PATH is nothing like the login shell's.

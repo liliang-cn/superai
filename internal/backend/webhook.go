@@ -128,14 +128,14 @@ func (n *Notifier) Send(ctx context.Context, p WebhookPayload) {
 		p.SentAt = time.Now().Format(time.RFC3339)
 	}
 	if p.Title == "" {
-		p.Title = "SuperAI"
+		p.Title = "SuperLeo"
 	}
 	p.Message = truncateRunes(p.Message, 4000)
 	p.Source = truncateRunes(p.Source, 300)
 
 	body, err := json.Marshal(p)
 	if err != nil {
-		log.Printf("superai: webhook payload: %v", err)
+		log.Printf("superleo: webhook payload: %v", err)
 		return
 	}
 
@@ -147,7 +147,7 @@ func (n *Notifier) Send(ctx context.Context, p WebhookPayload) {
 
 	req, err := http.NewRequestWithContext(sendCtx, http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
-		log.Printf("superai: webhook request: %v", err)
+		log.Printf("superleo: webhook request: %v", err)
 		return
 	}
 	req.Header.Set("Content-Type", "application/json")
@@ -160,12 +160,12 @@ func (n *Notifier) Send(ctx context.Context, p WebhookPayload) {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Printf("superai: webhook post failed: %v", err)
+		log.Printf("superleo: webhook post failed: %v", err)
 		return
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 300 {
-		log.Printf("superai: webhook returned %s", resp.Status)
+		log.Printf("superleo: webhook returned %s", resp.Status)
 	}
 }
 
@@ -182,8 +182,8 @@ func (n *Notifier) SendTest(ctx context.Context) error {
 
 	body, _ := json.Marshal(WebhookPayload{
 		Event:   WebhookEventTest,
-		Title:   "SuperAI",
-		Message: "Test notification from SuperAI. Receiving this means the webhook is configured correctly.",
+		Title:   "SuperLeo",
+		Message: "Test notification from SuperLeo. Receiving this means the webhook is configured correctly.",
 		SentAt:  time.Now().Format(time.RFC3339),
 	})
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))

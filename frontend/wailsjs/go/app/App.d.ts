@@ -166,13 +166,13 @@ export function Life():Promise<backend.LifeData>;
 
 export function LinkHive(arg1:string,arg2:string):Promise<app.HiveLinkInfo>;
 
-export function LinkSuperAI(arg1:string,arg2:string,arg3:string):Promise<string>;
+export function LinkSuperLeo(arg1:string,arg2:string,arg3:string):Promise<string>;
 
 export function LinkedAgents():Promise<Array<app.LinkedAgent>>;
 
 export function LinkedAgentsAll():Promise<Array<app.LinkedAgent>>;
 
-export function LinkedSuperAIs():Promise<Array<app.LinkedSuperAI>>;
+export function LinkedSuperLeos():Promise<Array<app.LinkedSuperLeo>>;
 
 export function ListApprovalRules():Promise<Array<backend.ApprovalRule>>;
 
@@ -376,7 +376,7 @@ export function TurnTraces(arg1:number):Promise<Array<app.TurnTrace>>;
 
 export function UnlinkHive():Promise<void>;
 
-export function UnlinkSuperAI(arg1:string):Promise<void>;
+export function UnlinkSuperLeo(arg1:string):Promise<void>;
 
 export function UnpairDevice(arg1:string):Promise<void>;
 

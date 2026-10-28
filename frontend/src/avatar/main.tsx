@@ -45,7 +45,7 @@ const ROWS: Record<string, number> = {
 /** 144px per row at 6x. */
 const ROW_HEIGHT = 144;
 
-const STORAGE_KEY = "superai-avatar-char";
+const STORAGE_KEY = "superleo-avatar-char";
 
 type AvatarEvent = {
   type: "state" | "emotion" | "speech";

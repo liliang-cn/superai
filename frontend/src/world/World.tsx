@@ -21,7 +21,7 @@ import { Response } from "@/components/ai-elements/response";
 import { RefreshCwIcon, XIcon } from "lucide-react";
 import "./world.css";
 
-const HOLO_KEY = "superai-world-holo";
+const HOLO_KEY = "superleo-world-holo";
 
 /** The app's slower lists, refreshed now and then and on the events that
  *  change them. */
@@ -216,10 +216,10 @@ export default function World({ view, onFlipTheme }: { view: ViewKey; onFlipThem
       </div>
       <StatsHud hive={hive} runs={runs} on={holo} />
       <div ref={card} className="wl-callout" style={{ display: picked ? "" : "none" }}>
-        {picked && <Inspector key={picked.kind + ":" + picked.id} picked={picked} data={data} onClose={close} openDash={setDash} open={(to, full) => { if (full) window.dispatchEvent(new CustomEvent("superai:window", { detail: to })); else navigate(to); }} />}
+        {picked && <Inspector key={picked.kind + ":" + picked.id} picked={picked} data={data} onClose={close} openDash={setDash} open={(to, full) => { if (full) window.dispatchEvent(new CustomEvent("superleo:window", { detail: to })); else navigate(to); }} />}
       </div>
       {dash && <DashScreen id={dash} onClose={() => setDash("")} />}
-      <Command view={view} onConversation={() => window.dispatchEvent(new CustomEvent("superai:window", { detail: "/" }))} onTyping={(kind, id) => engine.current?.hint(kind, id)} hosts={topo.hosts} />
+      <Command view={view} onConversation={() => window.dispatchEvent(new CustomEvent("superleo:window", { detail: "/" }))} onTyping={(kind, id) => engine.current?.hint(kind, id)} hosts={topo.hosts} />
     </div>
   );
 }
@@ -231,8 +231,8 @@ export default function World({ view, onFlipTheme }: { view: ViewKey; onFlipThem
 function Hud({ data, on }: { view: ViewKey; data: WorldData; on: boolean }) {
   const { t } = useI18n();
   // Folded to its top line unless opened; it remembers.
-  const [open, setOpen] = useState(() => { try { return localStorage.getItem("superai-world-stats") === "1"; } catch { return false; } });
-  const toggle = () => setOpen((v) => { try { localStorage.setItem("superai-world-stats", v ? "0" : "1"); } catch { /* fine */ } return !v; });
+  const [open, setOpen] = useState(() => { try { return localStorage.getItem("superleo-world-stats") === "1"; } catch { return false; } });
+  const toggle = () => setOpen((v) => { try { localStorage.setItem("superleo-world-stats", v ? "0" : "1"); } catch { /* fine */ } return !v; });
   // Tokens spent between updates, for the line.
   const hist = useRef<number[]>([]);
   const last = useRef(-1);
@@ -252,7 +252,7 @@ function Hud({ data, on }: { view: ViewKey; data: WorldData; on: boolean }) {
   const line = pts.map((v, i) => `${(i / Math.max(1, pts.length - 1)) * W},${H - 2 - (v / max) * (H - 6)}`).join(" ");
   const members = [...data.meter.members].sort((a, b) => b.tokens - a.tokens).slice(0, 6);
   const topTokens = Math.max(1, ...members.map((m) => m.tokens));
-  const short = (n: string) => n.replace(/^superai-worker-/, "w").replace(/^superai-/, "");
+  const short = (n: string) => n.replace(/^superai-worker-/, "w").replace(/^superleo-/, "");
   return (
     <div className={`wl-holo tl wl-hive${open ? " open" : ""}${on ? "" : " off"}`} aria-hidden={!on}>
       <button className="wh-hive-top" onClick={toggle} aria-expanded={open} title={t(open ? "Fold" : "Show the figures")}>

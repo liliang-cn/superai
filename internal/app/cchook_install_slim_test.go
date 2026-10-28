@@ -7,15 +7,15 @@ import (
 	"testing"
 )
 
-// The prompt and tool events go to superai-cchook when it sits beside
-// superai; an install from before it is moved over in place.
+// The prompt and tool events go to superleo-cchook when it sits beside
+// superleo; an install from before it is moved over in place.
 func TestTheBusyEventsMoveToTheSmallHook(t *testing.T) {
-	const slim = "/Users/me/.superai-node/bin/superai-cchook"
+	const slim = "/Users/me/.superleo-node/bin/superleo-cchook"
 	old, _, err := mergeCCHooks([]byte(otherToolsSettings), testBin, "", ccHookSpecs)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// A person added a key of their own to SuperAI's group by hand.
+	// A person added a key of their own to SuperLeo's group by hand.
 	old = []byte(strings.Replace(string(old), `"command": "`+testBin+` hook PostToolUse",`,
 		`"command": "`+testBin+` hook PostToolUse",`+"\n            \"note\": \"mine\",", 1))
 
@@ -23,7 +23,7 @@ func TestTheBusyEventsMoveToTheSmallHook(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "UserPromptSubmit (now superai-cchook),PreToolUse (now superai-cchook),PostToolUse (now superai-cchook)"
+	want := "UserPromptSubmit (now superleo-cchook),PreToolUse (now superleo-cchook),PostToolUse (now superleo-cchook)"
 	if strings.Join(changed, ",") != want {
 		t.Fatalf("changed %v", changed)
 	}
@@ -64,11 +64,11 @@ func TestTheBusyEventsMoveToTheSmallHook(t *testing.T) {
 	}
 	for _, ev := range []string{"Stop", "SessionEnd", "PermissionRequest", "Notification"} {
 		if got := commands(t, s, ev); len(got) != 1 || !isOurHook(got[0], ev) {
-			t.Errorf("%s should stay with superai hook: %v", ev, got)
+			t.Errorf("%s should stay with superleo hook: %v", ev, got)
 		}
 	}
 	// Again, with or without the small binary at hand: nothing to do.
-	for _, sl := range []string{slim, "", "/elsewhere/superai-cchook"} {
+	for _, sl := range []string{slim, "", "/elsewhere/superleo-cchook"} {
 		if again, changed, err := mergeCCHooks(next, testBin, sl, ccHookSpecs); err != nil || len(changed) != 0 || string(again) != string(next) {
 			t.Fatalf("with %q: changed %v (%v)", sl, changed, err)
 		}
@@ -82,7 +82,7 @@ func TestTheBusyEventsMoveToTheSmallHook(t *testing.T) {
 
 func TestTheSmallHookIsUsedOnlyWhenItIsThere(t *testing.T) {
 	dir := t.TempDir()
-	bin := filepath.Join(dir, "superai")
+	bin := filepath.Join(dir, "superleo")
 	_ = os.WriteFile(bin, []byte("x"), 0o755)
 	if got := slimHookBeside(bin); got != "" {
 		t.Fatalf("found %q before it was there", got)
@@ -106,10 +106,10 @@ func TestTheSmallHookIsUsedOnlyWhenItIsThere(t *testing.T) {
 	}
 	for cmd, want := range map[string]bool{
 		slim + " PreToolUse":               true,
-		"'/a b/superai-cchook' PreToolUse": true,
-		"/x/superai hook PreToolUse":       false,
-		"/x/superai-cchook PostToolUse":    false,
-		"/x/not-superai-cchook PreToolUse": false,
+		"'/a b/superleo-cchook' PreToolUse": true,
+		"/x/superleo hook PreToolUse":       false,
+		"/x/superleo-cchook PostToolUse":    false,
+		"/x/not-superleo-cchook PreToolUse": false,
 	} {
 		if got := isOurSlimHook(cmd, "PreToolUse"); got != want {
 			t.Errorf("isOurSlimHook(%q) = %v", cmd, got)

@@ -3,13 +3,13 @@ package app
 import (
 	"testing"
 
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // A queen that restarts is still on the term she held, and a member already
 // on it is not taken for a later queen's.
 func TestARestartedQueenKeepsHerTerm(t *testing.T) {
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	saveTerm(3)
 	a := &App{}
 	cfg := &backend.Settings{Hive: backend.HiveSettings{Role: backend.HiveRoleQueen, Name: "q"}}

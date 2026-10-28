@@ -3,7 +3,7 @@ package backend
 // The live 3D view of the brain.
 //
 // CortexDB can serve its own knowledge graph as a rotatable WebGL page on
-// loopback, and SuperAI reads that brain on every turn. This wires the two
+// loopback, and SuperLeo reads that brain on every turn. This wires the two
 // together so the app can show the graph it is actually thinking with, rather
 // than a picture of one exported at some point in the past.
 //
@@ -148,7 +148,7 @@ func (g *GraphViews) Ensure(ctx context.Context, s *Settings) (*liveview.Server,
 	// cancellation of our own, ended by Close.
 	viewCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
 	// activity=false: tool-call events reach a live view through CortexDB's own
-	// MCP middleware, and SuperAI's tools do not run through it. The page reads
+	// MCP middleware, and SuperLeo's tools do not run through it. The page reads
 	// the flag and says "structure only" rather than leaving a still ticker to
 	// be mistaken for a fault.
 	sv, err := liveview.Start(viewCtx, src, liveview.DefaultPort, liveview.DefaultInterval, false)

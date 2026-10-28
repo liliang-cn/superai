@@ -1,5 +1,5 @@
 {
-  "description": "Shared fixtures for the alarm schedule engine (docs/alarms.md). Each case: an alarm (schedule, holidayPolicy, region; enabled defaults to true), a time `now`, and the rings strictly after now: `expected` holds the first `limit` of them, `total` how many there are in one expansion (today plus 180 days in the alarm's zone, at most 200). Compare times as instants. `holidays` is the CN calendar the cases use (only read when region is CN); dates it does not list are ordinary days. Run by internal/alarm (Go) and by the SuperAI iOS engine (Swift).",
+  "description": "Shared fixtures for the alarm schedule engine (docs/alarms.md). Each case: an alarm (schedule, holidayPolicy, region; enabled defaults to true), a time `now`, and the rings strictly after now: `expected` holds the first `limit` of them, `total` how many there are in one expansion (today plus 180 days in the alarm's zone, at most 200). Compare times as instants. `holidays` is the CN calendar the cases use (only read when region is CN); dates it does not list are ordinary days. Run by internal/alarm (Go) and by the SuperLeo iOS engine (Swift).",
   "version": 1,
   "windowDays": 180,
   "maxOccurrences": 200,

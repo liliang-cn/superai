@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 func TestTheQueenIsAddressedByHerNamesAndAliases(t *testing.T) {
@@ -31,7 +31,7 @@ func TestTheQueenIsAddressedByHerNamesAndAliases(t *testing.T) {
 }
 
 func TestAnAddressToTheQueenNeverGoesToAnAgentOfTheSameName(t *testing.T) {
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	log := &eventLog{}
 	a := NewApp()
 	a.emitFn = log.record
@@ -55,7 +55,7 @@ func TestAnAddressToTheQueenNeverGoesToAnAgentOfTheSameName(t *testing.T) {
 }
 
 func TestClientsReadTheQueensName(t *testing.T) {
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	a := &App{settings: &backend.Settings{QueenName: "小蜂", QueenAliases: []string{"bee"}}}
 	if a.HiveStatus()["queen_name"] != "小蜂" || a.GetStatus()["queenName"] != "小蜂" {
 		t.Fatal("status does not carry the name")

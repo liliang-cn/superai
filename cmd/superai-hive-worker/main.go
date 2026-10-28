@@ -1,8 +1,8 @@
-// superai-hive-worker lets an agent that is not a SuperAI be a worker in a hive.
+// superai-hive-worker lets an agent that is not a SuperLeo be a worker in a hive.
 //
 // It does the two things a worker has to: it announces itself to the queen and
 // keeps doing so, and it takes the orders the queen sends and reports back the
-// way a SuperAI worker does. What actually does the work is whatever is behind
+// way a SuperLeo worker does. What actually does the work is whatever is behind
 // it — a command-line agent, or a model behind an OpenAI-compatible endpoint.
 //
 // A command-line agent, its answer taken from what it prints:
@@ -35,7 +35,7 @@
 //	    -openai-base https://api.example.com/v1 -openai-model some-model
 //
 // {prompt} is the order, passed as one argument and never through a shell. The
-// queen's token comes from -queen-token or $SUPERAI_HIVE_TOKEN.
+// queen's token comes from -queen-token or $SUPERLEO_HIVE_TOKEN.
 package main
 
 import (
@@ -45,6 +45,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	_ "github.com/liliang-cn/superleo/internal/brand" // the old SuperAI names keep working
 	"log"
 	"net"
 	"net/http"
@@ -55,18 +56,18 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 func main() {
 	var (
 		queen       = flag.String("queen", "", "the queen's address, e.g. http://192.168.123.214")
-		queenToken  = flag.String("queen-token", os.Getenv("SUPERAI_HIVE_TOKEN"), "the bearer the queen accepts (or $SUPERAI_HIVE_TOKEN)")
+		queenToken  = flag.String("queen-token", os.Getenv("SUPERLEO_HIVE_TOKEN"), "the bearer the queen accepts (or $SUPERLEO_HIVE_TOKEN)")
 		name        = flag.String("name", "", "this worker's name in the hive (letters, digits, . _ -)")
 		about       = flag.String("about", "", "one line about what this worker is, for the roster")
 		listen      = flag.String("listen", "0.0.0.0:0", "where to listen for orders; port 0 picks a free one")
 		advertise   = flag.String("advertise", "", "the address the queen should use to reach this worker; default is this machine's address toward the queen")
-		token       = flag.String("token", os.Getenv("SUPERAI_WORKER_TOKEN"), "the bearer the queen must present; default is a fresh random one, which the queen is told when this joins")
+		token       = flag.String("token", os.Getenv("SUPERLEO_WORKER_TOKEN"), "the bearer the queen must present; default is a fresh random one, which the queen is told when this joins")
 		concurrency = flag.Int("concurrency", 1, "orders to run at once; the rest wait")
 		dir         = flag.String("dir", "", "working directory for the command")
 		stdin       = flag.Bool("stdin", false, "send the order on the command's standard input instead of as {prompt} (use for ssh, so the order is never re-parsed by a remote shell)")
@@ -91,7 +92,7 @@ func main() {
 		os.Exit(2)
 	}
 	if *queenToken == "" {
-		log.Fatal("no queen token: pass -queen-token or set $SUPERAI_HIVE_TOKEN")
+		log.Fatal("no queen token: pass -queen-token or set $SUPERLEO_HIVE_TOKEN")
 	}
 
 	var engine backend.Engine

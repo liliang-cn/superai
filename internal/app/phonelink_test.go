@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/liliang-cn/superai/internal/relay"
+	"github.com/liliang-cn/superleo/internal/relay"
 )
 
 // phoneOver is a phone's HTTP client: it dials addr whatever the URL says, and
@@ -67,7 +67,7 @@ func TestTheDesktopPairsAPhoneOverTheLANAndTheRelay(t *testing.T) {
 	defer rl.Close()
 	rs := &relay.Server{Domain: "localhost", Logf: func(string, ...any) {}}
 	go rs.Serve(rl)
-	t.Setenv("SUPERAI_RELAY", "localhost:"+portOf(rl.Addr()))
+	t.Setenv("SUPERLEO_RELAY", "localhost:"+portOf(rl.Addr()))
 
 	first, err := app.PairPhone()
 	if err != nil {

@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // Where the agents the settings reach over ssh are, for the hosts list.

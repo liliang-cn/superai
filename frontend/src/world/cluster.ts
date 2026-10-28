@@ -43,10 +43,10 @@ export interface WorldData {
   services?: HAService[];
 }
 
-const short = (n: string) => n.replace(/^superai-worker-/, "w").replace(/^superai-/, "");
+const short = (n: string) => n.replace(/^superai-worker-/, "w").replace(/^superleo-/, "");
 /** A tool as a screen line shows it: an MCP tool by its own name, not its server's. */
 const toolName = (t?: string) => (t && t.startsWith("mcp__") ? t.split("__").pop() || t : t || "");
-/** What a terminal session of a coding CLI is on, in one line: "superai: Bash". */
+/** What a terminal session of a coding CLI is on, in one line: "superleo: Bash". */
 export function sessionLine(s: CCActivitySession, cli = "claude"): string {
   const what = s.state === "waiting"
     ? (s.wait === "permission" ? translate("waiting for your OK") + (s.tool ? ` · ${toolName(s.tool)}` : "") : translate("waiting for you"))
@@ -69,8 +69,8 @@ function termState(act: CCActivity | undefined) {
 /** An HA service's pin says which it is and where to reach it: "openclaw · 192.168.123.252". */
 const svcTitle = (s: HAService) => (s.vip ? `${s.name} · ${s.vip}` : s.name);
 const clip = (s: string, n = 30) => { const t = s.replace(/\s+/g, " ").trim(); return t.length > n ? t.slice(0, n - 1) + "…" : t; };
-/** The queen's name over her robot, with who is thinking for her: "queen · Claude Code", or "queen · SuperAI" when
- *  SuperAI answered in the engine's place. */
+/** The queen's name over her robot, with who is thinking for her: "queen · Claude Code", or "queen · SuperLeo" when
+ *  SuperLeo answered in the engine's place. */
 const queenLabel = (engine?: string, now?: string) => {
   const name = getQueenName().name;
   const note = queenEngineNote(engine, now);
@@ -981,7 +981,7 @@ export const cluster: District<WorldData> = {
             if (a.kind !== "cli") actor("agent:" + n, r);
           });
         }
-        // Its pods, each with its SuperAI standing inside.
+        // Its pods, each with its SuperLeo standing inside.
         p.pods.forEach((h, i) => {
           const pd = pod(h.state);
           pd.position.set(p.cols.pods[i], SLAB_TOP, p.station && !p.small ? 1.2 : 0.2);
@@ -995,7 +995,7 @@ export const cluster: District<WorldData> = {
             grp.add(r);
             ctx.pickable(r, { kind: "worker", id: a.name, title: a.name });
             workers.set(a.name, { r, label: ctx.label(r, short(a.name), "", 2.4), node: p.host.id });
-            placed.push({ key: `superai:${a.name}`, host: p.host.id, r });
+            placed.push({ key: `superleo:${a.name}`, host: p.host.id, r });
             actor("worker:" + a.name, r);
           });
         });
@@ -1010,7 +1010,7 @@ export const cluster: District<WorldData> = {
             grp.add(r);
             ctx.pickable(r, { kind: "worker", id: a.name, title: a.name });
             workers.set(a.name, { r, label: ctx.label(r, short(a.name), "", 2.4), node: p.host.id });
-            placed.push({ key: `superai:${a.name}`, host: p.host.id, r });
+            placed.push({ key: `superleo:${a.name}`, host: p.host.id, r });
             actor("worker:" + a.name, r);
             return;
           }
@@ -1313,7 +1313,7 @@ export const cluster: District<WorldData> = {
             const FIRST = ["claude", "codex", "pi", "openclaw", "opencode", "hermes"];
             const rank = (n: string) => { const i = FIRST.indexOf(n); return i < 0 ? 99 : i; };
             // The terminal sessions people run on it, every coding CLI's: work
-            // that is not SuperAI's, done by the same CLIs.
+            // that is not SuperLeo's, done by the same CLIs.
             const term = clisOf(a);
             const running = Object.keys(term);
             const ccWork = running.reduce((n, c) => n + (term[c].working ?? 0), 0);
@@ -1359,7 +1359,7 @@ export const cluster: District<WorldData> = {
             const liveHere = runsHere.filter((r) => r.state === "running");
             x.cable.setActive(liveHere.length > 0 || run.some((t) => route(t.worker)?.curve === x!.cable.curve));
             setLight(x.dev, liveHere.length || ccWork ? "busy" : "idle");
-            // The screen: SuperAI's runs, and the terminal sessions beside them,
+            // The screen: SuperLeo's runs, and the terminal sessions beside them,
             // each by its project and the tool it is on.
             const said = [
               liveHere.length ? `${liveHere.length} running` : "",
@@ -1473,7 +1473,7 @@ export const cluster: District<WorldData> = {
 
         // The queen: thinking while a turn runs, working while tools do.
         const live = d.busy || d.meter.total.live;
-        queenState = asking.includes("SuperAI") || asking.includes("queen") ? "wait" : live ? (run.length ? "work" : "think") : "idle";
+        queenState = asking.includes("SuperLeo") || asking.includes("queen") ? "wait" : live ? (run.length ? "work" : "think") : "idle";
         setState(queen, queenState);
         if (calls >= 0 && d.meter.total.calls > calls) { ctx.spark(new THREE.Vector3(0.8, 4.6, 1.4)); queen.userData.gestureUntil = clock + 0.9; }
         calls = d.meter.total.calls;
@@ -1503,7 +1503,7 @@ export const cluster: District<WorldData> = {
             switch (it.kind) {
               case "approval": {
                 const asker = it.title.split(" asks")[0].split(" · ")[0].trim();
-                return asker === "SuperAI" || asker === "queen" ? queen : cliRobot(asker) ?? queen;
+                return asker === "SuperLeo" || asker === "queen" ? queen : cliRobot(asker) ?? queen;
               }
               case "bee": case "report": return bees.get(it.ref ?? "")?.r ?? null;
               case "lost": return workers.get(it.ref ?? "")?.r ?? null;

@@ -8,7 +8,7 @@ import (
 )
 
 // The in-process cortexbridge toolbox must expose the full ontology surface
-// (ObjectSets + Actions landed in cortexdb v2.67.0; superai was pinned to
+// (ObjectSets + Actions landed in cortexdb v2.67.0; superleo was pinned to
 // v2.63.2 which only had save/get/list/delete).
 func TestInProcessToolboxHasFullOntologySurface(t *testing.T) {
 	db, err := cortexdb.Open(cortexdb.DefaultConfig(filepath.Join(t.TempDir(), "cortex.db")))

@@ -10,12 +10,12 @@ import (
 	"testing"
 	"time"
 
-	agentlinkpb "github.com/liliang-cn/superai/internal/agentlink/pb"
-	"github.com/liliang-cn/superai/internal/backend"
+	agentlinkpb "github.com/liliang-cn/superleo/internal/agentlink/pb"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
-// Every agent that can work is a worker, peers whatever they are: a SuperAI
-// with a model, a coding CLI on a machine. A SuperAI with no model is not one,
+// Every agent that can work is a worker, peers whatever they are: a SuperLeo
+// with a model, a coding CLI on a machine. A SuperLeo with no model is not one,
 // though what it runs is; the queen hands work out and is not counted.
 func TestEveryAgentThatCanWorkIsAWorker(t *testing.T) {
 	core := NewApp()

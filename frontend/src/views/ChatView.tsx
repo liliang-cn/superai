@@ -246,7 +246,7 @@ export default function ChatView({
                 <ConversationEmptyState
                   icon={<MessageSquareIcon className="size-10" />}
                   title="Start a conversation"
-                  description="Chat with SuperAI. It can use tools, search memory and the web, and stream its reasoning live."
+                  description="Chat with SuperLeo. It can use tools, search memory and the web, and stream its reasoning live."
                 >
                   {notReady && (
                     <div className="empty-hint">
@@ -284,7 +284,7 @@ export default function ChatView({
                                     says who. It goes above the progress block
                                     so the turn is signed before it reports. */}
                                 <MessageByline
-                                  name="SuperAI"
+                                  name="SuperLeo"
                                   meta={bylineMeta(m)}
                                   engine={engineByline(m)}
                                 />
@@ -436,10 +436,10 @@ export default function ChatView({
                   notReady
                     ? "Choose a model in Settings first"
                     : room === "phone"
-                      ? "Message SuperAI"
+                      ? "Message SuperLeo"
                       : mentions.agents.length > 0
-                        ? "Message SuperAI. @ reaches another agent; drop files or paste a screenshot."
-                        : "Message SuperAI. Drop files or paste a screenshot."
+                        ? "Message SuperLeo. @ reaches another agent; drop files or paste a screenshot."
+                        : "Message SuperLeo. Drop files or paste a screenshot."
                 }
               />
               <PromptInputToolbar>

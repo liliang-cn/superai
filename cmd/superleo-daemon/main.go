@@ -1,4 +1,4 @@
-// Command superai-daemon keeps SuperAI's scheduled prompts running while the
+// Command superleo-daemon keeps SuperLeo's scheduled prompts running while the
 // desktop app is closed.
 //
 // "Every morning at eight, work out my stock returns and message me" is the
@@ -27,6 +27,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	_ "github.com/liliang-cn/superleo/internal/brand" // the old SuperAI names keep working
 	"log"
 	"os"
 	"os/exec"
@@ -36,7 +37,7 @@ import (
 	"time"
 
 	"github.com/liliang-cn/agent-go/v3/pkg/agent"
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 func main() {
@@ -56,7 +57,7 @@ func main() {
 		defer f.Close()
 		log.SetOutput(f)
 	}
-	log.SetPrefix("superai-daemon ")
+	log.SetPrefix("superleo-daemon ")
 
 	settings, err := backend.LoadSettings()
 	if err != nil {
@@ -65,8 +66,8 @@ func main() {
 
 	// Nothing here needs a browser, and launching Chrome costs about a second of
 	// every start.
-	if os.Getenv("SUPERAI_NO_BROWSER") == "" {
-		_ = os.Setenv("SUPERAI_NO_BROWSER", "1")
+	if os.Getenv("SUPERLEO_NO_BROWSER") == "" {
+		_ = os.Setenv("SUPERLEO_NO_BROWSER", "1")
 	}
 
 	svc, err := backend.NewService(settings)
@@ -228,7 +229,7 @@ func logRun(run agent.PromptRun) {
 // process has none. osascript is available on every macOS install and needs no
 // permission grant of its own, which suits a background job.
 func notify(run agent.PromptRun) {
-	title := "SuperAI"
+	title := "SuperLeo"
 	body := firstLine(run.Answer)
 	if run.Err != nil {
 		body = "运行失败：" + run.Err.Error()

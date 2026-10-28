@@ -1,7 +1,7 @@
-// The first start, on the desktop and in a browser: may SuperAI look for the
+// The first start, on the desktop and in a browser: may SuperLeo look for the
 // AI agents on this Mac (desktop only), and what it thinks with. Nothing is
 // looked for before the person says yes, and nothing is chosen for them
-// (app/first_run.go). It ends with SuperAI able to answer, or with the person
+// (app/first_run.go). It ends with SuperLeo able to answer, or with the person
 // saying "later", never in a window that silently cannot reply.
 
 import { useEffect, useRef, useState } from "react";
@@ -36,7 +36,7 @@ type Check = { ok: boolean; models: string[]; error?: string; listed?: boolean }
 
 export default function Onboarding({ onDone, web = false, start = "ask" }: {
   onDone: () => void;
-  /** In a browser: the agents are looked for on the machine SuperAI runs on. */
+  /** In a browser: the agents are looked for on the machine SuperLeo runs on. */
   web?: boolean;
   start?: "ask" | "model";
 }) {
@@ -45,8 +45,8 @@ export default function Onboarding({ onDone, web = false, start = "ask" }: {
   const [step, setStep] = useState<"looking" | "found" | "model" | "key" | "phone">(start === "model" ? "model" : "looking");
   const [pick, setPick] = useState("");
   // Where the agents are looked for: this Mac, or the machine a browser's
-  // SuperAI runs on.
-  const where = web ? t("the machine SuperAI runs on") : t("this {machine}", { machine: t(machine) });
+  // SuperLeo runs on.
+  const where = web ? t("the machine SuperLeo runs on") : t("this {machine}", { machine: t(machine) });
   const [agents, setAgents] = useState<Agent[]>([]);
   const [looked, setLooked] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -131,7 +131,7 @@ export default function Onboarding({ onDone, web = false, start = "ask" }: {
     }
   };
 
-  // The agents that can think for SuperAI, signed-in ones first.
+  // The agents that can think for SuperLeo, signed-in ones first.
   const thinkers = agents.filter((a) => a.canBeDefault).sort((x, y) => Number(!!y.signedIn) - Number(!!x.signedIn));
   const chosen = thinkers.find((a) => a.name === pick && a.signedIn);
   const state = (a: Agent) => a.signedIn === true ? t("Signed in") : a.signedIn === false ? t("Not signed in") : t("Installed");
@@ -219,7 +219,7 @@ export default function Onboarding({ onDone, web = false, start = "ask" }: {
         </>}
 
         {step === "found" && <>
-          <h1>{t("How should SuperAI think?")}</h1>
+          <h1>{t("How should SuperLeo think?")}</h1>
           {thinkers.length > 0 ? (
             <ul className="gate2-agents pick" role="radiogroup">
               {thinkers.map((a) => {

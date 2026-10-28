@@ -8,17 +8,17 @@ import (
 	"time"
 )
 
-// Reaching the live graph view from a browser that is not on the SuperAI host.
+// Reaching the live graph view from a browser that is not on the SuperLeo host.
 //
 // The view binds 127.0.0.1 and has no authentication: the page it serves is the
 // whole brain, so a listener on any other interface would be an unauthenticated
 // read of everything in it. That is right, and it means a browser anywhere else
-// — which is how SuperAI is actually used, over the network at a domain —
+// — which is how SuperLeo is actually used, over the network at a domain —
 // cannot reach it at all. The page used to explain that and offer an `ssh -L`
 // command, which is honest and is not a feature working.
 //
-// SuperAI runs on that host and already has a front door. So it proxies: the
-// tab asks SuperAI, SuperAI asks loopback, and the view inherits the
+// SuperLeo runs on that host and already has a front door. So it proxies: the
+// tab asks SuperLeo, SuperLeo asks loopback, and the view inherits the
 // authentication it does not have. This is exactly what liveview's own package
 // documentation tells an embedder to do.
 //

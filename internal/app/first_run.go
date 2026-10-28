@@ -1,7 +1,7 @@
 package app
 
 // The desktop app's first start. Someone who downloads it should be talking
-// to it in a minute, so the window asks two things and SuperAI does the
+// to it in a minute, so the window asks two things and SuperLeo does the
 // rest: may it look for the AI agents on this Mac (OnboardingNeeded,
 // DetectAgents), and should one of them — Claude Code, Codex, pi or Hermes,
 // signed in on the person's own account — be the one it thinks with
@@ -24,7 +24,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // engineThinks is whether a queen engine answers the person's words, so the
@@ -55,14 +55,14 @@ type DetectedAgent struct {
 	Path  string `json:"path"`
 	// SignedIn is whether it says it is signed in; nil when it cannot say.
 	SignedIn *bool `json:"signedIn,omitempty"`
-	// CanBeDefault is whether SuperAI can think with it: Claude Code, Codex,
+	// CanBeDefault is whether SuperLeo can think with it: Claude Code, Codex,
 	// pi or Hermes (queenCLIs).
 	CanBeDefault bool `json:"canBeDefault"`
 }
 
 // DetectAgents looks for the AI agents installed on this Mac and asks the
 // ones that can tell whether they are signed in. Asked for only once the
-// person said SuperAI may look.
+// person said SuperLeo may look.
 func (a *App) DetectAgents() []DetectedAgent {
 	loginPath.Do(usePathOfLoginShell)
 	a.mu.Lock()
@@ -86,7 +86,7 @@ func (a *App) DetectAgents() []DetectedAgent {
 		}
 	}
 	wg.Wait()
-	// The ones SuperAI can think with first, then by name.
+	// The ones SuperLeo can think with first, then by name.
 	slices.SortStableFunc(out, func(x, y DetectedAgent) int {
 		if x.CanBeDefault != y.CanBeDefault {
 			if x.CanBeDefault {
@@ -100,7 +100,7 @@ func (a *App) DetectAgents() []DetectedAgent {
 }
 
 // FinishOnboarding records the person's answers: engine is the agent to
-// think with ("claude", "codex", "pi", "hermes", or "" for none), and agents whether SuperAI may hand
+// think with ("claude", "codex", "pi", "hermes", or "" for none), and agents whether SuperLeo may hand
 // work to the agents it found. The questions are not asked again.
 func (a *App) FinishOnboarding(engine string, agents bool) error {
 	a.mu.Lock()
@@ -133,7 +133,7 @@ func (a *App) FinishOnboarding(engine string, agents bool) error {
 		return err
 	}
 	// The coding CLIs' activity hooks go in once the person has said
-	// SuperAI may use the agents here, not before (server.go).
+	// SuperLeo may use the agents here, not before (server.go).
 	if next.ExternalAgents.Enabled {
 		go autoInstallCLIHooks()
 	}
@@ -198,7 +198,7 @@ func askAgent(bin string, both bool, args ...string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, bin, args...)
-	cmd.Env = append(os.Environ(), "SUPERAI_CLI_RUN=1")
+	cmd.Env = append(os.Environ(), "SUPERLEO_CLI_RUN=1")
 	if both {
 		return cmd.CombinedOutput()
 	}
@@ -313,7 +313,7 @@ func (a *App) CheckModel(baseURL, key, model string) ModelCheck {
 	return out
 }
 
-// mayInstallCLIHooks is whether this SuperAI may put its activity hooks into
+// mayInstallCLIHooks is whether this SuperLeo may put its activity hooks into
 // the coding CLIs on this machine at start: once a first start has allowed
 // the agents here, or for one set up without a first start (a hive member).
 func (a *App) mayInstallCLIHooks() bool {

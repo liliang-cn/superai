@@ -8,7 +8,7 @@ package app
 // a little CPU since the last look. That is all a process can say: no
 // prompts, no files, only that it is busy, where, and since when.
 //
-// A CLI started by this SuperAI (a coding run) is left out: it is a child of
+// A CLI started by this SuperLeo (a coding run) is left out: it is a child of
 // this process, and it already reports as a run.
 
 import (
@@ -408,11 +408,11 @@ func parseLsofCwd(b []byte) map[int]string {
 	return out
 }
 
-// cliPollOn says whether to look at processes: not with SUPERAI_CLI_POLL=0,
+// cliPollOn says whether to look at processes: not with SUPERLEO_CLI_POLL=0,
 // and not in a test binary unless the test asks (it would see this machine's
 // real CLIs).
 var cliPollOn = func() bool {
-	return os.Getenv("SUPERAI_CLI_POLL") != "0" && !strings.HasSuffix(os.Args[0], ".test")
+	return os.Getenv("SUPERLEO_CLI_POLL") != "0" && !strings.HasSuffix(os.Args[0], ".test")
 }
 
 // runPS is the ps call.
@@ -426,8 +426,8 @@ type cliPollConfig struct {
 	ps    func(context.Context) ([]byte, error)
 }
 
-// pollCLIProcs looks at the processes every cliPollEvery while this SuperAI
-// is linked to a core, until ctx ends. Off with SUPERAI_CLI_POLL=0.
+// pollCLIProcs looks at the processes every cliPollEvery while this SuperLeo
+// is linked to a core, until ctx ends. Off with SUPERLEO_CLI_POLL=0.
 func (a *App) pollCLIProcs(ctx context.Context, t *cliTracker) {
 	every, ps := cliPollEvery, runPS
 	if c := a.cliPoll; c != nil {

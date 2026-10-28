@@ -18,7 +18,7 @@ import { CodeBlock } from "@/components/ai-elements/code-block";
 import { AddRecord, AddSchedule } from "../../wailsjs/go/app/App";
 
 /**
- * The language SuperAI speaks. The persona answers in Chinese, so the block
+ * The language SuperLeo speaks. The persona answers in Chinese, so the block
  * rules handed to the model and the labels plugins draw follow it.
  */
 export const APP_LOCALE = "zh-CN";

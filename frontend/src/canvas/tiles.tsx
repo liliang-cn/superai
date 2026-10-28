@@ -47,7 +47,7 @@ export function NeedsYou({ pending, resolve, bees }: { pending: ToolApproval[]; 
     <div className="cv-glass cv-needs" key={a.id}>
       <div className="cv-needs-by">
         <Cell label={(a.by || "S").slice(0, 1).toUpperCase()} state="working" size={16} />
-        {a.by ? `${a.by} asks you` : "SuperAI asks you"}
+        {a.by ? `${a.by} asks you` : "SuperLeo asks you"}
         {left !== null && <span className="cv-needs-left">{Math.floor(left / 60)}:{String(left % 60).padStart(2, "0")}</span>}
       </div>
       <div className="cv-needs-q">{question(a)}</div>
@@ -104,7 +104,7 @@ export function InFlight({ hive, open }: { hive: Hive; open: (worker: string) =>
 }
 
 export function Machines({ hive, open, agents = [] }: { hive: Hive; open: (name: string) => void; agents?: LinkedAgent[] }) {
-  if (hive.loaded && !hive.role) return <p className="cv-quiet">This SuperAI is not in a hive.</p>;
+  if (hive.loaded && !hive.role) return <p className="cv-quiet">This SuperLeo is not in a hive.</p>;
   const busy = new Set(hive.tasks.filter((t) => t.state === "running").map((t) => t.worker));
   const recent = new Set(hive.tasks.slice(0, 30).filter((t) => t.state === "done").map((t) => t.worker));
   const center = hive.role === "queen" ? hive.name : "queen";

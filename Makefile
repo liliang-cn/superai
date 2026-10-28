@@ -1,4 +1,4 @@
-# SuperAI
+# SuperLeo
 #
 # A go.work one directory up lists sibling modules but not this one, so plain
 # `go build ./...` here fails with "directory prefix . does not contain modules
@@ -7,9 +7,9 @@
 SHELL := /bin/bash
 export GOWORK := off
 
-APP  := build/bin/SuperAI.app
-DMG  := build/bin/SuperAI.dmg
-BIN  := $(APP)/Contents/MacOS/SuperAI
+APP  := build/bin/SuperLeo.app
+DMG  := build/bin/SuperLeo.dmg
+BIN  := $(APP)/Contents/MacOS/SuperLeo
 
 .DEFAULT_GOAL := help
 
@@ -21,13 +21,13 @@ help:
 dev:
 	wails dev
 
-## build: build the native app for this machine -> build/bin/SuperAI.app
+## build: build the native app for this machine -> build/bin/SuperLeo.app
 build:
 	wails build
 
 ## run: build, then (re)launch the app
 run: build
-	@pkill -f "SuperAI.app/Contents/MacOS/SuperAI" || true
+	@pkill -f "SuperLeo.app/Contents/MacOS/SuperLeo" || true
 	@sleep 1
 	open $(APP)
 
@@ -35,26 +35,26 @@ run: build
 package:
 	./scripts/package-macos.sh
 
-## cli: build the headless one-prompt binary -> build/bin/superai
+## cli: build the headless one-prompt binary -> build/bin/superleo
 cli:
-	go build -o build/bin/superai ./cmd/superai
+	go build -o build/bin/superleo ./cmd/superleo
 
-## web: build the windowless web-server binary -> build/bin/superai-web (run: superai-web serve)
+## web: build the windowless web-server binary -> build/bin/superleo-web (run: superleo-web serve)
 web:
 	cd frontend && npm run build
-	go build -o build/bin/superai-web .
+	go build -o build/bin/superleo-web .
 
 ## serve: build and run the web server on 127.0.0.1:43117
 serve: web
-	./build/bin/superai-web serve
+	./build/bin/superleo-web serve
 
-## cchook: build the small Claude Code hook for prompts and tool calls -> build/bin/superai-cchook (ship it beside superai)
+## cchook: build the small Claude Code hook for prompts and tool calls -> build/bin/superleo-cchook (ship it beside superleo)
 cchook:
-	go build -trimpath -ldflags "-s -w" -o build/bin/superai-cchook ./cmd/superai-cchook
+	go build -trimpath -ldflags "-s -w" -o build/bin/superleo-cchook ./cmd/superleo-cchook
 
 ## daemon: build the background scheduler binary
 daemon:
-	go build -o build/bin/superai-daemon ./cmd/superai-daemon
+	go build -o build/bin/superleo-daemon ./cmd/superleo-daemon
 
 ## install-daemon: install the launchd job that fires schedules while the app is closed
 install-daemon:
@@ -79,7 +79,7 @@ test:
 
 ## smoke: live end-to-end test against the configured model (needs credentials)
 smoke:
-	SUPERAI_SMOKE=1 go test ./backend/ -run TestSmokeLive -v -count=1 -timeout 15m
+	SUPERLEO_SMOKE=1 go test ./backend/ -run TestSmokeLive -v -count=1 -timeout 15m
 
 ## check: everything CI would run — Go tests plus a frontend typecheck and build
 check: test

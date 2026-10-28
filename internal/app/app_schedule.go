@@ -8,7 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/liliang-cn/agent-go/v3/pkg/agent"
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -25,7 +25,7 @@ import (
 // conversation shows the whole turn, tools and produced files included.
 
 // notifyTitle keeps the banner short; the body carries the answer.
-const scheduleNotifyTitle = "SuperAI"
+const scheduleNotifyTitle = "SuperLeo"
 
 // startScheduler builds and starts the prompt scheduler for the current service.
 // A failure is not fatal: the app is still usable, it just will not fire
@@ -158,7 +158,7 @@ func (a *App) onScheduledRun(run agent.PromptRun) {
 			prompt := run.Prompt
 			go func() {
 				if n := svc.DropFinishedOneShots(prompt); n > 0 {
-					log.Printf("superai: removed %d one-shot reminder(s) after firing", n)
+					log.Printf("superleo: removed %d one-shot reminder(s) after firing", n)
 				}
 			}()
 		}
@@ -197,7 +197,7 @@ func (a *App) notify(title, subtitle, body, session string) {
 		return
 	}
 	opts := runtime.NotificationOptions{
-		ID:       "superai-" + uuid.NewString(),
+		ID:       "superleo-" + uuid.NewString(),
 		Title:    title,
 		Subtitle: subtitle,
 		Body:     truncateRunes(body, 300),
@@ -211,7 +211,7 @@ func (a *App) notify(title, subtitle, body, session string) {
 	}
 	if err := runtime.SendNotification(ctx, opts); err != nil {
 		// Logged, not surfaced: the run itself succeeded.
-		fmt.Printf("superai: notification failed: %v\n", err)
+		fmt.Printf("superleo: notification failed: %v\n", err)
 	}
 }
 

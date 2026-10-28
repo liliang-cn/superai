@@ -28,7 +28,7 @@ import (
 )
 
 // CLIProxy is an embedded CLIProxyAPI instance. It runs in-process and exposes
-// an OpenAI-compatible endpoint on 127.0.0.1, which lets SuperAI drive Claude
+// an OpenAI-compatible endpoint on 127.0.0.1, which lets SuperLeo drive Claude
 // Code / Codex / Gemini CLI subscriptions (whose OAuth credentials live in
 // <data>/cliproxy/auths) instead of a paid API key.
 //
@@ -52,7 +52,7 @@ type CLIProxy struct {
 // cliProxyConfigTemplate is written on first run. Only local-facing defaults are
 // set; everything else is left to CLIProxyAPI's own defaults so the file stays
 // editable by hand (and by the proxy's own config watcher).
-const cliProxyConfigTemplate = `# SuperAI-managed CLIProxyAPI config.
+const cliProxyConfigTemplate = `# SuperLeo-managed CLIProxyAPI config.
 # Add provider credentials by logging in with the CLIProxyAPI CLI against this
 # same auth-dir, or by dropping existing auth JSON files into it.
 host: "127.0.0.1"
@@ -107,13 +107,13 @@ func StartCLIProxy(port int) (*CLIProxy, error) {
 		}
 		cfg.APIKeys = []string{key}
 		if serr := cpaconfig.SaveConfigPreserveComments(cfgPath, cfg); serr != nil {
-			log.Printf("superai: cliproxy: persist generated api key: %v", serr)
+			log.Printf("superleo: cliproxy: persist generated api key: %v", serr)
 		}
 	}
 
 	// CLIProxyAPI logs every request through the global logrus logger; keep the
 	// desktop log readable unless explicitly debugging.
-	if strings.TrimSpace(os.Getenv("SUPERAI_CLIPROXY_DEBUG")) == "" {
+	if strings.TrimSpace(os.Getenv("SUPERLEO_CLIPROXY_DEBUG")) == "" {
 		logrus.SetLevel(logrus.WarnLevel)
 	}
 
@@ -328,5 +328,5 @@ func randomKey() (string, error) {
 	if _, err := rand.Read(buf); err != nil {
 		return "", fmt.Errorf("generate cliproxy key: %w", err)
 	}
-	return "superai-" + hex.EncodeToString(buf), nil
+	return "superleo-" + hex.EncodeToString(buf), nil
 }

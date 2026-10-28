@@ -103,7 +103,7 @@ func (s *Service) MemoryRecall(ctx context.Context, query string) (string, error
 	// chain came out [session:memory-panel, global] and every memory scoped to
 	// the agent was filtered out before the panel saw it. Measured against the
 	// shared brain, the two best hits for "AI Agent" were both
-	// scope=agent/SuperAI: SuperAI could not find its own memories in its own
+	// scope=agent/SuperLeo: SuperLeo could not find its own memories in its own
 	// knowledge panel, and what it showed instead was whatever global entry
 	// happened to rank next.
 	formatted, _, err := s.svc.Memory.RetrieveAndInjectWithContext(ctx, query, domain.MemoryQueryContext{

@@ -9,7 +9,7 @@ import (
 )
 
 // A settings file as the Mac has it: other tools' hooks on the same events,
-// SuperAI's older set, and settings that have nothing to do with hooks.
+// SuperLeo's older set, and settings that have nothing to do with hooks.
 const otherToolsSettings = `{
   "model": "opus",
   "permissions": {
@@ -40,7 +40,7 @@ const otherToolsSettings = `{
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/me/.superai-node/bin/superai hook Stop",
+            "command": "/Users/me/.superleo-node/bin/superleo hook Stop",
             "timeout": 5
           }
         ]
@@ -51,7 +51,7 @@ const otherToolsSettings = `{
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/me/.superai-node/bin/superai hook SessionStart",
+            "command": "/Users/me/.superleo-node/bin/superleo hook SessionStart",
             "timeout": 5
           }
         ]
@@ -65,7 +65,7 @@ const otherToolsSettings = `{
 }
 `
 
-const testBin = "/Users/me/.superai-node/bin/superai"
+const testBin = "/Users/me/.superleo-node/bin/superleo"
 
 func readSettings(t *testing.T, b []byte) map[string]any {
 	t.Helper()
@@ -133,20 +133,20 @@ func TestInstallAddsOnlyWhatIsMissingAndKeepsEveryoneElses(t *testing.T) {
 	if err != nil || len(added) != 0 || string(again) != string(next) {
 		t.Fatalf("second install added %v (%v)", added, err)
 	}
-	// Another path to SuperAI is still SuperAI: not a second set.
-	if _, added, _ := mergeCCHooks(next, "/usr/local/bin/superai", "", ccHookSpecs); len(added) != 0 {
+	// Another path to SuperLeo is still SuperLeo: not a second set.
+	if _, added, _ := mergeCCHooks(next, "/usr/local/bin/superleo", "", ccHookSpecs); len(added) != 0 {
 		t.Fatalf("a second binary added %v", added)
 	}
 }
 
 func TestInstallFromNothing(t *testing.T) {
 	for _, in := range []string{"", "{}", `{"hooks": null}`} {
-		next, added, err := mergeCCHooks([]byte(in), "/opt/super ai/superai", "", ccHookSpecs)
+		next, added, err := mergeCCHooks([]byte(in), "/opt/super ai/superleo", "", ccHookSpecs)
 		if err != nil || len(added) != len(ccHookSpecs) {
 			t.Fatalf("%q: added %v (%v)", in, added, err)
 		}
 		s := readSettings(t, next)
-		if got := commands(t, s, "UserPromptSubmit"); len(got) != 1 || got[0] != "'/opt/super ai/superai' hook UserPromptSubmit" {
+		if got := commands(t, s, "UserPromptSubmit"); len(got) != 1 || got[0] != "'/opt/super ai/superleo' hook UserPromptSubmit" {
 			t.Fatalf("%q: %v", in, got)
 		}
 	}
@@ -181,7 +181,7 @@ func TestInstallWritesTheFileThroughItsLinkAndKeepsTheOld(t *testing.T) {
 	if st.Mode().Perm() != 0o600 {
 		t.Errorf("mode %v", st.Mode().Perm())
 	}
-	if bak, err := os.ReadFile(real + ".superai.bak"); err != nil || string(bak) != otherToolsSettings {
+	if bak, err := os.ReadFile(real + ".superleo.bak"); err != nil || string(bak) != otherToolsSettings {
 		t.Fatalf("no backup of the old file: %v", err)
 	}
 	b, _ := os.ReadFile(real)
@@ -210,15 +210,15 @@ func TestInstallWritesTheFileThroughItsLinkAndKeepsTheOld(t *testing.T) {
 
 func TestOnlyAnOptedInSettingsFileIsUpgraded(t *testing.T) {
 	if !settingsHaveOurHook([]byte(otherToolsSettings), testBin) {
-		t.Fatal("SuperAI's own hooks were not recognised")
+		t.Fatal("SuperLeo's own hooks were not recognised")
 	}
-	if settingsHaveOurHook([]byte(otherToolsSettings), "/elsewhere/superai") {
+	if settingsHaveOurHook([]byte(otherToolsSettings), "/elsewhere/superleo") {
 		t.Fatal("another binary's hooks count as this one's")
 	}
 	for cmd, want := range map[string]string{
-		"/x/superai hook Stop":                             "/x/superai",
-		"'/a b/superai' hook PermissionRequest --wait 100": "/a b/superai",
-		"superai hook Stop":                                "superai",
+		"/x/superleo hook Stop":                             "/x/superleo",
+		"'/a b/superleo' hook PermissionRequest --wait 100": "/a b/superleo",
+		"superleo hook Stop":                                "superleo",
 		"/opt/homebrew/bin/anywhered PreToolUse":           "",
 	} {
 		if got := hookCommandBinary(cmd); got != want {
@@ -227,24 +227,24 @@ func TestOnlyAnOptedInSettingsFileIsUpgraded(t *testing.T) {
 	}
 	// The same binary through a link is the same binary.
 	dir0 := t.TempDir()
-	bin0 := filepath.Join(dir0, "superai")
+	bin0 := filepath.Join(dir0, "superleo")
 	_ = os.WriteFile(bin0, []byte("x"), 0o755)
 	_ = os.Symlink(dir0, filepath.Join(dir0, "via"))
-	linked := `{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"` + filepath.Join(dir0, "via", "superai") + ` hook Stop"}]}]}}`
+	linked := `{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"` + filepath.Join(dir0, "via", "superleo") + ` hook Stop"}]}]}}`
 	if !settingsHaveOurHook([]byte(linked), bin0) {
 		t.Error("a hook through a linked directory was not this binary's")
 	}
 	onlyOthers := `{"hooks":{"PreToolUse":[{"hooks":[{"type":"command","command":"/opt/homebrew/bin/anywhered hook PreToolUse"}]}]}}`
 	if settingsHaveOurHook([]byte(onlyOthers), "/opt/homebrew/bin/anywhered") {
-		t.Fatal("anywhered's hook taken for SuperAI's")
+		t.Fatal("anywhered's hook taken for SuperLeo's")
 	}
 	for cmd, want := range map[string]bool{
-		"/x/superai hook Stop":                  true,
-		"'/a b/superai' hook Stop":              true,
-		"superai hook Stop --flag":              true,
+		"/x/superleo hook Stop":                  true,
+		"'/a b/superleo' hook Stop":              true,
+		"superleo hook Stop --flag":              true,
 		"/opt/homebrew/bin/anywhered hook Stop": false,
-		"/x/superai-desktop hook Stop":          false,
-		"/x/superai hook StopFailure":           false,
+		"/x/superleo-desktop hook Stop":          false,
+		"/x/superleo hook StopFailure":           false,
 	} {
 		if got := isOurHook(cmd, "Stop"); got != want {
 			t.Errorf("isOurHook(%q) = %v", cmd, got)
@@ -254,11 +254,11 @@ func TestOnlyAnOptedInSettingsFileIsUpgraded(t *testing.T) {
 	// The node's start-up upgrade, against a settings file of its own.
 	dir := t.TempDir()
 	t.Setenv("CLAUDE_CONFIG_DIR", dir)
-	t.Setenv("SUPERAI_HOOK_AUTOINSTALL", "")
+	t.Setenv("SUPERLEO_HOOK_AUTOINSTALL", "")
 	path := filepath.Join(dir, "settings.json")
 	_ = os.WriteFile(path, []byte(onlyOthers), 0o644)
 	autoUpgradeCCHooks() // a test binary never installs itself
 	if b, _ := os.ReadFile(path); string(b) != onlyOthers {
-		t.Fatalf("a file without SuperAI's hooks was changed: %s", b)
+		t.Fatalf("a file without SuperLeo's hooks was changed: %s", b)
 	}
 }

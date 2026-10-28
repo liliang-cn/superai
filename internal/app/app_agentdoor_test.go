@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // A machine joining the desktop app is told the agent link is on the same
@@ -46,7 +46,7 @@ func TestTheClaimSaysTheLinkIsWhereTheClaimCameIn(t *testing.T) {
 // this one has; a door that is not open says why instead of a command that
 // would not work.
 func TestAddingAnAgentGivesTheCommandToRun(t *testing.T) {
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	a := &App{}
 	if j, err := a.AgentJoinCode(); err != nil || j.Error == "" || j.Code != "" {
 		t.Fatalf("a closed door gave %+v %v", j, err)
@@ -60,7 +60,7 @@ func TestAddingAnAgentGivesTheCommandToRun(t *testing.T) {
 		t.Fatalf("%+v", j)
 	}
 	for _, c := range j.Commands {
-		if !strings.HasPrefix(c, "superai agent join http://") || !strings.HasSuffix(c, ":43781 "+j.Code) {
+		if !strings.HasPrefix(c, "superleo agent join http://") || !strings.HasSuffix(c, ":43781 "+j.Code) {
 			t.Fatalf("command %q", c)
 		}
 	}
@@ -69,9 +69,9 @@ func TestAddingAnAgentGivesTheCommandToRun(t *testing.T) {
 	}
 }
 
-// A SuperAI on its own becomes the queen of the machines that joined it once
+// A SuperLeo on its own becomes the queen of the machines that joined it once
 // one of them can think; one the person kept on its own, or a worker, stays.
-func TestAThinkingAgentMakesASoloSuperAIItsQueen(t *testing.T) {
+func TestAThinkingAgentMakesASoloSuperLeoItsQueen(t *testing.T) {
 	for _, c := range []struct {
 		name string
 		hive backend.HiveSettings
@@ -82,7 +82,7 @@ func TestAThinkingAgentMakesASoloSuperAIItsQueen(t *testing.T) {
 		{"a worker", backend.HiveSettings{Role: backend.HiveRoleWorker, JoinURL: "http://q:1"}, backend.HiveRoleWorker},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			t.Setenv("SUPERAI_HOME", t.TempDir())
+			t.Setenv("SUPERLEO_HOME", t.TempDir())
 			a := NewApp()
 			s, err := backend.LoadSettings()
 			if err != nil {

@@ -9,7 +9,7 @@ import (
 
 func TestRemoveMCPServer(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("SUPERAI_HOME", home)
+	t.Setenv("SUPERLEO_HOME", home)
 	path := mcpConfigPath()
 
 	// Removing from a config that was never written is not an error: the caller
@@ -57,7 +57,7 @@ func TestRemoveMCPServer(t *testing.T) {
 
 func TestRemoveSkill(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("SUPERAI_HOME", home)
+	t.Setenv("SUPERLEO_HOME", home)
 
 	dir := filepath.Join(home, "skills", "doomed")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -94,7 +94,7 @@ func TestRemoveSkill(t *testing.T) {
 
 func TestInstalledSkillNames(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("SUPERAI_HOME", home)
+	t.Setenv("SUPERLEO_HOME", home)
 
 	if names := InstalledSkillNames(); len(names) != 0 {
 		t.Errorf("a fresh install has no skills, got %v", names)
@@ -116,7 +116,7 @@ func TestInstalledSkillNames(t *testing.T) {
 }
 
 func TestInstallMCPServerValidates(t *testing.T) {
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	var svc *Service
 
 	if err := svc.InstallMCPServer(t.Context(), "", "npx", nil, nil); err == nil {
@@ -134,11 +134,11 @@ func TestInstallMCPServerValidates(t *testing.T) {
 	}
 }
 
-// A server can be in either file this SuperAI reads; it goes from both, and
+// A server can be in either file this SuperLeo reads; it goes from both, and
 // the rest of each file stays as it was.
 func TestRemoveMCPServerFromEveryConfig(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("SUPERAI_HOME", home)
+	t.Setenv("SUPERLEO_HOME", home)
 	data := filepath.Join(home, "data", "mcpServers.json")
 	if err := os.MkdirAll(filepath.Dir(data), 0o755); err != nil {
 		t.Fatal(err)
@@ -162,10 +162,10 @@ func TestRemoveMCPServerFromEveryConfig(t *testing.T) {
 	}
 }
 
-// One the queen hands out is not this SuperAI's to remove, and it says so.
+// One the queen hands out is not this SuperLeo's to remove, and it says so.
 func TestAServerFromTheQueenIsNotRemovedHere(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("SUPERAI_HOME", home)
+	t.Setenv("SUPERLEO_HOME", home)
 	if err := os.WriteFile(HiveMCPFile(), []byte(`{"mcpServers":{"noted":{"type":"http","url":"http://x"}}}`), 0o600); err != nil {
 		t.Fatal(err)
 	}

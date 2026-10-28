@@ -4,10 +4,10 @@ package app
 // release is two files dropped into <data dir>/android: latest.json, and the
 // APK it names.
 //
-//	{"versionCode":2,"versionName":"0.2.0","url":"superai-0.2.0.apk",
+//	{"versionCode":2,"versionName":"0.2.0","url":"superleo-0.2.0.apk",
 //	 "sha256":"<hex>","notes":"…"}
 //
-// `superai android publish` (android_publish.go) writes both. The app asks
+// `superleo android publish` (android_publish.go) writes both. The app asks
 // for latest.json at most once a day, downloads the APK when
 // versionCode is newer than its own, checks sha256 and hands it to the
 // system installer. A relative url is read against /api/android/. Both
@@ -21,7 +21,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 const (

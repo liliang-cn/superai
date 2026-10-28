@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // haRefresh is how old the HA services may get before the next listing
@@ -24,7 +24,7 @@ type haCache struct {
 }
 
 // haSource is the haify controller to ask: the settings', or
-// SUPERAI_HAIFY_URL with SUPERAI_HAIFY_TOKEN (or SUPERAI_HAIFY_TOKEN_FILE)
+// SUPERLEO_HAIFY_URL with SUPERLEO_HAIFY_TOKEN (or SUPERLEO_HAIFY_TOKEN_FILE)
 // for a deployment that keeps it out of the settings.
 func (a *App) haSource() backend.HaifySource {
 	a.mu.Lock()
@@ -33,13 +33,13 @@ func (a *App) haSource() backend.HaifySource {
 		src = a.settings.HA.Haify
 	}
 	a.mu.Unlock()
-	if u := os.Getenv("SUPERAI_HAIFY_URL"); u != "" {
+	if u := os.Getenv("SUPERLEO_HAIFY_URL"); u != "" {
 		src.URL = u
 	}
-	if t := os.Getenv("SUPERAI_HAIFY_TOKEN"); t != "" {
+	if t := os.Getenv("SUPERLEO_HAIFY_TOKEN"); t != "" {
 		src.Token = t
 	}
-	if f := os.Getenv("SUPERAI_HAIFY_TOKEN_FILE"); f != "" {
+	if f := os.Getenv("SUPERLEO_HAIFY_TOKEN_FILE"); f != "" {
 		src.TokenFile = f
 	}
 	return src

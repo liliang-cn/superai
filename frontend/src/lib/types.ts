@@ -33,9 +33,9 @@ export interface ChatEvent {
   args: Record<string, any>;
   result: any;
   debugType: string;
-  /** The agent CLI thinking for the queen ("claude", "claude.mac"); absent for SuperAI's own agent. */
+  /** The agent CLI thinking for the queen ("claude", "claude.mac"); absent for SuperLeo's own agent. */
   engine?: string;
-  /** The engine SuperAI's own agent answers for, when none in the chain could. */
+  /** The engine SuperLeo's own agent answers for, when none in the chain could. */
   standInFor?: string;
 }
 
@@ -136,9 +136,9 @@ export interface ChatMessage {
    */
   startedAt?: number;
   finishedAt?: number;
-  /** Who thought for the queen in this answer, when it was not SuperAI's own agent. */
+  /** Who thought for the queen in this answer, when it was not SuperLeo's own agent. */
   engine?: string;
-  /** The engine SuperAI's own agent answered for, when no engine could. */
+  /** The engine SuperLeo's own agent answered for, when no engine could. */
   standInFor?: string;
   costUsd?: number;
 }

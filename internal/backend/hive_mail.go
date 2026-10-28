@@ -54,7 +54,7 @@ type HiveMessage struct {
 	Observed bool `json:"observed,omitempty"`
 	// Via is "queen" on a message the queen passed on because its sender could
 	// not reach the recipient: a worker outside the cluster cannot resolve the
-	// in-cluster address a SuperAI worker is listed under, and the queen can
+	// in-cluster address a SuperLeo worker is listed under, and the queen can
 	// reach both.
 	Via string `json:"via,omitempty"`
 	// Read is the recipient's own bookkeeping and never travels.

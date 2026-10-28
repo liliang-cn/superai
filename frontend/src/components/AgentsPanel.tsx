@@ -49,7 +49,7 @@ export function AgentsBody({ onMention }: { onMention?: (name: string) => void }
           <p className="agents-dim">
             Turn on <b>external_agents</b> for the CLIs on this machine, or{" "}
             <b>remote_agents</b> for the ones on the cluster, in
-            <code> ~/.superai/settings.json</code>.
+            <code> ~/.superleo/settings.json</code>.
           </p>
         </div>
       </div>
@@ -60,7 +60,7 @@ export function AgentsBody({ onMention }: { onMention?: (name: string) => void }
     <div className="agents-panel">
       <div className="agents-lede">
         Ask one directly by starting a message with its name. Mention it
-        mid-sentence instead and SuperAI decides whether to call it.
+        mid-sentence instead and SuperLeo decides whether to call it.
       </div>
       {agents.map((a) => {
         // The about line already begins with the name and a dash; showing it

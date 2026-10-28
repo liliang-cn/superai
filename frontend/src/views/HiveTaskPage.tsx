@@ -26,7 +26,7 @@ export interface FullTask {
   events?: TaskStep[];
 }
 
-const short = (n: string) => n.replace(/^superai-/, "");
+const short = (n: string) => n.replace(/^superleo-/, "");
 
 const stepLabel = (e: TaskStep) => {
   switch (e.phase) {

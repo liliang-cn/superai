@@ -9,7 +9,7 @@ import (
 	"github.com/liliang-cn/agent-go/v3/pkg/agent"
 )
 
-// SuperAI, operated from inside the conversation.
+// SuperLeo, operated from inside the conversation.
 //
 // The app already lets the agent acquire capabilities — install.go gives it
 // add_mcp_server and install_skill. These are the other half: the things it can
@@ -24,7 +24,7 @@ import (
 //   - Settings. An agent that can rewrite its own configuration can also
 //     switch off the thing that asks you before it runs a shell command. So the
 //     writable set is a whitelist of preferences, and the fields that decide
-//     what SuperAI is allowed to do are not in it. See settingsWritable.
+//     what SuperLeo is allowed to do are not in it. See settingsWritable.
 
 // selfMaxRoundsCeiling bounds what the agent may set its own round budget to.
 // Wide enough for the long-horizon work that needs hundreds of rounds, and
@@ -42,7 +42,7 @@ const selfMaxRoundsCeiling = 2000
 //   - llm_key, embed_key, search_key, shared_memory_token, webhook_secret are
 //     credentials. Nothing that can be talked into reading a web page should be
 //     able to move a secret from a config file into a tool call.
-//   - llm_base_url and shared_memory_endpoint decide who SuperAI talks to. The
+//   - llm_base_url and shared_memory_endpoint decide who SuperLeo talks to. The
 //     brain and the memory are not somewhere a conversation gets to redirect.
 //   - remote_agents runs commands on other machines under a real account.
 //     Nothing about "the model may adjust its own settings" should extend to
@@ -186,7 +186,7 @@ func (s *Service) registerSelfTools() {
 	// --- settings_get ---
 	svc.AddToolWithMetadata(
 		"settings_get",
-		"Read SuperAI's own configuration. Secrets are reported as whether they are set, never as their value.",
+		"Read SuperLeo's own configuration. Secrets are reported as whether they are set, never as their value.",
 		map[string]interface{}{"type": "object", "properties": map[string]interface{}{}},
 		func(_ context.Context, _ map[string]interface{}) (interface{}, error) {
 			return okData(s.settingsSnapshot()), nil
@@ -197,7 +197,7 @@ func (s *Service) registerSelfTools() {
 	// --- settings_set ---
 	svc.AddToolWithMetadata(
 		"settings_set",
-		"Change one of SuperAI's own settings and rebuild. Only preferences can be changed: the approval gate, the credentials, and the addresses of the model and the memory are not writable from a conversation. Call settings_get for the current values and the writable list.",
+		"Change one of SuperLeo's own settings and rebuild. Only preferences can be changed: the approval gate, the credentials, and the addresses of the model and the memory are not writable from a conversation. Call settings_get for the current values and the writable list.",
 		map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{

@@ -4,8 +4,8 @@ package backend
 //
 // YOLO is all or nothing, and per-request approval is one tap per call. The
 // thing in between is a rule the user makes from a card they are answering:
-// "Claude on mac may write under ~/Things/dev/apps/superai", "the queen may run
-// `kubectl -n superai rollout restart …`". A rule is checked before a card is
+// "Claude on mac may write under ~/Things/dev/apps/superleo", "the queen may run
+// `kubectl -n superleo rollout restart …`". A rule is checked before a card is
 // raised; an allow rule answers yes, a deny rule answers no, both audited under
 // their own name so "who said yes to that?" still has an answer.
 //
@@ -54,7 +54,7 @@ const (
 )
 
 // LocalMachine is the machine constraint of a rule made from a call on this
-// SuperAI itself. Empty would mean "any machine", which is broader than what
+// SuperLeo itself. Empty would mean "any machine", which is broader than what
 // the user was looking at.
 const LocalMachine = "@local"
 
@@ -93,7 +93,7 @@ type RuleScope struct {
 	// Command: the shell command is exactly this.
 	Command string `json:"command,omitempty"`
 	// Machine: where the call runs — a remote node or hive worker by name,
-	// LocalMachine for this SuperAI. Empty is any machine.
+	// LocalMachine for this SuperLeo. Empty is any machine.
 	Machine string `json:"machine,omitempty"`
 	// Agent: who asks — claude, codex, a standing agent, "queen". Empty is
 	// anyone.
@@ -104,7 +104,7 @@ type RuleScope struct {
 type RuleSuggestion struct {
 	Scope string `json:"scope"`
 	// Label is what the card shows, e.g. "以后 claude 在 mac 上写入
-	// ~/Things/dev/apps/superai 下的文件都不用问".
+	// ~/Things/dev/apps/superleo 下的文件都不用问".
 	Label string `json:"label"`
 	// Rule is what would be saved if this one is picked with 同意.
 	Rule ApprovalRule `json:"rule"`
@@ -146,7 +146,7 @@ func subjectOf(req ApprovalRequest) approvalSubject {
 			s.Machine = host
 		}
 	case req.Gated:
-		// SuperAI's own tool call: a standing agent by its name, else the queen.
+		// SuperLeo's own tool call: a standing agent by its name, else the queen.
 		s.Agent = strings.TrimSpace(req.By)
 		if s.Agent == "" {
 			s.Agent = "queen"

@@ -12,7 +12,7 @@ import (
 // Uploading a file to import.
 //
 // The import used to take a path, and a path is only meaningful on the machine
-// SuperAI runs on. In the desktop window those are the same machine and it was
+// SuperLeo runs on. In the desktop window those are the same machine and it was
 // merely awkward; over the network they are not, and the field was unusable —
 // a browser at a domain has no way to name a file on the server, and the
 // obvious thing to type (a path on your own laptop) is the one thing that

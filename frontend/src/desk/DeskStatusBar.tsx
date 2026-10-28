@@ -10,7 +10,7 @@ import { machine } from "../lib/machine";
 import { queenEngineNote } from "../lib/format";
 
 /** Runtime status belongs to every desktop page, below its working area. */
-const served = Boolean((window as unknown as Record<string, unknown>).superaiServed);
+const served = Boolean((window as unknown as Record<string, unknown>).superleoServed);
 
 export default function DeskStatusBar({ status, loading, codingRuns }: { status:AppStatus|null; loading:boolean; codingRuns:number }) {
   const { t } = useI18n();
@@ -40,12 +40,12 @@ export default function DeskStatusBar({ status, loading, codingRuns }: { status:
   }, []);
   // A browser tab's live updates: a stream that is down means answers and
   // events stop arriving while everything else still looks fine.
-  const [stream, setStream] = useState<string>(() => String((window as unknown as { superaiStream?: { state: string } }).superaiStream?.state ?? "open"));
+  const [stream, setStream] = useState<string>(() => String((window as unknown as { superleoStream?: { state: string } }).superleoStream?.state ?? "open"));
   useEffect(() => {
     if (!served) return;
     const off = EventsOn("stream:status", (h: { state?: string }) => setStream(String(h?.state ?? "")));
     // It may have changed between the first render and this subscription.
-    setStream(String((window as unknown as { superaiStream?: { state: string } }).superaiStream?.state ?? "open"));
+    setStream(String((window as unknown as { superleoStream?: { state: string } }).superleoStream?.state ?? "open"));
     return () => { if (typeof off === "function") off(); };
   }, []);
   const queenNote = queenEngineNote(hive.engine, hive.engineNow);
@@ -75,7 +75,7 @@ export default function DeskStatusBar({ status, loading, codingRuns }: { status:
     </button>
     {runtime.model && <span className="dk-status-model" title={runtime.model}><CpuIcon size={12}/>{runtime.model}</span>}
     {served && stream === "down" && <span className="dk-status-stream" title={t("Answers and live updates are not arriving; reconnecting.")}><i className="dk-status-dot bad"/>{t("Live updates off")}</span>}
-    {queenNote && <span className="dk-status-queen" title={t("SuperAI answered in the engine's place")}>{t("Queen")}: {queenNote}</span>}
+    {queenNote && <span className="dk-status-queen" title={t("SuperLeo answered in the engine's place")}>{t("Queen")}: {queenNote}</span>}
     <button type="button" className={`dk-status-yolo${yolo ? " on" : ""}`} onClick={flipYolo} aria-pressed={yolo}
       title={yolo ? t("YOLO on: tools and coding agents run without asking. Click to ask again.") : t("YOLO off: risky tools ask first. Click to stop asking.")} data-testid="yolo">
       <i className="dk-yolo-dot"/>YOLO

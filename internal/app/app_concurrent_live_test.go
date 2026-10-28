@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // Two questions at once, end to end through App.
@@ -75,8 +75,8 @@ func (c captured) str(key string) string {
 
 func TestTwoAsksAtOnceStaySeparate(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("SUPERAI_HOME", home)
-	t.Setenv("SUPERAI_NO_BROWSER", "1")
+	t.Setenv("SUPERLEO_HOME", home)
+	t.Setenv("SUPERLEO_NO_BROWSER", "1")
 
 	provider := &overlappingProvider{delay: 200 * time.Millisecond}
 	app := NewApp()

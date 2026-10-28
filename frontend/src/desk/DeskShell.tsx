@@ -22,7 +22,7 @@ import { askToCompose } from "../lib/compose";
 import "../canvas/canvas.css";
 import "./desk.css";
 
-const served = Boolean((window as unknown as Record<string, unknown>).superaiServed);
+const served = Boolean((window as unknown as Record<string, unknown>).superleoServed);
 export const drag = { "--wails-draggable": "drag" } as React.CSSProperties;
 export const noDrag = { "--wails-draggable": "no-drag" } as React.CSSProperties;
 
@@ -41,14 +41,14 @@ export const useDeskWorld = () => useContext(WorldCtx);
 type Pane = { folded: boolean; fold: (on: boolean) => void; setBusy: (busy: boolean) => void };
 const PaneCtx = createContext<Pane>({ folded: false, fold: () => {}, setBusy: () => {} });
 export const useDeskPane = () => useContext(PaneCtx);
-const FOLD_KEY = "superai-desk-live-folded";
+const FOLD_KEY = "superleo-desk-live-folded";
 // In a narrow window, where it would float over the conversation, it starts folded.
 const loadFolded = () => {
   try { const v = localStorage.getItem(FOLD_KEY); if (v !== null) return v === "1"; } catch { /* fine */ }
   return window.matchMedia("(max-width: 1240px)").matches;
 };
 
-const MODE_KEY = "superai-desk-mode";
+const MODE_KEY = "superleo-desk-mode";
 const loadMode = (): "world" | "menu" => {
   try { return localStorage.getItem(MODE_KEY) === "menu" ? "menu" : "world"; } catch { return "world"; }
 };
@@ -121,9 +121,9 @@ export default function DeskShell({ view, badges, children, onOpenConversation, 
       if (e.key === "Escape" && !(e.target as HTMLElement)?.closest?.("input,textarea,[contenteditable=true]")) setMode((m) => (m === "window" ? "world" : m));
     };
     window.addEventListener("keydown", esc);
-    window.addEventListener("superai:window", open);
-    window.addEventListener("superai:theme", theme);
-    return () => { window.removeEventListener("keydown", esc); window.removeEventListener("superai:window", open); window.removeEventListener("superai:theme", theme); };
+    window.addEventListener("superleo:window", open);
+    window.addEventListener("superleo:theme", theme);
+    return () => { window.removeEventListener("keydown", esc); window.removeEventListener("superleo:window", open); window.removeEventListener("superleo:theme", theme); };
   }, [navigate]);
   const world = mode !== "menu";
   // The mode changes how the page in front of you is framed, never which page
@@ -138,7 +138,7 @@ export default function DeskShell({ view, badges, children, onOpenConversation, 
   // window over the world in 3D, with the cursor in its box either way.
   const openChat = () => {
     if (mode === "menu") navigate(PATHS.home);
-    else window.dispatchEvent(new CustomEvent("superai:window", { detail: PATHS.home }));
+    else window.dispatchEvent(new CustomEvent("superleo:window", { detail: PATHS.home }));
     askToCompose();
   };
   const runs = useCodingRuns();
@@ -169,7 +169,7 @@ export default function DeskShell({ view, badges, children, onOpenConversation, 
       return;
     }
     if (mode === "menu") navigate(PATHS[k]);
-    else window.dispatchEvent(new CustomEvent("superai:window", { detail: PATHS[k] }));
+    else window.dispatchEvent(new CustomEvent("superleo:window", { detail: PATHS[k] }));
   };
 
   // The older screens paint with the app-wide tokens; desk.css gives them the
@@ -182,7 +182,7 @@ export default function DeskShell({ view, badges, children, onOpenConversation, 
   // The older screens read the app-wide light/dark flag; keep it in step.
   useEffect(() => {
     document.documentElement.dataset.theme = theme.mode;
-    try { localStorage.setItem("superai-theme", theme.mode); } catch { /* fine */ }
+    try { localStorage.setItem("superleo-theme", theme.mode); } catch { /* fine */ }
     if (!served) void SetWindowTheme(theme.mode === "dark").catch(() => {});
   }, [theme.mode]);
 
@@ -252,7 +252,7 @@ export default function DeskShell({ view, badges, children, onOpenConversation, 
           <button className="dk-win-x" style={noDrag} title={t("Back to the world")} onClick={() => setMode("world")}><XIcon size={18} /></button>
         )}
         <FabStack style={noDrag}>
-          {world && <SettingsFab onClick={() => window.dispatchEvent(new CustomEvent("superai:window", { detail: PATHS.settings }))} />}
+          {world && <SettingsFab onClick={() => window.dispatchEvent(new CustomEvent("superleo:window", { detail: PATHS.settings }))} />}
           <ModeFab world={world} onClick={toggleMode} />
           <ChatFab onClick={openChat} />
         </FabStack>

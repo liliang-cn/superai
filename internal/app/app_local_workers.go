@@ -8,7 +8,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // Agents installed on this machine that can be added as workers: pi, hermes

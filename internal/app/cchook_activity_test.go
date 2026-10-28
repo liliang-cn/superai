@@ -27,8 +27,8 @@ func TestActivityFollowsASessionThroughItsTurn(t *testing.T) {
 		}
 		return CCActivitySession{}
 	}
-	s := step(0, ccHookEvent{Event: "SessionStart", Session: "s1", Cwd: "/Users/me/code/superai/", Source: "startup"})
-	if s.State != actIdle || s.Project != "superai" {
+	s := step(0, ccHookEvent{Event: "SessionStart", Session: "s1", Cwd: "/Users/me/code/superleo/", Source: "startup"})
+	if s.State != actIdle || s.Project != "superleo" {
 		t.Fatalf("a new session: %+v", s)
 	}
 	s = step(1, ccHookEvent{Event: "UserPromptSubmit", Session: "s1"})
@@ -201,9 +201,9 @@ func TestTerminalSessionsShowOnCoreAndTheirPromptsDoNot(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { os.RemoveAll(home) })
-	t.Setenv("SUPERAI_HOME", home)
-	t.Setenv("SUPERAI_HOOK_SOCKET", filepath.Join(home, ccHookSocketName))
-	t.Setenv("SUPERAI_CLI_RUN", "")
+	t.Setenv("SUPERLEO_HOME", home)
+	t.Setenv("SUPERLEO_HOOK_SOCKET", filepath.Join(home, ccHookSocketName))
+	t.Setenv("SUPERLEO_CLI_RUN", "")
 
 	// Everything core tells its screens, to look for the secrets in.
 	var mu sync.Mutex
@@ -256,12 +256,12 @@ func TestTerminalSessionsShowOnCoreAndTheirPromptsDoNot(t *testing.T) {
 		return nil
 	}
 
-	hook("SessionStart", `{"session_id":"t1","cwd":"/Users/me/code/superai","source":"startup"}`)
+	hook("SessionStart", `{"session_id":"t1","cwd":"/Users/me/code/superleo","source":"startup"}`)
 	for _, ev := range []struct{ name, payload string }{
-		{"UserPromptSubmit", `{"session_id":"t1","cwd":"/Users/me/code/superai","prompt":"PROMPT-SECRET deploy it"}`},
-		{"PreToolUse", `{"session_id":"t1","cwd":"/Users/me/code/superai","tool_name":"Bash","tool_input":{"command":"echo ARG-SECRET"}}`},
+		{"UserPromptSubmit", `{"session_id":"t1","cwd":"/Users/me/code/superleo","prompt":"PROMPT-SECRET deploy it"}`},
+		{"PreToolUse", `{"session_id":"t1","cwd":"/Users/me/code/superleo","tool_name":"Bash","tool_input":{"command":"echo ARG-SECRET"}}`},
 		{"PostToolUse", `{"session_id":"t1","tool_name":"Bash","tool_input":{"command":"echo ARG-SECRET"},"tool_response":{"stdout":"OUTPUT-SECRET"}}`},
-		{"PreToolUse", `{"session_id":"t1","tool_name":"Edit","tool_input":{"file_path":"/Users/me/code/superai/FILE-SECRET.go","new_string":"CONTENT-SECRET"}}`},
+		{"PreToolUse", `{"session_id":"t1","tool_name":"Edit","tool_input":{"file_path":"/Users/me/code/superleo/FILE-SECRET.go","new_string":"CONTENT-SECRET"}}`},
 		{"UserPromptSubmit", `{"session_id":"t2","cwd":"/Users/me/code/noted","prompt":"PROMPT-SECRET two"}`},
 	} {
 		if out := hook(ev.name, ev.payload); out != "" {
@@ -277,7 +277,7 @@ func TestTerminalSessionsShowOnCoreAndTheirPromptsDoNot(t *testing.T) {
 	for _, s := range a.Sessions {
 		byID[s.ID] = s
 	}
-	if s := byID["t1"]; s.Project != "superai" || s.Tool != "Edit" || s.Tools != 2 {
+	if s := byID["t1"]; s.Project != "superleo" || s.Tool != "Edit" || s.Tools != 2 {
 		t.Fatalf("t1 on core: %+v", s)
 	}
 	if s := byID["t2"]; s.Project != "noted" || s.State != actWorking {

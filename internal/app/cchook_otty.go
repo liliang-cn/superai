@@ -72,7 +72,7 @@ func ottyType(ctx context.Context, pane, text string) error {
 	if cli == "" {
 		return errors.New("otty-cli not found")
 	}
-	f, err := os.CreateTemp("", "superai-otty-*")
+	f, err := os.CreateTemp("", "superleo-otty-*")
 	if err != nil {
 		return err
 	}

@@ -137,7 +137,7 @@ func TestSyncEmbeddingProviderRetiresClearedSettings(t *testing.T) {
 }
 
 // A user who configured embeddings through agent-go directly should keep that
-// provider; SuperAI only owns its own row.
+// provider; SuperLeo only owns its own row.
 func TestSyncEmbeddingProviderLeavesForeignProvidersAlone(t *testing.T) {
 	cfg := syncTestConfig(t)
 	db := openSyncedDB(t, cfg)
@@ -155,6 +155,6 @@ func TestSyncEmbeddingProviderLeavesForeignProvidersAlone(t *testing.T) {
 	}
 
 	if _, err := db.GetEmbeddingProvider("hand-rolled"); err != nil {
-		t.Fatalf("a provider SuperAI does not own was removed: %v", err)
+		t.Fatalf("a provider SuperLeo does not own was removed: %v", err)
 	}
 }

@@ -3,8 +3,8 @@ package app
 // Claude Code's permission prompts in a terminal, answered from the phone.
 //
 // Claude Code runs the PermissionRequest hook the moment it is about to ask
-// at the terminal. `superai hook PermissionRequest` hands the request to the
-// SuperAI on this machine (/cc/permission on the hook socket), which sends it
+// at the terminal. `superleo hook PermissionRequest` hands the request to the
+// SuperLeo on this machine (/cc/permission on the hook socket), which sends it
 // up the agent link to core. Core weighs the same presence gate the turn
 // notices use — nobody at the machine, or the phone said away — and either
 // says "pass" at once (the terminal's own dialog does its job) or raises the
@@ -35,8 +35,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/liliang-cn/agentexec/hooks"
-	"github.com/liliang-cn/superai/internal/apns"
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/apns"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // ccPermissionPath is the hook socket's route for a permission request.
@@ -44,7 +44,7 @@ const ccPermissionPath = "/cc/permission"
 
 const (
 	// ccPermDefaultWait is how long the hook waits for the phone unless told
-	// otherwise (--wait, SUPERAI_HOOK_PERMISSION_WAIT). The hook entry's
+	// otherwise (--wait, SUPERLEO_HOOK_PERMISSION_WAIT). The hook entry's
 	// timeout in settings.json must be longer.
 	ccPermDefaultWait = 100 * time.Second
 	ccPermMinWait     = 5 * time.Second
@@ -87,10 +87,10 @@ type ccPermAnswer struct {
 // ---- the hook
 
 // permissionWait is the hook's bound: `--wait 100` / `--wait=100` after the
-// event name, else SUPERAI_HOOK_PERMISSION_WAIT, else the default; seconds,
+// event name, else SUPERLEO_HOOK_PERMISSION_WAIT, else the default; seconds,
 // held between the minimum and the maximum.
 func permissionWait(argv []string) time.Duration {
-	val := strings.TrimSpace(os.Getenv("SUPERAI_HOOK_PERMISSION_WAIT"))
+	val := strings.TrimSpace(os.Getenv("SUPERLEO_HOOK_PERMISSION_WAIT"))
 	for i := 1; i < len(argv); i++ {
 		switch a := argv[i]; {
 		case a == "--wait" && i+1 < len(argv):
@@ -124,7 +124,7 @@ func (a *App) ccAway() bool {
 	return ccAwayHintV.Load()
 }
 
-// permissionHook is `superai hook PermissionRequest`.
+// permissionHook is `superleo hook PermissionRequest`.
 func permissionHook(argv []string, hev hooks.HookEvent) {
 	ev, ok := ccEventFromHook("PermissionRequest", hev, nil)
 	if !ok {
@@ -143,8 +143,8 @@ func permissionHook(argv []string, hev hooks.HookEvent) {
 	}
 }
 
-// askCCPermission hands the request to the local SuperAI and waits for its
-// answer. Nothing comes back from a SuperAI that is not running or cannot
+// askCCPermission hands the request to the local SuperLeo and waits for its
+// answer. Nothing comes back from a SuperLeo that is not running or cannot
 // ask.
 func askCCPermission(ctx context.Context, sockets []string, ev ccHookEvent) ccPermAnswer {
 	var out ccPermAnswer
@@ -185,7 +185,7 @@ func permissionOutput(a ccPermAnswer) []byte {
 }
 
 // ccDeniedMessage is what Claude is told when the phone says no.
-const ccDeniedMessage = "The user denied this from their phone (SuperAI). Do not retry the same call; ask what to do instead or try something else."
+const ccDeniedMessage = "The user denied this from their phone (SuperLeo). Do not retry the same call; ask what to do instead or try something else."
 
 // ---- the machine
 
@@ -377,7 +377,7 @@ func (c *ccCore) permAsking(agent, session string, now time.Time) bool {
 }
 
 // ccTitle is how a terminal session is named on the phone:
-// "claude · mac · superai".
+// "claude · mac · superleo".
 func ccTitle(machine, cwd string) string {
 	parts := []string{"claude"}
 	if machine != "" {

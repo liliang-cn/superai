@@ -30,7 +30,7 @@ interface Props {
 
 const QUEEN = "\u0000queen";
 const SELF = "\u0000self";
-const short = (n: string) => n.replace(/^superai-/, "");
+const short = (n: string) => n.replace(/^superleo-/, "");
 
 type Flight = { from: string; to: string; t0: number; dur: number; color: string; size: number; alpha: number };
 type Ring = { at: string; t0: number; color: string; big: boolean };

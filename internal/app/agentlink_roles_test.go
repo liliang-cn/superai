@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	agentlinkpb "github.com/liliang-cn/superai/internal/agentlink/pb"
-	"github.com/liliang-cn/superai/internal/backend"
+	agentlinkpb "github.com/liliang-cn/superleo/internal/agentlink/pb"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // linkHello connects a hand-played agent that says hello and answers nothing.
@@ -145,7 +145,7 @@ func TestAWorkerSaysItIsOneOnTheLink(t *testing.T) {
 // settings.json, and is one of the settings settings_set may change.
 func TestRelayOnlyRoundTripsThroughTheSettingsRPC(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("SUPERAI_HOME", home)
+	t.Setenv("SUPERLEO_HOME", home)
 	a := NewApp()
 	s, err := backend.LoadSettings()
 	if err != nil {
@@ -236,7 +236,7 @@ func TestAMacWorkerIsStillAMachine(t *testing.T) {
 			t.Fatalf("the mac: %+v", la)
 		}
 	}
-	// Codex itself first, a worker of its own; the Mac's SuperAI, which can
+	// Codex itself first, a worker of its own; the Mac's SuperLeo, which can
 	// run it, next.
 	if got := core.delegateCandidates([]string{"codex"}); strings.Join(got, " ") != "codex.mac mac" {
 		t.Fatalf("codex work goes to %v", got)

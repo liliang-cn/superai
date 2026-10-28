@@ -22,7 +22,7 @@ echo 'console.log(1)' > "$dir/node_modules/$spec/dist/proxy.js"
 
 func TestNpxServerRunsFromItsInstalledPackage(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("SUPERAI_HOME", home)
+	t.Setenv("SUPERLEO_HOME", home)
 	bin := t.TempDir()
 	for name, body := range map[string]string{"npx": "#!/bin/sh\n", "node": "#!/bin/sh\n", "npm": fakeNpm} {
 		if err := os.WriteFile(filepath.Join(bin, name), []byte(body), 0o755); err != nil {

@@ -154,15 +154,15 @@ export function engineLabel(engine: string): string {
 }
 
 /** Who answered for the queen, as it goes under an answer: the engine
- *  ("Claude Code"), or "SuperAI" when its own agent answered in the
- *  engine's place. Empty for SuperAI's own turns, which need no name. */
+ *  ("Claude Code"), or "SuperLeo" when its own agent answered in the
+ *  engine's place. Empty for SuperLeo's own turns, which need no name. */
 export function engineByline(m: { engine?: string; standInFor?: string }): string {
-  if (m.standInFor) return "SuperAI";
+  if (m.standInFor) return "SuperLeo";
   return m.engine ? engineLabel(m.engine) : "";
 }
 
-/** Who answers for the queen now when it is not her engine: "SuperAI",
+/** Who answers for the queen now when it is not her engine: "SuperLeo",
  *  answering in its place. Empty when the engine is answering. */
 export function queenEngineNote(engine?: string, now?: string): string {
-  return engine && now === "superai" ? "SuperAI" : "";
+  return engine && now === "superai" ? "SuperLeo" : "";
 }

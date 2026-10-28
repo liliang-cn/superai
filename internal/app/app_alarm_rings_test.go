@@ -62,7 +62,7 @@ func fakeRingsNoted(t *testing.T, token string, holidayCalls *atomic.Int64) stri
 }
 
 func TestAlarmRingsExpandsWithHolidays(t *testing.T) {
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	app, _, srv := serveTestApp(t)
 	t.Cleanup(func() { app.actionsV.Close() })
 

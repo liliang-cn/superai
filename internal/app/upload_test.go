@@ -24,7 +24,7 @@ func multipartBody(t *testing.T, filename, content string) (*bytes.Buffer, strin
 	return buf, w.FormDataContentType()
 }
 
-// The upload lands a file on the machine running SuperAI, so it has to be
+// The upload lands a file on the machine running SuperLeo, so it has to be
 // behind the same door as everything else. Forgetting this line would let
 // anyone who can reach the port write files there.
 func TestTheUploadEndpointIsGated(t *testing.T) {

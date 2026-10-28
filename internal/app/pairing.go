@@ -36,7 +36,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 const (
@@ -141,7 +141,7 @@ func (s *deviceStore) newCode() (string, time.Time) {
 	for {
 		n, err := rand.Int(rand.Reader, big.NewInt(1_000_000))
 		if err != nil {
-			panic("superai: cannot read random bytes for a pairing code: " + err.Error())
+			panic("superleo: cannot read random bytes for a pairing code: " + err.Error())
 		}
 		code = fmt.Sprintf("%06d", n.Int64())
 		if _, taken := s.codes[code]; !taken {

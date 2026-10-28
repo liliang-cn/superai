@@ -1,4 +1,4 @@
-// superai-relay puts a phone through to a SuperAI on a computer it shares no
+// superai-relay puts a phone through to a SuperLeo on a computer it shares no
 // network with. It reads the name a phone's TLS asks for and copies bytes; the
 // TLS itself is between the phone and the computer (internal/relay).
 //
@@ -9,10 +9,11 @@ package main
 
 import (
 	"flag"
+	_ "github.com/liliang-cn/superleo/internal/brand" // the old SuperAI names keep working
 	"log"
 	"net"
 
-	"github.com/liliang-cn/superai/internal/relay"
+	"github.com/liliang-cn/superleo/internal/relay"
 )
 
 func main() {

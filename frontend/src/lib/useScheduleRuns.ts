@@ -94,7 +94,7 @@ export function useScheduleRuns(onOpenConversation?: (session: string) => void):
       notifyRun(
         {
           key: entry.key,
-          title: entry.error !== "" ? "定时任务失败" : "SuperAI",
+          title: entry.error !== "" ? "定时任务失败" : "SuperLeo",
           body: firstLine(entry.answer || entry.error || entry.prompt, 140),
           session: entry.session,
         },

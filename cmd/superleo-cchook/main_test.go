@@ -18,8 +18,8 @@ func TestParseKeepsOnlyWhatTheNodeNeeds(t *testing.T) {
 		name, event, in string
 		want            *event
 	}{
-		{"a tool call", "PreToolUse", `{"session_id":"s1","cwd":"/Users/me/code/superai/","tool_name":"Bash","tool_input":{"command":"cat ARG-SECRET"}}`,
-			&event{Event: "PreToolUse", Session: "s1", Cwd: "superai", Tool: "Bash"}},
+		{"a tool call", "PreToolUse", `{"session_id":"s1","cwd":"/Users/me/code/superleo/","tool_name":"Bash","tool_input":{"command":"cat ARG-SECRET"}}`,
+			&event{Event: "PreToolUse", Session: "s1", Cwd: "superleo", Tool: "Bash"}},
 		{"its end", "PostToolUse", `{"session_id":"s1","cwd":"/w/x","tool_name":"Edit","tool_input":{"new_string":"ARG-SECRET"},"tool_response":{"ok":"OUT-SECRET"}}`,
 			&event{Event: "PostToolUse", Session: "s1", Cwd: "x", Tool: "Edit"}},
 		{"a prompt", "UserPromptSubmit", `{"session_id":"s1","cwd":"/w/x","prompt":"PROMPT-SECRET"}`,
@@ -45,7 +45,7 @@ func TestParseKeepsOnlyWhatTheNodeNeeds(t *testing.T) {
 	}
 }
 
-// node is a stand-in for the SuperAI on this machine: it answers like
+// node is a stand-in for the SuperLeo on this machine: it answers like
 // handleCCHook and keeps the bodies it got.
 func node(t *testing.T, answer bool) (string, chan string) {
 	t.Helper()
@@ -98,14 +98,14 @@ func runWith(t *testing.T, args []string, in string) time.Duration {
 
 func TestTheNodeHearsTheToolAndNothingElse(t *testing.T) {
 	sock, got := node(t, true)
-	t.Setenv("SUPERAI_HOOK_SOCKET", sock)
-	t.Setenv("SUPERAI_CLI_RUN", "")
+	t.Setenv("SUPERLEO_HOOK_SOCKET", sock)
+	t.Setenv("SUPERLEO_CLI_RUN", "")
 	t.Setenv("TMUX_PANE", "%3")
-	runWith(t, []string{"PreToolUse"}, `{"session_id":"s1","cwd":"/Users/me/code/superai","tool_name":"Bash","tool_input":{"command":"echo ARG-SECRET"}}`)
-	runWith(t, []string{"UserPromptSubmit"}, `{"session_id":"s1","cwd":"/Users/me/code/superai","prompt":"PROMPT-SECRET"}`)
+	runWith(t, []string{"PreToolUse"}, `{"session_id":"s1","cwd":"/Users/me/code/superleo","tool_name":"Bash","tool_input":{"command":"echo ARG-SECRET"}}`)
+	runWith(t, []string{"UserPromptSubmit"}, `{"session_id":"s1","cwd":"/Users/me/code/superleo","prompt":"PROMPT-SECRET"}`)
 	for _, want := range []event{
-		{Event: "PreToolUse", Session: "s1", Cwd: "superai", Tool: "Bash", Pane: "%3"},
-		{Event: "UserPromptSubmit", Session: "s1", Cwd: "superai", Pane: "%3"},
+		{Event: "PreToolUse", Session: "s1", Cwd: "superleo", Tool: "Bash", Pane: "%3"},
+		{Event: "UserPromptSubmit", Session: "s1", Cwd: "superleo", Pane: "%3"},
 	} {
 		select {
 		case b := <-got:
@@ -125,29 +125,29 @@ func TestTheNodeHearsTheToolAndNothingElse(t *testing.T) {
 }
 
 func TestItFailsOpenAndFast(t *testing.T) {
-	t.Setenv("SUPERAI_CLI_RUN", "")
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_CLI_RUN", "")
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	t.Setenv("HOME", t.TempDir())
 	payload := `{"session_id":"s1","tool_name":"Bash"}`
 
-	// No SuperAI at all, and a socket file nobody listens on.
+	// No SuperLeo at all, and a socket file nobody listens on.
 	stale := filepath.Join(t.TempDir(), socketName)
 	_ = os.WriteFile(stale, nil, 0o600)
-	t.Setenv("SUPERAI_HOOK_SOCKET", stale)
+	t.Setenv("SUPERLEO_HOOK_SOCKET", stale)
 	if d := runWith(t, []string{"PreToolUse"}, payload); d > 100*time.Millisecond {
-		t.Errorf("with no SuperAI it took %s", d)
+		t.Errorf("with no SuperLeo it took %s", d)
 	}
 	// A node that takes the event and hangs: given up within the budget.
 	sock, got := node(t, false)
-	t.Setenv("SUPERAI_HOOK_SOCKET", sock)
+	t.Setenv("SUPERLEO_HOOK_SOCKET", sock)
 	if d := runWith(t, []string{"PreToolUse"}, payload); d > budget+150*time.Millisecond {
 		t.Errorf("a hung node held the hook for %s", d)
 	}
 	<-got
 	// Garbage in: nothing sent.
 	runWith(t, []string{"PreToolUse"}, "not json")
-	// A run SuperAI started itself: nothing sent.
-	t.Setenv("SUPERAI_CLI_RUN", "run-1")
+	// A run SuperLeo started itself: nothing sent.
+	t.Setenv("SUPERLEO_CLI_RUN", "run-1")
 	runWith(t, []string{"PreToolUse"}, payload)
 	select {
 	case b := <-got:
@@ -157,34 +157,34 @@ func TestItFailsOpenAndFast(t *testing.T) {
 }
 
 func TestSocketsAreTriedInTheNodesOrder(t *testing.T) {
-	t.Setenv("SUPERAI_HOOK_SOCKET", "/x/explicit.sock")
-	t.Setenv("SUPERAI_HOME", "/y/home")
+	t.Setenv("SUPERLEO_HOOK_SOCKET", "/x/explicit.sock")
+	t.Setenv("SUPERLEO_HOME", "/y/home")
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	s := sockets()
 	if len(s) < 4 || s[0] != "/x/explicit.sock" || s[1] != "/y/home/"+socketName ||
-		s[len(s)-2] != filepath.Join(home, ".superai-node", socketName) || s[len(s)-1] != filepath.Join(home, ".superai", socketName) {
+		s[len(s)-2] != filepath.Join(home, ".superleo-node", socketName) || s[len(s)-1] != filepath.Join(home, ".superleo", socketName) {
 		t.Fatalf("sockets %v", s)
 	}
 }
 
 // The desktop app and the Mac's node can both be serving here, each for its
 // own core: both hear the terminal, not only the first one found.
-func TestEverySuperAIServingHereHearsTheEvent(t *testing.T) {
+func TestEverySuperLeoServingHereHearsTheEvent(t *testing.T) {
 	node1, got1 := node(t, true)
 	node2, got2 := node(t, true)
-	t.Setenv("SUPERAI_HOOK_SOCKET", node1)
-	t.Setenv("SUPERAI_HOME", filepath.Dir(node2))
-	t.Setenv("SUPERAI_CLI_RUN", "")
-	runWith(t, []string{"UserPromptSubmit"}, `{"session_id":"s1","cwd":"/x/superai"}`)
+	t.Setenv("SUPERLEO_HOOK_SOCKET", node1)
+	t.Setenv("SUPERLEO_HOME", filepath.Dir(node2))
+	t.Setenv("SUPERLEO_CLI_RUN", "")
+	runWith(t, []string{"UserPromptSubmit"}, `{"session_id":"s1","cwd":"/x/superleo"}`)
 	for i, got := range []chan string{got1, got2} {
 		select {
 		case b := <-got:
 			if !strings.Contains(b, `"event":"UserPromptSubmit"`) {
-				t.Fatalf("SuperAI %d got %s", i+1, b)
+				t.Fatalf("SuperLeo %d got %s", i+1, b)
 			}
 		case <-time.After(2 * time.Second):
-			t.Fatalf("SuperAI %d heard nothing", i+1)
+			t.Fatalf("SuperLeo %d heard nothing", i+1)
 		}
 	}
 }

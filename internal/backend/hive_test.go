@@ -238,7 +238,7 @@ func TestAWorkerSaysWhyItCannotAnnounce(t *testing.T) {
 		"nowhere to reach":  {Settings: HiveSettings{Role: HiveRoleWorker, Name: "a", JoinURL: "http://x"}},
 		"a name that fails": {Settings: HiveSettings{Role: HiveRoleWorker, Name: "a b", JoinURL: "http://x", AdvertiseURL: "http://y"}},
 	}
-	t.Setenv("SUPERAI_ADVERTISE_URL", "")
+	t.Setenv("SUPERLEO_ADVERTISE_URL", "")
 	for name, a := range cases {
 		if err := a.Validate(); err == nil {
 			t.Errorf("%s: no error", name)
@@ -249,7 +249,7 @@ func TestAWorkerSaysWhyItCannotAnnounce(t *testing.T) {
 }
 
 func TestTheAdvertiseAddressFallsBackToTheEnvironment(t *testing.T) {
-	t.Setenv("SUPERAI_ADVERTISE_URL", "http://10.42.0.5:43117")
+	t.Setenv("SUPERLEO_ADVERTISE_URL", "http://10.42.0.5:43117")
 	a := Announcer{Settings: HiveSettings{Role: HiveRoleWorker, Name: "a", JoinURL: "http://x"}}
 	if err := a.Validate(); err != nil {
 		t.Fatal(err)

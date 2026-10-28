@@ -1,6 +1,6 @@
 package app
 
-// Publishing the Android release: `superai android publish` copies an APK
+// Publishing the Android release: `superleo android publish` copies an APK
 // into <data dir>/android, hashes it and points latest.json at it. A running
 // core serves the new files at once (android_update.go); nothing restarts.
 
@@ -32,7 +32,7 @@ type AndroidRelease struct {
 // two before it, for a phone halfway through downloading an older one.
 const androidKeep = 3
 
-// publishAndroid copies the APK at src into dir as superai-<name>.apk, hashes
+// publishAndroid copies the APK at src into dir as superleo-<name>.apk, hashes
 // it, and only then points latest.json at it, so a phone never reads a
 // manifest naming a file that is not all there.
 func publishAndroid(dir, src string, code int64, name, notes string) (AndroidRelease, error) {
@@ -43,7 +43,7 @@ func publishAndroid(dir, src string, code int64, name, notes string) (AndroidRel
 	if name == "" {
 		name = strconv.FormatInt(code, 10)
 	}
-	file := "superai-" + name + ".apk"
+	file := "superleo-" + name + ".apk"
 	if !androidFile.MatchString(file) {
 		return AndroidRelease{}, fmt.Errorf("versionName %q does not make a plain file name", name)
 	}
@@ -133,18 +133,18 @@ func replaceFile(path string, data []byte) error {
 	return os.Rename(tmp.Name(), path)
 }
 
-// AndroidMain is `superai android`:
+// AndroidMain is `superleo android`:
 //
-//	superai android publish --code 3 --name 0.3.0 [--notes "…"] app-release.apk
-//	superai android show
+//	superleo android publish --code 3 --name 0.3.0 [--notes "…"] app-release.apk
+//	superleo android show
 //
-// It writes into <data dir>/android (SUPERAI_HOME). On a core in a pod, copy
-// the APK in and run it there, with the pod's SUPERAI_HOME.
+// It writes into <data dir>/android (SUPERLEO_HOME). On a core in a pod, copy
+// the APK in and run it there, with the pod's SUPERLEO_HOME.
 func AndroidMain(argv []string) {
 	usage := func() {
-		fmt.Fprintln(os.Stderr, "usage: superai android publish --code <versionCode> [--name <versionName>] [--notes <text>] <file.apk>")
-		fmt.Fprintln(os.Stderr, "       superai android show")
-		fmt.Fprintln(os.Stderr, "  the release is kept in", androidReleaseDir(), "(set SUPERAI_HOME to change)")
+		fmt.Fprintln(os.Stderr, "usage: superleo android publish --code <versionCode> [--name <versionName>] [--notes <text>] <file.apk>")
+		fmt.Fprintln(os.Stderr, "       superleo android show")
+		fmt.Fprintln(os.Stderr, "  the release is kept in", androidReleaseDir(), "(set SUPERLEO_HOME to change)")
 		os.Exit(2)
 	}
 	if len(argv) == 0 {
@@ -163,7 +163,7 @@ func AndroidMain(argv []string) {
 		}
 		rel, err := publishAndroid(androidReleaseDir(), fl.Arg(0), *code, *name, *notes)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "superai:", err)
+			fmt.Fprintln(os.Stderr, "superleo:", err)
 			os.Exit(1)
 		}
 		fmt.Fprintf(os.Stderr, "published %s (versionCode %d) to %s\n", rel.VersionName, rel.VersionCode, androidReleaseDir())
@@ -171,7 +171,7 @@ func AndroidMain(argv []string) {
 	case "show":
 		b, err := os.ReadFile(filepath.Join(androidReleaseDir(), androidManifest))
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "superai: no release published:", err)
+			fmt.Fprintln(os.Stderr, "superleo: no release published:", err)
 			os.Exit(1)
 		}
 		_, _ = os.Stdout.Write(b)

@@ -4,7 +4,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // A conversation whose first answer is still being written is listed, once,

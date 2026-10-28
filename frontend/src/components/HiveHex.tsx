@@ -36,7 +36,7 @@ const wrOf = (n: number) => (n > 14 ? 12 : n > 8 ? 16 : 20);
 const scaleFor = (h: number) => Math.max(0.5, Math.min(1, h / 460));
 const SELF = "\u0000self";
 
-const short = (n: string) => n.replace(/^superai-/, "");
+const short = (n: string) => n.replace(/^superleo-/, "");
 
 function hexPath(ctx: CanvasRenderingContext2D, c: Pt, r: number, rot = 0) {
   ctx.beginPath();

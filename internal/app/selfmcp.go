@@ -1,8 +1,8 @@
-// SuperAI about itself: what it is running on and how it is doing, and the
+// SuperLeo about itself: what it is running on and how it is doing, and the
 // preferences it may change, as one set of tools.
 //
-// The same table is served twice. On /mcp, as superai_<name>, so any MCP
-// client — Claude Code, another SuperAI, a script — can ask a SuperAI how it is
+// The same table is served twice. On /mcp, as superleo_<name>, so any MCP
+// client — Claude Code, another SuperLeo, a script — can ask a SuperLeo how it is
 // and adjust it. And to its own agent, as <name>, so "what model are you on",
 // "is anything wrong", "turn PII redaction on" are answered in a conversation
 // by the code that answers them on /mcp. Two hand-written copies were how the
@@ -27,7 +27,7 @@ import (
 	"time"
 
 	"github.com/liliang-cn/agent-go/v3/pkg/agent"
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -59,15 +59,15 @@ func (t selfTool) schema() map[string]any {
 func selfTools() []selfTool {
 	return append([]selfTool{
 		{
-			Name: "status", Title: "SuperAI status", ReadOnly: true,
-			Description: "How this SuperAI is doing: whether it is ready (and the error if not), the model and provider it thinks with, " +
+			Name: "status", Title: "SuperLeo status", ReadOnly: true,
+			Description: "How this SuperLeo is doing: whether it is ready (and the error if not), the model and provider it thinks with, " +
 				"the embedding model, memory mode, skills, MCP servers and tools running, scheduler and Telegram state, its role in a hive " +
 				"and how many members and linked agents it has, and anything that needs attention. Start here for any question about itself.",
 			Run: func(a *App, _ map[string]any) (any, error) { return a.selfStatus(), nil },
 		},
 		{
 			Name: "doctor", Title: "Health check", ReadOnly: true,
-			Description: "Run SuperAI's health checks (model reachable, memory, MCP servers, scheduler, disk…) and report each as ok, warn or fail with why.",
+			Description: "Run SuperLeo's health checks (model reachable, memory, MCP servers, scheduler, disk…) and report each as ok, warn or fail with why.",
 			Run:         func(a *App, _ map[string]any) (any, error) { return a.Doctor(), nil },
 		},
 		{
@@ -77,27 +77,27 @@ func selfTools() []selfTool {
 		},
 		{
 			Name: "linked_agents", Title: "Linked agents", ReadOnly: true,
-			Description: "The agents connected to this SuperAI over the agent link (host, OS, the coding CLIs and agents each offers, when last heard), and the ones that dropped recently without coming back." +
+			Description: "The agents connected to this SuperLeo over the agent link (host, OS, the coding CLIs and agents each offers, when last heard), and the ones that dropped recently without coming back." +
 				" Each says what it is: role machine (machine true) is a machine machine_inspect and machine_act look after; worker is a hive worker's pod, reached through the hive tools; relay is there only for the named agents it serves." +
-				" activity, when present, is what the interactive Claude Code sessions people run in that machine's terminals are doing (not SuperAI's own runs): working and waiting counts, and per session its project (the directory's name), state (working, waiting — wait says permission or input — or idle), the tool it is on and since when. No prompts or tool arguments are ever in it." +
+				" activity, when present, is what the interactive Claude Code sessions people run in that machine's terminals are doing (not SuperLeo's own runs): working and waiting counts, and per session its project (the directory's name), state (working, waiting — wait says permission or input — or idle), the tool it is on and since when. No prompts or tool arguments are ever in it." +
 				" cliActivity is the same for every coding CLI running there (claude, codex, opencode, pi, gemini, ...), by CLI: source plugin is the CLI's own plugin or hooks (precise), source process is the machine's look at its processes (working while it uses CPU, else idle). A CLI not running is not in it.",
 			Run: func(a *App, _ map[string]any) (any, error) { return a.selfLinkedAgents(), nil },
 		},
 		{
 			Name: "hosts", Title: "Hosts", ReadOnly: true,
-			Description: "Every host this SuperAI knows of and what runs on each. A host is a pod, a container, a Mac, a VM or bare metal (kind), with parent the host it sits inside (a pod's k3s node) and state live, lost or configured (known from the settings only)." +
-				" Its agents are SuperAI itself (kind superai, with role queen, worker, machine, relay or standalone, and the MCP servers it can call), the coding CLIs installed there (kind cli, named cli.machine, with what they are doing) and named agents (kind agent, like openclaw) with via, the SuperAI that runs them." +
+			Description: "Every host this SuperLeo knows of and what runs on each. A host is a pod, a container, a Mac, a VM or bare metal (kind), with parent the host it sits inside (a pod's k3s node) and state live, lost or configured (known from the settings only)." +
+				" Its agents are SuperLeo itself (kind superleo, with role queen, worker, machine, relay or standalone, and the MCP servers it can call), the coding CLIs installed there (kind cli, named cli.machine, with what they are doing) and named agents (kind agent, like openclaw) with via, the SuperLeo that runs them." +
 				" services are the HA services (provider haify): one copy runs on active and moves to a ready standby; reach it at vip. An agent such a service runs says service, and shows on standby hosts with state standby.",
 			Run: func(a *App, _ map[string]any) (any, error) { return a.fullTopology(), nil },
 		},
 		{
 			Name: "mcp_servers", Title: "MCP servers", ReadOnly: true,
-			Description: "The MCP servers SuperAI has configured: whether each is running and the tools it provides.",
+			Description: "The MCP servers SuperLeo has configured: whether each is running and the tools it provides.",
 			Run:         func(a *App, _ map[string]any) (any, error) { return a.selfMCPServers(), nil },
 		},
 		{
 			Name: "skills", Title: "Skills", ReadOnly: true,
-			Description: "The skills installed in SuperAI, with what each is for.",
+			Description: "The skills installed in SuperLeo, with what each is for.",
 			Run:         func(a *App, _ map[string]any) (any, error) { return a.Skills(), nil },
 		},
 		{
@@ -133,7 +133,7 @@ func selfTools() []selfTool {
 		},
 		{
 			Name: "devices", Title: "Paired devices", ReadOnly: true,
-			Description: "The phones, desktops and agents paired with this SuperAI, with when each was paired and last seen.",
+			Description: "The phones, desktops and agents paired with this SuperLeo, with when each was paired and last seen.",
 			Run: func(a *App, _ map[string]any) (any, error) {
 				return a.PairedDevices()
 			},
@@ -145,12 +145,12 @@ func selfTools() []selfTool {
 		},
 		{
 			Name: "settings_get", Title: "Read settings", ReadOnly: true,
-			Description: "SuperAI's own configuration. Secrets are reported as whether they are set, never as their value. Also lists what settings_set may change, and any change still waiting to be applied.",
+			Description: "SuperLeo's own configuration. Secrets are reported as whether they are set, never as their value. Also lists what settings_set may change, and any change still waiting to be applied.",
 			Run:         func(a *App, _ map[string]any) (any, error) { return a.selfSettings(), nil },
 		},
 		{
 			Name: "settings_set", Title: "Change a setting",
-			Description: "Change one of SuperAI's own settings. Only preferences can be changed (settings_get lists them): the approval gate, the credentials and the addresses of the model and the memory are not writable from here. " +
+			Description: "Change one of SuperLeo's own settings. Only preferences can be changed (settings_get lists them): the approval gate, the credentials and the addresses of the model and the memory are not writable from here. " +
 				"The change is saved at once and applied as soon as no conversation is mid-turn, since applying it restarts the agent.",
 			Params: map[string]any{
 				"key":   map[string]any{"type": "string", "description": "setting name, e.g. llm_model or max_rounds"},
@@ -193,7 +193,7 @@ func (a *App) registerSelfTools(svc *backend.Service) {
 // approval card says is asking, for a tool that has to ask.
 func addSelfMCPTools(s *mcp.Server, app *App, caller string) {
 	for _, t := range selfTools() {
-		tool := &mcp.Tool{Name: "superai_" + t.Name, Title: t.Title, Description: t.Description, InputSchema: t.schema()}
+		tool := &mcp.Tool{Name: "superleo_" + t.Name, Title: t.Title, Description: t.Description, InputSchema: t.schema()}
 		if t.ReadOnly {
 			tool.Annotations = &mcp.ToolAnnotations{ReadOnlyHint: true}
 		}
@@ -296,7 +296,7 @@ func (a *App) selfSettings() map[string]any {
 	if p := a.pendingSettings(); len(p) > 0 {
 		out["pending"] = p
 	}
-	if os.Getenv("SUPERAI_SETTINGS_JSON") != "" {
+	if os.Getenv("SUPERLEO_SETTINGS_JSON") != "" {
 		out["note"] = "This instance takes its settings from its deployment: a change here lasts until it restarts."
 	}
 	return out
@@ -335,7 +335,7 @@ func (a *App) selfSetSetting(key string, value any) (any, error) {
 
 	out := map[string]any{"key": key, "value": applied,
 		"note": "Accepted; saved and applied as soon as no conversation is mid-turn, usually right after this reply."}
-	if os.Getenv("SUPERAI_SETTINGS_JSON") != "" {
+	if os.Getenv("SUPERLEO_SETTINGS_JSON") != "" {
 		out["note"] = out["note"].(string) + " This instance takes its settings from its deployment, so the change lasts until it restarts."
 	}
 	return out, nil

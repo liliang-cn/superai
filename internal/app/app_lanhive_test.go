@@ -7,8 +7,8 @@ import (
 // A member keeps its queen's roster and key, and says where it would take
 // agents in; with no roster, or no model, it draws nobody.
 func TestAMemberKeepsTheRosterAndDrawsTheNextQueenFromIt(t *testing.T) {
-	t.Setenv("SUPERAI_HOME", t.TempDir())
-	t.Setenv("SUPERAI_AGENT_DOOR_PORT", "43785")
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_AGENT_DOOR_PORT", "43785")
 	a := &App{}
 	if _, _, ok := a.lanElect("w1", map[string]bool{}); ok {
 		t.Fatal("drew a queen with no roster")

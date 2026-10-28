@@ -14,8 +14,8 @@ const {movesOf, along, tripTime, turn} = mod.exports;
 const at = (key, host, x = 0, z = 0) => ({key, host, x, y: 0, z});
 
 test('an HA agent on another host is a move', () => {
-  const m = movesOf([at('agent:openclaw', 'sds-a', 10, 0), at('superai:w1', 'sds-a')],
-    [at('agent:openclaw', 'sds-b', -10, 4), at('superai:w1', 'sds-a')]);
+  const m = movesOf([at('agent:openclaw', 'sds-a', 10, 0), at('superleo:w1', 'sds-a')],
+    [at('agent:openclaw', 'sds-b', -10, 4), at('superleo:w1', 'sds-a')]);
   assert.equal(m.length, 1);
   assert.equal(m[0].key, 'agent:openclaw');
   assert.equal(m[0].from.host, 'sds-a');

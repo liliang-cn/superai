@@ -6,7 +6,7 @@ package app
 // on a clock, when an event reaches it, when it asked to be woken — runs one
 // ordinary turn, keeps notes for next time, tells the person what they should
 // know, and sleeps. The engine is agent-go's Standing (pkg/agent/standing.go):
-// the wakes, the notes, the daily ceilings. This file is what SuperAI adds
+// the wakes, the notes, the daily ceilings. This file is what SuperLeo adds
 // around it:
 //
 //   - who it is: a name and a look (a glyph on a coloured disc);
@@ -34,7 +34,7 @@ import (
 	"time"
 
 	"github.com/liliang-cn/agent-go/v3/pkg/agent"
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 	"github.com/robfig/cron/v3"
 )
 
@@ -179,7 +179,7 @@ func (a *App) startStanding() {
 	}
 	if lock == nil {
 		h.mu.Lock()
-		h.reason = "another SuperAI process on this machine runs the standing agents"
+		h.reason = "another SuperLeo process on this machine runs the standing agents"
 		h.mu.Unlock()
 		return
 	}

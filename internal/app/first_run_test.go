@@ -3,7 +3,7 @@ package app
 import (
 	"testing"
 
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // onboardingApp is a desktop app on its first start, with the login shell's
@@ -11,7 +11,7 @@ import (
 // signedIn.
 func onboardingApp(t *testing.T, s backend.Settings, signedIn bool) *App {
 	t.Helper()
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	loginPath.Do(func() {})
 	was := signedInChecks
 	signedInChecks = map[string]func(string) bool{"claude": func(string) bool { return signedIn }}
@@ -38,7 +38,7 @@ func TestOnboardingIsAskedOnceAndOnlyWhenNothingThinks(t *testing.T) {
 	}
 }
 
-// Looking finds Claude Code, says it is signed in and that SuperAI can think
+// Looking finds Claude Code, says it is signed in and that SuperLeo can think
 // with it, and lists it first.
 func TestLookingFindsASignedInClaudeCodeFirst(t *testing.T) {
 	bin, _ := fakeClaude(t, fakeClaudeTurn, 0)

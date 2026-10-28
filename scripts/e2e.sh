@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
-# End-to-end check against a running SuperAI, exercising the paths a person and
+# End-to-end check against a running SuperLeo, exercising the paths a person and
 # a program each take: password -> session cookie -> RPC, and bearer -> MCP ->
 # the schedule tools.
 #
 # Written after a release where all of this was verified by hand, one curl at a
 # time, and none of it was repeatable the next day.
 #
-#   SUPERAI_URL=https://ai.superleo.cn \
-#   SUPERAI_PASSWORD=... SUPERAI_TOKEN=... ./scripts/e2e.sh
+#   SUPERLEO_URL=https://ai.superleo.cn \
+#   SUPERLEO_PASSWORD=... SUPERLEO_TOKEN=... ./scripts/e2e.sh
 #
 # Everything it creates, it deletes. It runs against a live instance and writes
 # real data on the way through, so it deliberately touches only schedules it
 # named itself.
 set -uo pipefail
 
-URL="${SUPERAI_URL:-http://127.0.0.1:43117}"
-PASSWORD="${SUPERAI_PASSWORD:-}"
-TOKEN="${SUPERAI_TOKEN:-}"
+URL="${SUPERLEO_URL:-http://127.0.0.1:43117}"
+PASSWORD="${SUPERLEO_PASSWORD:-}"
+TOKEN="${SUPERLEO_TOKEN:-}"
 COOKIE_JAR="$(mktemp)"
 MARKER="e2e-$$-$(date +%s)"
 FAILED=0
@@ -68,7 +68,7 @@ if [ -n "$PASSWORD" ]; then
     pass "a wrong password is rejected (HTTP $code)"
   fi
 else
-  echo "  skip  password paths (set SUPERAI_PASSWORD)"
+  echo "  skip  password paths (set SUPERLEO_PASSWORD)"
 fi
 
 step "static app"
@@ -77,7 +77,7 @@ expect "the page loads without credentials, so a password can be typed" "$code" 
 
 if [ -z "$TOKEN" ]; then
   echo
-  echo "  skip  MCP paths (set SUPERAI_TOKEN)"
+  echo "  skip  MCP paths (set SUPERLEO_TOKEN)"
   [ "$FAILED" -eq 0 ] && { echo; echo "all checks passed"; exit 0; }
   echo
   echo "$FAILED check(s) failed"
@@ -103,17 +103,17 @@ mcp '{"jsonrpc":"2.0","method":"notifications/initialized"}' >/dev/null
 
 tools=$(mcp '{"jsonrpc":"2.0","id":2,"method":"tools/list"}')
 for tool in create list enable delete run_now; do
-  contains "tools/list offers superai_schedule_$tool" "$tools" "superai_schedule_$tool"
+  contains "tools/list offers superleo_schedule_$tool" "$tools" "superleo_schedule_$tool"
 done
 
 step "schedule lifecycle"
-created=$(mcp "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"superai_schedule_create\",\"arguments\":{\"name\":\"$MARKER\",\"cron\":\"7 4 * * *\",\"prompt\":\"end-to-end probe for $MARKER, reply with the single word ok\"}}}")
+created=$(mcp "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"superleo_schedule_create\",\"arguments\":{\"name\":\"$MARKER\",\"cron\":\"7 4 * * *\",\"prompt\":\"end-to-end probe for $MARKER, reply with the single word ok\"}}}")
 contains "create reports success" "$created" '\"created\":true'
 # A cron string is meaningless without knowing when it actually fires; the echo
 # is what caught a whole VM running on UTC.
 contains "create echoes the next runs" "$created" 'next_runs'
 
-ID=$(mcp '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"superai_schedule_list","arguments":{}}}' |
+ID=$(mcp '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"superleo_schedule_list","arguments":{}}}' |
   sed -n 's/^data: //p' |
   python3 -c "
 import sys, json
@@ -123,16 +123,16 @@ print(next((r['id'] for r in rows if '$MARKER' in r.get('prompt','') + r.get('no
 if [ -n "$ID" ]; then pass "the new schedule appears in list"; else fail "the new schedule appears in list"; fi
 
 if [ -n "$ID" ]; then
-  started=$(mcp "{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"tools/call\",\"params\":{\"name\":\"superai_schedule_run_now\",\"arguments\":{\"id\":\"$ID\"}}}")
+  started=$(mcp "{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"tools/call\",\"params\":{\"name\":\"superleo_schedule_run_now\",\"arguments\":{\"id\":\"$ID\"}}}")
   contains "run_now starts the task" "$started" '"started"'
 
   # The run goes through a real model call, so give it room before asking.
   sleep 45
 
-  deleted=$(mcp "{\"jsonrpc\":\"2.0\",\"id\":6,\"method\":\"tools/call\",\"params\":{\"name\":\"superai_schedule_delete\",\"arguments\":{\"id\":\"$ID\"}}}")
+  deleted=$(mcp "{\"jsonrpc\":\"2.0\",\"id\":6,\"method\":\"tools/call\",\"params\":{\"name\":\"superleo_schedule_delete\",\"arguments\":{\"id\":\"$ID\"}}}")
   contains "delete removes the schedule" "$deleted" '"deleted"'
 
-  remaining=$(mcp '{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"superai_schedule_list","arguments":{}}}')
+  remaining=$(mcp '{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"superleo_schedule_list","arguments":{}}}')
   case "$remaining" in
   *"$MARKER"*) fail "the deleted schedule is gone from list" ;;
   *) pass "the deleted schedule is gone from list" ;;

@@ -12,8 +12,8 @@ import path from "node:path"
 
 const dir = fs.mkdtempSync(path.join("/tmp", "clip-"))
 const sock = path.join(dir, "cc-hook.sock")
-process.env.SUPERAI_HOOK_SOCKET = sock
-delete process.env.SUPERAI_CLI_RUN
+process.env.SUPERLEO_HOOK_SOCKET = sock
+delete process.env.SUPERLEO_CLI_RUN
 
 const got = []
 const server = http.createServer((req, res) => {
@@ -29,21 +29,21 @@ const until = async (n) => { for (let i = 0; i < 200 && got.length < n; i++) awa
 const opencode = (await import("./opencode.js")).default
 const pi = (await import("./pi.js")).default
 
-test("opencode events in SuperAI's terms", () => {
+test("opencode events in SuperLeo's terms", () => {
   const tr = opencode.server.translate
   const kids = new Set()
-  const d = "/Users/me/code/superai/"
+  const d = "/Users/me/code/superleo/"
   assert.deepEqual(tr({ type: "session.created", properties: { info: { id: "s1", directory: "/Users/me/code/web" } } }, d, kids),
     { session: "s1", cwd: "web", event: "SessionStart" })
   // A subagent's session is its parent's work: never its own.
   assert.equal(tr({ type: "session.created", properties: { info: { id: "k1", parentID: "s1" } } }, d, kids), null)
   assert.equal(tr({ type: "session.status", properties: { sessionID: "k1", status: { type: "busy" } } }, d, kids), null)
   assert.deepEqual(tr({ type: "session.status", properties: { sessionID: "s1", status: { type: "busy" } } }, d, kids),
-    { session: "s1", cwd: "superai", event: "Working" })
+    { session: "s1", cwd: "superleo", event: "Working" })
   assert.equal(tr({ type: "session.status", properties: { sessionID: "s1", status: { type: "idle" } } }, d, kids).event, "Stop")
   assert.equal(tr({ type: "session.idle", properties: { sessionID: "s1" } }, d, kids).event, "Stop")
   const perm = tr({ type: "permission.asked", properties: { id: "p", sessionID: "s1", permission: "bash", patterns: ["rm -rf ARG-SECRET"], metadata: { command: "ARG-SECRET" } } }, d, kids)
-  assert.deepEqual(perm, { session: "s1", cwd: "superai", event: "PermissionRequest", tool: "bash" })
+  assert.deepEqual(perm, { session: "s1", cwd: "superleo", event: "PermissionRequest", tool: "bash" })
   assert.equal(tr({ type: "permission.replied", properties: { sessionID: "s1", requestID: "p", reply: "once" } }, d, kids).event, "PermissionAnswered")
   assert.equal(tr({ type: "question.asked", properties: { id: "q", sessionID: "s1", questions: [{ question: "PROMPT-SECRET?" }] } }, d, kids).event, "WaitInput")
   assert.equal(tr({ type: "session.deleted", properties: { info: { id: "s1" } } }, d, kids).event, "SessionEnd")
@@ -53,7 +53,7 @@ test("opencode events in SuperAI's terms", () => {
 
 test("opencode hooks reach the socket in order, without arguments", async () => {
   got.length = 0
-  const hooks = await opencode.server({ directory: "/Users/me/code/superai", worktree: "/Users/me/code/superai" })
+  const hooks = await opencode.server({ directory: "/Users/me/code/superleo", worktree: "/Users/me/code/superleo" })
   await hooks["chat.message"]({ sessionID: "s1", agent: "build" }, { message: { text: "PROMPT-SECRET" }, parts: [{ text: "PROMPT-SECRET" }] })
   await hooks["tool.execute.before"]({ tool: "bash", sessionID: "s1", callID: "c" }, { args: { command: "echo ARG-SECRET" } })
   await hooks["tool.execute.after"]({ tool: "bash", sessionID: "s1", callID: "c", args: { command: "echo ARG-SECRET" } }, { title: "t", output: "OUT-SECRET", metadata: {} })
@@ -61,16 +61,16 @@ test("opencode hooks reach the socket in order, without arguments", async () => 
   await until(4)
   const pid = process.pid
   assert.deepEqual(got.map((g) => g.body), [
-    { cli: "opencode", pid, pane: process.env.TMUX_PANE || "", event: "UserPromptSubmit", session: "s1", cwd: "superai" },
-    { cli: "opencode", pid, pane: process.env.TMUX_PANE || "", event: "PreToolUse", session: "s1", cwd: "superai", tool: "bash" },
+    { cli: "opencode", pid, pane: process.env.TMUX_PANE || "", event: "UserPromptSubmit", session: "s1", cwd: "superleo" },
+    { cli: "opencode", pid, pane: process.env.TMUX_PANE || "", event: "PreToolUse", session: "s1", cwd: "superleo", tool: "bash" },
     { cli: "opencode", pid, pane: process.env.TMUX_PANE || "", event: "PostToolUse", session: "s1", tool: "bash" },
-    { cli: "opencode", pid, pane: process.env.TMUX_PANE || "", session: "s1", cwd: "superai", event: "Stop" },
+    { cli: "opencode", pid, pane: process.env.TMUX_PANE || "", session: "s1", cwd: "superleo", event: "Stop" },
   ])
   assert.ok(got.every((g) => g.url === "/cc/hook"))
   assert.ok(!JSON.stringify(got).includes("SECRET") && !JSON.stringify(got).includes("/Users/me"))
 })
 
-test("pi events in SuperAI's terms", async () => {
+test("pi events in SuperLeo's terms", async () => {
   got.length = 0
   const handlers = {}
   pi({ on: (name, fn) => { handlers[name] = fn } })
@@ -96,21 +96,21 @@ test("pi events in SuperAI's terms", async () => {
   await handlers.agent_start({ type: "agent_start" }, { sessionManager: { getSessionId: () => { throw new Error("x") } } })
 })
 
-test("no socket, a SuperAI run: nothing sent, nothing thrown", async () => {
-  process.env.SUPERAI_HOOK_SOCKET = path.join(dir, "nobody.sock")
-  process.env.SUPERAI_HOME = path.join(dir, "nohome")
+test("no socket, a SuperLeo run: nothing sent, nothing thrown", async () => {
+  process.env.SUPERLEO_HOOK_SOCKET = path.join(dir, "nobody.sock")
+  process.env.SUPERLEO_HOME = path.join(dir, "nohome")
   const hooks = await opencode.server({ directory: "/x" })
   const t0 = Date.now()
   await hooks["tool.execute.before"]({ tool: "bash", sessionID: "s9", callID: "c" }, { args: {} })
   assert.ok(Date.now() - t0 < 50)
-  process.env.SUPERAI_HOOK_SOCKET = sock
-  process.env.SUPERAI_CLI_RUN = "1"
+  process.env.SUPERLEO_HOOK_SOCKET = sock
+  process.env.SUPERLEO_CLI_RUN = "1"
   got.length = 0
   assert.deepEqual(await opencode.server({ directory: "/x" }), {})
   const handlers = {}
   pi({ on: (name, fn) => { handlers[name] = fn } })
   assert.deepEqual(handlers, {})
-  delete process.env.SUPERAI_CLI_RUN
+  delete process.env.SUPERLEO_CLI_RUN
 })
 
 const queen = (await import("./pi_queen.js")).default
@@ -125,11 +125,11 @@ test("pi as the queen: her servers with their tokens filled in, and a change ask
   })
   await new Promise((r) => approver.listen(0, "127.0.0.1", r))
   const url = `http://127.0.0.1:${approver.address().port}/approve/run/secret`
-  process.env.SUPERAI_QUEEN_SERVERS = JSON.stringify({ hive: { type: "http", url: "http://core/mcp",
-    headers: { Authorization: "Bearer ${SUPERAI_QUEEN_TOKEN}" }, exposure: "direct" } })
-  process.env.SUPERAI_QUEEN_TOKEN = "tok"
-  process.env.SUPERAI_QUEEN_ALLOWED = "mcp__hive"
-  process.env.SUPERAI_APPROVE_URL = url
+  process.env.SUPERLEO_QUEEN_SERVERS = JSON.stringify({ hive: { type: "http", url: "http://core/mcp",
+    headers: { Authorization: "Bearer ${SUPERLEO_QUEEN_TOKEN}" }, exposure: "direct" } })
+  process.env.SUPERLEO_QUEEN_TOKEN = "tok"
+  process.env.SUPERLEO_QUEEN_ALLOWED = "mcp__hive"
+  process.env.SUPERLEO_APPROVE_URL = url
   const registered = {}
   const handlers = {}
   queen({ registerMcpServer: (name, cfg) => { registered[name] = cfg }, on: (name, fn) => { handlers[name] = fn } })
@@ -138,7 +138,7 @@ test("pi as the queen: her servers with their tokens filled in, and a change ask
 
   // Reads and the hive's own tools are not asked about.
   assert.equal(await handlers.tool_call({ toolName: "read", input: { path: "a" } }), undefined)
-  assert.equal(await handlers.tool_call({ toolName: "mcp__hive__superai_hive_members", input: {} }), undefined)
+  assert.equal(await handlers.tool_call({ toolName: "mcp__hive__superleo_hive_members", input: {} }), undefined)
   assert.equal(asked.length, 0)
   // A shell command is, and runs when the person says yes.
   assert.equal(await handlers.tool_call({ toolName: "bash", input: { command: "ls" } }), undefined)
@@ -146,14 +146,14 @@ test("pi as the queen: her servers with their tokens filled in, and a change ask
   answer = { behavior: "deny", message: "no" }
   assert.deepEqual(await handlers.tool_call({ toolName: "mcp__noted__delete_task", input: { id: "1" } }), { block: true, reason: "no" })
   approver.close()
-  // SuperAI gone: the call is blocked, not run unasked.
+  // SuperLeo gone: the call is blocked, not run unasked.
   const gone = await handlers.tool_call({ toolName: "write", input: { path: "x" } })
   assert.equal(gone.block, true)
 
   // Unattended: servers only, nothing in the way.
-  delete process.env.SUPERAI_APPROVE_URL
+  delete process.env.SUPERLEO_APPROVE_URL
   const none = {}
   queen({ registerMcpServer: () => {}, on: (name, fn) => { none[name] = fn } })
   assert.deepEqual(none, {})
-  for (const k of ["SUPERAI_QUEEN_SERVERS", "SUPERAI_QUEEN_TOKEN", "SUPERAI_QUEEN_ALLOWED"]) delete process.env[k]
+  for (const k of ["SUPERLEO_QUEEN_SERVERS", "SUPERLEO_QUEEN_TOKEN", "SUPERLEO_QUEEN_ALLOWED"]) delete process.env[k]
 })

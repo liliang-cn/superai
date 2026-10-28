@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	agentlinkpb "github.com/liliang-cn/superai/internal/agentlink/pb"
-	"github.com/liliang-cn/superai/internal/backend"
+	agentlinkpb "github.com/liliang-cn/superleo/internal/agentlink/pb"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 func hostByName(hs []Host, name string) *Host {
@@ -33,7 +33,7 @@ func agentNamed(x *Host, name string) *HostAgent {
 }
 
 // The hive as it runs today: a queen pod, worker pods on the orange VMs (one
-// of them also on the agent link), a VM's own superai agent, a Mac with its
+// of them also on the agent link), a VM's own superleo agent, a Mac with its
 // coding CLIs, and a relay serving openclaw. Hosts puts each on the box it
 // runs on, each box once, and every agent on it.
 func TestHostsPutsAgentsOnTheirHosts(t *testing.T) {
@@ -82,7 +82,7 @@ func TestHostsPutsAgentsOnTheirHosts(t *testing.T) {
 	if mac == nil || mac.Kind != "mac" || mac.Hostname != "Liangs-MacBook-Pro" || mac.State != "live" {
 		t.Fatalf("mac: %+v", mac)
 	}
-	if g := agentNamed(mac, "mac"); g == nil || g.Kind != hostAgentSuperAI || g.Role != agentRoleMachine {
+	if g := agentNamed(mac, "mac"); g == nil || g.Kind != hostAgentSuperLeo || g.Role != agentRoleMachine {
 		t.Fatalf("mac's own agent: %+v", g)
 	}
 	if g := agentNamed(mac, "codex.mac"); g == nil || g.Kind != hostAgentCLI || g.State != "installed" || g.Via != "mac" {
@@ -97,7 +97,7 @@ func TestHostsPutsAgentsOnTheirHosts(t *testing.T) {
 	}
 	n := 0
 	for _, g := range w0.Agents {
-		if g.Kind == hostAgentSuperAI {
+		if g.Kind == hostAgentSuperLeo {
 			n++
 			if g.Role != backend.HiveRoleWorker || len(g.MCP) != 2 {
 				t.Fatalf("worker-0's agent: %+v", g)
@@ -348,7 +348,7 @@ func TestHostsPutAnAgentOnEveryHostItIsOn(t *testing.T) {
 		t.Fatalf("pi.sds-e reached %v", c)
 	}
 	if hub.servingOn("pi", "sds-a") != nil {
-		t.Fatal("sds-a's own SuperAI does not serve pi")
+		t.Fatal("sds-a's own SuperLeo does not serve pi")
 	}
 	for machine, dest := range map[string]string{
 		"sds-a":           "-F ~/.lima/sds-a/ssh.config lima-sds-a",
@@ -369,7 +369,7 @@ func TestHostsPutAnAgentOnEveryHostItIsOn(t *testing.T) {
 	}
 }
 
-// A SuperAI with no model of its own is how the queen reaches a machine, not
+// A SuperLeo with no model of its own is how the queen reaches a machine, not
 // a member: it is not drawn, and a machine with nothing else working on it is
 // not either. What it runs that works on its own (a signed-in claude, a named
 // agent) stays, and so does a pod's node that carries a worker.
@@ -392,7 +392,7 @@ func TestOnlyWhatWorksIsDrawn(t *testing.T) {
 			{Name: "codex.mac", Kind: "cli", Via: "mac", State: "installed"},                  // can say it is signed in
 			{Name: "goose.mac", Kind: "cli", Via: "mac", State: "installed"},                  // cannot, and is not in use
 			{Name: "opencode.mac", Kind: "cli", Via: "mac", State: "working"},                 // cannot say, but is in use
-			{Name: "gemini.mac", Kind: "cli", Via: "mac", State: "working", Unrunnable: true}, // in use, but not one SuperAI can start
+			{Name: "gemini.mac", Kind: "cli", Via: "mac", State: "working", Unrunnable: true}, // in use, but not one SuperLeo can start
 		}},
 	}}
 	got := map[string][]string{}
@@ -422,7 +422,7 @@ func TestTheHAServiceSaysWhereItsClusterRuns(t *testing.T) {
 	top := withoutHA(HiveTopology{
 		Hosts: []Host{
 			{ID: "superai-worker-2", Name: "superai-worker-2", State: "live", Agents: []HostAgent{
-				{Name: "superai-worker-2", Kind: hostAgentSuperAI, Role: "worker", State: "live"},
+				{Name: "superai-worker-2", Kind: hostAgentSuperLeo, Role: "worker", State: "live"},
 				{Name: "openclaw", Kind: hostAgentNamed, State: "live", Via: "superai-worker-2", Service: "openclaw"},
 			}},
 			{ID: "sds-e", Name: "sds-e", State: "live", Agents: []HostAgent{
@@ -442,6 +442,6 @@ func TestTheHAServiceSaysWhereItsClusterRuns(t *testing.T) {
 		}
 	}
 	if w := hostByName(top.Hosts, "superai-worker-2"); w == nil || agentNamed(w, "openclaw") != nil {
-		t.Fatalf("the worker keeps its SuperAI and loses the copy: %+v", w)
+		t.Fatalf("the worker keeps its SuperLeo and loses the copy: %+v", w)
 	}
 }

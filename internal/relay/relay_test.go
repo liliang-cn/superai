@@ -25,7 +25,7 @@ func selfSigned(t *testing.T, key *ecdsa.PrivateKey) tls.Certificate {
 	t.Helper()
 	tmpl := &x509.Certificate{
 		SerialNumber: big.NewInt(1),
-		Subject:      pkix.Name{CommonName: "SuperAI"},
+		Subject:      pkix.Name{CommonName: "SuperLeo"},
 		NotBefore:    time.Now().Add(-time.Hour),
 		NotAfter:     time.Now().Add(time.Hour),
 	}

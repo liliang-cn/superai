@@ -10,7 +10,7 @@ import (
 
 // One capability, one route.
 //
-// When the shared CortexDB becomes SuperAI's memory backend, the built-in
+// When the shared CortexDB becomes SuperLeo's memory backend, the built-in
 // memory_* tools already reach it. An MCP server in mcpServers.json pointed at
 // that same server offers memory a second time — and, observed in practice,
 // the model then calls both and reports "not found". But the same server also

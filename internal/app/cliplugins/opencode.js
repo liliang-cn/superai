@@ -1,14 +1,14 @@
-// SuperAI activity for opencode. Installed by `superai hook install` (and a
-// SuperAI node on start); SuperAI overwrites this file when it changes.
+// SuperLeo activity for opencode. Installed by `superleo hook install` (and a
+// SuperLeo node on start); SuperLeo overwrites this file when it changes.
 //
-// It tells the SuperAI on this machine, over its local socket, what each
+// It tells the SuperLeo on this machine, over its local socket, what each
 // opencode session is doing: working, waiting for you (a permission or a
 // question), or idle, and the name of the tool it is on. Never a prompt, a
 // message, a file, or a tool's arguments: only the session's id, the last
 // element of its directory, and the tool's name.
 //
 // Fire and forget: nothing here is awaited by opencode, and nothing throws.
-// No SuperAI listening costs one failed connect per event.
+// No SuperLeo listening costs one failed connect per event.
 
 import http from "node:http"
 import fs from "node:fs"
@@ -17,17 +17,17 @@ import path from "node:path"
 
 const CLI = "opencode"
 // The socket of the node that installed this file; replaced at install.
-const INSTALLED = "__SUPERAI_SOCKET__"
+const INSTALLED = "__SUPERLEO_SOCKET__"
 
 function sockets() {
   const out = []
   const add = (p) => { if (p && !p.startsWith("__") && !out.includes(p)) out.push(p) }
-  add((process.env.SUPERAI_HOOK_SOCKET || "").trim())
-  const home = (process.env.SUPERAI_HOME || "").trim()
+  add((process.env.SUPERLEO_HOOK_SOCKET || "").trim())
+  const home = (process.env.SUPERLEO_HOME || "").trim()
   if (home) add(path.join(home.replace(/^~(?=\/)/, os.homedir()), "cc-hook.sock"))
   add(INSTALLED)
-  add(path.join(os.homedir(), ".superai-node", "cc-hook.sock"))
-  add(path.join(os.homedir(), ".superai", "cc-hook.sock"))
+  add(path.join(os.homedir(), ".superleo-node", "cc-hook.sock"))
+  add(path.join(os.homedir(), ".superleo", "cc-hook.sock"))
   return out
 }
 
@@ -70,7 +70,7 @@ function project(dir) {
   try { return dir ? path.basename(String(dir).replace(/\/+$/, "")) : "" } catch { return "" }
 }
 
-// translate is one opencode event in SuperAI's terms, or null.
+// translate is one opencode event in SuperLeo's terms, or null.
 function translate(event, dir, children) {
   const p = (event && event.properties) || {}
   const sid = p.sessionID || (p.info && p.info.id) || ""
@@ -104,8 +104,8 @@ function translate(event, dir, children) {
   return null
 }
 
-const SuperAIActivity = async (input) => {
-  if (process.env.SUPERAI_CLI_RUN) return {} // a run SuperAI started reports itself
+const SuperLeoActivity = async (input) => {
+  if (process.env.SUPERLEO_CLI_RUN) return {} // a run SuperLeo started reports itself
   const dir = (input && (input.directory || input.worktree)) || process.cwd()
   const children = new Set()
   return {
@@ -125,7 +125,7 @@ const SuperAIActivity = async (input) => {
 }
 
 // For the tests (cliplugins/plugins_test.mjs): the parts that decide what is sent.
-SuperAIActivity.translate = translate
-SuperAIActivity.project = project
+SuperLeoActivity.translate = translate
+SuperLeoActivity.project = project
 
-export default { id: "superai-activity", server: SuperAIActivity }
+export default { id: "superleo-activity", server: SuperLeoActivity }

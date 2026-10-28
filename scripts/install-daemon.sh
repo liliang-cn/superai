@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install (or remove) the launchd job that keeps SuperAI's scheduled prompts
+# Install (or remove) the launchd job that keeps SuperLeo's scheduled prompts
 # running while the app is closed.
 #
 # The schedules themselves live in the shared database; this only decides whether
@@ -13,11 +13,11 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-LABEL="com.superleo.superai.scheduler"
+LABEL="com.superleo.superleo.scheduler"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
-BIN_DIR="$HOME/.superai/bin"
-BIN="$BIN_DIR/superai-daemon"
-LOG="$HOME/.superai/daemon.log"
+BIN_DIR="$HOME/.superleo/bin"
+BIN="$BIN_DIR/superleo-daemon"
+LOG="$HOME/.superleo/daemon.log"
 
 case "${1:-install}" in
 --uninstall)
@@ -43,7 +43,7 @@ echo "==> building"
 # The daemon is installed to its own directory rather than run from build/bin,
 # because a `make clean` or a rebuild would otherwise pull the binary out from
 # under a running launchd job.
-GOWORK=off go build -o "$BIN" ./cmd/superai-daemon
+GOWORK=off go build -o "$BIN" ./cmd/superleo-daemon
 mkdir -p "$BIN_DIR"
 
 echo "==> writing $PLIST"
@@ -79,7 +79,7 @@ cat >"$PLIST" <<PLIST_EOF
 	<key>EnvironmentVariables</key>
 	<dict>
 		<!-- Nothing here browses, and launching Chrome costs a second per start. -->
-		<key>SUPERAI_NO_BROWSER</key>
+		<key>SUPERLEO_NO_BROWSER</key>
 		<string>1</string>
 		<!-- launchd gives a job a minimal PATH; npx/uvx-based MCP servers and
 		     git-based skill installs need the usual places. -->

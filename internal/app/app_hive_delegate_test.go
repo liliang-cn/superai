@@ -15,13 +15,13 @@ import (
 	"time"
 
 	"github.com/liliang-cn/agent-go/v3/pkg/agent"
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // A queen on a scripted model, with workers that are fakes over real HTTP: the
 // whole route of a delegated piece — the queen's tool surface, hive_delegate,
 // the order on the worker, its tool events back on the queen's turn, the
-// report, the transcript and superai_ask — with nothing in it mocked but the
+// report, the transcript and superleo_ask — with nothing in it mocked but the
 // two ends.
 
 // llmRequest is the part of a chat completion request the script reads.
@@ -191,9 +191,9 @@ type delegateHive struct {
 func newDelegateHive(t *testing.T, mode string, step func(r llmRequest) (string, map[string]any)) *delegateHive {
 	t.Helper()
 	home := t.TempDir()
-	t.Setenv("SUPERAI_HOME", home)
-	t.Setenv("SUPERAI_NO_BROWSER", "1")
-	t.Setenv("SUPERAI_HIVE_DELEGATION", "")
+	t.Setenv("SUPERLEO_HOME", home)
+	t.Setenv("SUPERLEO_NO_BROWSER", "1")
+	t.Setenv("SUPERLEO_HIVE_DELEGATION", "")
 	h := &delegateHive{log: &eventLog{}, llm: &scriptedLLM{step: step}}
 	a := NewApp()
 	a.emitFn = h.log.record
@@ -275,7 +275,7 @@ func TestMaxDelegationHasAWorkerDoTheWork(t *testing.T) {
 	if got := w1.received(); len(got) != 1 || !strings.Contains(got[0], "2026-10-19") {
 		t.Fatalf("w1 got %q", got)
 	}
-	// Who did what: on the stream, in superai_ask, and in the transcript.
+	// Who did what: on the stream, in superleo_ask, and in the transcript.
 	var attributed bool
 	for _, p := range chatEvents(h.log, "tool_call") {
 		if p["tool"] == "w1 · mcp_noted_list_events" && p["worker"] == "w1" && p["workerTool"] == "mcp_noted_list_events" {
@@ -286,7 +286,7 @@ func TestMaxDelegationHasAWorkerDoTheWork(t *testing.T) {
 		t.Fatalf("no attributed tool call on the queen's stream: %v", chatEvents(h.log, "tool_call"))
 	}
 	if !slices.Contains(out.Tools, askTool{Name: "w1 · mcp_noted_list_events", OK: true, Worker: "w1"}) {
-		t.Fatalf("superai_ask tools: %+v", out.Tools)
+		t.Fatalf("superleo_ask tools: %+v", out.Tools)
 	}
 	turns := h.a.ChatHistory(out.Conversation)
 	last := turns[len(turns)-1]

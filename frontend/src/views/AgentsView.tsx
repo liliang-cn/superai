@@ -88,7 +88,7 @@ function addressOf(value: string, names: string[]): [string, string] {
   return ["", value];
 }
 
-const LAST = "superai-coding-agent";
+const LAST = "superleo-coding-agent";
 const lastAgent = () => {
   try { return localStorage.getItem(LAST) ?? ""; } catch { return ""; }
 };
@@ -202,7 +202,7 @@ export default function AgentsView() {
               <span className="cd-item-p">{x.project || x.session}{x.tool ? ` · ${x.tool}` : ""}</span>
             </button>
           ))}
-          {threads.length > 0 && terms.length > 0 && <div className="cd-group">{t("Started by SuperAI")}</div>}
+          {threads.length > 0 && terms.length > 0 && <div className="cd-group">{t("Started by SuperLeo")}</div>}
           {threads.map((t) => {
             const { cli, host } = partsOf(t.agent);
             return (
@@ -289,7 +289,7 @@ function Start({ choices, onStarted }: { choices: string[] | null; onStarted: (r
       <div className="cd-start">
         <div className="cd-start-in">
           <h2>No coding CLI to run</h2>
-          <p className="cd-sub">Core has none installed and no linked agent offers one. Install Claude Code or Codex on core, or run <code>superai agent</code> on a machine that has them.</p>
+          <p className="cd-sub">Core has none installed and no linked agent offers one. Install Claude Code or Codex on core, or run <code>superleo agent</code> on a machine that has them.</p>
           <button className="cd-btn" onClick={() => navigate(PATHS.settings)}>Open Settings</button>
         </div>
       </div>

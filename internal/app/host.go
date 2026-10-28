@@ -83,16 +83,16 @@ type HostExecResult struct {
 
 // hostControl says whether this machine takes orders that change it. On by
 // default, since core can already run Claude Code here; the owner turns it
-// off with SUPERAI_HOST_CONTROL=off in the service's environment.
+// off with SUPERLEO_HOST_CONTROL=off in the service's environment.
 func hostControl() bool {
-	switch strings.ToLower(strings.TrimSpace(os.Getenv("SUPERAI_HOST_CONTROL"))) {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("SUPERLEO_HOST_CONTROL"))) {
 	case "0", "off", "false", "no":
 		return false
 	}
 	return true
 }
 
-var errNoHostControl = errors.New("this machine does not take service actions or commands (SUPERAI_HOST_CONTROL is off)")
+var errNoHostControl = errors.New("this machine does not take service actions or commands (SUPERLEO_HOST_CONTROL is off)")
 
 const hostOutputCap = 64 << 10
 
@@ -141,7 +141,7 @@ func (a *App) HostStatus() (HostInfo, error) {
 
 // hostName is the name core knows this machine by, when it is linked.
 func (a *App) hostName() string {
-	if n := strings.TrimSpace(os.Getenv("SUPERAI_AGENT_NAME")); n != "" {
+	if n := strings.TrimSpace(os.Getenv("SUPERLEO_AGENT_NAME")); n != "" {
 		return n
 	}
 	h, _ := os.Hostname()

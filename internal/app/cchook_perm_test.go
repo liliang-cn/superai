@@ -12,17 +12,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/liliang-cn/superai/internal/apns"
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/apns"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // ---- the hook: what it reads, and what it prints
 
 func TestAPermissionRequestIsReadWithItsTool(t *testing.T) {
-	ev, ok := ccEventFromHook("PermissionRequest", hookEvent(t, `{"session_id":"s1","cwd":"/w/superai","hook_event_name":"PermissionRequest",
+	ev, ok := ccEventFromHook("PermissionRequest", hookEvent(t, `{"session_id":"s1","cwd":"/w/superleo","hook_event_name":"PermissionRequest",
 		"tool_name":"Bash","tool_input":{"command":"rm -rf node_modules","description":"Remove node_modules"},
 		"permission_suggestions":[{"type":"addRules","behavior":"allow"}]}`), nil)
-	if !ok || ev.Tool != "Bash" || ev.Text != "rm -rf node_modules" || ev.Session != "s1" || ev.Cwd != "/w/superai" {
+	if !ok || ev.Tool != "Bash" || ev.Text != "rm -rf node_modules" || ev.Session != "s1" || ev.Cwd != "/w/superleo" {
 		t.Fatalf("got %+v (%v)", ev, ok)
 	}
 	var in map[string]any
@@ -64,7 +64,7 @@ func TestThePermissionDecisionIsClaudeCodesSchema(t *testing.T) {
 }
 
 func TestThePermissionWaitIsBounded(t *testing.T) {
-	t.Setenv("SUPERAI_HOOK_PERMISSION_WAIT", "")
+	t.Setenv("SUPERLEO_HOOK_PERMISSION_WAIT", "")
 	cases := map[string]struct {
 		argv []string
 		env  string
@@ -79,7 +79,7 @@ func TestThePermissionWaitIsBounded(t *testing.T) {
 		"not a number": {[]string{"PermissionRequest", "--wait", "soon"}, "", ccPermDefaultWait},
 	}
 	for name, c := range cases {
-		t.Setenv("SUPERAI_HOOK_PERMISSION_WAIT", c.env)
+		t.Setenv("SUPERLEO_HOOK_PERMISSION_WAIT", c.env)
 		if got := permissionWait(c.argv); got != c.want {
 			t.Errorf("%s: %s, want %s", name, got, c.want)
 		}
@@ -157,7 +157,7 @@ func capturePushes(t *testing.T) *pushedAlerts {
 // (agent ""), and returns the slot its verdicts land in.
 func permReport(a *App, away bool, session, request string) chan ccPermVerdict {
 	ch := ccLocalState().awaitPerm(request)
-	raw, _ := json.Marshal(ccReport{ccHookEvent: ccHookEvent{Event: "PermissionRequest", Session: session, Cwd: "/w/superai",
+	raw, _ := json.Marshal(ccReport{ccHookEvent: ccHookEvent{Event: "PermissionRequest", Session: session, Cwd: "/w/superleo",
 		Tool: "Bash", Input: `{"command":"git push"}`, Text: "git push", Request: request,
 		Expires: time.Now().Add(time.Minute).Format(time.RFC3339)}, Host: "mbp", Away: away})
 	a.noteCCSession("", string(raw))
@@ -211,8 +211,8 @@ func TestAnAwayPersonGetsAPushedCardAndTheAnswerGoesBack(t *testing.T) {
 	}
 	waitFor(t, "the card", func() bool { return len(a.PendingToolApprovals()) == 1 })
 	card := a.PendingToolApprovals()[0]
-	if card["origin"] != "terminal" || card["by"] != "claude · mbp · superai" || card["tool"] != "Bash" ||
-		card["command"] != "git push" || card["project"] != "superai" || card["ccSession"] != "s1" || card["machine"] != "mbp" {
+	if card["origin"] != "terminal" || card["by"] != "claude · mbp · superleo" || card["tool"] != "Bash" ||
+		card["command"] != "git push" || card["project"] != "superleo" || card["ccSession"] != "s1" || card["machine"] != "mbp" {
 		t.Errorf("card %v", card)
 	}
 	if _, ok := card["rule_suggestions"]; ok {
@@ -224,7 +224,7 @@ func TestAnAwayPersonGetsAPushedCardAndTheAnswerGoesBack(t *testing.T) {
 	}
 	p := got[0]
 	data := p.Data.(map[string]any)
-	if p.Category != ccApprovalCategory || p.CollapseID != "cc:s1" || p.Title != "claude · mbp · superai" ||
+	if p.Category != ccApprovalCategory || p.CollapseID != "cc:s1" || p.Title != "claude · mbp · superleo" ||
 		!strings.Contains(p.Body, "git push") || !p.Sound || data["kind"] != "approval" || data["id"] != card["id"] {
 		t.Errorf("push %+v", p)
 	}
@@ -347,7 +347,7 @@ func TestOnlyTheOwnerMayAnswerATerminalCard(t *testing.T) {
 }
 
 func TestATerminalTurnPushCarriesItsReplyTarget(t *testing.T) {
-	n := ccNotice("mac", ccReport{ccHookEvent: ccHookEvent{Event: "Stop", Session: "s-1", Cwd: "/w/superai", Text: "done"}}, "", time.Now())
+	n := ccNotice("mac", ccReport{ccHookEvent: ccHookEvent{Event: "Stop", Session: "s-1", Cwd: "/w/superleo", Text: "done"}}, "", time.Now())
 	a, ok := alertFor(n)
 	if !ok || a.Category != ccReplyCategory {
 		t.Fatalf("alert %+v", a)
@@ -380,7 +380,7 @@ func TestATerminalPermissionPromptIsAnsweredFromThePhone(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { os.RemoveAll(home) })
-	t.Setenv("SUPERAI_HOME", home)
+	t.Setenv("SUPERLEO_HOME", home)
 
 	addr := startCore(t, core)
 	agent := NewApp()
@@ -396,7 +396,7 @@ func TestATerminalPermissionPromptIsAnsweredFromThePhone(t *testing.T) {
 	sock := filepath.Join(home, ccHookSocketName)
 	waitFor(t, "the hook socket", func() bool { _, err := os.Stat(sock); return err == nil })
 
-	ev := ccHookEvent{Event: "PermissionRequest", Session: "s9", Cwd: "/w/superai", Tool: "Bash", Input: `{"command":"make deploy"}`, Text: "make deploy", Wait: 30}
+	ev := ccHookEvent{Event: "PermissionRequest", Session: "s9", Cwd: "/w/superleo", Tool: "Bash", Input: `{"command":"make deploy"}`, Text: "make deploy", Wait: 30}
 	type result struct{ a ccPermAnswer }
 	ask := func() chan result {
 		out := make(chan result, 1)
@@ -412,7 +412,7 @@ func TestATerminalPermissionPromptIsAnsweredFromThePhone(t *testing.T) {
 	got := ask()
 	waitFor(t, "the card on core", func() bool { return len(core.PendingToolApprovals()) == 1 })
 	card := core.PendingToolApprovals()[0]
-	if card["by"] != "claude · mac · superai" || card["command"] != "make deploy" {
+	if card["by"] != "claude · mac · superleo" || card["command"] != "make deploy" {
 		t.Fatalf("card %v", card)
 	}
 	core.ResolveToolApproval(card["id"].(string), true)
@@ -449,17 +449,17 @@ func TestATerminalPermissionPromptIsAnsweredFromThePhone(t *testing.T) {
 	}
 }
 
-// The command itself, with no SuperAI to ask: silent, and quick.
+// The command itself, with no SuperLeo to ask: silent, and quick.
 func TestThePermissionHookIsSilentWithNobodyToAsk(t *testing.T) {
 	home, err := os.MkdirTemp("/tmp", "cc")
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { os.RemoveAll(home) })
-	t.Setenv("SUPERAI_HOME", home)
+	t.Setenv("SUPERLEO_HOME", home)
 	t.Setenv("HOME", home)
-	t.Setenv("SUPERAI_HOOK_SOCKET", filepath.Join(home, "nobody.sock"))
-	t.Setenv("SUPERAI_CLI_RUN", "")
+	t.Setenv("SUPERLEO_HOOK_SOCKET", filepath.Join(home, "nobody.sock"))
+	t.Setenv("SUPERLEO_CLI_RUN", "")
 	inR, inW, _ := os.Pipe()
 	outR, outW, _ := os.Pipe()
 	oldIn, oldOut := os.Stdin, os.Stdout

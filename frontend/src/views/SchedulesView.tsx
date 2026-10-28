@@ -21,7 +21,7 @@ import { toast } from "../lib/toasts";
 type Note = { kind: "ok" | "err"; text: string } | null;
 
 /**
- * Scheduled prompts: what SuperAI will do on its own, and what it did.
+ * Scheduled prompts: what SuperLeo will do on its own, and what it did.
  *
  * Every mutating binding answers with a message string rather than throwing, and
  * the message is the whole point — the backend refuses a schedule it cannot parse
@@ -207,7 +207,7 @@ export default function SchedulesView({
             // are on" is not the same as having seen one arrive, and the
             // difference is where Focus modes and full-screen apps hide.
             if (granted === "granted") {
-              notifyNow("SuperAI", "通知已开启 —— 定时任务跑完时会这样提醒你。");
+              notifyNow("SuperLeo", "通知已开启 —— 定时任务跑完时会这样提醒你。");
             }
           }}
         >
@@ -219,7 +219,7 @@ export default function SchedulesView({
           className="btn ghost sm"
           title="Post a test notification now"
           onClick={() => {
-            const result = notifyNow("SuperAI", "这是一条测试通知。定时任务跑完时就是这个样子。");
+            const result = notifyNow("SuperLeo", "这是一条测试通知。定时任务跑完时就是这个样子。");
             setNote(
               result === "posted"
                 ? {
@@ -262,7 +262,7 @@ export default function SchedulesView({
           <div className="card" style={{ marginBottom: 14 }}>
             <div className="card-title">New routine</div>
             <div className="card-desc">
-              Say what SuperAI should do and when, in one sentence. It works out the timing itself
+              Say what SuperLeo should do and when, in one sentence. It works out the timing itself
               and the answers land in a conversation you can open afterwards.
             </div>
             <div className="field">
@@ -337,7 +337,7 @@ export default function SchedulesView({
             <AlarmClockIcon className="ie-icon" size={22} strokeWidth={1.6} />
             <div>No routines.</div>
             <div className="ie-hint">
-              Something SuperAI does on its own every morning, every weekday, or every few hours.
+              Something SuperLeo does on its own every morning, every weekday, or every few hours.
             </div>
           </div>
         )}
@@ -504,7 +504,7 @@ export default function SchedulesView({
         <div>
           <div className="view-title">Schedules{list.length > 0 ? ` (${list.length})` : ""}</div>
           <div className="view-desc">
-            Prompts SuperAI runs on a clock, without being asked — “every morning at eight, work out
+            Prompts SuperLeo runs on a clock, without being asked — “every morning at eight, work out
             my stock returns and message me”.
           </div>
         </div>

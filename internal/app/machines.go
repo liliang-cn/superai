@@ -173,7 +173,7 @@ func intArg(v any) int {
 // machineTools are the two tools of the self table (selfmcp.go) that look
 // after machines: one only reads, the other changes things and so is asked.
 func machineTools() []selfTool {
-	machine := map[string]any{"type": "string", "description": "A linked machine's name (the linked_agents entries with machine true), or \"core\" for the machine this SuperAI runs on. Hive workers and relays are not machines."}
+	machine := map[string]any{"type": "string", "description": "A linked machine's name (the linked_agents entries with machine true), or \"core\" for the machine this SuperLeo runs on. Hive workers and relays are not machines."}
 	return []selfTool{
 		{
 			Name: "machine_inspect", Title: "Inspect a machine", ReadOnly: true,

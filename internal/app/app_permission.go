@@ -16,7 +16,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // pendingApproval is one tool call parked in front of the user, with the
@@ -94,7 +94,7 @@ func (a *App) askToolApproval(ctx context.Context, req backend.ApprovalRequest) 
 func approvalPayload(req backend.ApprovalRequest) map[string]any {
 	out := map[string]any{
 		// Who is asking, in words: a standing agent by its name; empty is
-		// SuperAI itself.
+		// SuperLeo itself.
 		"by":        req.By,
 		"id":        req.ID,
 		"tool":      req.Tool,

@@ -79,7 +79,7 @@ func TestNotifierPostsPayload(t *testing.T) {
 	}
 	// A title and a timestamp are always present, so a receiver can render
 	// something without checking for absent fields.
-	if calls[0].Title != "SuperAI" {
+	if calls[0].Title != "SuperLeo" {
 		t.Errorf("title = %q, want a default", calls[0].Title)
 	}
 	if _, err := time.Parse(time.RFC3339, calls[0].SentAt); err != nil {

@@ -6,10 +6,10 @@ package app
 // Delegation is asynchronous. A piece can take minutes (DefaultDelegateTimeout
 // is five, and a failure moves it to another worker or the queen), and an MCP
 // client such as Claude Code gives up on a call long before that. So
-// superai_hive_delegate starts the delegation, waits a little in case it is
-// quick, and otherwise answers with its id; superai_hive_tasks with that id
+// superleo_hive_delegate starts the delegation, waits a little in case it is
+// quick, and otherwise answers with its id; superleo_hive_tasks with that id
 // is the rest of it. The delegation runs on its own context here, so the
-// caller going away does not stop it; superai_hive_task_cancel does.
+// caller going away does not stop it; superleo_hive_task_cancel does.
 
 import (
 	"context"
@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -30,7 +30,7 @@ const (
 	// delegationsKeep is how many finished delegations are remembered, in
 	// memory, like the task board.
 	delegationsKeep = 30
-	// How long superai_hive_delegate waits before answering with the id.
+	// How long superleo_hive_delegate waits before answering with the id.
 	// Under a minute: past that, clients start timing the call out.
 	delegateWaitDefault = 25 * time.Second
 	delegateWaitMax     = 55 * time.Second
@@ -44,7 +44,7 @@ const (
 // tell it from a task board id at a glance.
 const delegationPrefix = "dlg-"
 
-// delegationJob is one superai_hive_delegate call and how it is going.
+// delegationJob is one superleo_hive_delegate call and how it is going.
 type delegationJob struct {
 	id        string
 	caller    string
@@ -245,7 +245,7 @@ func (a *App) delegationView(j *delegationJob, full bool) delegationView {
 		v.Steps = append([]backend.WorkerToolEvent(nil), j.steps...)
 	}
 	if j.state == backend.TaskRunning {
-		v.Next = fmt.Sprintf("still running: call superai_hive_tasks with id %q to follow it, superai_hive_task_cancel to stop it", j.id)
+		v.Next = fmt.Sprintf("still running: call superleo_hive_tasks with id %q to follow it, superleo_hive_task_cancel to stop it", j.id)
 	}
 	return v
 }
@@ -274,7 +274,7 @@ type taskLine struct {
 	Prompt    string    `json:"prompt"`
 	Result    string    `json:"result,omitempty"`
 	Error     string    `json:"error,omitempty"`
-	// Stoppable is whether superai_hive_task_cancel can stop it from here.
+	// Stoppable is whether superleo_hive_task_cancel can stop it from here.
 	Stoppable bool `json:"stoppable,omitempty"`
 }
 
@@ -298,7 +298,7 @@ type hiveTasksIn struct {
 }
 
 type hiveTaskCancelIn struct {
-	ID string `json:"id" jsonschema:"a delegation id (dlg-…) from superai_hive_delegate, or a running task's id from superai_hive_tasks"`
+	ID string `json:"id" jsonschema:"a delegation id (dlg-…) from superleo_hive_delegate, or a running task's id from superleo_hive_tasks"`
 }
 
 type hiveDelegateTask struct {
@@ -343,7 +343,7 @@ func (a *App) pendingApprovals() []approvalLine {
 	for _, r := range reqs {
 		by := r.By
 		if by == "" {
-			by = "SuperAI"
+			by = "SuperLeo"
 		}
 		out = append(out, approvalLine{
 			ID: r.ID, Tool: r.Tool, Command: r.Command, Summary: backend.SummarizeArgs(r.Tool, r.Args), By: by,
@@ -354,7 +354,7 @@ func (a *App) pendingApprovals() []approvalLine {
 	return out
 }
 
-// hiveTaskList is superai_hive_tasks without an id.
+// hiveTaskList is superleo_hive_tasks without an id.
 func (a *App) hiveTaskList(limit int, runningOnly bool) map[string]any {
 	if limit <= 0 {
 		limit = 20
@@ -412,7 +412,7 @@ func (a *App) hiveTaskList(limit int, runningOnly bool) map[string]any {
 	return map[string]any{"delegations": dels, "tasks": tasks}
 }
 
-// hiveTaskOne is superai_hive_tasks with an id.
+// hiveTaskOne is superleo_hive_tasks with an id.
 func (a *App) hiveTaskOne(id string) (any, error) {
 	if j := a.delegations.find(id); j != nil {
 		return map[string]any{"delegation": a.delegationView(j, true)}, nil
@@ -453,14 +453,14 @@ func (a *App) stopTarget(id string) (stop func() error, what string, err error) 
 // on the MCP server.
 func addHiveMCPTools(s *mcp.Server, app *App, caller string) {
 	mcp.AddTool(s, &mcp.Tool{
-		Name:  "superai_hive_delegate",
+		Name:  "superleo_hive_delegate",
 		Title: "Delegate work to the hive",
 		Description: "Hand concrete pieces of tool work to the hive's workers, the way the queen does: each piece goes to the " +
 			"least busy live worker that has the MCP servers in needs; a worker that fails or times out is replaced by another, " +
 			"and when nobody can do it the queen does it herself. Several independent pieces run at the same time on different " +
 			"workers. Each piece stands alone (the worker sees nothing else), so put everything needed in it. " +
 			"Asynchronous: it waits up to wait_seconds (default 25) and returns the delegation, with id and state. If state is " +
-			"still running, call superai_hive_tasks with that id until it is done, failed or cancelled. When finished, each " +
+			"still running, call superleo_hive_tasks with that id until it is done, failed or cancelled. When finished, each " +
 			"piece has who did it, the tools it called, its report (which carries the raw data its tools returned) and its task " +
 			"id; the full record adds every tool call with its arguments. Only on a queen; at most 20 pieces per call.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in hiveDelegateIn) (*mcp.CallToolResult, any, error) {
@@ -495,9 +495,9 @@ func addHiveMCPTools(s *mcp.Server, app *App, caller string) {
 	})
 
 	mcp.AddTool(s, &mcp.Tool{
-		Name:  "superai_hive_tasks",
+		Name:  "superleo_hive_tasks",
 		Title: "Hive tasks and delegations",
-		Description: "What the hive is doing and has done. Without id: the recent delegations (superai_hive_delegate calls: " +
+		Description: "What the hive is doing and has done. Without id: the recent delegations (superleo_hive_delegate calls: " +
 			"state, pieces done and failed, workers) and the recent task board orders (each order one worker carries out: " +
 			"worker, direction, state running/done/failed/cancelled, current phase and tool, timings, the start of the prompt " +
 			"and result, and whether it can be stopped from here), newest first. With id: the whole record of that " +
@@ -516,34 +516,34 @@ func addHiveMCPTools(s *mcp.Server, app *App, caller string) {
 	})
 
 	mcp.AddTool(s, &mcp.Tool{
-		Name:  "superai_hive_task_cancel",
+		Name:  "superleo_hive_task_cancel",
 		Title: "Stop a task or delegation",
 		Description: "Stop a running delegation (every piece still out is stopped on its worker and nothing is handed on) or " +
-			"one running order on the task board (one this instance gave or is carrying out). Passes SuperAI's approval gate: " +
+			"one running order on the task board (one this instance gave or is carrying out). Passes SuperLeo's approval gate: " +
 			"the person is asked on the phone and the call waits for the answer, denied if nobody answers in time. Refused " +
 			"at once, without asking, for an id that is unknown or already finished.",
 		Annotations: &mcp.ToolAnnotations{DestructiveHint: ptr(true)},
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in hiveTaskCancelIn) (*mcp.CallToolResult, any, error) {
 		id := strings.TrimSpace(in.ID)
 		if id == "" {
-			return toolErr("id is required: a delegation id or a task id from superai_hive_tasks")
+			return toolErr("id is required: a delegation id or a task id from superleo_hive_tasks")
 		}
 		stop, what, err := app.stopTarget(id)
 		if err != nil {
 			return toolErr(err.Error())
 		}
-		if refused := app.mcpGate(ctx, caller, "superai_hive_task_cancel", map[string]any{"id": id}); refused != nil {
+		if refused := app.mcpGate(ctx, caller, "superleo_hive_task_cancel", map[string]any{"id": id}); refused != nil {
 			return refused, nil, nil
 		}
 		if err := stop(); err != nil {
 			return toolErr(err.Error())
 		}
 		return toolOK(map[string]any{"stopping": id, "kind": what,
-			"note": "stopped; it settles as cancelled once its worker has stopped, which superai_hive_tasks shows"})
+			"note": "stopped; it settles as cancelled once its worker has stopped, which superleo_hive_tasks shows"})
 	})
 
 	mcp.AddTool(s, &mcp.Tool{
-		Name:  "superai_approvals_pending",
+		Name:  "superleo_approvals_pending",
 		Title: "Pending approvals",
 		Description: "The tool calls waiting for the person to allow or deny them, oldest first: what (tool, the command or " +
 			"a one-line summary of the arguments, secrets redacted), who asked, in which conversation or on which machine, " +

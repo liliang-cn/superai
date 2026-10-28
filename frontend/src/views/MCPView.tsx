@@ -78,7 +78,7 @@ export default function MCPView() {
       <div className="view-header with-action">
         <div>
           <div className="view-title">MCP{servers.length > 0 ? ` (${servers.length})` : ""}</div>
-          <div className="view-desc">{translate("Model Context Protocol servers SuperAI connects to for extra tools.")}</div>
+          <div className="view-desc">{translate("Model Context Protocol servers SuperLeo connects to for extra tools.")}</div>
         </div>
         <div className="vh-actions">
           <button className="btn ghost sm" onClick={() => (results ? setResults(null) : search())}>
@@ -175,7 +175,7 @@ export default function MCPView() {
             <PlugIcon className="ie-icon" size={22} strokeWidth={1.6} />
             <div>No MCP servers.</div>
             <div className="ie-hint">
-              Add them in ~/.superai/mcpServers.json (standard {"{"}"mcpServers": {"{...}"}{"}"} format) and restart.
+              Add them in ~/.superleo/mcpServers.json (standard {"{"}"mcpServers": {"{...}"}{"}"} format) and restart.
             </div>
           </div>
         )}

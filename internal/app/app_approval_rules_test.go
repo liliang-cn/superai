@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // Remembered answers, through the App: the card offers them, the answer saves
@@ -18,14 +18,14 @@ import (
 
 func rulesHome(t *testing.T) {
 	t.Helper()
-	t.Setenv("SUPERAI_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
 }
 
 func relayedBash(id, cmd string) backend.ApprovalRequest {
 	now := time.Now()
 	return backend.ApprovalRequest{
 		ID: id, Tool: "claude.mac · Bash", Command: cmd, Args: map[string]any{"command": cmd},
-		AgentID: "claude.mac", Machine: "mac", Workdir: "/Users/l/Things/dev/apps/superai",
+		AgentID: "claude.mac", Machine: "mac", Workdir: "/Users/l/Things/dev/apps/superleo",
 		AskedAt: now, ExpiresAt: now.Add(time.Minute),
 	}
 }
@@ -49,7 +49,7 @@ func TestRememberViaRPCAnswersTheNextCallLikeIt(t *testing.T) {
 	a := NewApp()
 	read := captureEmits(a)
 
-	cmd := "kubectl -n superai rollout restart deployment/superai-worker"
+	cmd := "kubectl -n superleo rollout restart deployment/superai-worker"
 	first := askInBackground(a, relayedBash("r-1", cmd))
 	waitForPending(t, a, 1)
 
@@ -57,7 +57,7 @@ func TestRememberViaRPCAnswersTheNextCallLikeIt(t *testing.T) {
 	asked := waitForEvent(t, read, "tool:approval", "r-1")
 	sug, _ := asked["rule_suggestions"].([]backend.RuleSuggestion)
 	if len(sug) != 3 || sug[0].Scope != backend.RememberSameCommandPrefix ||
-		sug[0].Label != "以后 claude 在 mac 上运行以 “kubectl -n superai rollout restart” 开头的命令都不用问" {
+		sug[0].Label != "以后 claude 在 mac 上运行以 “kubectl -n superleo rollout restart” 开头的命令都不用问" {
 		t.Fatalf("rule_suggestions = %+v", asked["rule_suggestions"])
 	}
 
@@ -67,7 +67,7 @@ func TestRememberViaRPCAnswersTheNextCallLikeIt(t *testing.T) {
 		t.Fatalf("result = %+v", res)
 	}
 	rule, ok := res["rule"].(backend.ApprovalRule)
-	if !ok || rule.Scope.CommandPrefix != "kubectl -n superai rollout restart" || rule.Scope.Machine != "mac" ||
+	if !ok || rule.Scope.CommandPrefix != "kubectl -n superleo rollout restart" || rule.Scope.Machine != "mac" ||
 		rule.Scope.Agent != "claude" || rule.CreatedFromApprovalID != "r-1" || rule.Decision != backend.RuleAllow {
 		t.Fatalf("rule = %+v", res["rule"])
 	}
@@ -76,7 +76,7 @@ func TestRememberViaRPCAnswersTheNextCallLikeIt(t *testing.T) {
 	}
 
 	// The next one like it: no card.
-	dec, _ := a.askToolApproval(context.Background(), relayedBash("r-2", "kubectl -n superai rollout restart deployment/superai-queen"))
+	dec, _ := a.askToolApproval(context.Background(), relayedBash("r-2", "kubectl -n superleo rollout restart deployment/superai-queen"))
 	if !dec.Allowed || dec.By != backend.DecidedByApprovalRule || !strings.HasPrefix(dec.Reason, "按规则自动同意：") {
 		t.Fatalf("second answer = %+v", dec)
 	}
@@ -87,7 +87,7 @@ func TestRememberViaRPCAnswersTheNextCallLikeIt(t *testing.T) {
 	}
 
 	// Not like it: asked.
-	other := askInBackground(a, relayedBash("r-3", "kubectl -n superai delete pod x"))
+	other := askInBackground(a, relayedBash("r-3", "kubectl -n superleo delete pod x"))
 	waitForPending(t, a, 1)
 	if got := a.ResolveToolApproval("r-3", false); got != "ok" { // the old two-argument answer still works
 		t.Fatalf("ResolveToolApproval = %q", got)
@@ -101,7 +101,7 @@ func TestRememberViaRPCAnswersTheNextCallLikeIt(t *testing.T) {
 	if len(list) != 1 || list[0].ID != rule.ID {
 		t.Fatalf("ListApprovalRules = %+v", list)
 	}
-	if _, err := os.Stat(filepath.Join(os.Getenv("SUPERAI_HOME"), "approval-rules.json")); err != nil {
+	if _, err := os.Stat(filepath.Join(os.Getenv("SUPERLEO_HOME"), "approval-rules.json")); err != nil {
 		t.Fatalf("rules not persisted in the data dir: %v", err)
 	}
 	if del := rpcJSON(t, a, "DeleteApprovalRule", rule.ID).(map[string]any); del["deleted"] != true {
@@ -226,12 +226,12 @@ func TestRuleAnswerToACodingAgentIsAudited(t *testing.T) {
 	a, _ := gateTestApp(t, "true", false)
 	if _, err := a.approvalRules().Add(backend.ApprovalRule{
 		Tool: backend.KindWriteFile, Decision: backend.RuleAllow,
-		Scope: backend.RuleScope{PathPrefix: "/Users/l/Things/dev/apps/superai", Machine: "mac", Agent: "claude"},
+		Scope: backend.RuleScope{PathPrefix: "/Users/l/Things/dev/apps/superleo", Machine: "mac", Agent: "claude"},
 	}); err != nil {
 		t.Fatal(err)
 	}
 	req := backend.ApprovalRequest{ID: "c-1", Tool: "claude.mac · Write", Machine: "mac",
-		Args: map[string]any{"file_path": "/Users/l/Things/dev/apps/superai/a.go", "content": "x"}}
+		Args: map[string]any{"file_path": "/Users/l/Things/dev/apps/superleo/a.go", "content": "x"}}
 	dec, _ := a.askToolApproval(context.Background(), req)
 	if !dec.Allowed {
 		t.Fatalf("dec = %+v", dec)
@@ -239,7 +239,7 @@ func TestRuleAnswerToACodingAgentIsAudited(t *testing.T) {
 	entries := a.ToolApprovalInfo(10)["entries"].([]backend.AuditEntry)
 	last := entries[len(entries)-1]
 	if last.Tool != "claude.mac · Write" || last.DecidedBy != backend.DecidedByApprovalRule ||
-		last.Reason != "按规则自动同意：以后 claude 在 mac 上写入 ~/Things/dev/apps/superai 下的文件都不用问" {
+		last.Reason != "按规则自动同意：以后 claude 在 mac 上写入 ~/Things/dev/apps/superleo 下的文件都不用问" {
 		t.Errorf("audit = %+v", last)
 	}
 }

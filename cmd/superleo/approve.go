@@ -21,7 +21,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // stdinIsTerminal reports whether stdin is a tty. Character-device mode rather
@@ -43,7 +43,7 @@ func stdinIsTerminal() bool {
 // in.
 func terminalApprover(in *bufio.Reader) backend.Approver {
 	return func(ctx context.Context, req backend.ApprovalRequest) (backend.ApprovalDecision, error) {
-		fmt.Fprintf(os.Stderr, "\nSuperAI wants to run %s\n", req.Tool)
+		fmt.Fprintf(os.Stderr, "\nSuperLeo wants to run %s\n", req.Tool)
 		if req.Command != "" {
 			fmt.Fprintf(os.Stderr, "  %s\n", req.Command)
 		} else if len(req.Args) > 0 {

@@ -36,7 +36,7 @@ export const BASES: Record<Exclude<BaseName, "timelapse">, { light: [number[], n
 
 export const DEFAULT_THEME: CanvasTheme = { color: "honey", base: "timelapse", glass: "frosted", radius: 0.5, mode: "light" };
 
-const KEY = "superai-canvas-theme";
+const KEY = "superleo-canvas-theme";
 
 // Saved themes carry a version. Before version 2 the default corners were
 // twice as round, and every saved theme kept them whether or not anybody

@@ -44,8 +44,8 @@ func TestCoreLooksAfterALinkedMachine(t *testing.T) {
 		t.Fatalf("an unknown machine should say which there are: %v", err)
 	}
 
-	t.Setenv("SUPERAI_HOST_CONTROL", "off")
-	if _, err := core.MachineExec("box", "true", 5); err == nil || !strings.Contains(err.Error(), "SUPERAI_HOST_CONTROL") {
+	t.Setenv("SUPERLEO_HOST_CONTROL", "off")
+	if _, err := core.MachineExec("box", "true", 5); err == nil || !strings.Contains(err.Error(), "SUPERLEO_HOST_CONTROL") {
 		t.Fatalf("exec with control off: %v", err)
 	}
 	if _, err := core.MachineService("box", "x", "restart"); err == nil {

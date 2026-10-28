@@ -1,5 +1,5 @@
 [Unit]
-Description=embeddinggemma for the shared brain (CortexDB recall); see superai deploy/k3s/embed
+Description=embeddinggemma for the shared brain (CortexDB recall); see superleo deploy/k3s/embed
 After=network-online.target
 Wants=network-online.target
 

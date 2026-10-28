@@ -11,8 +11,8 @@ import (
 // every event of a turn, by name, and nothing of what it said or ran.
 func TestCodexHooksReachTheNodeAsCodex(t *testing.T) {
 	sock, got := node(t, true)
-	t.Setenv("SUPERAI_HOOK_SOCKET", sock)
-	t.Setenv("SUPERAI_CLI_RUN", "")
+	t.Setenv("SUPERLEO_HOOK_SOCKET", sock)
+	t.Setenv("SUPERLEO_CLI_RUN", "")
 	t.Setenv("TMUX_PANE", "")
 	in := []struct{ event, payload string }{
 		{"SessionStart", `{"session_id":"cx","transcript_path":null,"cwd":"/Users/me/code/noted","hook_event_name":"SessionStart","model":"gpt","source":"startup"}`},

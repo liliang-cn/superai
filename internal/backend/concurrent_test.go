@@ -78,9 +78,9 @@ func (l *slowLLM) start(t *testing.T) string {
 func newConcurrentService(t *testing.T, delay time.Duration) (*Service, *slowLLM) {
 	t.Helper()
 	home := t.TempDir()
-	t.Setenv("SUPERAI_HOME", home)
+	t.Setenv("SUPERLEO_HOME", home)
 	// Chrome costs ~1s per NewService and no test here browses.
-	t.Setenv("SUPERAI_NO_BROWSER", "1")
+	t.Setenv("SUPERLEO_NO_BROWSER", "1")
 
 	llm := &slowLLM{delay: delay}
 	svc, err := NewService(&Settings{

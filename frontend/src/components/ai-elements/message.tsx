@@ -41,7 +41,7 @@ export type MessageBylineProps = {
   name: string;
   /** What the turn cost — "34s · 6 tools". Left off when nothing is known. */
   meta?: string;
-  /** Who thought for the queen, as engineByline puts it, when it was not SuperAI's own agent alone. */
+  /** Who thought for the queen, as engineByline puts it, when it was not SuperLeo's own agent alone. */
   engine?: string;
 };
 

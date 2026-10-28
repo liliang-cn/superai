@@ -1,13 +1,13 @@
-// Command superai answers one prompt and exits.
+// Command superleo answers one prompt and exits.
 //
 // The app is a window, and a window cannot be measured. Everything the desktop
 // build can do — the same agent, tools, skills, MCP servers and settings — is
 // reachable here without one, so the agent can be scripted, diffed between
 // versions, and put in a benchmark next to other agents.
 //
-//	superai "what is 2 + 2?"
-//	superai --json "read uploads/cv.pdf and summarise it"
-//	echo "summarise this" | superai -
+//	superleo "what is 2 + 2?"
+//	superleo --json "read uploads/cv.pdf and summarise it"
+//	echo "summarise this" | superleo -
 //
 // Plain mode writes the answer to stdout and nothing else, so it composes with
 // pipes. --json writes one object with the answer, the tools that were called
@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	_ "github.com/liliang-cn/superleo/internal/brand" // the old SuperAI names keep working
 	"io"
 	"log"
 	"os"
@@ -31,7 +32,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/liliang-cn/agent-go/v3/pkg/agent"
-	"github.com/liliang-cn/superai/internal/backend"
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // result is the --json shape. Deliberately small and stable: a harness reads
@@ -76,7 +77,7 @@ func main() {
 		verbose = flag.Bool("v", false, "log tool calls to stderr as they happen")
 	)
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "usage: superai [flags] <prompt>\n\n"+
+		fmt.Fprintf(os.Stderr, "usage: superleo [flags] <prompt>\n\n"+
 			"Answers one prompt with the same agent the desktop app uses.\n"+
 			"Pass - as the prompt to read it from stdin.\n\nflags:\n")
 		flag.PrintDefaults()
@@ -93,10 +94,10 @@ func main() {
 	// Nothing about answering a prompt needs a window, and a browser costs about
 	// a second of every start.
 	if !*browser {
-		_ = os.Setenv("SUPERAI_NO_BROWSER", "1")
+		_ = os.Setenv("SUPERLEO_NO_BROWSER", "1")
 	}
 	log.SetOutput(os.Stderr)
-	log.SetPrefix("superai ")
+	log.SetPrefix("superleo ")
 
 	settings, err := backend.LoadSettings()
 	if err != nil {
