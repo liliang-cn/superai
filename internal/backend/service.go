@@ -165,6 +165,9 @@ func NewService(s *Settings) (*Service, error) {
 	if strings.TrimSpace(s.LLMModel) == "" {
 		return nil, fmt.Errorf("no model selected: pick one under Settings → Accounts")
 	}
+	// Again here, not only on load: a model picked in the settings page
+	// reaches this without the file being read again.
+	s.registerWindow()
 
 	// The builtin websearch MCP reads SEARXNG_BASE_URL at construction; the
 	// setting is the explicit way to point this process at an instance.

@@ -159,6 +159,9 @@ func applySettingsProvider(out *DoctorReport, home string) {
 	// that matters for a long task: does it know how much this model holds?
 	// Loading the settings above already registered any window they carry.
 	window := DoctorCheck{Name: "llm.window", Status: "ok", Detail: st.LLMModel + " has a known context window"}
+	if st.LLMContextTokens <= 0 {
+		window.Detail = fmt.Sprintf("%s is taken to hold %d tokens (the default); set llm_context_tokens if it holds less", st.LLMModel, DefaultLLMContextTokens)
+	}
 	if _, known := pool.LookupModelWindow(st.LLMModel); !known {
 		window = DoctorCheck{
 			Name: "llm.window", Status: "warn",

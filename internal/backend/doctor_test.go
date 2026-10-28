@@ -32,11 +32,10 @@ func TestDoctorTrustsTheSettingsProvider(t *testing.T) {
 	}
 }
 
-// A model agent-go knows no window for compacts at a fixed 60k whatever it
-// holds. The window is optional and set in settings.json, never a table of
-// model names: the doctor says when it is missing, and stops saying so once
-// settings carry it.
-func TestDoctorWarnsWhenTheWindowIsUnknown(t *testing.T) {
+// The window is optional and set in settings.json, never a table of model
+// names. Unset it is the 1M default, and the doctor says that is what it
+// assumed, so a smaller model can be told otherwise.
+func TestDoctorSaysWhichWindowItAssumed(t *testing.T) {
 	find := func(r DoctorReport) *DoctorCheck {
 		for i := range r.Checks {
 			if r.Checks[i].Name == "llm.window" {
@@ -52,8 +51,8 @@ func TestDoctorWarnsWhenTheWindowIsUnknown(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := find(doctorReportFor(context.Background(), home))
-	if got == nil || got.Status != "warn" || !strings.Contains(got.Detail, "gw-alias-no-window") {
-		t.Fatalf("llm.window = %+v, want a warning naming the model", got)
+	if got == nil || got.Status != "ok" || !strings.Contains(got.Detail, "gw-alias-no-window") || !strings.Contains(got.Detail, "1000000") || !strings.Contains(got.Detail, "default") {
+		t.Fatalf("llm.window = %+v, want the model named with the 1M default", got)
 	}
 
 	if err := os.WriteFile(filepath.Join(home, "settings.json"),

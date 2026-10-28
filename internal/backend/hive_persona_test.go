@@ -48,8 +48,23 @@ func TestTheSettingsStateTheModelsWindow(t *testing.T) {
 	if !ok || w.ContextTokens != 1048576 || w.MaxOutputTokens != 65536 {
 		t.Fatalf("window = %+v %v", w, ok)
 	}
-	if _, ok := pool.LookupModelWindow("some-other-model"); ok {
+	// Other tests register their own models (every one now gets the default),
+	// so the question is whether this window spread, not whether any exists.
+	if o, ok := pool.LookupModelWindow("some-other-model"); ok && o == w {
 		t.Fatal("registered more than the one model")
+	}
+}
+
+// Unstated, the window is 1M: the models this runs on hold that much, and the
+// 60k agent-go falls back to compacted a long conversation sixteen times too
+// early.
+func TestAnUnstatedWindowIsOneMillionTokens(t *testing.T) {
+	s := &Settings{LLMModel: "window-test-model-default"}
+	s.registerWindow()
+	defer pool.UnregisterModelWindow("window-test-model-default")
+	w, ok := pool.LookupModelWindow("window-test-model-default")
+	if !ok || w.ContextTokens != 1_000_000 {
+		t.Fatalf("window = %+v %v; want 1000000", w, ok)
 	}
 }
 

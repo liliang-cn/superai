@@ -23,8 +23,8 @@ type Settings struct {
 	LLMModel   string `json:"llm_model"`
 	// LLMContextTokens is LLMModel's context window, and LLMMaxOutputTokens the
 	// most one response may use. agent-go derives when to compact from the
-	// window and knows none by itself; unset, it compacts at a fixed 60k
-	// tokens, a sixteenth of a 1M-token model.
+	// window and knows none by itself, so unset it is DefaultLLMContextTokens:
+	// agent-go's own fallback, a fixed 60k, is a sixteenth of a 1M-token model.
 	LLMContextTokens   int `json:"llm_context_tokens,omitempty"`
 	LLMMaxOutputTokens int `json:"llm_max_output_tokens,omitempty"`
 	// LLMReasoningEffort is sent as reasoning_effort on every call to LLMModel
@@ -694,15 +694,22 @@ func (s *Settings) backfill(def *Settings) {
 
 // Save writes the settings to ~/.superleo/settings.json (creating the
 // data directory if needed).
-// registerWindow tells agent-go how much the brain's model holds, when the
-// settings say.
+// DefaultLLMContextTokens is the window assumed when the settings state none.
+const DefaultLLMContextTokens = 1_000_000
+
+// registerWindow tells agent-go how much the brain's model holds: what the
+// settings say, DefaultLLMContextTokens when they say nothing.
 func (s *Settings) registerWindow() {
 	model := strings.TrimSpace(s.LLMModel)
-	if model == "" || s.LLMContextTokens <= 0 {
+	if model == "" {
 		return
 	}
+	window := s.LLMContextTokens
+	if window <= 0 {
+		window = DefaultLLMContextTokens
+	}
 	pool.RegisterModelWindow(model, pool.ModelWindow{
-		ContextTokens:   s.LLMContextTokens,
+		ContextTokens:   window,
 		MaxOutputTokens: s.LLMMaxOutputTokens,
 	})
 }
