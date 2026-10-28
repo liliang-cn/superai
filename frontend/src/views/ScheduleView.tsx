@@ -114,10 +114,8 @@ export default function ScheduleView() {
   return (
     <div className="view sch-view">
       <div className="view-header with-action sch-head">
-        <div>
-          <div className="view-title">{t("Schedule")}</div>
-          <div className="view-desc">{t("Events, alarms, reminders and to-dos in one place. Each one can ring like an alarm, remind you, send a notification, or just sit here.")}</div>
-        </div>
+        <div className="view-title">{t("Schedule")}</div>
+        <AskQueen onAnswered={() => void load()} />
         <div className="vh-actions sch-actions">
           {from !== today && <button className="sch-btn" onClick={() => jump(today)}>{t("Today")}</button>}
           <label className="sch-datepick" title={t("Go to a date")}>
@@ -140,8 +138,6 @@ export default function ScheduleView() {
           </div>
         </div>
       </div>
-
-      <AskQueen onAnswered={() => void load()} />
 
       <div className={`sch-body${picked ? " with-panel" : ""}`}>
         <div className="sch-scroll">
@@ -569,7 +565,7 @@ function AskQueen({ onAnswered }: { onAnswered: () => void }) {
       <form onSubmit={(e) => { e.preventDefault(); void send(); }}>
         <input value={text} onChange={(e) => setText(e.target.value)} {...ime.handlers}
           onKeyDown={(e) => { if (e.key === "Enter" && ime.composing(e)) e.preventDefault(); }}
-          placeholder={t("Or just say it: “wake me at 7 on workdays”, “remind me about the dentist on Friday at 3”")} aria-label={t("Tell the queen")} />
+          placeholder={t("Add by saying it…")} aria-label={t("Tell the queen")} />
         <button type="submit" disabled={!text.trim() || busy} title={t("Send")} aria-label={t("Send")}>
           {busy ? <span className="sch-spin" /> : <ArrowUpIcon size={16} />}
         </button>
