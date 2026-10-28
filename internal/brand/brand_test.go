@@ -50,3 +50,30 @@ func TestLegacyEnvFillsOnlyUnsetNames(t *testing.T) {
 		t.Fatalf("an explicitly set new name was overwritten: %q", got["SUPERLEO_TOKEN"])
 	}
 }
+
+// The new name already in use by another program's data — the SuperLeo
+// project before this one — is set aside, not run on.
+func TestMigrateDirsSetsAForeignDirectoryAside(t *testing.T) {
+	home := t.TempDir()
+	mk := func(p, body string) {
+		if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	mk(filepath.Join(home, ".superai", "settings.json"), "{}")
+	mk(filepath.Join(home, ".superleo", "recall.db"), "old project")
+	MigrateDirs(home)
+
+	if _, err := os.Stat(filepath.Join(home, ".superleo", "settings.json")); err != nil {
+		t.Fatalf("this program's data is not at the new path: %v", err)
+	}
+	if b, err := os.ReadFile(filepath.Join(home, ".superleo-legacy", "recall.db")); err != nil || string(b) != "old project" {
+		t.Fatalf("the other program's data was not set aside: %q %v", b, err)
+	}
+	if link, _ := os.Readlink(filepath.Join(home, ".superai")); link != ".superleo" {
+		t.Fatalf("old path is not a link: %q", link)
+	}
+}
