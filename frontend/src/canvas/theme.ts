@@ -34,13 +34,21 @@ export const BASES: Record<Exclude<BaseName, "timelapse">, { light: [number[], n
   sand: { light: [[244, 232, 212], [252, 247, 238]], dark: [[33, 28, 20], [48, 40, 29]], label: "Sand" },
 };
 
-export const DEFAULT_THEME: CanvasTheme = { color: "honey", base: "timelapse", glass: "frosted", radius: 1, mode: "light" };
+export const DEFAULT_THEME: CanvasTheme = { color: "honey", base: "timelapse", glass: "frosted", radius: 0.5, mode: "light" };
 
 const KEY = "superai-canvas-theme";
 
+// Saved themes carry a version. Before version 2 the default corners were
+// twice as round, and every saved theme kept them whether or not anybody
+// picked them; such a theme takes the new default.
+const VERSION = 2;
+
 export function loadTheme(): CanvasTheme {
   try {
-    return { ...DEFAULT_THEME, ...JSON.parse(localStorage.getItem(KEY) || "{}") };
+    const saved = JSON.parse(localStorage.getItem(KEY) || "{}");
+    if ((saved.v ?? 1) < VERSION && saved.radius === 1) delete saved.radius;
+    delete saved.v;
+    return { ...DEFAULT_THEME, ...saved };
   } catch {
     return DEFAULT_THEME;
   }
@@ -48,7 +56,7 @@ export function loadTheme(): CanvasTheme {
 
 export function saveTheme(t: CanvasTheme) {
   try {
-    localStorage.setItem(KEY, JSON.stringify(t));
+    localStorage.setItem(KEY, JSON.stringify({ ...t, v: VERSION }));
   } catch {
     /* kept for this visit only */
   }
