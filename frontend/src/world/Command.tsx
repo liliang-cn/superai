@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useStickToBottom } from "../lib/useStickToBottom";
 import { ArrowUpIcon, MessageSquareIcon, PlusIcon, MinusIcon, ChevronDownIcon } from "lucide-react";
 import { ChatHistory, HiveRetire, HiveSpawn, SendChat } from "../../wailsjs/go/app/App";
 import { earlyError, requestSetup, useReady } from "../lib/ready";
@@ -82,7 +83,11 @@ export default function Command({ view, onConversation, onTyping, hosts }: {
           by: engineByline({ engine: x.engine, standInFor: x.stand_in_for }) || undefined })));
     }).catch(() => {});
   }, []);
-  useEffect(() => { end.current?.scrollIntoView({ block: "end" }); }, [lines, live, step, open]);
+  // The thread stays on its newest line; sending brings it back down.
+  const thread = useStickToBottom<HTMLDivElement>();
+  useEffect(() => {
+    if (lines[lines.length - 1]?.who === "you") thread.follow();
+  }, [lines]);
   // A bubble clicked: the queen's opens the conversation; anyone else's
   // selects them, and their card holds the talk.
   useEffect(() => {
@@ -197,7 +202,7 @@ export default function Command({ view, onConversation, onTyping, hosts }: {
             <button title={t("Open the whole conversation")} onClick={onConversation}><MessageSquareIcon size={14} /></button>
             <button title={t("Fold")} onClick={() => setOpen(false)}><ChevronDownIcon size={15} /></button>
           </header>
-          <div className="wc-lines">
+          <div className="wc-lines" ref={thread.ref} onScroll={thread.onScroll}>
             {lines.map((l, i) => (
               <div key={i} className={`wc-${l.who}`}>
                 {l.who === "queen" && l.by && <span className="msg-byline-engine">{l.by}</span>}

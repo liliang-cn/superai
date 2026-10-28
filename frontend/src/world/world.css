@@ -101,6 +101,9 @@
 .wl-detail header b { font-size: 16px; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .wl-detail header button { border: 0; background: #f1f4f8; border-radius: 8px; width: 26px; height: 26px; display: grid; place-items: center; color: #4f5e68; cursor: pointer; flex: none; }
 .wl-detail dl { margin: 0 0 12px; display: grid; gap: 0; }
+.wl-facts-toggle { display: flex; align-items: center; gap: 6px; width: 100%; min-width: 0; margin: 0 0 6px; padding: 4px 0; border: 0; background: none; color: #5f6d77; font: inherit; font-size: 12px; text-align: left; cursor: pointer; }
+.wl-facts-toggle span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wl-facts-toggle:hover { color: #0e1a22; }
 .wl-detail dl > div { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 10px; padding: 6px 0; border-top: 1px solid #eef1f5; }
 .wl-detail dt { color: #5f6d77; }
 .wl-detail dd { margin: 0; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }

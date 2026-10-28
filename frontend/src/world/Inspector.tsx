@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ArrowRightIcon, XIcon, Maximize2Icon, PlayIcon, PauseIcon, Trash2Icon, SquareIcon, SendIcon, RefreshCwIcon, SearchIcon, ZapIcon } from "lucide-react";
+import { ArrowRightIcon, ChevronDownIcon, ChevronRightIcon, XIcon, Maximize2Icon, PlayIcon, PauseIcon, Trash2Icon, SquareIcon, SendIcon, RefreshCwIcon, SearchIcon, ZapIcon } from "lucide-react";
 import {
   CLIRunDetail, InstallMCPServer, InstallSkill, SearchMCPServers, SearchSkills,
   CancelCLIRun, DeleteDashboard, DeleteStandingAgent, ForgetLife, HiveTaskDetail, MemoryRecall, PauseStandingAgent,
@@ -62,6 +62,10 @@ export default function Inspector({ picked, data, onClose, open, openDash }: {
   /** A destructive action asks once more, on the same button. */
   const twice = (key: string, fn: () => void) => () => { if (confirm === key) { setConfirm(""); fn(); } else setConfirm(key); };
 
+  // The facts under the title fold to one line, and stay the way they were
+  // left on every card.
+  const [facts, setFactsState] = useState(() => { try { return localStorage.getItem("superai.inspector.facts") !== "folded"; } catch { return true; } });
+  const setFacts = (v: boolean) => { setFactsState(v); try { localStorage.setItem("superai.inspector.facts", v ? "open" : "folded"); } catch { /* ignore */ } };
   const rows: [string, string][] = [];
   let kind = picked.kind;
   let body: React.ReactNode = null;
@@ -406,7 +410,15 @@ export default function Inspector({ picked, data, onClose, open, openDash }: {
         <button title={t("Open full screen")} onClick={() => open(screen, true)}><Maximize2Icon size={14} /></button>
         <button title={t("Close")} onClick={onClose}><XIcon size={15} /></button>
       </header>
-      {rows.length > 0 && <dl>{rows.map(([k, v]) => <div key={k}><dt>{t(k)}</dt><dd>{t(v)}</dd></div>)}</dl>}
+      {rows.length > 0 && (
+        <div className="wl-facts">
+          <button type="button" className="wl-facts-toggle" aria-expanded={facts} onClick={() => setFacts(!facts)} data-testid="facts-toggle">
+            {facts ? <ChevronDownIcon size={13} /> : <ChevronRightIcon size={13} />}
+            <span>{facts ? t("Details") : rows.slice(0, 3).map(([k, v]) => `${t(k)} ${t(v)}`).join(" · ")}</span>
+          </button>
+          {facts && <dl>{rows.map(([k, v]) => <div key={k}><dt>{t(k)}</dt><dd>{t(v)}</dd></div>)}</dl>}
+        </div>
+      )}
       <div className="wi-body">{body}</div>
     </aside>
   );

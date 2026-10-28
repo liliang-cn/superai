@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useStickToBottom } from "../lib/useStickToBottom";
 import { SendIcon } from "lucide-react";
 import { AskRemoteAgent, ChatHistory, FollowUpCLIRun, SendChat, StandingReports, StartCLIRun, WakeStandingAgent } from "../../wailsjs/go/app/App";
 import { EventsOn } from "../../wailsjs/runtime";
@@ -83,7 +84,11 @@ export default function Talk({ who, placeholder }: { who: Talker; placeholder: s
       setLines(th.lines);
     }).catch(() => {});
   }, [key]);
-  useEffect(() => { end.current?.scrollIntoView({ block: "end" }); }, [lines, busy, streamed]);
+  // The thread stays on its newest line; sending brings it back down.
+  const thread = useStickToBottom<HTMLDivElement>();
+  useEffect(() => {
+    if (lines[lines.length - 1]?.who === "you") thread.follow();
+  }, [lines]);
 
   const push = (l: Line) => {
     if (l.who === "it") sayDone(actorOf(who), l.text);
@@ -205,7 +210,7 @@ export default function Talk({ who, placeholder }: { who: Talker; placeholder: s
   return (
     <div className="wt">
       {(lines.length > 0 || busy) && (
-        <div className="wt-lines">
+        <div className="wt-lines" ref={thread.ref} onScroll={thread.onScroll}>
           {lines.map((l, i) => l.who === "it" && !l.bad
             ? <div key={i} className="wt-line wt-it"><Response>{l.text}</Response></div>
             : <p key={i} className={`wt-line wt-${l.who}${l.bad ? " bad" : ""}`}>{l.text}</p>)}
