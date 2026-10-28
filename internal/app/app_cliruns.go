@@ -318,6 +318,9 @@ func (a *App) startCLIRun(o cliStart) (CLIRun, error) {
 	for k, v := range backend.ProxyEnv() {
 		req.Env[k] = v
 	}
+	if req.Env["HTTPS_PROXY"] != "" {
+		req.Env["NODE_USE_ENV_PROXY"] = "1" // Node CLIs (pi, codex's npm shim) read the proxy only with this
+	}
 	// A run thinking for the queen is handed her kit the way its CLI takes
 	// it (queen_engine_cli.go).
 	approve := ""

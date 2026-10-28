@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"regexp"
 	"sort"
@@ -679,8 +680,10 @@ func sshRun(ctx context.Context, host, script string, deadline time.Duration) (s
 	cmd := exec.CommandContext(ctx, "ssh", args...)
 	if IsLocalHost(host) {
 		// The agent is on this machine: an agent process installed beside it
-		// runs it directly, no ssh to itself.
+		// runs it directly, no ssh to itself — through the proxy set in
+		// Settings, as the coding CLIs are.
 		cmd = exec.CommandContext(ctx, "sh", "-c", script)
+		cmd.Env = withProxyEnv(os.Environ())
 	}
 	cmd.Stdin = nil
 	// WaitDelay because ssh can leave the far side holding the pipes open: the
@@ -847,3 +850,26 @@ func RetryAfter(raw string) time.Duration {
 // maxRetryWait bounds an automatic retry. Beyond this the honest thing is to
 // report the failure and let the person decide, rather than hold a spinner.
 const maxRetryWait = 30 * time.Second
+
+// withProxyEnv is env with the proxy set in Settings over it. Node (pi,
+// openclaw) reads HTTPS_PROXY only with NODE_USE_ENV_PROXY on.
+func withProxyEnv(env []string) []string {
+	px := ProxyEnv()
+	if len(px) == 0 {
+		return env
+	}
+	out := make([]string, 0, len(env)+len(px)+1)
+	for _, kv := range env {
+		k, _, _ := strings.Cut(kv, "=")
+		if _, over := px[k]; !over && k != "NODE_USE_ENV_PROXY" {
+			out = append(out, kv)
+		}
+	}
+	for k, v := range px {
+		out = append(out, k+"="+v)
+	}
+	if px["HTTPS_PROXY"] != "" {
+		out = append(out, "NODE_USE_ENV_PROXY=1")
+	}
+	return out
+}
