@@ -97,12 +97,12 @@ func installedScript(dir, spec string) string {
 	return script
 }
 
-var npxInstalls sync.Map // spec -> struct{}: one background install per process
+var npxInstalls sync.Map // dir -> struct{}: one background install per destination
 
 // installNpxPackage installs spec under dir with the npm beside npx. Errors
 // are logged: the server keeps starting through npx, which works, only slower.
 func installNpxPackage(npx, spec, dir string) {
-	if _, busy := npxInstalls.LoadOrStore(spec, struct{}{}); busy {
+	if _, busy := npxInstalls.LoadOrStore(dir, struct{}{}); busy {
 		return
 	}
 	go func() {
@@ -113,7 +113,7 @@ func installNpxPackage(npx, spec, dir string) {
 		}
 		cmd := exec.Command(npm, "install", "--prefix", dir, "--no-audit", "--no-fund", "--loglevel=error", spec)
 		if out, err := cmd.CombinedOutput(); err != nil {
-			npxInstalls.Delete(spec) // let a later start try again
+			npxInstalls.Delete(dir) // let a later start try again
 			log.Printf("superleo: mcp package %s not installed: %v: %s", spec, err, strings.TrimSpace(string(out)))
 			return
 		}
