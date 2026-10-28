@@ -405,7 +405,12 @@ func (a *App) Shutdown(ctx context.Context) {
 func (a *App) rebuild() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	// YOLO lives in the gate, and a rebuild makes a new gate. Carried over,
+	// or a settings save switches it off while the status bar still says
+	// YOLO, and the next delete asks after all.
+	yolo := false
 	if a.svc != nil {
+		yolo, _ = a.svc.ToolGate().YoloStatus()
 		_ = a.svc.Close()
 		a.svc = nil
 	}
@@ -417,6 +422,9 @@ func (a *App) rebuild() {
 	}
 	a.buildErr = ""
 	a.svc = svc
+	if yolo {
+		svc.ToolGate().StartYolo()
+	}
 	// A rebuild is what a settings save produces, so this is where a changed
 	// host list stops being ignored.
 	a.resetRemote()

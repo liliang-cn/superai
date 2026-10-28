@@ -203,3 +203,19 @@ func TestDisabledGateRunsTheCommandAndStillAudits(t *testing.T) {
 		t.Errorf("decided_by = %q, want %q", entries[len(entries)-1].DecidedBy, backend.DecidedByGateOff)
 	}
 }
+
+// A rebuild — what every settings save does — makes a new gate. YOLO switched
+// on before it is still on after it.
+func TestYoloSurvivesRebuild(t *testing.T) {
+	a, _ := gateTestApp(t, "true", false)
+	a.StartYoloMode()
+	a.rebuild()
+	if on, _ := a.svc.ToolGate().YoloStatus(); !on {
+		t.Fatal("YOLO was switched off by a rebuild")
+	}
+	a.StopYoloMode()
+	a.rebuild()
+	if on, _ := a.svc.ToolGate().YoloStatus(); on {
+		t.Fatal("YOLO came back on after it was switched off")
+	}
+}
