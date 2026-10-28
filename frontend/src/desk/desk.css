@@ -606,8 +606,8 @@ html[data-desk] body { background: transparent; }
 .dk-world .attention-view button { padding: 7px 11px; font-size: 13px; }
 .dk-world .attention-cards { gap: 8px; }
 .dk-world .attention-card { flex-wrap: wrap; gap: 6px 10px; padding: 12px 14px; border-left-width: 3px; cursor: pointer; transition: box-shadow 0.15s, background 0.15s; }
-.dk-world .attention-card:hover { background: #f7f9fc; }
-.dk-world .attention-card.on { box-shadow: 0 0 0 2px #2f5bea; background: #f4f7ff; }
+.dk-world .attention-card:hover { background: var(--bg-2); }
+.dk-world .attention-card.on { box-shadow: 0 0 0 2px var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--bg-1)); }
 .dk-world .attention-card-icon { width: 17px; height: 17px; margin-top: 2px; }
 .dk-world .attention-card-content { flex: 1 1 calc(100% - 40px); }
 .dk-world .attention-card h2 { font-size: 14.5px; margin: 2px 0; }

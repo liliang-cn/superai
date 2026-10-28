@@ -71,7 +71,7 @@ export default function DeskStatusBar({ status, loading, codingRuns }: { status:
   return <footer className="dk-statusbar" aria-label={t("Status bar")}>
     <button className="dk-status-connection" onClick={openSwitcher} title={error || t("Switch backend")}>
       <i className={`dk-status-dot${disconnected || !loading && !status?.ready ? " bad" : loading ? " pending" : ""}`}/>
-      <span>{t(state)}</span><span className="dk-status-backend">{link?.linked ? link.url?.replace(/^https?:\/\//,"") : t("This {machine} only", { machine: t(machine) })}</span>
+      <span>{t(state)}</span><span className="dk-status-backend">{link?.linked ? link.url?.replace(/^https?:\/\//,"") : t("This {machine}", { machine: t(machine) })}</span>
     </button>
     {runtime.model && <span className="dk-status-model" title={runtime.model}><CpuIcon size={12}/>{runtime.model}</span>}
     {served && stream === "down" && <span className="dk-status-stream" title={t("Answers and live updates are not arriving; reconnecting.")}><i className="dk-status-dot bad"/>{t("Live updates off")}</span>}
