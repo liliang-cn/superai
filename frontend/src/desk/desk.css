@@ -651,11 +651,14 @@ html[data-desk] body { background: transparent; }
 @keyframes dk-win-in { from { opacity: 0; transform: scale(0.97); } }
 .dk-win-x { position: fixed; z-index: 9; top: 40px; right: 58px; width: 34px; height: 34px; border-radius: 50%; border: 0; background: #16202b; color: #fff; display: grid; place-items: center; cursor: pointer; box-shadow: 0 6px 16px rgba(22, 32, 43, 0.3); }
 /* The window always takes the same frame, whatever width the page had as a
-   panel, and its close button sits on its own corner. */
+   panel. Its close button stands on the page's title row, as far in from
+   the right edge as the title is from the left, and the row keeps clear of
+   it. */
 .dk-world.window-on > .dk-page { width: auto !important; justify-self: stretch; }
-.dk-world.window-on > .dk-win-x { top: 64px; right: 84px; width: 30px; height: 30px; background: var(--bg-2); color: var(--text-0); box-shadow: none; border: 1px solid var(--border); }
+.dk-world.window-on > .dk-win-x { top: 76px; right: 104px; width: 30px; height: 30px; background: var(--bg-2); color: var(--text-0); box-shadow: none; border: 1px solid var(--border); }
 .dk-world.window-on > .dk-win-x:hover { background: var(--text-0); color: var(--bg-1); }
-.dk-world.window-on > .dk-page > .content { padding-right: 40px; }
+.dk-world.window-on > .dk-page > .content { padding-right: 56px; }
+.dk-world.window-on > .dk .dk-chead { padding-right: 52px; }
 
 /* ── The round buttons, bottom right (components/fabs.css) ───────────── */
 /* They keep a lane of their own down the right, with the bell at its top:
