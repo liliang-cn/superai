@@ -20,6 +20,8 @@ export function AskRemoteAgent(arg1:string,arg2:string):Promise<backend.RemoteRe
 
 export function Attention():Promise<Array<app.AttentionItem>>;
 
+export function BrowserStatus():Promise<backend.BrowserStatus>;
+
 export function CCActivityAll():Promise<Record<string, app.CCActivity>>;
 
 export function CCAwayHint(arg1:boolean):Promise<Record<string, any>>;
@@ -323,6 +325,8 @@ export function SendCallChat(arg1:string,arg2:string,arg3:Array<string>):Promise
 export function SendChat(arg1:string,arg2:string,arg3:Array<string>):Promise<string>;
 
 export function SetAway(arg1:boolean):Promise<app.CCPresence>;
+
+export function SetBrowserMode(arg1:string):Promise<void>;
 
 export function SetDashboardCron(arg1:string,arg2:string):Promise<Record<string, any>>;
 

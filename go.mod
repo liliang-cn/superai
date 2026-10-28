@@ -6,7 +6,8 @@ require (
 	github.com/BurntSushi/toml v1.6.0
 	github.com/JohannesKaufmann/html-to-markdown/v2 v2.5.2
 	github.com/google/uuid v1.6.0
-	github.com/liliang-cn/agent-go/v3 v3.75.0
+	github.com/gorilla/websocket v1.5.3
+	github.com/liliang-cn/agent-go/v3 v3.75.2
 	github.com/liliang-cn/agentexec v0.6.0
 	github.com/liliang-cn/cortexdb/v2 v2.123.0
 	github.com/modelcontextprotocol/go-sdk v1.7.0
@@ -97,7 +98,6 @@ require (
 	github.com/gogs/chardet v0.0.0-20211120154057-b7413eaefb8f // indirect
 	github.com/golang/snappy v1.0.0 // indirect
 	github.com/google/jsonschema-go v0.4.3 // indirect
-	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/jackc/pgio v1.0.0 // indirect
 	github.com/jackc/pglogrepl v0.0.0-20260401131349-e37c41485510 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect

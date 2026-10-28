@@ -6,6 +6,7 @@ import {
   BrainIcon,
   CalendarDaysIcon,
   ChartColumnIcon,
+  GlobeIcon,
   HexagonIcon,
   LayoutGridIcon,
   LogOutIcon,
@@ -19,6 +20,7 @@ import {
   SettingsIcon,
 } from "lucide-react";
 import { ViewKey } from "../lib/types";
+import { openBrowserPanel } from "../lib/browser";
 import { useRoom } from "../lib/useViewport";
 
 const served = Boolean((window as unknown as Record<string, unknown>).superleoServed);
@@ -37,7 +39,8 @@ const served = Boolean((window as unknown as Record<string, unknown>).superleoSe
 // shortcut hint can have that is worse than having no hint at all.
 const NAV: {
   section: string;
-  items: { key: ViewKey; label: string; Icon: typeof MessageSquareIcon; shortcut?: string }[];
+  // "browser" is not a page: it opens the live browser over whichever page is up.
+  items: { key: ViewKey | "browser"; label: string; Icon: typeof MessageSquareIcon; shortcut?: string }[];
 }[] = [
   {
     section: "Workspace",
@@ -51,6 +54,7 @@ const NAV: {
       { key: "hive", label: "Hive", Icon: HexagonIcon },
       { key: "agents", label: "Bees", Icon: BotIcon },
       { key: "coding", label: "Coding", Icon: TerminalIcon },
+      { key: "browser", label: "Browser", Icon: GlobeIcon },
     ],
   },
   {
@@ -75,7 +79,7 @@ const NAV: {
 const BY_SHORTCUT = new Map<string, ViewKey>(
   NAV.flatMap((g) => g.items)
     .filter((it) => it.shortcut)
-    .map((it) => [it.shortcut as string, it.key]),
+    .map((it) => [it.shortcut as string, it.key as ViewKey]),
 );
 
 export default function Sidebar({
@@ -174,7 +178,7 @@ export default function Sidebar({
           <div key={t(group.section)}>
             {labels && <div className="nav-section">{t(group.section)}</div>}
             {group.items.map((it) => {
-              const badge = badges?.[it.key] ?? 0;
+              const badge = it.key === "browser" ? 0 : badges?.[it.key] ?? 0;
               const Icon = it.Icon;
               return (
                 <button
@@ -182,7 +186,7 @@ export default function Sidebar({
                   className={`nav-item${current === it.key ? " active" : ""}`}
                   data-pet-spot={`nav-${it.key}`}
                   data-pet-label={`the ${t(it.label)} link in the left sidebar`}
-                  onClick={() => onNavigate(it.key)}
+                  onClick={() => (it.key === "browser" ? openBrowserPanel() : onNavigate(it.key))}
                   title={labels ? undefined : t(it.label)}
                 >
                   <span className="ic">

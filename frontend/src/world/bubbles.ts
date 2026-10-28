@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { CSS2DObject } from "three/examples/jsm/renderers/CSS2DRenderer.js";
-import { createElement } from "react";
+import { createElement, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { Response } from "@/components/ai-elements/response";
 
@@ -17,7 +17,10 @@ const actors = new Map<string, THREE.Object3D>();
 export function registerActor(key: string, obj: THREE.Object3D) { actors.set(key, obj); }
 export function forgetActor(key: string) { actors.delete(key); speaking.get(key)?.remove(); }
 
-type Bubble = { el: HTMLElement; obj: CSS2DObject; timer: number; md?: { box: HTMLElement; root: Root }; remove: () => void };
+type Bubble = { el: HTMLElement; body: HTMLElement; obj: CSS2DObject; timer: number; md?: { box: HTMLElement; root: Root }; extra?: Root; remove: () => void };
+// Something drawn under what a robot says (the browser card of the turn), by
+// robot. It outlives the switch between dots and words, and goes with the bubble.
+const attached = new Map<string, ReactNode>();
 const speaking = new Map<string, Bubble>();
 let onOpen: ((key: string) => void) | null = null;
 /** What clicking a bubble does (open the whole conversation). */
@@ -42,6 +45,12 @@ export function say(key: string, text: string, mode: "say" | "think" = "say", tt
     const inner = document.createElement("div");
     inner.className = "wl-say-in";
     el.appendChild(inner);
+    // The words or the dots go in `body`; `extra` keeps an attachment while
+    // they change.
+    const body = document.createElement("div");
+    const extra = document.createElement("div");
+    extra.className = "wl-say-extra";
+    inner.append(body, extra);
     const obj = new CSS2DObject(el);
     // Above the head, and above its name label, whatever the robot's size.
     const box = new THREE.Box3().setFromObject(actor);
@@ -50,13 +59,22 @@ export function say(key: string, text: string, mode: "say" | "think" = "say", tt
     obj.position.set(0, Math.max(top + 0.4, (pill?.position.y ?? 0) + 0.7), 0);
     actor.add(obj);
     el.addEventListener("click", () => onOpen?.(key));
-    const remove = () => { unmount(b!); obj.removeFromParent(); el.remove(); speaking.delete(key); };
-    b = { el, obj, timer: 0, remove };
+    const remove = () => {
+      unmount(b!);
+      const x = b!.extra;
+      if (x) setTimeout(() => x.unmount(), 0);
+      attached.delete(key);
+      obj.removeFromParent(); el.remove(); speaking.delete(key);
+    };
+    b = { el, body, obj, timer: 0, remove };
     speaking.set(key, b);
+    b.extra = createRoot(extra);
+    const a = attached.get(key);
+    if (a) { b.extra.render(a); el.classList.add("has-extra"); }
   }
   window.clearTimeout(b.timer);
   b.el.dataset.mode = mode;
-  const inner = b.el.firstChild as HTMLElement;
+  const inner = b.body;
   if (mode === "think") {
     unmount(b);
     inner.innerHTML = '<span class="wl-dots"><i></i><i></i><i></i></span>' + (text ? `<small>${escape(text)}</small>` : "");
@@ -99,6 +117,17 @@ function unmount(b: Bubble) {
   if (!md) return;
   b.md = undefined;
   setTimeout(() => md.root.unmount(), 0);
+}
+
+/**
+ * Draws `node` under what `key` says, from now until its bubble goes; null
+ * takes it away. Before the robot has a bubble it waits for the next one.
+ */
+export function attachToBubble(key: string, node: ReactNode | null) {
+  if (node) attached.set(key, node); else attached.delete(key);
+  const b = speaking.get(key);
+  b?.extra?.render(node ?? null);
+  b?.el.classList.toggle("has-extra", !!node);
 }
 
 export function hush(key: string) { speaking.get(key)?.remove(); }

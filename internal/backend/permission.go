@@ -124,6 +124,11 @@ type ToolGate struct {
 	// rules alone; it can only ever add an ask, never remove one.
 	decider decider
 
+	// forbidden are tools refused outright, by name, with the reason given
+	// back to the model. Not an ask: the gate being off or YOLO being on
+	// relaxes asking, and these are never to run here at all (Forbid).
+	forbidden map[string]string
+
 	// yolo is YOLO mode: every gated call approved without asking, until it is
 	// switched off. yoloSince is when it was turned on, which is what the
 	// banner shows — see yolo.go for why there is no deadline.
@@ -273,6 +278,9 @@ func (g *ToolGate) Policy() agent.PermissionPolicy {
 	g.mu.RUnlock()
 	base := policyWith(d)
 	return func(req agent.PermissionRequest) bool {
+		if g.forbiddenReason(req.ToolName) != "" {
+			return true
+		}
 		// A call a session rule has an opinion on reaches the handler, read
 		// only or not: an agent may be forbidden a tool that changes nothing.
 		if v, _ := g.sessionVerdict(req); v != VerdictNone {
@@ -280,6 +288,25 @@ func (g *ToolGate) Policy() agent.PermissionPolicy {
 		}
 		return base(req)
 	}
+}
+
+// Forbid refuses tool outright from now on, telling the model why. It is for
+// a tool that must not run in this configuration at all — agent-browser's
+// close in the person's own Chrome, which quit (crashed) it with their tabs
+// open — rather than one that should be asked about.
+func (g *ToolGate) Forbid(tool, reason string) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.forbidden == nil {
+		g.forbidden = map[string]string{}
+	}
+	g.forbidden[tool] = reason
+}
+
+func (g *ToolGate) forbiddenReason(tool string) string {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	return g.forbidden[tool]
 }
 
 // SetDecider installs (or with nil, removes) the argument-judging pass.
@@ -370,6 +397,9 @@ func (g *ToolGate) decide(ctx context.Context, req agent.PermissionRequest) (*ag
 	}
 	ask.ExpiresAt = ask.AskedAt.Add(wait)
 
+	if why := g.forbiddenReason(req.ToolName); why != "" {
+		return g.answer(ask, ApprovalDecision{By: DecidedByRule, Reason: why})
+	}
 	// The session's own rule first. A refusal holds even with the gate
 	// switched off or YOLO on: those relax asking, and "never" is not an ask.
 	verdict, why := g.sessionVerdict(req)

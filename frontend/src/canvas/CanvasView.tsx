@@ -20,7 +20,8 @@ import "./canvas.css";
 import StatsBlock from "../components/StatsBlock";
 import { Response } from "@/components/ai-elements/response";
 import { withoutCallNotes } from "../lib/format";
-import type { ChatMessage } from "../lib/types";
+import type { ChatMessage, TraceItem } from "../lib/types";
+import { ChatTurnBrowser, newestBrowserTurn } from "../components/BrowserCard";
 import { queenRef, queenTitle, useQueenName } from "../lib/queenName";
 import { translate } from "../lib/i18n";
 
@@ -245,7 +246,7 @@ export default function CanvasView({ approvals }: { approvals: { pending: ToolAp
           <div className="cv-split">
             <section className="cv-glass cv-convo">
               <h2>{queenTitle(queen)}</h2>
-              <Conversation messages={chat.messages} />
+              <Conversation messages={chat.messages} trace={chat.trace} />
               <div className="cv-say inner">
                 <input
                   value={order}
@@ -377,7 +378,7 @@ function useWide() {
 }
 
 /** The whole conversation with the queen, newest at the bottom. */
-function Conversation({ messages }: { messages: ChatMessage[] }) {
+function Conversation({ messages, trace }: { messages: ChatMessage[]; trace: TraceItem[] }) {
   const queen = useQueenName();
   const box = useRef<HTMLDivElement>(null);
   const inner = useRef<HTMLDivElement>(null);
@@ -394,6 +395,7 @@ function Conversation({ messages }: { messages: ChatMessage[] }) {
     stick();
     return () => ro.disconnect();
   }, [shown.length]);
+  const newestBrowser = newestBrowserTurn(shown, trace);
   if (!shown.length) return <div className="cv-conv"><p className="cv-quiet cv-conv-empty">{translate("Orders you give below go to {name}; her answers show here.", { name: queenRef(queen) })}</p></div>;
   return (
     <div className="cv-conv" ref={box} onScroll={(e) => { const el = e.currentTarget; pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60; }}>
@@ -402,6 +404,7 @@ function Conversation({ messages }: { messages: ChatMessage[] }) {
         <div key={m.id} className="cv-conv-you">{withoutCallNotes(m.content)}</div>
       ) : (
         <div key={m.id} className={m.error ? "cv-conv-her bad" : "cv-conv-her"}>
+          <ChatTurnBrowser m={m} trace={trace} newest={newestBrowser} />
           {m.content ? <Response>{withoutCallNotes(m.content)}</Response> : <span className="cv-quiet">{m.streaming ? "Working on it…" : m.cancelled ? "Stopped." : ""}</span>}
           {m.error && <p className="cv-conv-err">{m.error}</p>}
         </div>

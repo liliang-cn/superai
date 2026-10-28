@@ -11,6 +11,7 @@ import { getQueenName, queenNamed, queenRef, queenTitle, useQueenName } from "..
 import { useChat } from "../lib/useChat";
 import { usePulse } from "../components/Reactor";
 import LiveTurn from "./LiveTurn";
+import { ChatTurnBrowser, newestBrowserTurn } from "../components/BrowserCard";
 import EventSheet from "../components/EventSheet";
 import { AgentInfo, useAgentMentions } from "../lib/useAgentMentions";
 import { AgentMenu } from "../components/AgentMenu";
@@ -240,6 +241,7 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
   }, []);
 
   const msgs = chat.messages.filter((m) => m.kind !== "context");
+  const newestBrowser = newestBrowserTurn(msgs, chat.trace);
   const lastText = msgs.length ? msgs[msgs.length - 1].content : "";
   // Follow the conversation while the person is at the bottom of it: a tool
   // call, a thought or a line of answer landing keeps the newest in view. If
@@ -479,6 +481,7 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
             ) : (
               <div key={m.id} className={m.error ? "dk-q bad" : "dk-q"}>
                 <LiveTurn m={m} trace={chat.trace} pulse={pulse} session={chat.sessionId} />
+                <ChatTurnBrowser m={m} trace={chat.trace} newest={newestBrowser} />
                 {m.content ? <Response>{withoutCallNotes(m.content)}</Response>
                   : m.cancelled ? <span className="dk-thinking">{t("Stopped.")}</span> : null}
                 {m.cancelled && m.content && <div className="dk-thinking" role="status">{t("Stopped.")}</div>}

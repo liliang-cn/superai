@@ -23,6 +23,7 @@ import RecordsView from "./views/RecordsView";
 import ScheduleView from "./views/ScheduleView";
 import CanvasView from "./canvas/CanvasView";
 import DeskView from "./desk/DeskView";
+import { BrowserPanelHost } from "./components/BrowserPanel";
 import DeskShell from "./desk/DeskShell";
 import { clientKind } from "./lib/hivelink";
 import { ScheduleRunToasts } from "./components/ScheduleRuns";
@@ -223,6 +224,7 @@ export default function App() {
         {view !== "records" && <ScheduleRunToasts log={runs} onOpenConversation={openConversation} />}
         <Toaster onOpenConversation={openConversation} />
         <SetupBanner status={status} loading={loading} />
+        <BrowserPanelHost />
         <ToolApprovals
           pending={view === "home" || view === "chat" || view === "tasks" ? [] : approvals.pending}
           note={approvals.note}
@@ -240,6 +242,7 @@ export default function App() {
         <ScheduleRunToasts log={runs} onOpenConversation={openConversation} />
         <Toaster onOpenConversation={openConversation} />
         <SetupBanner status={status} loading={loading} />
+        <BrowserPanelHost />
       </>
     );
   }
@@ -294,6 +297,7 @@ export default function App() {
       {/* Everything the backend publishes, whatever raised it. */}
       <Toaster onOpenConversation={openConversation} />
       <SetupBanner status={status} loading={loading} />
+      <BrowserPanelHost />
       <ToolApprovals
         pending={approvals.pending}
         note={approvals.note}

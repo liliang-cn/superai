@@ -30,6 +30,10 @@ export function Attention() {
   return window['go']['app']['App']['Attention']();
 }
 
+export function BrowserStatus() {
+  return window['go']['app']['App']['BrowserStatus']();
+}
+
 export function CCActivityAll() {
   return window['go']['app']['App']['CCActivityAll']();
 }
@@ -636,6 +640,10 @@ export function SendChat(arg1, arg2, arg3) {
 
 export function SetAway(arg1) {
   return window['go']['app']['App']['SetAway'](arg1);
+}
+
+export function SetBrowserMode(arg1) {
+  return window['go']['app']['App']['SetBrowserMode'](arg1);
 }
 
 export function SetDashboardCron(arg1, arg2) {

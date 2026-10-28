@@ -160,7 +160,8 @@ func resolveMCPConfig(src string, lookup func(string) (string, bool)) (string, e
 		return "", err
 	}
 	hasRefs := mcpEnvRef.Match(raw)
-	if !hasRefs && !strings.Contains(string(raw), "npx") {
+	ownBrowser := browserBuiltin.Load() && strings.Contains(string(raw), "agent-browser")
+	if !hasRefs && !ownBrowser && !strings.Contains(string(raw), "npx") {
 		return src, nil
 	}
 	var f struct {
@@ -175,6 +176,12 @@ func resolveMCPConfig(src string, lookup func(string) (string, bool)) (string, e
 	out := map[string]map[string]any{}
 	localized := false
 	for name, entry := range f.MCPServers {
+		// The built-in browser is this agent-browser, with a stream the
+		// page can show; a second one from the file would only compete.
+		if ownBrowser && isUserBrowserEntry(name, entry) {
+			localized = true
+			continue
+		}
 		resolved, missing := expandMCPEntry(entry, lookup)
 		if len(missing) > 0 {
 			log.Printf("superleo: mcp server %s (%s) left out: %s not set", name, src, strings.Join(missing, ", "))

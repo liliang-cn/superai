@@ -73,6 +73,7 @@
 .dk-a-rec { background: linear-gradient(160deg, #e6c534, #c19c06); }
 .dk-a-set, .dk-a-mode { background: linear-gradient(160deg, #eef0f2, #cfd4d9); color: #3d4045 !important; }
 .dk-a-mcp { background: linear-gradient(160deg, #5aa7c8, #2f7fa3); }
+.dk-a-web { background: linear-gradient(160deg, #5f7f96, #34505f); }
 .dk-app.on::before { background: var(--ink); }
 
 /* The sidebar. */

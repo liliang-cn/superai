@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   ListTodoIcon, LayoutDashboardIcon, ChartColumnIcon, PanelRightOpenIcon, PanelRightCloseIcon, BookOpenIcon, BotIcon, HexagonIcon, MessageSquareIcon, PaletteIcon,
   NotebookTabsIcon, PuzzleIcon, SlidersHorizontalIcon, TerminalIcon, XIcon,
-  MoonIcon, SunIcon, CalendarDaysIcon,
+  MoonIcon, SunIcon, CalendarDaysIcon, GlobeIcon,
 } from "lucide-react";
 import DeskStatusBar from "./DeskStatusBar";
 import World from "../world/World";
@@ -19,6 +19,7 @@ import BackendSwitcher from "./BackendSwitcher";
 import ThemePanel from "../canvas/ThemePanel";
 import { ChatFab, FabStack, ModeFab, SettingsFab } from "../components/Fabs";
 import { askToCompose } from "../lib/compose";
+import { openBrowserPanel, useBrowserPanelOpen } from "../lib/browser";
 import "../canvas/canvas.css";
 import "./desk.css";
 
@@ -81,6 +82,7 @@ export const TITLES: Record<ViewKey, string> = {
  */
 export default function DeskShell({ view, badges, children, onOpenConversation, status, loading }: { view: ViewKey; badges?: Partial<Record<ViewKey, number>>; children: React.ReactNode; onOpenConversation?: (session: string) => void; status:AppStatus|null; loading:boolean }) {
   const { t } = useI18n();
+  const browserOn = useBrowserPanelOpen();
   const queen = useQueenName();
   const navigate = useNavigate();
   const [theme, setThemeState] = useState<CanvasTheme>(loadTheme);
@@ -233,6 +235,11 @@ export default function DeskShell({ view, badges, children, onOpenConversation, 
               {count(key) > 0 && <span className="dk-badge">{count(key)}</span>}
             </button>
           ))}
+          {/* The browser the agent drives, live, whenever you want to look
+              or take it over; a panel over whatever page you are on. */}
+          <button title={t("Browser")} style={noDrag} className={`dk-app dk-a-web${browserOn ? " on" : ""}`} onClick={openBrowserPanel} data-testid="rail-browser">
+            <GlobeIcon size={20} strokeWidth={2} />
+          </button>
           <span className="dk-sp" />
           <BackendSwitcher />
           <button title={t("Theme")} style={noDrag} className={`dk-app dk-a-mode${theming ? " on" : ""}`} onClick={() => setTheming((v) => !v)}>

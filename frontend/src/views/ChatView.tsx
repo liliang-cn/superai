@@ -44,6 +44,8 @@ import ContextBlock from "../components/ContextBlock";
 import NameDashboardModal from "../components/NameDashboardModal";
 import { dashboards, hasRenderableBlock, suggestName } from "../lib/dashboards";
 import AgentProgress from "../components/AgentProgress";
+import { ChatTurnBrowser, newestBrowserTurn } from "../components/BrowserCard";
+import { isBrowserStep } from "../lib/browser";
 import { machine } from "../lib/machine";
 
 /**
@@ -83,6 +85,7 @@ export default function ChatView({
   const attach = useAttachments();
   const notReady = status !== null && !status.ready;
   const messages = chat.messages;
+  const newestBrowser = newestBrowserTurn(messages, chat.trace);
   const room = useRoom();
   const history = useHistory();
   const [filesKey, setFilesKey] = useState(0);
@@ -288,14 +291,17 @@ export default function ChatView({
                                   meta={bylineMeta(m)}
                                   engine={engineByline(m)}
                                 />
-                                {m.progress && m.progress.length > 0 && (
+                                {/* Browser calls leave the step list for
+                                    their own card, which shows the page. */}
+                                {m.progress && m.progress.some((p) => !isBrowserStep(p)) && (
                                   <AgentProgress
-                                    steps={m.progress}
+                                    steps={m.progress.filter((p) => !isBrowserStep(p))}
                                     running={!!m.streaming}
                                     startedAt={m.startedAt}
                                     finishedAt={m.finishedAt}
                                   />
                                 )}
+                                <ChatTurnBrowser m={m} trace={chat.trace} newest={newestBrowser} />
                                 {m.content ? (
                                   <Response>{withoutCallNotes(m.content)}</Response>
                                 ) : m.streaming ? (

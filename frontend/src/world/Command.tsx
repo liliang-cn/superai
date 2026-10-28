@@ -7,7 +7,7 @@ import { ChatHistory, HiveRetire, HiveSpawn, SendChat } from "../../wailsjs/go/a
 import { earlyError, requestSetup, useReady } from "../lib/ready";
 import { engineByline, visibleAnswer } from "../lib/format";
 import { Response } from "@/components/ai-elements/response";
-import { onBubbleClick, say, sayDone } from "./bubbles";
+import { attachToBubble, onBubbleClick, say, sayDone } from "./bubbles";
 import { focusInWorld } from "./bus";
 import { EventsOn } from "../../wailsjs/runtime";
 import { loadQueenSession, queenSession } from "../lib/queenConsole";
@@ -21,6 +21,8 @@ import { AgentMenu } from "../components/AgentMenu";
 import { useAgentMentions } from "../lib/useAgentMentions";
 import type { Host } from "../canvas/data";
 import { mentionsOf } from "./mentions";
+import { BubbleBrowser, useRequestBrowser } from "../components/BrowserCard";
+import { browserOp } from "../lib/browser";
 
 
 /** A district's own actions: the things a person does there that are not
@@ -66,7 +68,8 @@ export default function Command({ view, onConversation, onTyping, hosts }: {
   // its last turns stay above the line, and what is typed continues it.
   // by: who answered for the queen, when not SuperLeo's own agent alone
   // (engineByline): the engine, or SuperLeo in its place.
-  const [lines, setLines] = useState<{ who: "you" | "queen"; text: string; by?: string }[]>([]);
+  // `req` is the request that wrote an answer, for the browser card under it.
+  const [lines, setLines] = useState<{ who: "you" | "queen"; text: string; by?: string; req?: string }[]>([]);
   const [open, setOpen] = useState(false);
   // A pod about to come or go, waiting for the person's yes.
   const [pod, setPod] = useState<{ change: PodChange; go: () => void } | null>(null);
@@ -127,7 +130,7 @@ export default function Command({ view, onConversation, onTyping, hosts }: {
         setLines((l) => [...l, { who: "you" as const, text: String(p.message ?? "") }].slice(-12));
       }),
       EventsOn("chat:done", (p: any) => {
-        if (others.delete(p?.requestId)) setLines((l) => [...l, { who: "queen" as const, text: String(p.final ?? ""), by: engineByline(p) || undefined }].slice(-12));
+        if (others.delete(p?.requestId)) setLines((l) => [...l, { who: "queen" as const, text: String(p.final ?? ""), by: engineByline(p) || undefined, req: p.requestId }].slice(-12));
       }),
       EventsOn("chat:error", (p: any) => { others.delete(p?.requestId); }),
       EventsOn("chat:cancelled", (p: any) => { others.delete(p?.requestId); }),
@@ -153,7 +156,13 @@ export default function Command({ view, onConversation, onTyping, hosts }: {
       credit(p);
       // Work the queen handed out is drawn on the worker doing it.
       if (p.type === "tool_call" && p.tool && p.worker) { patch(id, { step: p.tool }); say("worker:" + p.worker, p.workerTool || p.tool, "think", 60); }
-      else if (p.type === "tool_call" && p.tool) { patch(id, { step: p.tool }); say("queen", p.tool, "think", 60); }
+      else if (p.type === "tool_call" && p.tool) {
+        patch(id, { step: p.tool });
+        say("queen", p.tool, "think", 60);
+        // A turn in the browser shows the page under what the queen says,
+        // live while it runs; the card stays with the bubble to the end.
+        if (browserOp(p.tool)) attachToBubble("queen", <BubbleBrowser req={id} />);
+      }
       else if (p.type === "model_wire") { const k = p.wire?.kind; if (["queued", "retry", "restart", "waiting", "error"].includes(k)) patch(id, { wire: String(p.content ?? "") }); else if (k === "first_byte" || k === "slot" || k === "request" || (k === "response" && p.wire?.status < 400)) patch(id, { wire: "" }); }
       else if (p.type === "partial" && p.content) { const r = (raw.current.get(id) ?? "") + p.content; raw.current.set(id, r); const v = visibleAnswer(r); patch(id, { live: v, step: "", wire: "" }); if (v) say("queen", v, "say", 60); }
     });
@@ -161,7 +170,7 @@ export default function Command({ view, onConversation, onTyping, hosts }: {
       const by = engineByline(who.current.get(id) ?? {}) || undefined;
       mineIds.current.delete(id); raw.current.delete(id); who.current.delete(id);
       sayDone("queen", text);
-      setLines((l) => [...l, { who: "queen" as const, text, by }].slice(-12));
+      setLines((l) => [...l, { who: "queen" as const, text, by, req: id }].slice(-12));
       setPending((l) => l.filter((x) => x.id !== id));
     };
     const b = EventsOn("chat:done", (p: any) => { if (!ours(p)) return; credit(p); finish(p.requestId, String(p.final ?? visibleAnswer(raw.current.get(p.requestId) ?? ""))); });
@@ -179,6 +188,7 @@ export default function Command({ view, onConversation, onTyping, hosts }: {
     setText("");
     mentions.close();
     say("queen", "", "think", 120);
+    attachToBubble("queen", null);
     attach.clear();
     setLines((l) => [...l, { who: "you" as const, text: typed || s }].slice(-12));
     mine.current = s;
@@ -207,6 +217,7 @@ export default function Command({ view, onConversation, onTyping, hosts }: {
     finally { setBusy(""); }
   };
 
+  const browser = useRequestBrowser([...lines.map((l) => l.req), ...pending.map((p) => p.id)]);
   return (
     <div className="wc">
       {open && (lines.length > 0 || pending.length > 0) && (
@@ -220,11 +231,13 @@ export default function Command({ view, onConversation, onTyping, hosts }: {
             {lines.map((l, i) => (
               <div key={i} className={`wc-${l.who}`}>
                 {l.who === "queen" && l.by && <span className="msg-byline-engine">{l.by}</span>}
+                {browser(l.req, false)}
                 {l.who === "queen" ? <Response>{l.text}</Response> : l.text}
               </div>
             ))}
             {pending.map((p) => (
               <div key={p.id} className="wc-queen">
+                {browser(p.id, true)}
                 {p.live ? <Response>{p.live}</Response> : <span className="wc-busy">{p.step ? t("Using {tool}…", { tool: p.step }) : t("Thinking…")}{p.wire && <span className="wc-wire" title={p.wire}> · {p.wire}</span>}</span>}
               </div>
             ))}

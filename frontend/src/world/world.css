@@ -300,6 +300,17 @@
 .wl-say[data-mode="think"] .wl-say-in::before, .wl-say[data-mode="think"] .wl-say-in::after { content: ""; position: absolute; background: #fff; border: 2px solid #16202b; border-radius: 50%; }
 .wl-say[data-mode="think"] .wl-say-in::before { width: 12px; height: 12px; left: calc(50% - 2px); bottom: -14px; }
 .wl-say[data-mode="think"] .wl-say-in::after { width: 7px; height: 7px; left: calc(50% - 8px); bottom: -24px; }
+/* The dots and their line sit in the bubble's first box now that a second
+   one (an attachment) can follow them. */
+.wl-say[data-mode="think"] .wl-say-in > div:first-child { display: flex; align-items: center; gap: 8px; }
+/* A bubble with a browser card under its words: one column, and anchored by
+   its bottom so the taller bubble grows upward, away from the robot. */
+.wl-say.has-extra .wl-say-in { flex-direction: column; align-items: stretch; transform: translateY(calc(-100% + 24px)); }
+/* Fewer lines of words above a card, so the two together are about the
+   height of a bubble without one; the rest is a click away, as before. */
+.wl-say.has-extra .wl-say-md { max-height: 80px; -webkit-mask-image: linear-gradient(#000 70%, transparent); mask-image: linear-gradient(#000 70%, transparent); }
+.wl-say.has-extra[data-mode="think"] .wl-say-in { border-radius: 18px; }
+.wl-say-extra:empty { display: none; }
 .wl-say small { font-size: 11.5px; color: #5f6d77; font-family: "Geist Mono", monospace; }
 .wl-dots { display: inline-flex; gap: 4px; }
 .wl-dots i { width: 7px; height: 7px; border-radius: 50%; background: #16202b; animation: wl-dot 1s infinite ease-in-out; }

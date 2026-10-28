@@ -134,10 +134,13 @@ type Settings struct {
 	TurnMaxTokens     int `json:"turn_max_tokens,omitempty"`
 	LongTaskMaxTokens int `json:"long_task_max_tokens,omitempty"`
 
-	// DisableBrowser is retained for settings-file compatibility. agent-go v3
-	// removed pkg/browser, so SuperLeo no longer attaches a browser at all;
-	// wire an MCP browser server if browsing is needed.
+	// DisableBrowser is retained for settings-file compatibility; the
+	// browser is BrowserMode's.
 	DisableBrowser bool `json:"disable_browser"`
+	// BrowserMode is the built-in browser (browser.go): "chrome" works in the
+	// person's own Chrome, "own" in one it launches, "off" — the default —
+	// has none.
+	BrowserMode string `json:"browser_mode,omitempty"`
 
 	// DisablePTC turns off Programmatic Tool Calling (the model writes JS that
 	// drives tools in a sandbox, so one round does several tool calls).

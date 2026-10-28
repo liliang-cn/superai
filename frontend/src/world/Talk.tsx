@@ -9,6 +9,7 @@ import { useImeGuard } from "../lib/ime";
 import { visibleAnswer } from "../lib/format";
 import { Response } from "@/components/ai-elements/response";
 import { say, sayDone } from "./bubbles";
+import { useRequestBrowser } from "../components/BrowserCard";
 
 /** Who a robot is, for talking to it. */
 export type Talker =
@@ -18,7 +19,8 @@ export type Talker =
   | { kind: "cli"; agent: string } // a coding CLI: "claude.mac", or "codex" on the core
   | { kind: "bee"; id: string };
 
-type Line = { who: "you" | "it"; text: string; bad?: boolean };
+/** `req` is the queen's request that wrote an answer, for the browser card under it. */
+type Line = { who: "you" | "it"; text: string; bad?: boolean; req?: string };
 
 // Each robot's conversation lasts as long as the app does, so closing its
 // card and opening it again picks up where it was.
@@ -67,6 +69,8 @@ export default function Talk({ who, placeholder }: { who: Talker; placeholder: s
   const [streamed, setStreamed] = useState("");
   const raw = useRef("");
   const live = useRef("");
+  // The same request, as state: the card for the turn in progress follows it.
+  const [liveReq, setLiveReq] = useState("");
   // What this card just sent, until SendChat names its request.
   const mine = useRef("");
   const end = useRef<HTMLDivElement>(null);
@@ -105,16 +109,16 @@ export default function Talk({ who, placeholder }: { who: Talker; placeholder: s
   useEffect(() => {
     if (who.kind !== "queen") return;
     const others = new Set<string>();
-    const settle = () => { live.current = ""; raw.current = ""; setStreamed(""); setBusy(""); };
+    const settle = () => { live.current = ""; raw.current = ""; setStreamed(""); setBusy(""); setLiveReq(""); };
     const offs = [
       EventsOn("chat:turn", (p: any) => {
         if (!p?.requestId || p.sessionId !== queenSession() || p.requestId === live.current) return;
         // Ours, before SendChat answered with its id: its words stream from now.
-        if (mine.current && mine.current === p.message) { mine.current = ""; live.current = p.requestId; return; }
+        if (mine.current && mine.current === p.message) { mine.current = ""; live.current = p.requestId; setLiveReq(p.requestId); return; }
         others.add(p.requestId);
         push({ who: "you", text: String(p.message ?? "") });
       }),
-      EventsOn("chat:done", (p: any) => { if (others.delete(p?.requestId)) push({ who: "it", text: String(p.final ?? "") }); }),
+      EventsOn("chat:done", (p: any) => { if (others.delete(p?.requestId)) push({ who: "it", text: String(p.final ?? ""), req: p.requestId }); }),
       EventsOn("chat:error", (p: any) => { if (others.delete(p?.requestId)) push({ who: "it", text: String(p.error ?? ""), bad: true }); }),
       EventsOn("chat:cancelled", (p: any) => { others.delete(p?.requestId); }),
       EventsOn("chat:event", (p: any) => {
@@ -135,9 +139,9 @@ export default function Talk({ who, placeholder }: { who: Talker; placeholder: s
         if (!live.current || p?.requestId !== live.current) return;
         const text = String(p.final ?? visibleAnswer(raw.current));
         settle();
-        push({ who: "it", text });
+        push({ who: "it", text, req: p.requestId });
       }),
-      EventsOn("chat:error", (p: any) => { if (live.current && p?.requestId === live.current) { settle(); push({ who: "it", text: String(p.error ?? ""), bad: true }); } }),
+      EventsOn("chat:error", (p: any) => { if (live.current && p?.requestId === live.current) { settle(); push({ who: "it", text: String(p.error ?? ""), bad: true, req: p.requestId }); } }),
       EventsOn("chat:cancelled", (p: any) => { if (live.current && p?.requestId === live.current) settle(); }),
     ];
     return () => offs.forEach((f) => typeof f === "function" && f());
@@ -168,6 +172,7 @@ export default function Talk({ who, placeholder }: { who: Talker; placeholder: s
           raw.current = "";
           setStreamed("");
           live.current = await SendChat(queenSession(), s, []);
+          setLiveReq(live.current);
           mine.current = "";
           break;
         case "worker": case "agent": {
@@ -203,17 +208,24 @@ export default function Talk({ who, placeholder }: { who: Talker; placeholder: s
     } catch (e) {
       setBusy("");
       live.current = "";
+      setLiveReq("");
       push({ who: "it", text: String(e instanceof Error ? e.message : e), bad: true });
     }
   };
 
+  // The inspector is a narrow column: the compact card, as under a bubble.
+  const browser = useRequestBrowser([...lines.map((l) => l.req), liveReq || undefined], true);
   return (
     <div className="wt">
       {(lines.length > 0 || busy) && (
         <div className="wt-lines" ref={thread.ref} onScroll={thread.onScroll}>
-          {lines.map((l, i) => l.who === "it" && !l.bad
-            ? <div key={i} className="wt-line wt-it"><Response>{l.text}</Response></div>
-            : <p key={i} className={`wt-line wt-${l.who}${l.bad ? " bad" : ""}`}>{l.text}</p>)}
+          {lines.map((l, i) => [
+            browser(l.req, false),
+            l.who === "it" && !l.bad
+              ? <div key={i} className="wt-line wt-it"><Response>{l.text}</Response></div>
+              : <p key={i} className={`wt-line wt-${l.who}${l.bad ? " bad" : ""}`}>{l.text}</p>,
+          ])}
+          {liveReq && browser(liveReq, true)}
           {streamed && <div className="wt-line wt-it"><Response>{streamed}</Response></div>}
           {busy && (!streamed || busy !== t("Thinking…")) && <p className="wt-line wt-it wt-busy">{busy} <Waited remote={who.kind === "agent" || who.kind === "worker"} /></p>}
           <div ref={end} />

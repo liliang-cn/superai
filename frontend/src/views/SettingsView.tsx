@@ -7,6 +7,7 @@ import LinkSuperLeoCard from "../components/LinkSuperLeoCard";
 import LocalHiveCard from "../components/LocalHiveCard";
 import QueenEngineCard from "../components/QueenEngineCard";
 import ProxyCard from "../components/ProxyCard";
+import BrowserModeCard from "../components/BrowserModeCard";
 import AddAgentCard from "../components/AddAgentCard";
 import AddWorkerCard from "../components/AddWorkerCard";
 import { AppStatus } from "../lib/types";
@@ -1279,6 +1280,11 @@ export default function SettingsView({
             />
           )}
 
+          {/* Saved the moment it is picked, so the page's own copy of the
+              settings is told too: a later Save must not put the old mode back. */}
+          {section === "runtime" && (
+            <BrowserModeCard onChanged={(mode) => setS((cur) => (cur ? backend.Settings.createFrom({ ...cur, browser_mode: mode }) : cur))} />
+          )}
           <ProxyCard
             hidden={section !== "runtime"}
             proxy={s.proxy ?? new backend.ProxySettings()}

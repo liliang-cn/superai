@@ -1,0 +1,94 @@
+/* The built-in browser: one card per turn in a conversation, and the large
+   live panel. Both are in the control-room tokens (.cr-scope), which every
+   screen already has in both themes, so the card reads the same in the desk,
+   the web chat and the world's cards. */
+
+.bw-card { display: grid; grid-template-columns: 168px minmax(0, 1fr); gap: 12px; margin: 6px 0 10px; padding: 8px; max-width: 560px;
+  border: 1px solid var(--cr-line); border-radius: 10px; background: var(--cr-panel); color: var(--cr-text); cursor: pointer; text-align: left;
+  transition: border-color .15s, box-shadow .15s; }
+.bw-card:hover { border-color: var(--cr-line-2); box-shadow: 0 4px 14px rgba(14, 26, 34, .06); }
+.bw-card:focus-visible { outline: 2px solid var(--cr-cyan); outline-offset: 2px; }
+.bw-card.running { border-color: rgba(var(--cr-cyan-rgb), .5); }
+
+.bw-thumb { position: relative; aspect-ratio: 16 / 10; border-radius: 6px; overflow: hidden; background: var(--cr-bg); border: 1px solid var(--cr-line);
+  display: grid; place-items: center; color: var(--cr-mute); }
+.bw-thumb img { width: 100%; height: 100%; object-fit: cover; object-position: top left; display: block; }
+.bw-live { position: absolute; left: 5px; top: 5px; display: inline-flex; align-items: center; gap: 4px; padding: 1px 6px 1px 5px; border-radius: 999px;
+  background: rgba(255, 255, 255, .92); color: var(--cr-text); font: 600 9.5px var(--cr-mono); letter-spacing: .06em; text-transform: uppercase; box-shadow: 0 0 0 1px var(--cr-line); }
+.bw-live::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--cr-lime); }
+[data-theme="dark"] .bw-live { background: rgba(10, 16, 21, .85); }
+.bw-flag { position: absolute; left: 6px; right: 6px; bottom: 6px; text-align: center; font: 500 10px var(--cr-mono); color: var(--cr-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bw-flag.bad { color: var(--cr-rose); }
+
+.bw-body { min-width: 0; display: flex; flex-direction: column; gap: 3px; padding: 1px 2px 0 0; }
+.bw-head { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 12.5px; }
+.bw-head svg { flex: none; color: var(--cr-dim); }
+.bw-head b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.bw-bad { margin-left: auto; flex: none; font: 600 10px var(--cr-mono); color: var(--cr-rose); }
+.bw-addr-line { font: 11px var(--cr-mono); color: var(--cr-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bw-steps { list-style: none; margin: 4px 0 0; padding: 5px 0 0; border-top: 1px solid var(--cr-line); display: flex; flex-direction: column; gap: 1px;
+  max-height: 132px; overflow-y: auto; }
+.bw-steps li { display: flex; align-items: center; gap: 7px; min-width: 0; font: 11.5px var(--cr-mono); color: var(--cr-text); line-height: 1.6;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bw-steps li.fail { color: var(--cr-rose); }
+.bw-steps li.running { color: var(--cr-cyan); }
+.bw-mark { width: 14px; height: 14px; flex: none; display: inline-grid; place-items: center; border-radius: 50%; color: var(--cr-mute); }
+.bw-steps li.ok .bw-mark { background: rgba(var(--cr-lime-rgb), .14); color: var(--cr-lime); }
+.bw-steps li.fail .bw-mark { background: rgba(var(--cr-rose-rgb), .14); color: var(--cr-rose); }
+.bw-spin { width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid rgba(var(--cr-cyan-rgb), .25); border-top-color: var(--cr-cyan); animation: bw-rot .8s linear infinite; }
+@keyframes bw-rot { to { transform: rotate(360deg); } }
+
+/* Under a speech bubble in the world: the page over the last few steps, small
+   enough that the bubble still reads as one. */
+.bw-card.compact { grid-template-columns: 92px minmax(0, 1fr); gap: 8px; margin: 8px 0 0; padding: 5px; max-width: 272px; border-radius: 9px; }
+.bw-card.compact .bw-thumb { aspect-ratio: 16 / 10; border-radius: 5px; }
+.bw-card.compact .bw-live { left: 3px; top: 3px; padding: 0 4px; font-size: 8px; }
+.bw-card.compact .bw-flag { font-size: 8.5px; bottom: 3px; }
+.bw-card.compact .bw-head { font-size: 11.5px; }
+.bw-card.compact .bw-steps { max-height: none; margin-top: 1px; padding-top: 3px; }
+.bw-card.compact .bw-steps li { font-size: 10px; line-height: 1.45; }
+.bw-card.compact .bw-mark { width: 12px; height: 12px; }
+.bw-card.compact .bw-addr-line { display: none; }
+
+/* Narrow columns (the world's cards, a phone): the picture over the steps. */
+@media (max-width: 520px) { .bw-card:not(.compact) { grid-template-columns: 1fr; } }
+
+/* ---- the panel ---- */
+.bw-overlay { position: fixed; inset: 0; z-index: 120; display: grid; place-items: center; padding: 28px; background: rgba(14, 26, 34, .22); backdrop-filter: blur(3px); }
+.bw-panel { width: min(1240px, 100%); height: min(860px, 100%); display: flex; flex-direction: column; overflow: hidden;
+  background: var(--cr-panel); border: 1px solid var(--cr-line-2); border-radius: 12px; box-shadow: 0 20px 60px rgba(14, 26, 34, .22); color: var(--cr-text); }
+
+.bw-tabs { display: flex; align-items: flex-end; gap: 2px; padding: 8px 8px 0 12px; background: var(--cr-bg); border-bottom: 1px solid var(--cr-line); min-height: 40px; }
+.bw-tabs-ic { flex: none; color: var(--cr-dim); align-self: center; margin: 0 6px 6px 0; }
+.bw-tab { max-width: 220px; padding: 7px 12px; border: 1px solid transparent; border-bottom: 0; border-radius: 8px 8px 0 0; font-size: 12px; color: var(--cr-dim);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: -1px; }
+.bw-tab.on { background: var(--cr-panel); border-color: var(--cr-line); color: var(--cr-text); font-weight: 550; }
+.bw-x { margin-left: auto; align-self: center; margin-bottom: 6px; }
+
+.bw-addr { display: flex; align-items: center; gap: 9px; padding: 7px 12px; border-bottom: 1px solid var(--cr-line); }
+.bw-url { flex: 1; min-width: 0; padding: 5px 10px; border: 1px solid var(--cr-line); border-radius: 7px; background: var(--cr-bg);
+  font: 12px var(--cr-mono); color: var(--cr-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; user-select: text; }
+.bw-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--cr-mute); }
+.bw-dot.on { background: var(--cr-lime); }
+.bw-dot.wait { background: var(--cr-amber); }
+
+/* The page itself: fitted, never cropped, so a point on it maps back to the
+   page exactly. Focus is the take-over: an accent ring says keys go there. */
+.bw-screen { position: relative; flex: 1; min-height: 0; display: grid; place-items: center; background: var(--cr-bg); outline: none; cursor: default; overflow: hidden; }
+.bw-screen img { width: 100%; height: 100%; object-fit: contain; display: block; user-select: none; -webkit-user-drag: none; }
+.bw-screen.taken { box-shadow: inset 0 0 0 2px var(--cr-cyan); }
+.bw-screen .bw-flag { left: 50%; right: auto; bottom: 12px; transform: translateX(-50%); padding: 3px 10px; border-radius: 999px; background: var(--cr-panel); box-shadow: 0 0 0 1px var(--cr-line-2); }
+.bw-blank { color: var(--cr-mute); }
+.bw-empty { cursor: default; }
+.bw-state { display: flex; flex-direction: column; align-items: center; gap: 10px; max-width: 520px; text-align: center; }
+.bw-state b { font-size: 14px; font-weight: 600; }
+.bw-state.bad b { color: var(--cr-rose); }
+.bw-state code { font: 11.5px var(--cr-mono); color: var(--cr-dim); white-space: pre-wrap; word-break: break-word; }
+.bw-btns { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.bw-spin.big { width: 18px; height: 18px; border-width: 2px; }
+
+.bw-foot { display: flex; align-items: center; gap: 16px; padding: 6px 12px; border-top: 1px solid var(--cr-line); font: 10.5px var(--cr-mono); color: var(--cr-dim); }
+.bw-ver { margin-left: auto; color: var(--cr-mute); }
+
+@media (max-width: 640px) { .bw-overlay { padding: 0; } .bw-panel { border-radius: 0; height: 100%; } }
+@media (prefers-reduced-motion: reduce) { .bw-spin { animation: none; } }

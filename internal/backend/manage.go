@@ -29,9 +29,11 @@ func (s *Service) InstallMCPServer(ctx context.Context, name, command string, ar
 	}
 	// A start failure is not an install failure: the config is written, so the
 	// server comes back on the next launch.
-	// WithEnv, not the plain variant: most servers need a credential, and one
-	// started without its env is up but unable to do anything.
-	if err := s.svc.MCP.AddDynamicServerWithEnv(ctx, name, command, args, env); err != nil {
+	// With its env: most servers need a credential, and one started without
+	// it is up but unable to do anything. AddMCPServer also indexes its tools:
+	// started without that, the server ran and the model could not find a
+	// single tool of it until a restart.
+	if err := s.svc.AddMCPServer(ctx, name, command, args, env); err != nil {
 		return fmt.Errorf("saved, but it did not start: %w", err)
 	}
 	return nil

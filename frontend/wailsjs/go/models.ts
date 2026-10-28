@@ -2244,6 +2244,28 @@ export namespace backend {
 		    return a;
 		}
 	}
+	export class BrowserStatus {
+	    enabled: boolean;
+	    ready: boolean;
+	    version: string;
+	    mode: string;
+	    streamUrl: string;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new BrowserStatus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.enabled = source["enabled"];
+	        this.ready = source["ready"];
+	        this.version = source["version"];
+	        this.mode = source["mode"];
+	        this.streamUrl = source["streamUrl"];
+	        this.error = source["error"];
+	    }
+	}
 	export class CLIProxyAccount {
 	    file: string;
 	    provider: string;
@@ -3364,6 +3386,7 @@ export namespace backend {
 	    turn_max_tokens?: number;
 	    long_task_max_tokens?: number;
 	    disable_browser: boolean;
+	    browser_mode?: string;
 	    disable_ptc: boolean;
 	    pii_redaction: boolean;
 	    avatar_port: number;
@@ -3423,6 +3446,7 @@ export namespace backend {
 	        this.turn_max_tokens = source["turn_max_tokens"];
 	        this.long_task_max_tokens = source["long_task_max_tokens"];
 	        this.disable_browser = source["disable_browser"];
+	        this.browser_mode = source["browser_mode"];
 	        this.disable_ptc = source["disable_ptc"];
 	        this.pii_redaction = source["pii_redaction"];
 	        this.avatar_port = source["avatar_port"];
@@ -3638,36 +3662,6 @@ export namespace backend {
 	        this.spark = source["spark"];
 	    }
 	}
-
-}
-
-export namespace domain {
-	
-	export class TokenUsage {
-	    prompt_tokens: number;
-	    completion_tokens: number;
-	    cached_prompt_tokens?: number;
-	    cache_write_tokens?: number;
-	    reasoning_tokens?: number;
-	
-	    static createFrom(source: any = {}) {
-	        return new TokenUsage(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.prompt_tokens = source["prompt_tokens"];
-	        this.completion_tokens = source["completion_tokens"];
-	        this.cached_prompt_tokens = source["cached_prompt_tokens"];
-	        this.cache_write_tokens = source["cache_write_tokens"];
-	        this.reasoning_tokens = source["reasoning_tokens"];
-	    }
-	}
-
-}
-
-export namespace mcp {
-	
 	export class ToolStat {
 	    tool: string;
 	    calls: number;
@@ -3734,6 +3728,36 @@ export namespace mcp {
 		    return a;
 		}
 	}
+
+}
+
+export namespace domain {
+	
+	export class TokenUsage {
+	    prompt_tokens: number;
+	    completion_tokens: number;
+	    cached_prompt_tokens?: number;
+	    cache_write_tokens?: number;
+	    reasoning_tokens?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new TokenUsage(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.prompt_tokens = source["prompt_tokens"];
+	        this.completion_tokens = source["completion_tokens"];
+	        this.cached_prompt_tokens = source["cached_prompt_tokens"];
+	        this.cache_write_tokens = source["cache_write_tokens"];
+	        this.reasoning_tokens = source["reasoning_tokens"];
+	    }
+	}
+
+}
+
+export namespace mcp {
+	
 	export class ToolSummary {
 	    name: string;
 	    description: string;

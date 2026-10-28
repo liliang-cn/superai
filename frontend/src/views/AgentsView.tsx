@@ -25,6 +25,8 @@ import { toast } from "../lib/toasts";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { mdComponents } from "../components/Transcript";
+import BrowserCard from "../components/BrowserCard";
+import { BrowserCall, browserOp } from "../lib/browser";
 
 // Plain shapes: what arrives over events is JSON, not the generated classes.
 type Ev = Omit<app.CLIRunEvent, "convertValues">;
@@ -581,8 +583,10 @@ function TermView({ term }: { term: Term }) {
           {evs === null && !err && <div className="cd-none">{t("Reading…")}</div>}
           {err && <div className="agents-note bad">{err}</div>}
           <div className="agents-run" data-testid="term-log">
-            {shown.filter((e) => !(e.kind === "result" && e.callId && results.has(e.callId) && shown.some((c) => c.kind === "tool" && c.callId === e.callId))).map((e) =>
-              e.kind === "you" ? (
+            {withBrowserCards(shown.filter((e) => !(e.kind === "result" && e.callId && results.has(e.callId) && shown.some((c) => c.kind === "tool" && c.callId === e.callId))), results, term.state === "running", termKey(term)).map((e) =>
+              isCard(e) ? (
+                <BrowserCard key={`bw-${e.seq}`} turnKey={e.key} calls={e.calls} running={e.running} live={e.running} />
+              ) : e.kind === "you" ? (
                 <div key={e.seq} className="agents-you">{e.text}</div>
               ) : e.kind === "tool" ? (
                 <ToolStep key={e.seq} call={e} result={e.callId ? results.get(e.callId) : undefined} />
@@ -622,8 +626,10 @@ function RunBlock({ run, events }: { run: Run; events: Ev[] }) {
   return (
     <div className="agents-run">
       <div className="agents-you">{run.prompt}</div>
-      {shown.map((e) =>
-        e.kind === "tool" ? (
+      {withBrowserCards(shown, results, run.state === "running", run.id).map((e) =>
+        isCard(e) ? (
+          <BrowserCard key={`bw-${e.seq}`} turnKey={e.key} calls={e.calls} running={e.running} live={e.running} />
+        ) : e.kind === "tool" ? (
           <ToolStep key={e.seq} call={e} result={e.callId ? results.get(e.callId) : undefined} />
         ) : e.kind === "text" ? (
           <div key={e.seq} className="agents-text md">
@@ -656,6 +662,33 @@ function RunBlock({ run, events }: { run: Run; events: Ev[] }) {
       </div>
     </div>
   );
+}
+
+type BrowserItem = { kind: "browser"; seq: number; key: string; calls: BrowserCall[]; running: boolean };
+const isCard = (e: Ev | BrowserItem): e is BrowserItem => e.kind === "browser";
+
+/**
+ * A log with each turn's browser calls drawn as one card, where the first of
+ * them was. A turn here is the stretch between two things the person said.
+ */
+function withBrowserCards(evs: Ev[], results: Map<string, Ev>, running: boolean, key: string): (Ev | BrowserItem)[] {
+  const out: (Ev | BrowserItem)[] = [];
+  let card: BrowserItem | null = null;
+  evs.forEach((e, i) => {
+    if (e.kind === "you") card = null;
+    const op = e.kind === "tool" ? browserOp(e.tool) : "";
+    if (!op) { out.push(e); return; }
+    const r = e.callId ? results.get(e.callId) : undefined;
+    const call: BrowserCall = { id: String(e.seq), op, args: {}, detail: e.detail, status: r ? (r.failed ? "fail" : "ok") : running ? "running" : "ok" };
+    if (!card) {
+      card = { kind: "browser", seq: e.seq, key: `${key}:${e.seq}`, calls: [], running: false };
+      out.push(card);
+    }
+    card.calls.push(call);
+    // Only the last turn of a running log can still be at work.
+    card.running = running && !evs.slice(i + 1).some((x) => x.kind === "you");
+  });
+  return out;
 }
 
 function ToolStep({ call, result }: { call: Ev; result?: Ev }) {

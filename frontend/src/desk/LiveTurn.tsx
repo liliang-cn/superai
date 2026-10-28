@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { BookmarkCheckIcon, CheckIcon, ChevronDownIcon, XIcon } from "lucide-react";
 import { ChatMessage, TraceItem } from "../lib/types";
 import { fmtK, Snap } from "../components/Reactor";
+import { browserOp } from "../lib/browser";
 import "./liveturn.css";
 
 /**
@@ -155,7 +156,8 @@ export default function LiveTurn({ m, trace, pulse, session }: { m: ChatMessage;
       </button>
       {(top.length > 0 || (running && thought)) && (
         <ol className="lt-steps">
-          {top.map((t) => (
+          {/* Browser calls are drawn as one card under this one, with the page. */}
+          {top.filter((t) => !browserOp(t.tool)).map((t) => (
             <li key={t.id} className={`lt-step ${t.status}`}>
               <span className="lt-mark">{t.status === "running" ? <i className="lt-spin" /> : t.status === "ok" ? <CheckIcon size={12} strokeWidth={3} /> : <XIcon size={12} strokeWidth={3} />}</span>
               <code>{t.tool}</code>

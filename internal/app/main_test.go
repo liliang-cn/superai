@@ -11,5 +11,8 @@ import (
 // test here is about that answer but the cache's own, which brings its own.
 func TestMain(m *testing.M) {
 	cliSignIn.checks = nil
+	// No test here downloads agent-browser or drives a browser; the ones
+	// about the browser set what they need.
+	os.Setenv("SUPERLEO_BROWSER_MODE", "off")
 	os.Exit(m.Run())
 }
