@@ -38,10 +38,14 @@ var localWorkerKinds = []struct {
 // LocalWorkerCandidates lists the agents installed here that can be added
 // as workers.
 func (a *App) LocalWorkerCandidates() []LocalWorkerCandidate {
+	// A copy, taken under the lock: a save rewrites the map, and reading it
+	// while that happens is a fatal error that takes the whole app down.
 	a.mu.Lock()
-	var have map[string]backend.RemoteAgent
+	have := map[string]backend.RemoteAgent{}
 	if a.settings != nil {
-		have = a.settings.RemoteAgents.Agents
+		for k, v := range a.settings.RemoteAgents.Agents {
+			have[k] = v
+		}
 	}
 	a.mu.Unlock()
 	out := []LocalWorkerCandidate{}
