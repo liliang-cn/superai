@@ -637,13 +637,13 @@ html[data-desk] body { background: transparent; }
 .dk-world.window-on > .dk-rail { display: none; }
 .dk-world.window-on > .dk-page {
   display: flex; position: fixed; z-index: 8; inset: 52px 72px 44px 72px; width: auto; margin: 0;
-  border-radius: 18px; background: #fff; box-shadow: 0 30px 80px rgba(22, 32, 43, 0.28), 0 0 0 1px rgba(22, 32, 43, 0.08);
+  border-radius: 18px; background: var(--bg-1); box-shadow: 0 30px 80px rgba(22, 32, 43, 0.28), 0 0 0 1px var(--border);
   animation: dk-win-in 0.22s ease-out;
 }
 .dk-world.window-on > .dk {
   display: grid; position: fixed; z-index: 8; inset: 52px 72px 44px 72px; margin: 0;
   grid-template-columns: var(--dk-side-width, 252px) minmax(0, 1fr) 0 !important; grid-template-rows: minmax(0, 1fr);
-  background: #f3f5f8; border-radius: 18px; padding: 10px; box-shadow: 0 30px 80px rgba(22, 32, 43, 0.28);
+  background: var(--bg-0); border-radius: 18px; padding: 10px; box-shadow: 0 30px 80px rgba(22, 32, 43, 0.28);
   animation: dk-win-in 0.22s ease-out;
 }
 .dk-world.window-on > .dk > .dk-live { display: none; }
@@ -653,8 +653,8 @@ html[data-desk] body { background: transparent; }
 /* The window always takes the same frame, whatever width the page had as a
    panel, and its close button sits on its own corner. */
 .dk-world.window-on > .dk-page { width: auto !important; justify-self: stretch; }
-.dk-world.window-on > .dk-win-x { top: 64px; right: 84px; width: 30px; height: 30px; background: #f1f4f8; color: #16202b; box-shadow: none; border: 1px solid rgba(22, 32, 43, 0.1); }
-.dk-world.window-on > .dk-win-x:hover { background: #16202b; color: #fff; }
+.dk-world.window-on > .dk-win-x { top: 64px; right: 84px; width: 30px; height: 30px; background: var(--bg-2); color: var(--text-0); box-shadow: none; border: 1px solid var(--border); }
+.dk-world.window-on > .dk-win-x:hover { background: var(--text-0); color: var(--bg-1); }
 .dk-world.window-on > .dk-page > .content { padding-right: 40px; }
 
 /* ── The round buttons, bottom right (components/fabs.css) ───────────── */
