@@ -18,12 +18,20 @@ export function bootDone() {
   window.setTimeout(() => el.remove(), 700);
 }
 
-/** After the first render: a page with no 3D world is ready as it stands. */
+/**
+ * After the first render. The 3D desk mounts a little later than the page
+ * (settings are read first), so the page is watched for a while: with the
+ * desk in it, the engine's first frame takes the screen down; without it,
+ * the page as it stands does once it has had time to show.
+ */
 export function bootAfterMount() {
   window.setTimeout(bootDone, MAX_MS);
-  // Two frames: the first commit has laid out; the second has painted.
-  requestAnimationFrame(() => requestAnimationFrame(() => {
-    // The 3D desk takes it down itself at its first frame (engine.ts).
-    if (!document.querySelector(".dk-world, canvas[data-engine]")) bootDone();
-  }));
+  const start = performance.now();
+  const look = () => {
+    if (done) return;
+    if (document.querySelector(".dk-world:not(.dk-flat), canvas[data-engine]")) return; // engine.ts takes it down
+    if (performance.now() - start > 1500 && document.getElementById("root")?.childElementCount) { bootDone(); return; }
+    window.setTimeout(look, 120);
+  };
+  requestAnimationFrame(look);
 }

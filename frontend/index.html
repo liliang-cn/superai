@@ -28,7 +28,16 @@
          colours are the 3D scene's haze, so the boot screen fades into it. -->
     <meta name="color-scheme" content="light dark"/>
     <script>
-      try { document.documentElement.dataset.boot = localStorage.getItem("superleo-theme") === "dark" ? "dark" : "light"; } catch (e) { document.documentElement.dataset.boot = "light"; }
+      // data-theme too, not only the boot screen's: styles.css takes the dark
+      // palette when the attribute is missing, and React sets it only after
+      // it has mounted, which left a dark second between this screen and the
+      // app.
+      (function () {
+        var t = "light";
+        try { if (localStorage.getItem("superleo-theme") === "dark") t = "dark"; } catch (e) {}
+        document.documentElement.dataset.boot = t;
+        document.documentElement.dataset.theme = t;
+      })();
     </script>
     <style>
       html { background: #f3f5f8; color-scheme: light; }
