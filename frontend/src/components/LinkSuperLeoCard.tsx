@@ -57,10 +57,6 @@ export default function LinkSuperLeoCard({ onChanged }: { onChanged: (s: backend
   return (
     <div className="card">
       <div className="card-title">Other SuperLeos</div>
-      <div className="card-desc">
-        Use Claude Code or Codex on another machine. On that machine, open Settings › Runtime › Pair a
-        device; enter its address and the six digits here.
-      </div>
       <div className="link-form">
         <input className="input" placeholder="Address, e.g. 192.168.1.20:43117" value={address} onChange={(e) => setAddress(e.target.value)} />
         <input

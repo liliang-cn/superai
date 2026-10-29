@@ -41,9 +41,6 @@ export default function QueenEngineCard({ hidden, engine, fallback, publicURL, o
   return (
     <div className="card" hidden={hidden}>
       <div className="card-title">{translate("Queen engine")}</div>
-      <div className="card-desc">
-        {translate("Who answers when you talk to the queen. Calls, schedules and dashboards stay with SuperLeo.")}
-      </div>
       <div className="field">
         <label>{translate("Engine")}</label>
         <div className="seg" role="radiogroup" aria-label={translate("Engine")} style={{ flexWrap: "wrap", alignSelf: "flex-start" }}>
@@ -86,7 +83,6 @@ export default function QueenEngineCard({ hidden, engine, fallback, publicURL, o
             autoComplete="off"
             onChange={(e) => onChange(engine, fallback, e.target.value)}
           />
-          <span className="hint">{translate("Where the other machine reaches this SuperLeo's /mcp.")}</span>
         </div>
       )}
     </div>

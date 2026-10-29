@@ -89,11 +89,6 @@ export default function PairPhoneCard() {
   return (
     <div className="card">
       <div className="card-title">Phones and other SuperLeos</div>
-      <div className="card-desc">
-        Pair the SuperLeo iPhone app — scan the code with the phone's camera — or another SuperLeo,
-        which enters this address and the six digits under Other SuperLeos. Each gets its own key
-        and can be unpaired here.
-      </div>
 
       {code ? (
         <div style={{ display: "flex", gap: 20, alignItems: "center", flexWrap: "wrap", marginBottom: 14 }}>

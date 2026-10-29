@@ -2427,10 +2427,8 @@ body.desktop-shell .dash-full-bar { padding-left: 112px; --wails-draggable: drag
      say: the ready state stays one row, which is nearly always. */
   .statusbar { flex-wrap: wrap; }
   .statusbar:not(.ok) .status-main { flex: 1 1 100%; }
-  /* Tab strips scroll sideways rather than wrap. Wrapped, Settings' five tabs
-     put "Runtime" alone on a second row, which reads as a separate thing
-     rather than the last of five. A strip that scrolls keeps them one rank,
-     and a phone already knows how to swipe one. */
+  /* Tab strips scroll sideways rather than wrap: a wrapped strip puts its last
+     tab alone on a second row, which reads as a separate thing. */
   .settings-tabs, .tabs {
     flex-wrap: nowrap;
     overflow-x: auto;
@@ -3081,33 +3079,6 @@ body.desktop-shell .dash-full-bar { padding-left: 112px; --wails-draggable: drag
  * exists further up, and source order is what settles it.
  */
 @media (max-width: 640px) {
-  /* The strip was already told to scroll sideways rather than wrap. What it
-     was never given is a reason to believe that: a scroll container with the
-     scrollbar hidden, whose last visible label ends flush against the screen
-     edge, is indistinguishable from a strip that has simply been cut off — and
-     six tabs are 518px against a 390px screen, so two of them are always past
-     the edge. The fade is the difference between a cut and a scroll.
-
-     It is taken off at the end of the travel from a class the view sets. A
-     fade that never goes away is decoration, and decoration shaped like an
-     affordance is worse than none: it would promise a seventh tab forever. */
-  .settings-tabs {
-    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
-    mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
-    /* A tab parked under the fade is a tab that cannot be read, so the strip
-       keeps an empty lane past the last one. scroll-padding is the same
-       reservation for scrollIntoView, which the view calls when the section
-       changes from somewhere other than a tap on the strip. */
-    padding-right: 32px;
-    scroll-padding-inline: 18px 32px;
-  }
-  .settings-tabs.at-end {
-    -webkit-mask-image: none;
-    mask-image: none;
-  }
-  /* "External agents" is two words, and a tab allowed to break between them
-     puts a second line inside the strip — which is the wrapped, three-rank
-     strip the scrolling was meant to avoid, arrived at from the other side. */
   .settings-tab {
     flex: none;
     white-space: nowrap;

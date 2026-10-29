@@ -56,10 +56,6 @@ export default function LocalHiveCard({ onChanged }: { onChanged: (s: backend.Se
   return (
     <div className="card">
       <div className="card-title">Workers on this machine</div>
-      <div className="card-desc">
-        Run extra SuperLeo processes on this computer. The queen hands them pieces of a request, so several
-        things get done at once. Each worker is its own process: about 60 MB while idle, more while it works.
-      </div>
 
       {!hive.available ? (
         <span className="hint">Not available here: {hive.note}.</span>
@@ -82,13 +78,11 @@ export default function LocalHiveCard({ onChanged }: { onChanged: (s: backend.Se
               <label>Always running</label>
               <input className="input" type="number" min={1} max={most} value={keep}
                 onChange={(e) => setKeep(Math.max(1, Number(e.target.value) || 1))} />
-              <span className="hint">Ready before there is work, so a hand-off does not wait for a start.</span>
             </div>
             <div className="field">
               <label>At most</label>
               <input className="input" type="number" min={keep} max={16} value={most}
                 onChange={(e) => setMost(Math.max(1, Number(e.target.value) || 1))} />
-              <span className="hint">The queen adds workers up to this when there is more to do, and lets the extra ones go after 10 idle minutes.</span>
             </div>
           </div>
 

@@ -1,7 +1,6 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { translate, useI18n } from "../lib/i18n";
 import LanguageSettings from "../components/LanguageSettings";
-import AvatarSection from "./AvatarSection";
 import PairPhoneCard from "../components/PairPhoneCard";
 import LinkSuperLeoCard from "../components/LinkSuperLeoCard";
 import LocalHiveCard from "../components/LocalHiveCard";
@@ -11,7 +10,6 @@ import BrowserModeCard from "../components/BrowserModeCard";
 import DesktopControlCard from "../components/DesktopControlCard";
 import AddAgentCard from "../components/AddAgentCard";
 import AddWorkerCard from "../components/AddWorkerCard";
-import { AppStatus } from "../lib/types";
 import {
   CLIProxyAccounts,
   CLIProxyLogin,
@@ -73,7 +71,7 @@ function AuditTail({ info }: { info: ApprovalInfo | null }) {
     <div className="field">
       <label>Recent tool decisions</label>
       {info.entries.length === 0 ? (
-        <span className="hint">Nothing yet. Shell commands, installs and deletions land here.</span>
+        <span className="hint">{translate("None")}</span>
       ) : (
         <div className="audit-list">
           {/* Newest first on screen; the file itself is append-order. */}
@@ -89,9 +87,7 @@ function AuditTail({ info }: { info: ApprovalInfo | null }) {
           ))}
         </div>
       )}
-      <span className="hint">
-        Full log: <code>{info.auditPath}</code> — one JSON object per line, readable without this app.
-      </span>
+      <span className="hint"><code>{info.auditPath}</code></span>
     </div>
   );
 }
@@ -172,9 +168,6 @@ function QueenNameCard({ name, aliases, onChange, hidden }: {
   return (
     <div className="card" hidden={hidden}>
       <div className="card-title">{translate("Queen's name")}</div>
-      <div className="card-desc">
-        {translate("What the hive's main agent is called here, on the phone and in its own replies. @ with the name or an alias reaches it, never a worker.")}
-      </div>
       <TextField label="Name" value={name} placeholder={DEFAULT_QUEEN} onChange={(v) => onChange(v, aliases)} />
       <div className="field">
         <label>{translate("Also answers to")}</label>
@@ -215,12 +208,6 @@ function OpenInBrowserCard() {
   return (
     <div className="card">
       <div className="card-title">Open in Browser</div>
-      <div className="card-desc">
-        Serve this running app on localhost and open it in your default browser. Not a copy —
-        the same conversations, the same agent, the same runs in flight, seen from a second
-        window. The link signs that browser in once and then expires; the server stops when
-        SuperLeo quits.
-      </div>
       {origin && (
         <div className="url-box" style={{ marginBottom: 14 }}>
           <span className="url-label">LOCAL</span>
@@ -244,26 +231,17 @@ function OpenInBrowserCard() {
 }
 
 /**
- * The settings, in groups.
- *
- * They were one column of eight cards, which meant scrolling past the model
- * accounts to reach the workspace directory and scrolling back to save. The
- * groups are by what a person came to change, not by which struct the fields
- * live in — embeddings and the memory backend are one decision made in two
- * places, so they sit together.
+ * The settings, in three groups: what it thinks and remembers with, what it
+ * can reach and who decides, and everything else. Embeddings and the memory
+ * backend are one decision made in two places, so they sit together; the hive
+ * is an ability like the browser, so it sits with the browser.
  */
-type SectionID = "model" | "memory" | "notifications" | "safety" | "agents" | "runtime";
+type SectionID = "model" | "abilities" | "general";
 
 const SECTIONS: { id: SectionID; label: string }[] = [
   { id: "model", label: "Model" },
-  { id: "memory", label: "Memory" },
-  { id: "notifications", label: "Notifications" },
-  { id: "safety", label: "Safety" },
-  // Next to Safety, not to Runtime: the decisions on this tab are who else
-  // gets to touch this machine, which is the same question the tab before it
-  // asks about SuperLeo itself.
-  { id: "agents", label: "External agents" },
-  { id: "runtime", label: "Runtime" },
+  { id: "abilities", label: "Abilities" },
+  { id: "general", label: "General" },
 ];
 
 /** The agent CLIs SuperLeo can hand a task to, in the order they are listed. */
@@ -316,11 +294,6 @@ function ExternalAgentsCard({
   return (
     <div className="card">
       <div className="card-title">External agents</div>
-      <div className="card-desc">
-        Let SuperLeo hand a task to an agent CLI already installed here. It spends that
-        subscription, not this app's, and the CLI writes files with its own approval prompt
-        bypassed — so this is off until you turn it on.
-      </div>
 
       <div className="field">
         <label>Delegate to agent CLIs</label>
@@ -384,12 +357,6 @@ function ExternalAgentsCard({
             );
           })}
         </div>
-        <span className="hint">
-          Installed is not the same as usable, and only the first is checked on this page — a
-          real request costs a token, so asking is a button, on the card below. A CLI that
-          works in your terminal but reads as missing usually has a path this app never
-          inherited; type it in above.
-        </span>
         <div className="row" style={{ marginTop: 8 }}>
           <button className="btn ghost sm" onClick={onRecheck} disabled={probing}>
             {probing ? "Checking…" : "Save and re-check"}
@@ -401,10 +368,6 @@ function ExternalAgentsCard({
         <>
           <div className="field">
             <label>Directories it may work in</label>
-            <span className="hint">
-              The workspace is always allowed. Add a directory to let a delegated run read and
-              write there too — a repository it is meant to fix, and nothing else.
-            </span>
             <div className="ea-roots">
               {roots.map((r, i) => (
                 <div key={i} className="ea-root">
@@ -446,12 +409,6 @@ function ExternalAgentsCard({
                   : "Off — you are asked before another agent is handed the task"}
               </span>
             </div>
-            {ea.unattended && (
-              <span className="hint">
-                For scheduled work with nobody at the machine. Every call it lets through is
-                still written to the audit log under Safety.
-              </span>
-            )}
           </div>
 
           <div className="field">
@@ -463,10 +420,7 @@ function ExternalAgentsCard({
               value={ea.timeout_seconds ?? 0}
               onChange={(e) => onChange({ timeout_seconds: Number(e.target.value) })}
             />
-            <span className="hint">
-              How long one delegated run may take. 0 uses the built-in 20 minutes — long enough
-              for a real task, short enough that a CLI sitting on a login prompt gives up.
-            </span>
+            <span className="hint">0 = 20 min</span>
           </div>
         </>
       )}
@@ -504,11 +458,6 @@ function RemoteAgentsCard({
   return (
     <div className="card">
       <div className="card-title">Agents on other machines</div>
-      <div className="card-desc">
-        Ask an agent that is not on this laptop — pi, hermes and openclaw on the cluster.
-        They are reached over SSH as the account that already has a key on those nodes, so
-        turning this on lets SuperLeo run commands there. Off until you say otherwise.
-      </div>
 
       <div className="field">
         <label>Reach agents over the network</label>
@@ -553,11 +502,6 @@ function RemoteAgentsCard({
               );
             })}
           </div>
-          <span className="hint">
-            The hosts are tried in order and the one currently holding the agent wins, because
-            the cluster moves it between nodes. Edit them, or add an agent of your own, under
-            <code> remote_agents </code> in <code>~/.superleo/settings.json</code>.
-          </span>
         </div>
       )}
 
@@ -565,23 +509,12 @@ function RemoteAgentsCard({
         <button className="btn ghost sm" onClick={onCheck} disabled={checking}>
           {checking ? "Asking every agent…" : "Save and ask each one"}
         </button>
-        <span className="hint" style={{ marginLeft: 10 }}>
-          Asks every agent — including the CLIs on this machine — one trivial question. That is
-          a real request against each subscription.
-        </span>
       </div>
     </div>
   );
 }
 
-export default function SettingsView({
-  onSaved,
-  status,
-}: {
-  onSaved: () => void;
-  // Only the avatar section needs it, for the port the bridge is listening on.
-  status: AppStatus | null;
-}) {
+export default function SettingsView({ onSaved }: { onSaved: () => void }) {
   const { t } = useI18n();
   const [s, setS] = useState<backend.Settings | null>(null);
   const [saving, setSaving] = useState(false);
@@ -594,41 +527,6 @@ export default function SettingsView({
   const [projectID, setProjectID] = useState("");
   const [login, setLogin] = useState<{ status: string; provider: string; message: string } | null>(null);
   const [pasted, setPasted] = useState("");
-
-  /**
-   * The tab strip scrolls sideways on a phone — six labels are 518px wide and
-   * the screen is 390. Two things follow from that, and neither is CSS.
-   *
-   * The strip is faded at its right edge to say there is more, and the fade has
-   * to go away at the end of the scroll: a permanent one is decoration, and
-   * decoration that looks like an affordance is worse than none. And a tab
-   * picked from elsewhere — or the one that is active on arrival — has to be
-   * scrolled to, or the strip shows a selection the reader cannot see.
-   */
-  const tabsRef = useRef<HTMLDivElement | null>(null);
-  const activeTabRef = useRef<HTMLButtonElement | null>(null);
-  const [tabsAtEnd, setTabsAtEnd] = useState(false);
-
-  const syncTabsFade = useCallback(() => {
-    const el = tabsRef.current;
-    if (!el) return;
-    // Sub-pixel widths make the exact equality unreachable on some zoom levels.
-    setTabsAtEnd(el.scrollLeft + el.clientWidth >= el.scrollWidth - 1);
-  }, []);
-
-  useEffect(() => {
-    syncTabsFade();
-    window.addEventListener("resize", syncTabsFade);
-    return () => window.removeEventListener("resize", syncTabsFade);
-  }, [syncTabsFade]);
-
-  useEffect(() => {
-    // "nearest" on both axes is a no-op when the tab is already in view, so
-    // this never yanks the page on mount or on a screen wide enough to fit all
-    // six.
-    activeTabRef.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
-    syncTabsFade();
-  }, [section, syncTabsFade]);
 
   const [webhookTesting, setWebhookTesting] = useState(false);
   const [webhookResult, setWebhookResult] = useState("");
@@ -807,18 +705,12 @@ export default function SettingsView({
         <div className="view-title">{t("Settings")}</div>
         <div className="vh-actions"><LanguageSettings /></div>
       </div>
-      <div
-        className={`settings-tabs${tabsAtEnd ? " at-end" : ""}`}
-        role="tablist"
-        ref={tabsRef}
-        onScroll={syncTabsFade}
-      >
+      <div className="settings-tabs" role="tablist">
         {SECTIONS.map((t) => (
           <button
             key={t.id}
             role="tab"
             aria-selected={section === t.id}
-            ref={section === t.id ? activeTabRef : undefined}
             className={`settings-tab${section === t.id ? " active" : ""}`}
             onClick={() => setSection(t.id)}
           >
@@ -828,34 +720,9 @@ export default function SettingsView({
       </div>
       <div className="settings-scroll">
         <div className="settings-grid">
-          <QueenNameCard
-              hidden={section !== "model"}
-              name={s.queen_name === DEFAULT_QUEEN ? "" : s.queen_name ?? ""}
-              aliases={s.queen_aliases ?? []}
-              onChange={(name, aliases) => setS((prev) => (prev ? Object.assign(new backend.Settings(prev), { queen_name: name, queen_aliases: aliases }) : prev))}
-            />
-          {s.hive?.role !== "worker" && (
-            <QueenEngineCard
-              hidden={section !== "model"}
-              engine={s.hive?.queen_engine ?? ""}
-              fallback={s.hive?.queen_fallback !== false}
-              publicURL={s.hive?.public_url ?? ""}
-              onChange={(engine, fallback, publicURL) =>
-                setS((prev) =>
-                  prev
-                    ? Object.assign(new backend.Settings(prev), {
-                        hive: new backend.HiveSettings({ ...prev.hive, queen_engine: engine, queen_fallback: fallback, public_url: publicURL }),
-                      })
-                    : prev,
-                )
-              }
-            />
-          )}
+          {/* ── Model: what it thinks and remembers with ── */}
           <div className="card" hidden={section !== "model"}>
             <div className="card-title">{translate("Accounts")}</div>
-            <div className="card-desc">
-              {translate("Sign in with the AI accounts you already pay for — no API key needed. Everything stays on this machine.")}
-            </div>
             <div className="field">
               <label>{translate("Use my accounts")}</label>
               <div
@@ -865,25 +732,18 @@ export default function SettingsView({
               >
                 <div className={`switch${s.cliproxy_enabled ? " on" : ""}`}><div className="knob" /></div>
                 <span style={{ fontSize: 13, color: "var(--text-1)" }}>
-                  {s.cliproxy_enabled
-                    ? "On — SuperLeo runs on your signed-in accounts"
-                    : "Off — SuperLeo uses the API endpoint set under Advanced"}
+                  {translate(s.cliproxy_enabled ? "On — SuperLeo runs on your signed-in accounts" : "Off — SuperLeo uses the custom API")}
                 </span>
               </div>
             </div>
             {s.cliproxy_enabled && (
               <div className="field">
                 <label>Model</label>
-                {proxy?.running ? (
-                  <span className="hint">
-                    {proxy.models?.length
-                      ? `${proxy.models.length} models available from your accounts — pick the one SuperLeo should think with.`
-                      : "No accounts yet — sign in below to see the models you can use."}
-                  </span>
-                ) : (
-                  <span className="hint">
-                    {proxy?.error ? proxy.error : "Sign in below to get started."}
-                  </span>
+                {!proxy?.running && (
+                  <span className="hint">{proxy?.error ? proxy.error : "Sign in below to get started."}</span>
+                )}
+                {proxy?.running && !proxy.models?.length && (
+                  <span className="hint">No accounts yet — sign in below.</span>
                 )}
                 {proxy?.running && !!proxy.models?.length && (
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
@@ -905,9 +765,6 @@ export default function SettingsView({
             {s.cliproxy_enabled && !!accounts.length && (
               <div className="field">
                 <label>Signed in</label>
-                <span className="hint">
-                  Pause an account to hide its models without signing out.
-                </span>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
                   {accounts.map((acc) => (
                     <div
@@ -951,7 +808,6 @@ export default function SettingsView({
             {s.cliproxy_enabled && (
               <div className="field">
                 <label>Add an account</label>
-                <span className="hint">Opens your browser. Sign-in is stored on this machine only.</span>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
                   {providers.map((prov) => (
                     <button
@@ -1010,115 +866,39 @@ export default function SettingsView({
           </div>
 
           <div className="card" hidden={section !== "model"}>
-            <div className="card-title">{translate("Advanced")}</div>
-            <div className="card-desc">
-              {s.cliproxy_enabled
-                ? "Only used when \"Use my accounts\" is off — or to force a model name by hand."
-                : "OpenAI-compatible chat completions endpoint."}
-            </div>
+            <div className="card-title">{translate("Custom API")}</div>
             <TextField label="API Base URL" value={s.llm_base_url} onChange={(v) => set("llm_base_url", v)} placeholder="https://api.openai.com/v1" />
             <PasswordField label="API Key" value={s.llm_key} onChange={(v) => set("llm_key", v)} />
             <TextField label="Model" value={s.llm_model} onChange={(v) => set("llm_model", v)} placeholder="gpt-5.5" />
-            <div className="field">
-              <label>{translate("Local Port")}</label>
-              <input
-                className="input"
-                type="number"
-                value={s.cliproxy_port}
-                onChange={(e) => set("cliproxy_port", Number(e.target.value))}
-              />
-              <span className="hint">{translate("Only change this if something else already uses it.")}</span>
-            </div>
           </div>
 
-          <div className="card" hidden={section !== "safety"}>
-            <div className="card-title">{translate("Safety")}</div>
-            <div className="card-desc">
-              Shell commands run on this machine with your permissions — the agent workspace is
-              where they start, not a boundary they are held inside.
-            </div>
-            <div className="field">
-              <label>Ask before running commands</label>
-              <div
-                className="toggle"
-                onClick={() => set("disable_tool_approval", !s.disable_tool_approval)}
-                style={{ cursor: "pointer", marginTop: 2 }}
-              >
-                {/* The switch reads "on = asking", so it tracks the inverse of
-                    the stored disable flag. The setting is stored as a disable
-                    so that a settings file which has never heard of it — every
-                    file written before this existed — still comes up gated. */}
-                <div className={`switch${s.disable_tool_approval ? "" : " on"}`}><div className="knob" /></div>
-                <span style={{ fontSize: 13, color: "var(--text-1)" }}>
-                  {s.disable_tool_approval
-                    ? "Off — shell commands, installs and deletions run without asking"
-                    : `On — you are asked first; unanswered after ${
-                        approval?.waitSeconds ?? 120
-                      }s counts as no`}
-                </span>
-              </div>
-              {s.disable_tool_approval && (
-                <span className="hint">
-                  Decisions are still written to the audit log. Turn this off only for unattended
-                  runs you have decided to trust — a schedule that fires at 3am has nobody to ask.
-                </span>
-              )}
-            </div>
-            <div className="field">
-              <label>Also judge what a command does</label>
-              <TextField
-                label=""
-                value={s.tool_approval_decider_url ?? ""}
-                onChange={(v) => set("tool_approval_decider_url", v)}
-                placeholder="http://127.0.0.1:43711  (empty = off)"
-              />
-              <span className="hint">
-                The rules above match on a tool's <em>name</em>, so <code>shell</code> asks about{" "}
-                <code>ls</code> while a tool called <code>write_file</code> can write{" "}
-                <code>~/.ssh/authorized_keys</code> without asking. Point this at a laya-serve
-                instance and the gate reads the arguments too. It can only ever add a prompt —
-                never skip one — and if the service is unreachable the gate behaves exactly as it
-                does with this empty.
-              </span>
-            </div>
-            {(s.tool_approval_decider_url ?? "") !== "" && (
-              <div className="field">
-                <label>Sensitivity</label>
-                <input
-                  type="number"
-                  step="0.05"
-                  min="0.01"
-                  max="0.99"
-                  value={s.tool_approval_decider_threshold || 0.15}
-                  onChange={(e) =>
-                    set("tool_approval_decider_threshold", parseFloat(e.target.value) || 0)
-                  }
-                />
-                <span className="hint">
-                  Probability at or above which a call is treated as needing approval. Lower asks
-                  more often. The default of 0.15 looks low because this model's probabilities are
-                  — 0.5 reads as "confident" and lets a write to authorized_keys through. It was
-                  chosen on fifteen labelled calls; measure against your own audit log before
-                  raising it.
-                </span>
-              </div>
-            )}
-            <AuditTail info={approval} />
-          </div>
+          {s.hive?.role !== "worker" && (
+            <QueenEngineCard
+              hidden={section !== "model"}
+              engine={s.hive?.queen_engine ?? ""}
+              fallback={s.hive?.queen_fallback !== false}
+              publicURL={s.hive?.public_url ?? ""}
+              onChange={(engine, fallback, publicURL) =>
+                setS((prev) =>
+                  prev
+                    ? Object.assign(new backend.Settings(prev), {
+                        hive: new backend.HiveSettings({ ...prev.hive, queen_engine: engine, queen_fallback: fallback, public_url: publicURL }),
+                      })
+                    : prev,
+                )
+              }
+            />
+          )}
 
-          <div className="card" hidden={section !== "memory"}>
-            <div className="card-title">Embeddings</div>
-            <div className="card-desc">Optional. Enables RAG / vector memory when configured.</div>
+          <div className="card" hidden={section !== "model"}>
+            <div className="card-title">{translate("Embeddings")}</div>
             <TextField label="Base URL" value={s.embed_base_url} onChange={(v) => set("embed_base_url", v)} placeholder="https://api.openai.com/v1" />
             <PasswordField label="API Key" value={s.embed_key} onChange={(v) => set("embed_key", v)} />
             <TextField label="Model" value={s.embed_model} onChange={(v) => set("embed_model", v)} placeholder="text-embedding-3-small" />
           </div>
 
-          <div className="card" hidden={section !== "memory"}>
-            <div className="card-title">Memory</div>
-            <div className="card-desc">
-              Where durable memory lives. Pick one — a capability should have exactly one route.
-            </div>
+          <div className="card" hidden={section !== "model"}>
+            <div className="card-title">{translate("Memory")}</div>
             <div className="field">
               <label>Backend</label>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
@@ -1133,11 +913,6 @@ export default function SettingsView({
                   </button>
                 ))}
               </div>
-              <span className="hint">
-                {s.memory_backend === "shared"
-                  ? "memory_* tools read and write the shared CortexDB. Any MCP server pointed at the same address is left unmounted, so the model does not see two names for one store."
-                  : "memory_* tools use this machine's own store. MCP servers are mounted as configured."}
-              </span>
             </div>
             {s.memory_backend === "shared" && (
               <>
@@ -1146,89 +921,35 @@ export default function SettingsView({
                   value={s.shared_memory_endpoint}
                   onChange={(v) => set("shared_memory_endpoint", v)}
                   placeholder="192.168.1.10:47821"
-                  hint="host:port of the cortexdb gRPC server. Empty falls back to $CORTEXDB_REMOTE."
                 />
                 <PasswordField
                   label="Shared CortexDB Token"
                   value={s.shared_memory_token}
                   onChange={(v) => set("shared_memory_token", v)}
                 />
-                <span className="hint">Leave the token empty to read $CORTEXDB_GRPC_TOKEN instead, keeping it out of settings.json.</span>
                 <TextField
                   label="Namespace"
                   value={s.shared_memory_namespace}
                   onChange={(v) => set("shared_memory_namespace", v)}
                   placeholder="default"
-                  hint="Scopes reads and writes inside the shared brain."
                 />
               </>
             )}
           </div>
 
-          <div className="card" hidden={section !== "notifications"}>
-            <div className="card-title">Notifications</div>
-            <div className="card-desc">
-              Where messages go when nobody is looking at this page. notify_user and every
-              scheduled run are POSTed as JSON, so Telegram, a WeCom bot, bark, ntfy or a
-              script of your own can all receive them behind a short adapter.
-            </div>
-            <TextField
-              label="Webhook URL"
-              value={s.webhook_url}
-              onChange={(v) => set("webhook_url", v)}
-              placeholder="https://example.com/superleo-hook"
-              hint="Empty disables it. Serve mode has no desktop notification, so without this a reminder that fires reaches only the log."
+          {/* ── Abilities: what it can reach, and who else it can hand work to ── */}
+          {/* Saved the moment it is picked, so the page's own copy of the
+              settings is told too: a later Save must not put the old mode back. */}
+          {section === "abilities" && (
+            <BrowserModeCard onChanged={(mode) => setS((cur) => (cur ? backend.Settings.createFrom({ ...cur, browser_mode: mode }) : cur))} />
+          )}
+          {section === "abilities" && (
+            <DesktopControlCard
+              onChanged={(on) => setS((cur) => (cur ? backend.Settings.createFrom({ ...cur, desktop_control: on }) : cur))}
+              onBlockedChanged={(list) => setS((cur) => (cur ? backend.Settings.createFrom({ ...cur, desktop_blocked_apps: list as string[] }) : cur))}
             />
-            <PasswordField
-              label="Webhook Secret"
-              value={s.webhook_secret}
-              onChange={(v) => set("webhook_secret", v)}
-            />
-            <span className="hint">
-              Sent as <code>Authorization: Bearer &lt;secret&gt;</code>. Optional, but worth setting
-              if the receiver is reachable from the internet.
-            </span>
-            <div className="row">
-              <button className="btn" onClick={testWebhook} disabled={webhookTesting || !s.webhook_url}>
-                {webhookTesting ? "Sending…" : "Send test"}
-              </button>
-              {webhookResult && <span className="hint">{webhookResult}</span>}
-            </div>
-          </div>
-
-          <div className="card" hidden={section !== "notifications"}>
-            <div className="card-title">Telegram</div>
-            <div className="card-desc">
-              The way back in: messages sent to the bot run a turn and the answer comes back.
-              Conversations are shared with this page — a chat started on the phone is in
-              History here, and the reverse.
-            </div>
-            <PasswordField
-              label="Bot Token"
-              value={s.telegram_bot_token}
-              onChange={(v) => set("telegram_bot_token", v)}
-            />
-            <span className="hint">
-              From @BotFather. Empty turns the bridge off.
-            </span>
-            <TextField
-              label="Allowed Chat IDs"
-              value={(s.telegram_allowed_chats ?? []).join(", ")}
-              onChange={(v) =>
-                set(
-                  "telegram_allowed_chats",
-                  v
-                    .split(",")
-                    .map((x) => Number(x.trim()))
-                    .filter((n) => Number.isFinite(n) && n !== 0),
-                )
-              }
-              placeholder="1669479669"
-              hint="Who may talk to it, comma separated. For a private chat this is your own Telegram user id. There is no wildcard: a bot's username is public, and this agent runs shell commands, so an empty list leaves the bridge off rather than open."
-            />
-          </div>
-
-          {section === "agents" && (
+          )}
+          {section === "abilities" && (
             <ExternalAgentsCard
               ea={s.external_agents ?? new backend.ExternalAgents()}
               onChange={setEA}
@@ -1238,8 +959,17 @@ export default function SettingsView({
               onRecheck={recheckAgentCLIs}
             />
           )}
-
-          {section === "agents" && (
+          {section === "abilities" && (
+            <LocalHiveCard
+              onChanged={(fresh) => setS((cur) => (cur ? backend.Settings.createFrom({ ...cur, hive: fresh.hive }) : fresh))}
+            />
+          )}
+          {section === "abilities" && (
+            <LinkSuperLeoCard
+              onChanged={(fresh) => setS((cur) => (cur ? backend.Settings.createFrom({ ...cur, remote_agents: fresh.remote_agents }) : fresh))}
+            />
+          )}
+          {section === "abilities" && (
             <AddAgentCard
               queen={s.hive?.role === "queen"}
               onQueen={
@@ -1256,8 +986,7 @@ export default function SettingsView({
               }
             />
           )}
-
-          {section === "agents" && (
+          {section === "abilities" && (
             <AddWorkerCard
               ra={s.remote_agents ?? new backend.RemoteAgents()}
               onSave={async (agents) => {
@@ -1270,8 +999,7 @@ export default function SettingsView({
               }}
             />
           )}
-
-          {section === "agents" && (
+          {section === "abilities" && (
             <RemoteAgentsCard
               ra={s.remote_agents ?? new backend.RemoteAgents()}
               onChange={setRA}
@@ -1281,23 +1009,93 @@ export default function SettingsView({
             />
           )}
 
-          {/* Saved the moment it is picked, so the page's own copy of the
-              settings is told too: a later Save must not put the old mode back. */}
-          {section === "runtime" && (
-            <BrowserModeCard onChanged={(mode) => setS((cur) => (cur ? backend.Settings.createFrom({ ...cur, browser_mode: mode }) : cur))} />
-          )}
-          {section === "runtime" && (
-            <DesktopControlCard onChanged={(on) => setS((cur) => (cur ? backend.Settings.createFrom({ ...cur, desktop_control: on }) : cur))} />
-          )}
+          <div className="card" hidden={section !== "abilities"}>
+            <div className="card-title">{translate("Safety")}</div>
+            <div className="field">
+              <label>Ask before running commands</label>
+              <div
+                className="toggle"
+                onClick={() => set("disable_tool_approval", !s.disable_tool_approval)}
+                style={{ cursor: "pointer", marginTop: 2 }}
+              >
+                {/* The switch reads "on = asking", so it tracks the inverse of
+                    the stored disable flag. The setting is stored as a disable
+                    so that a settings file which has never heard of it — every
+                    file written before this existed — still comes up gated. */}
+                <div className={`switch${s.disable_tool_approval ? "" : " on"}`}><div className="knob" /></div>
+                <span style={{ fontSize: 13, color: "var(--text-1)" }}>
+                  {s.disable_tool_approval
+                    ? "Off — shell commands, installs and deletions run without asking"
+                    : `On — unanswered after ${approval?.waitSeconds ?? 120}s counts as no`}
+                </span>
+              </div>
+            </div>
+            <AuditTail info={approval} />
+          </div>
+
+          {/* ── General ── */}
+          <QueenNameCard
+            hidden={section !== "general"}
+            name={s.queen_name === DEFAULT_QUEEN ? "" : s.queen_name ?? ""}
+            aliases={s.queen_aliases ?? []}
+            onChange={(name, aliases) => setS((prev) => (prev ? Object.assign(new backend.Settings(prev), { queen_name: name, queen_aliases: aliases }) : prev))}
+          />
+          {section === "general" && <PairPhoneCard />}
+          {!served && section === "general" && <OpenInBrowserCard />}
+
+          <div className="card" hidden={section !== "general"}>
+            <div className="card-title">{translate("Notifications")}</div>
+            <TextField
+              label="Webhook URL"
+              value={s.webhook_url}
+              onChange={(v) => set("webhook_url", v)}
+              placeholder="https://example.com/superleo-hook"
+            />
+            <PasswordField
+              label="Webhook Secret"
+              value={s.webhook_secret}
+              onChange={(v) => set("webhook_secret", v)}
+            />
+            <div className="row">
+              <button className="btn" onClick={testWebhook} disabled={webhookTesting || !s.webhook_url}>
+                {webhookTesting ? "Sending…" : "Send test"}
+              </button>
+              {webhookResult && <span className="hint">{webhookResult}</span>}
+            </div>
+          </div>
+
+          <div className="card" hidden={section !== "general"}>
+            <div className="card-title">Telegram</div>
+            <PasswordField
+              label="Bot Token"
+              value={s.telegram_bot_token}
+              onChange={(v) => set("telegram_bot_token", v)}
+            />
+            <TextField
+              label="Allowed Chat IDs"
+              value={(s.telegram_allowed_chats ?? []).join(", ")}
+              onChange={(v) =>
+                set(
+                  "telegram_allowed_chats",
+                  v
+                    .split(",")
+                    .map((x) => Number(x.trim()))
+                    .filter((n) => Number.isFinite(n) && n !== 0),
+                )
+              }
+              placeholder="1669479669"
+            />
+          </div>
+
           <ProxyCard
-            hidden={section !== "runtime"}
+            hidden={section !== "general"}
             proxy={s.proxy ?? new backend.ProxySettings()}
             onChange={(p) => set("proxy", p)}
           />
-          <div className="card" hidden={section !== "runtime"}>
+
+          <div className="card" hidden={section !== "general"}>
             <div className="card-title">{translate("Runtime")}</div>
-            <div className="card-desc">Workspace, agent loop limits, and avatar bridge.</div>
-            <TextField label="Workspace Directory" value={s.workspace_dir} onChange={(v) => set("workspace_dir", v)} placeholder="~/.superleo/workspace" hint="Where the agent reads and writes deliverable files." />
+            <TextField label="Workspace Directory" value={s.workspace_dir} onChange={(v) => set("workspace_dir", v)} placeholder="~/.superleo/workspace" />
             <div className="row2">
               <div className="field">
                 <label>Max Rounds</label>
@@ -1308,7 +1106,6 @@ export default function SettingsView({
                   value={s.max_rounds}
                   onChange={(e) => set("max_rounds", Number(e.target.value))}
                 />
-                <span className="hint">Tool-call rounds per task.</span>
               </div>
               <div className="field">
                 <label>Token budget per turn</label>
@@ -1320,7 +1117,6 @@ export default function SettingsView({
                   placeholder="No limit"
                   onChange={(e) => set("turn_max_tokens", Math.max(0, Number(e.target.value) || 0))}
                 />
-                <span className="hint">Optional. Input plus output tokens one turn may use; empty means no limit.</span>
               </div>
               <div className="field">
                 <label>Token budget per long task</label>
@@ -1332,30 +1128,6 @@ export default function SettingsView({
                   placeholder="No limit"
                   onChange={(e) => set("long_task_max_tokens", Math.max(0, Number(e.target.value) || 0))}
                 />
-                <span className="hint">Optional. Used when a long task is started without its own budget.</span>
-              </div>
-              <div className="field">
-                <label>Avatar Port</label>
-                <input
-                  className="input"
-                  type="number"
-                  value={s.avatar_port}
-                  onChange={(e) => set("avatar_port", Number(e.target.value))}
-                />
-                <span className="hint">Local SSE bridge port.</span>
-              </div>
-            </div>
-            <div className="field">
-              <label>Headless Browser</label>
-              <div
-                className="toggle"
-                onClick={() => set("headless", !s.headless)}
-                style={{ cursor: "pointer", marginTop: 2 }}
-              >
-                <div className={`switch${s.headless ? " on" : ""}`}><div className="knob" /></div>
-                <span style={{ fontSize: 13, color: "var(--text-1)" }}>
-                  {s.headless ? "Run browser without a visible window" : "Show the browser window"}
-                </span>
               </div>
             </div>
             <div className="field">
@@ -1383,30 +1155,12 @@ export default function SettingsView({
                 <div className={`switch${s.pii_redaction ? " on" : ""}`}><div className="knob" /></div>
                 <span style={{ fontSize: 13, color: "var(--text-1)" }}>
                   {s.pii_redaction
-                    ? "On — email / phone / 身份证 / 手机号 / 银行卡 masked before reaching the model (cloud-safe)"
-                    : "Off — the model sees your data as-is (needed when it must act on real PII)"}
+                    ? "On — email / phone / 身份证 / 手机号 / 银行卡 masked before reaching the model"
+                    : "Off — the model sees your data as-is"}
                 </span>
               </div>
             </div>
           </div>
-
-          {/* Folded in from what used to be its own sidebar entry. It sits
-              after Runtime, and in the same section, because that is where the
-              avatar port it depends on is set. */}
-          {section === "runtime" && <AvatarSection status={status} />}
-
-          {!served && section === "runtime" && <OpenInBrowserCard />}
-          {section === "runtime" && <PairPhoneCard />}
-          {section === "runtime" && (
-            <LocalHiveCard
-              onChanged={(fresh) => setS((cur) => (cur ? backend.Settings.createFrom({ ...cur, hive: fresh.hive }) : fresh))}
-            />
-          )}
-          {section === "runtime" && (
-            <LinkSuperLeoCard
-              onChanged={(fresh) => setS((cur) => (cur ? backend.Settings.createFrom({ ...cur, remote_agents: fresh.remote_agents }) : fresh))}
-            />
-          )}
 
           <div className="settings-actions">
             <button className="btn" onClick={save} disabled={saving}>
