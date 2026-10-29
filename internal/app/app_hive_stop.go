@@ -64,6 +64,10 @@ func (a *App) registerQueenOrderTools(inner toolAdder) {
 			if id == "" {
 				return "", fmt.Errorf("id is required: a task id as hive_command or hive_task print it")
 			}
+			id, err := a.resolveTaskID(id)
+			if err != nil {
+				return "", err
+			}
 			stop, what, err := a.stopTarget(id)
 			if err != nil {
 				return "", err

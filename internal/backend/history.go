@@ -200,7 +200,11 @@ func visibleTurns(messages []domain.Message) []ChatTurn {
 		// but it is the record of the agent working, so it becomes progress.
 		// Except notify_user: its argument IS a message the user already saw
 		// live, so it is restored as an interim bubble, not a step line.
-		if len(messages[i].ToolCalls) > 0 && strings.TrimSpace(messages[i].Content) == "" {
+		// Text written beside a tool call is the model working ("Need to find
+		// the mac worker. Call hive_members?"), not something said to the
+		// person, so it goes with the calls; only a turn that merely ends the
+		// run (task_complete) can carry the answer.
+		if len(messages[i].ToolCalls) > 0 && (strings.TrimSpace(messages[i].Content) == "" || callsWork(messages[i].ToolCalls)) {
 			rest := make([]domain.ToolCall, 0, len(messages[i].ToolCalls))
 			for _, c := range messages[i].ToolCalls {
 				if c.Function.Name == "notify_user" {
@@ -354,6 +358,19 @@ func scriptSteps(raw string) []string {
 // agent learned to summarise its own runs can be the script *and* the only copy
 // of the answer. Dropping that would erase the reply from the user's history, so
 // when nothing follows it the scripts are merely stripped out.
+// callsWork says whether a turn's tool calls do something, rather than only
+// end the run.
+func callsWork(calls []domain.ToolCall) bool {
+	for _, c := range calls {
+		switch c.Function.Name {
+		case "task_complete", "task_blocked":
+		default:
+			return true
+		}
+	}
+	return false
+}
+
 func assistantText(messages []domain.Message, i int) string {
 	content := strings.TrimSpace(messages[i].Content)
 	if strings.Contains(content, "<code>") || strings.Contains(content, "</code>") {

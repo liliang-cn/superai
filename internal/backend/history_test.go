@@ -414,6 +414,41 @@ func TestVisibleTurnsRecoversStepsFromToolCalls(t *testing.T) {
 	}
 }
 
+// The model writes a working note beside its tool calls (session
+// mcp-802c0ad3…, 2026-10-29): it is the working, not the answer, and must not
+// reopen as a reply that starts "Need to find the mac worker".
+func TestVisibleTurnsHidesTextBesideToolCalls(t *testing.T) {
+	call := func(name string) []domain.ToolCall {
+		return []domain.ToolCall{{ID: "c-" + name, Function: domain.FunctionCall{Name: name, Arguments: map[string]interface{}{}}}}
+	}
+	turns := visibleTurns([]domain.Message{
+		{Role: "user", Content: "补发今天的宣发，派给 mac"},
+		{Role: "assistant", Content: "Need to find the mac worker. Call hive_members? Check members quickly.", ToolCalls: call("hive_members")},
+		{Role: "tool", ToolCallID: "c-hive_members", Content: `{"members":["mac"]}`},
+		{Role: "assistant", Content: "Use hive_command, which may not wait... Try it anyway.", ToolCalls: call("hive_command")},
+		{Role: "tool", ToolCallID: "c-hive_command", Content: "stopped"},
+		{Role: "assistant", Content: "补发任务我已经派给 mac 了。"},
+	})
+	if len(turns) != 2 {
+		t.Fatalf("got %d turns, want the question and the answer: %+v", len(turns), turns)
+	}
+	if turns[1].Content != "补发任务我已经派给 mac 了。" {
+		t.Errorf("answer = %q", turns[1].Content)
+	}
+	if got := turns[1].Steps; len(got) != 2 {
+		t.Errorf("steps = %v, want the two calls", got)
+	}
+
+	// A turn that only ends the run still carries its words.
+	turns = visibleTurns([]domain.Message{
+		{Role: "user", Content: "hi"},
+		{Role: "assistant", Content: "你好！", ToolCalls: call("task_complete")},
+	})
+	if len(turns) != 2 || turns[1].Content != "你好！" {
+		t.Errorf("task_complete turn: %+v", turns)
+	}
+}
+
 // TestVisibleTurnsKeepsRecalledMemoryAsAFoldedBlock covers the block the agent
 // injects as a user message when memory turns something up. It was rendered as
 // something the user had typed — a wall of "## Memory Index" in a chat bubble.

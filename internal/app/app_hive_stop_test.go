@@ -11,6 +11,7 @@ import (
 	"github.com/liliang-cn/agent-go/v3/pkg/agent"
 	agentlinkpb "github.com/liliang-cn/superleo/internal/agentlink/pb"
 	"github.com/liliang-cn/superleo/internal/backend"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 // tools catches what a register function adds, to call it as the model would.
@@ -97,6 +98,81 @@ func TestStoppingAnOrderStopsItsCodingRun(t *testing.T) {
 	}
 	if _, err := tl["hive_task_cancel"](context.Background(), map[string]any{"id": "nope"}); err == nil {
 		t.Fatal("an unknown id was accepted")
+	}
+}
+
+// hive_task shows ids by their first 8 characters, and that is what the queen
+// passes back: a start that names one order stops it, one shared by several
+// is refused with the ids it could be.
+func TestStoppingAnOrderByTheStartOfItsID(t *testing.T) {
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
+	a := NewApp()
+	tl := tools{}
+	a.registerQueenOrderTools(tl)
+	board := a.tasks()
+	const (
+		one   = "abc12345-0000-4000-8000-000000000001"
+		twinA = "d9d4ae30-0000-4000-8000-00000000000a"
+		twinB = "d9d4ae30-0000-4000-8000-00000000000b"
+	)
+	stopped := map[string]bool{}
+	for _, id := range []string{one, twinA, twinB} {
+		board.StartAs(id, "w1", "", backend.TaskOut, "work")
+		board.OnStop(id, func() { stopped[id] = true })
+	}
+
+	msg, err := tl["hive_task_cancel"](context.Background(), map[string]any{"id": "abc12345"})
+	if err != nil || !strings.Contains(msg.(string), one) || !stopped[one] {
+		t.Fatalf("short id: %v %v, stopped %v", msg, err, stopped)
+	}
+
+	_, err = tl["hive_task_cancel"](context.Background(), map[string]any{"id": "d9d4ae30"})
+	if err == nil || !strings.Contains(err.Error(), twinA) || !strings.Contains(err.Error(), twinB) {
+		t.Fatalf("ambiguous id: %v", err)
+	}
+	if stopped[twinA] || stopped[twinB] {
+		t.Fatalf("an ambiguous id stopped something: %v", stopped)
+	}
+
+	ss := selfSession(t, a)
+	if text, isErr := callSelf(t, ss, "superleo_hive_tasks", map[string]any{"id": "abc12345"}); isErr || !strings.Contains(text, one) {
+		t.Fatalf("superleo_hive_tasks by a unique start: err=%v %s", isErr, text)
+	}
+	if text, isErr := callSelf(t, ss, "superleo_hive_task_cancel", map[string]any{"id": "d9d4ae30"}); !isErr || !strings.Contains(text, twinA) {
+		t.Fatalf("superleo_hive_task_cancel by an ambiguous start: err=%v %s", isErr, text)
+	}
+}
+
+// A tool that returns an error is reported to a superleo_ask caller as not
+// ok: agent-go hands the error over as the event's content and an empty
+// result, which the ask used to read as a success.
+func TestAFailedToolIsNotOKInTheAsk(t *testing.T) {
+	h := newDelegateHive(t, "max", func(r llmRequest) (string, map[string]any) {
+		if r.Results == 0 && slices.Contains(r.Tools, "hive_task_cancel") {
+			return "hive_task_cancel", map[string]any{"id": "nope"}
+		}
+		return "", map[string]any{"text": "没有这单。"}
+	})
+	// The refusal is the tool's own, not a person's no.
+	h.a.settings.DisableToolApproval = true
+	h.a.rebuild()
+	ss := selfSession(t, h.a)
+	res, err := ss.CallTool(context.Background(), &mcp.CallToolParams{Name: "superleo_ask", Arguments: map[string]any{"message": "取消 nope", "timeout_seconds": 30}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := askResult(t, res)
+	var found bool
+	for _, tool := range out.Tools {
+		if strings.HasSuffix(tool.Name, "hive_task_cancel") {
+			found = true
+			if tool.OK {
+				t.Errorf("a refused hive_task_cancel came back ok: %+v", out.Tools)
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("hive_task_cancel never ran: %+v", out)
 	}
 }
 

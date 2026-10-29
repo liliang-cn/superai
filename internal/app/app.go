@@ -1215,6 +1215,12 @@ func (a *App) ownTurn(requestID, sessionID, message string, imagePaths []string,
 			if ev.Type == "model_wire" {
 				out["wire"] = ev.StateDelta
 			}
+			// A tool that returned an error has it in the event's content and
+			// an empty result (agent-go's emitToolResult), which read alone
+			// looks like a success.
+			if ev.Type == agent.EventTypeToolResult && toolEventFailed(ev) {
+				out["failed"] = true
+			}
 			a.emit("chat:event", out)
 			switch ev.Type {
 			case agent.EventTypeToolCall:

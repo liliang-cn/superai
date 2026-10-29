@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/liliang-cn/agent-go/v3/pkg/agent"
 	"github.com/liliang-cn/superleo/internal/backend"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -157,13 +158,18 @@ func (s *askState) apply(ev askEvent) (finished bool, progress string) {
 				s.streamed.Reset()
 			}
 		case "tool_call":
+			// What streamed before a tool call is the model working ("Need
+			// to find the mac worker. Call hive_members?"), not the answer:
+			// only the round that calls no tool answers.
+			s.streamed.Reset()
 			name := str("tool")
 			s.running[name] = len(s.out.Tools)
 			s.out.Tools = append(s.out.Tools, askTool{Name: name, OK: true, Worker: str("worker")})
 			return false, "calling " + name
 		case "tool_result":
 			if i, ok := s.running[str("tool")]; ok {
-				s.out.Tools[i].OK = !toolResultFailed(p["result"])
+				failed, _ := p["failed"].(bool)
+				s.out.Tools[i].OK = !failed && !toolResultFailed(p["result"])
 				delete(s.running, str("tool"))
 			}
 		}
@@ -199,6 +205,13 @@ func (s *askState) result() askOut {
 
 // toolResultFailed reads a tool result the way the chat panel does.
 func toolResultFailed(r any) bool { return backend.ToolResultFailed(r) }
+
+// toolEventFailed says whether an agent-go tool_result event is a failure:
+// a tool that returned an error comes with the error as the event's content
+// and no result, or with a result that says it failed.
+func toolEventFailed(ev *agent.Event) bool {
+	return strings.TrimSpace(ev.Content) != "" || backend.ToolResultFailed(ev.ToolResult)
+}
 
 // ask runs one superleo_ask. progress, when not nil, is told what the turn is
 // doing while it is waited on.

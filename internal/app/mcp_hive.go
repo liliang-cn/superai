@@ -423,17 +423,57 @@ func (a *App) hiveTaskList(limit int, runningOnly bool) map[string]any {
 
 // hiveTaskOne is superleo_hive_tasks with an id.
 func (a *App) hiveTaskOne(id string) (any, error) {
+	id, err := a.resolveTaskID(id)
+	if err != nil {
+		return nil, err
+	}
 	if j := a.delegations.find(id); j != nil {
 		return map[string]any{"delegation": a.delegationView(j, true)}, nil
 	}
-	if t, ok := a.tasks().Get(id); ok {
-		return map[string]any{"task": t, "stoppable": t.State == backend.TaskRunning && a.tasks().Stoppable(id)}, nil
+	t, _ := a.tasks().Get(id)
+	return map[string]any{"task": t, "stoppable": t.State == backend.TaskRunning && a.tasks().Stoppable(id)}, nil
+}
+
+// resolveTaskID turns what was typed into a full delegation or task id: the
+// id itself, or the start of exactly one (the 8 characters hive_task shows).
+// A start shared by several is refused with the ids it could be.
+func (a *App) resolveTaskID(id string) (string, error) {
+	if a.delegations.find(id) != nil {
+		return id, nil
 	}
-	return nil, fmt.Errorf("no delegation or task %q here: only recent ones are kept, and not across a restart", id)
+	if _, ok := a.tasks().Get(id); ok {
+		return id, nil
+	}
+	var matches []string
+	seen := map[string]bool{}
+	add := func(full string) {
+		if strings.HasPrefix(full, id) && !seen[full] {
+			seen[full] = true
+			matches = append(matches, full)
+		}
+	}
+	st := &a.delegations
+	st.mu.Lock()
+	for _, j := range st.jobs {
+		add(j.id)
+	}
+	st.mu.Unlock()
+	for _, t := range a.tasks().Recent() {
+		add(t.ID)
+	}
+	switch len(matches) {
+	case 0:
+		return "", fmt.Errorf("no delegation or task %q here: only recent ones are kept, and not across a restart", id)
+	case 1:
+		return matches[0], nil
+	}
+	sort.Strings(matches)
+	return "", fmt.Errorf("%q is the start of %d ids; give more of it: %s", id, len(matches), strings.Join(matches, ", "))
 }
 
 // stopTarget finds what an id names and whether it can be stopped, so the
-// person is only asked about a stop that would do something.
+// person is only asked about a stop that would do something. id is a full
+// one, from resolveTaskID.
 func (a *App) stopTarget(id string) (stop func() error, what string, err error) {
 	if j := a.delegations.find(id); j != nil {
 		st := &a.delegations
@@ -536,6 +576,10 @@ func addHiveMCPTools(s *mcp.Server, app *App, caller string) {
 		id := strings.TrimSpace(in.ID)
 		if id == "" {
 			return toolErr("id is required: a delegation id or a task id from superleo_hive_tasks")
+		}
+		id, err := app.resolveTaskID(id)
+		if err != nil {
+			return toolErr(err.Error())
 		}
 		stop, what, err := app.stopTarget(id)
 		if err != nil {

@@ -95,6 +95,33 @@ func TestSuperleoAskReturnsTheAnswer(t *testing.T) {
 	}
 }
 
+// A turn still running when the ask stops waiting answers with what has
+// streamed — which must not be the notes the model wrote beside its tool calls
+// (session mcp-802c0ad3…: "Need to find the mac worker. Call hive_members?…").
+func TestAPendingAskLeavesOutTheTextBesideToolCalls(t *testing.T) {
+	st := newAskState("c", "r")
+	for _, ev := range []map[string]any{
+		{"type": "partial", "content": "Need to find the mac worker. "},
+		{"type": "partial", "content": "Call hive_members?"},
+		{"type": "tool_call", "tool": "hive_members"},
+		{"type": "tool_result", "tool": "hive_members", "result": map[string]any{"members": []any{"mac"}}},
+		{"type": "partial", "content": "Use hive_command. Try it anyway."},
+		{"type": "tool_call", "tool": "hive_command"},
+	} {
+		ev["requestId"] = "r"
+		st.apply(askEvent{"chat:event", ev})
+	}
+	if out := st.result(); !out.Pending || out.Answer != "" {
+		t.Fatalf("pending answer while tools run = %q", out.Answer)
+	}
+
+	st.apply(askEvent{"chat:event", map[string]any{"requestId": "r", "type": "tool_result", "tool": "hive_command", "result": "ok"}})
+	st.apply(askEvent{"chat:event", map[string]any{"requestId": "r", "type": "partial", "content": "已经派给 mac 了。"}})
+	if out := st.result(); out.Answer != "已经派给 mac 了。" {
+		t.Fatalf("pending answer after the last tool = %q", out.Answer)
+	}
+}
+
 func TestSuperleoAskTimesOutPendingAndReportsApprovals(t *testing.T) {
 	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	app := NewApp()
@@ -135,7 +162,8 @@ func TestSuperleoAskTimesOutPendingAndReportsApprovals(t *testing.T) {
 	if el := time.Since(start); el < time.Second || el > 5*time.Second {
 		t.Errorf("waited %v, want about the 1s timeout", el)
 	}
-	if !out.Pending || out.Status != "pending" || out.Answer != "我先查一下" || out.RequestID == "" {
+	// "我先查一下" came before the tool call: the working, not the answer.
+	if !out.Pending || out.Status != "pending" || out.Answer != "" || out.RequestID == "" {
 		t.Errorf("pending answer = %+v", out)
 	}
 	if len(out.NeedsApproval) != 1 || out.NeedsApproval[0].ID != "ap-1" || out.NeedsApproval[0].Tool != "shell" {

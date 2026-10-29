@@ -497,7 +497,7 @@ func (a *App) queenSelf(ctx context.Context, prompt string) (backend.RemoteResul
 		case agent.EventTypeToolCall:
 			trace(backend.WorkerToolEvent{Kind: "tool_call", Tool: ev.ToolName, Args: ev.ToolArgs, OK: true})
 		case agent.EventTypeToolResult:
-			trace(backend.WorkerToolEvent{Kind: "tool_result", Tool: ev.ToolName, OK: !backend.ToolResultFailed(ev.ToolResult)})
+			trace(backend.WorkerToolEvent{Kind: "tool_result", Tool: ev.ToolName, OK: !toolEventFailed(ev)})
 		}
 	})
 	res.MS = time.Since(started).Milliseconds()
