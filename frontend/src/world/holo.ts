@@ -13,7 +13,8 @@ type Pane = { el: HTMLElement; body: HTMLElement; obj: CSS2DObject; actor: THREE
 const panes = new Map<string, Pane>();
 
 function open(key: string): Pane | null {
-  const actor = actorOf(key);
+  // A worker is drawn as a hive member or, on a machine of its own, as an agent.
+  const actor = actorOf(key) ?? (key.startsWith("worker:") ? actorOf("agent:" + key.slice(7)) : undefined);
   if (!actor) return null;
   let p = panes.get(key);
   if (p && p.actor !== actor) { p.obj.removeFromParent(); p.el.remove(); panes.delete(key); p = undefined; }
