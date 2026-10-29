@@ -101,3 +101,19 @@ func TestAPhoneBrowserCallTimesOutAndReportsFailures(t *testing.T) {
 		t.Fatalf("err = %v", err)
 	}
 }
+
+// Every parameter of every phone-browser tool is a schema object. A property
+// written as a bare string (str() where strParam() was meant) made the
+// Messages API refuse the whole request, and with it every turn the queen
+// took while a phone was online.
+func TestEveryPhoneBrowserParameterIsASchema(t *testing.T) {
+	for _, op := range phoneBrowserOps {
+		props, _ := op.params["properties"].(map[string]any)
+		for name, p := range props {
+			s, ok := p.(map[string]any)
+			if !ok || s["type"] == nil {
+				t.Errorf("%s.%s is %T %v, not a schema", op.op, name, p, p)
+			}
+		}
+	}
+}

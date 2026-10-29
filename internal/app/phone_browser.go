@@ -44,13 +44,13 @@ var phoneBrowserOps = []struct {
 	params    map[string]any
 }{
 	{"open", "Open a URL in the browser on the person's iPhone (their phone's logins). Returns the page title and URL.",
-		obj(map[string]any{"url": str("The full URL to open.")}, "url")},
+		obj(map[string]any{"url": strParam("The full URL to open.")}, "url")},
 	{"snapshot", "Outline of the phone browser's current page: text, links and controls, each control with a ref for click and fill.",
 		obj(map[string]any{})},
 	{"click", "Click the element with this ref (from snapshot) in the phone's browser.",
-		obj(map[string]any{"ref": str("The element's ref from snapshot, like e12.")}, "ref")},
+		obj(map[string]any{"ref": strParam("The element's ref from snapshot, like e12.")}, "ref")},
 	{"fill", "Type text into the field with this ref (from snapshot) in the phone's browser, replacing what is there.",
-		obj(map[string]any{"ref": str("The field's ref from snapshot."), "text": str("The text to put in it.")}, "ref", "text")},
+		obj(map[string]any{"ref": strParam("The field's ref from snapshot."), "text": strParam("The text to put in it.")}, "ref", "text")},
 	{"scroll", "Scroll the phone browser's page.",
 		obj(map[string]any{"direction": map[string]any{"type": "string", "enum": []string{"up", "down"}}, "amount": map[string]any{"type": "integer", "description": "Pixels, default one screen."}}, "direction")},
 	{"get_text", "The visible text of the phone browser's current page.", obj(map[string]any{})},
