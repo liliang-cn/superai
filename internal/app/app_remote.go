@@ -457,13 +457,20 @@ func (a *App) registerRemoteTools(svc *backend.Service, cfg backend.RemoteAgents
 		func(ctx context.Context, args map[string]any) (any, error) {
 			// Its steps and words show on this turn while it works.
 			ctx = a.traceWorkers(ctx)
-			id := a.tasks().Start(str(args["agent"]), backend.TaskOut, str(args["prompt"]))
-			a.tasks().InSession(id, backend.ChatSessionFrom(ctx))
+			// A worker on the roster is put on the board by the runner that
+			// sends it the order; a second entry here showed one order twice.
+			id := ""
+			if _, onRoster := a.remoteRunner().Workers()[str(args["agent"])]; !onRoster {
+				id = a.tasks().Start(str(args["agent"]), backend.TaskOut, str(args["prompt"]))
+				a.tasks().InSession(id, backend.ChatSessionFrom(ctx))
+			}
 			// The same route @name takes in the conversation: an agent linked
 			// over the agent link that serves it first, then the configured
 			// hosts. Configured hosts alone go stale — an HA service moves.
 			res := a.askAgent(ctx, str(args["agent"]), str(args["prompt"]))
-			a.finishDelegated(id, !res.Failed, res.Text, res.Reason)
+			if id != "" {
+				a.finishDelegated(id, !res.Failed, res.Text, res.Reason)
+			}
 			// The verdict comes first and in words, because the failure that
 			// matters here is the one that reads like an answer: a CLI sitting
 			// on a login prompt prints a paragraph and exits, and a result that

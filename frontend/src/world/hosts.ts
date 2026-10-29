@@ -42,6 +42,16 @@ export const isHost = (h: Host, name?: string) => {
   return !!n && (h.id === n || h.name.toLowerCase() === n || (h.hostname ?? "").toLowerCase() === n);
 };
 
+/** The machine the queen runs on, by name: the VM her pod is on, else her
+ *  own host. Empty while no host says it holds her. */
+export function coreMachine(hosts: Host[] | null | undefined): string {
+  const list = hosts ?? [];
+  const h = list.find((x) => x.agents.some(isCore));
+  if (!h) return "";
+  const parent = h.parent ? list.find((x) => x.id === h.parent) : undefined;
+  return parent?.name ?? h.name;
+}
+
 /** A SuperLeo that is this core: the queen, or a core in no hive. */
 export const isCore = (a: HostAgent) => a.kind === "superleo" && (a.role === "queen" || a.role === "standalone");
 /** An HA service's agent on a host it is not running on now. */
@@ -54,6 +64,8 @@ export interface Plot {
   host: Host;
   /** Hosts inside it, at any depth: its pods. */
   pods: Host[];
+  /** The queen's pod is inside it, drawn on the dais rather than here. */
+  holdsCore: boolean;
   /** What its SuperLeo is drawn as: a desk (machine agent), a laptop (a Mac),
    *  a pad (a relay, kept for its named agents), or nothing. */
   station: "desk" | "laptop" | "pad" | "";
@@ -168,7 +180,8 @@ export function planHosts(hosts: Host[], services: HAService[]): HostPlan {
     const w = Math.max(6, x + PAD);
     cols.station -= w / 2; cols.pods = cols.pods.map((p) => p - w / 2); cols.loose -= w / 2;
     const d = station && !small ? 9.5 : pods.length || station ? 7 : 5;
-    return { host, pods, station, small, via: machine?.name ?? others[0]?.via ?? host.name, crew, loose, w, d, at: new THREE.Vector3(), cols };
+    const holdsCore = !!core && core !== host && (kids.get(host.id) ?? []).includes(core);
+    return { host, pods, holdsCore, station, small, via: machine?.name ?? others[0]?.via ?? host.name, crew, loose, w, d, at: new THREE.Vector3(), cols };
   });
 
   ring(plots);

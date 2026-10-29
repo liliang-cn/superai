@@ -6,7 +6,7 @@ import { forgetActor, registerActor } from "./bubbles";
 import { Packets, type Link } from "./packets";
 import { CSS2DObject } from "three/examples/jsm/renderers/CSS2DRenderer.js";
 import type { Bee, CCActivity, CCActivitySession, CLIActivity, HAService, Hive, HiveTask, Host, HostAgent, LinkedAgent, RelayAgent } from "../canvas/data";
-import { CLOUD_LIFT, SLAB_TOP, cliName, cloud, floorLink, forgetLines, haRoles, isStandby, kindLabel, planHosts, pod, serviceMarker, setLinesNight, setServiceState, slab, socket, unlinkedStatus, type HostPlan, type Plot } from "./hosts";
+import { CLOUD_LIFT, SLAB_TOP, cliName, cloud, coreMachine, floorLink, forgetLines, haRoles, isStandby, kindLabel, planHosts, pod, serviceMarker, setLinesNight, setServiceState, slab, socket, unlinkedStatus, type HostPlan, type Plot } from "./hosts";
 import type { CodingRun } from "../canvas/tiles";
 import type { AttentionItem } from "../canvas/attention";
 import type { Member } from "../components/HiveMeter";
@@ -1169,7 +1169,7 @@ export const cluster: District<WorldData> = {
         // A cluster says which node runs it now.
         const status = p.host.kind === "ha" ? (p.host.on ? translate("on {name}", { name: p.host.on }) : translate("not running"))
           : p.host.state === "lost" ? translate("not answering") : p.host.state === "configured" ? unlinkedStatus(p.host, svcs, translate) || translate("not linked")
-          : [pods ? translate(pods === 1 ? "1 pod" : "{count} pods", { count: pods }) : "", translate(agents === 1 ? "1 agent" : "{count} agents", { count: agents })].filter(Boolean).join(" · ");
+          : [p.holdsCore ? getQueenName().name : "", pods ? translate(pods === 1 ? "1 pod" : "{count} pods", { count: pods }) : "", translate(agents === 1 ? "1 agent" : "{count} agents", { count: agents })].filter(Boolean).join(" · ");
         v.label.set(hostTitle(p.host), status, p.host.state === "lost" ? "bad" : onNode || busy || liveHere.length ? "work" : "idle");
       }
 
@@ -1486,7 +1486,10 @@ export const cluster: District<WorldData> = {
         if (calls >= 0 && d.meter.total.calls > calls) { ctx.spark(new THREE.Vector3(0.8, 4.6, 1.4)); queen.userData.gestureUntil = clock + 0.9; }
         calls = d.meter.total.calls;
         const doing = d.meter.members.find((m) => m.live && m.doing)?.doing;
-        queenLab.set(queenLabel(d.hive.engine, d.hive.engineNow), live ? clip(doing || translate("thinking"), 26) : translate("idle"), live ? "work" : queenState === "wait" ? "wait" : "idle");
+        // Where she runs, beside her name: the dais is drawn apart from the
+        // machine that holds her.
+        const at = coreMachine(d.hosts);
+        queenLab.set([queenLabel(d.hive.engine, d.hive.engineNow), at].filter(Boolean).join(" · "), live ? clip(doing || translate("thinking"), 26) : translate("idle"), live ? "work" : queenState === "wait" ? "wait" : "idle");
         setLight(core, live ? "busy" : "idle");
         const [s1, s2, s3] = core.userData.screens as Screen[];
         const fmt = (n: number) => (n >= 1e6 ? (n / 1e6).toFixed(2) + "M" : n >= 1e3 ? (n / 1e3).toFixed(1) + "k" : String(Math.round(n)));
