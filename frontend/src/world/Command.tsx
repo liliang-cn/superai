@@ -50,7 +50,12 @@ const ACTIONS: Record<string, { label: string; say?: string; run?: () => Promise
  * the queen from anywhere, and her answer above it while it is fresh.
  */
 /** A turn of ours the queen is still answering. */
-type Turn = { id: string; live: string; step: string; wire: string };
+type Turn = { id: string; live: string; step: string; wire: string;
+  /** The worker the queen handed this to, and what it is writing, as it writes it. */
+  work?: { worker: string; text: string } };
+
+/** The end of a worker's words: what it is writing now, not all it wrote. */
+const workTail = (s: string) => (s.length > 600 ? "…" + s.slice(-600) : s);
 
 export default function Command({ view, onConversation, onTyping, hosts }: {
   view: ViewKey; onConversation: () => void;
@@ -146,6 +151,8 @@ export default function Command({ view, onConversation, onTyping, hosts }: {
   // Our own turns: their words as they stream, the tool in use, and what the
   // model call is stuck on when it is (a queue, a retry, a quiet provider).
   const raw = useRef(new Map<string, string>());
+  // What each worker has written for a turn so far, by "request|worker".
+  const workText = useRef(new Map<string, string>());
   const who = useRef(new Map<string, { engine?: string; standInFor?: string }>());
   // Each turn's flow, from its first event, for the trace id under the answer.
   const flows = useRef(new Map<string, string>());
@@ -163,7 +170,14 @@ export default function Command({ view, onConversation, onTyping, hosts }: {
       credit(p);
       if (p.type === "flow") { const tid = traceIdOf(p.content); if (tid) flows.current.set(id, tid); return; }
       // Work the queen handed out is drawn on the worker doing it.
-      if (p.type === "tool_call" && p.tool && p.worker) { patch(id, { step: stepLabel(p.tool, p.args) }); say("worker:" + p.worker, p.workerTool || p.tool, "think", 60); }
+      if (p.type === "tool_call" && p.tool && p.worker) { patch(id, { step: stepLabel(p.tool, p.args), work: { worker: p.worker, text: workText.current.get(id + "|" + p.worker) ?? "" } }); say("worker:" + p.worker, p.workerTool || p.tool, "think", 60); }
+      else if (p.type === "worker_text" && p.worker && p.content) {
+        const k = id + "|" + p.worker;
+        const w = (workText.current.get(k) ?? "") + p.content;
+        workText.current.set(k, w);
+        patch(id, { work: { worker: p.worker, text: w }, step: "" });
+        say("worker:" + p.worker, workTail(w), "say", 60);
+      }
       else if (p.type === "tool_call" && p.tool) {
         patch(id, { step: stepLabel(p.tool, p.args) });
         say("queen", p.tool, "think", 60);
@@ -180,6 +194,7 @@ export default function Command({ view, onConversation, onTyping, hosts }: {
       const by = engineByline(who.current.get(id) ?? {}) || undefined;
       const trace = flows.current.get(id);
       mineIds.current.delete(id); raw.current.delete(id); who.current.delete(id); flows.current.delete(id);
+      for (const k of [...workText.current.keys()]) if (k.startsWith(id + "|")) workText.current.delete(k);
       sayDone("queen", text);
       setLines((l) => [...l, { who: "queen" as const, text, by, req: id, trace }].slice(-12));
       setPending((l) => l.filter((x) => x.id !== id));
@@ -250,7 +265,10 @@ export default function Command({ view, onConversation, onTyping, hosts }: {
             {pending.map((p) => (
               <div key={p.id} className="wc-queen">
                 {browser(p.id, true)}
-                {p.live ? <Response>{p.live}</Response> : <span className="wc-busy">{p.step ? t("Using {tool}…", { tool: p.step }) : t("Thinking…")}{p.wire && <span className="wc-wire" title={p.wire}> · {p.wire}</span>}</span>}
+                {p.live ? <Response>{p.live}</Response> : <>
+                  <span className="wc-busy">{p.step ? t("Using {tool}…", { tool: p.step }) : p.work ? t("{worker} is working…", { worker: p.work.worker }) : t("Thinking…")}{p.wire && <span className="wc-wire" title={p.wire}> · {p.wire}</span>}</span>
+                  {p.work?.text && <div className="wc-work" data-testid="wc-work"><b>→ {p.work.worker}</b><Response>{workTail(p.work.text)}</Response></div>}
+                </>}
               </div>
             ))}
             <div ref={end} />

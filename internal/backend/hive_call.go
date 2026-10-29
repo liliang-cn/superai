@@ -194,6 +194,7 @@ func askWorker(ctx context.Context, t workerTarget, prompt string, progress func
 	// carries every conversation the worker has.
 	var turn atomic.Value
 	pulser := NewPulser(t.pulse)
+	words := newWorkerWords(t.name, t.tools)
 	streamErr := make(chan error, 1)
 	go func() {
 		defer close(events)
@@ -218,6 +219,11 @@ func askWorker(ctx context.Context, t workerTarget, prompt string, progress func
 					}
 				}
 			case "chat:done", "chat:error", "chat:cancelled":
+				if mine, _ := turn.Load().(string); mine != "" {
+					if rid, _ := ev.Payload["requestId"].(string); rid == mine {
+						words.flush()
+					}
+				}
 				// The end of a turn must arrive, so this waits for room.
 				select {
 				case events <- ev:
@@ -242,6 +248,9 @@ func askWorker(ctx context.Context, t workerTarget, prompt string, progress func
 						}
 					}
 					pulser.Event(typ, tool, len(content), resultLen)
+					if typ == "partial" {
+						words.add(content)
+					}
 				}
 				phase := ""
 				switch typ {
@@ -375,6 +384,43 @@ func askWorker(ctx context.Context, t workerTarget, prompt string, progress func
 			return fail("stopped: %v", ctx.Err())
 		}
 	}
+}
+
+// workerWords passes on what a worker writes while it writes it, so the
+// queen's turn shows the words arriving instead of a wait that ends in a
+// report. A model streams a few characters many times a second; they are
+// gathered and sent every workerWordsEvery, and what is left at the end of
+// the turn goes when it ends.
+type workerWords struct {
+	worker string
+	fn     func(WorkerToolEvent)
+	held   strings.Builder
+	last   time.Time
+}
+
+const workerWordsEvery = 150 * time.Millisecond
+
+func newWorkerWords(worker string, fn func(WorkerToolEvent)) *workerWords {
+	return &workerWords{worker: worker, fn: fn}
+}
+
+func (w *workerWords) add(s string) {
+	if w.fn == nil || s == "" {
+		return
+	}
+	w.held.WriteString(s)
+	if time.Since(w.last) >= workerWordsEvery {
+		w.flush()
+	}
+}
+
+func (w *workerWords) flush() {
+	if w.fn == nil || w.held.Len() == 0 {
+		return
+	}
+	w.fn(WorkerToolEvent{Worker: w.worker, Kind: "text", Text: w.held.String(), OK: true})
+	w.held.Reset()
+	w.last = time.Now()
 }
 
 // cancelWorker is best effort, on its own short context: the caller's is already

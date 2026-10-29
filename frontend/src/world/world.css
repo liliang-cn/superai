@@ -273,6 +273,9 @@
 .wc-queen { align-self: flex-start; max-width: 92%; background: #f4f6f9; padding: 8px 12px; border-radius: 12px 12px 12px 3px; overflow-wrap: anywhere; }
 .wc-queen p { margin: 0 0 6px; } .wc-queen p:last-child { margin: 0; }
 .wc-busy { color: #5f6d77; font-style: italic; }
+/* A worker's words while it writes them: under the queen's line, quieter than her answer. */
+.wc-work { margin-top: 6px; padding: 6px 10px; border-left: 2px solid #2f6bff33; color: #5f6d77; font-size: 12.5px; max-height: 160px; overflow: hidden; }
+.wc-work b { display: block; font-size: 11.5px; color: #2f6bff; font-weight: 600; margin-bottom: 2px; }
 .wl-cam-sep { height: 1px; margin: 3px 6px; background: rgba(22, 32, 43, 0.12); }
 
 /* Comic speech: a bubble out of the robot's head, its tail pointing down at
@@ -432,7 +435,7 @@
 :root[data-theme="dark"] .wl-detail dt, :root[data-theme="dark"] .wl-chip span, :root[data-theme="dark"] .wl-cell span,
 :root[data-theme="dark"] .wi-list em, :root[data-theme="dark"] .wi-cap, :root[data-theme="dark"] .wi-latest em, :root[data-theme="dark"] .wi-note,
 :root[data-theme="dark"] .wi-seg span, :root[data-theme="dark"] .wi-shop-n small, :root[data-theme="dark"] .wi-none, :root[data-theme="dark"] .wi-cc-name em,
-:root[data-theme="dark"] .wc-busy, :root[data-theme="dark"] .wt-busy, :root[data-theme="dark"] .wl-say small,
+:root[data-theme="dark"] .wc-work, :root[data-theme="dark"] .wc-busy, :root[data-theme="dark"] .wt-busy, :root[data-theme="dark"] .wl-say small,
 :root[data-theme="dark"] .wl-stats-top em, :root[data-theme="dark"] .wl-stats-grid span, :root[data-theme="dark"] .wl-stats-cap, :root[data-theme="dark"] .wl-stats-chev,
 :root[data-theme="dark"] .wm-g span, :root[data-theme="dark"] .wm-g small, :root[data-theme="dark"] .wm-out em { color: #9aa8b4 !important; }
 :root[data-theme="dark"] .wl-chip b, :root[data-theme="dark"] .wl-cell b, :root[data-theme="dark"] .wl-stats-top b, :root[data-theme="dark"] .wm-g b,

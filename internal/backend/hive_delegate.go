@@ -154,8 +154,10 @@ type DelegateTask struct {
 // by a worker or, in a fallback, by the queen's own run.
 type WorkerToolEvent struct {
 	Worker string `json:"worker"`
-	// Kind is "tool_call" or "tool_result".
+	// Kind is "tool_call", "tool_result" or "text": a piece of what the
+	// worker is writing, in Text, as it writes it.
 	Kind string         `json:"kind"`
+	Text string         `json:"text,omitempty"`
 	Tool string         `json:"tool"`
 	Args map[string]any `json:"args,omitempty"`
 	OK   bool           `json:"ok"`

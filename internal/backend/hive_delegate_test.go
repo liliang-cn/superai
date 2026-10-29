@@ -398,3 +398,44 @@ func TestAStoppedPieceIsNotHandedOn(t *testing.T) {
 		t.Fatalf("handed on: asked %v, self %v", f.asked, f.self)
 	}
 }
+
+// What a worker writes reaches the queen while it writes it, gathered into a
+// few pieces rather than one per streamed token, and the last piece arrives
+// before the report does.
+func TestAWorkersWordsReachTheQueenAsItWrites(t *testing.T) {
+	f := newFakeWorker(t, "tok")
+	f.onSend = func(_, _ string, r *fakeWorker) string {
+		go func() {
+			time.Sleep(30 * time.Millisecond)
+			r.emit("chat:event", map[string]any{"requestId": "someone-else", "type": "partial", "content": "not mine"})
+			for _, w := range []string{"内存", "一共", "32 GB", "，"} {
+				r.emit("chat:event", map[string]any{"requestId": "req-1", "type": "partial", "content": w})
+			}
+			time.Sleep(workerWordsEvery + 50*time.Millisecond)
+			r.emit("chat:event", map[string]any{"requestId": "req-1", "type": "partial", "content": "swap 快满了"})
+			r.emit("chat:done", map[string]any{"requestId": "req-1", "final": "内存一共 32 GB，swap 快满了"})
+		}()
+		return "req-1"
+	}
+	var words []string
+	var mu sync.Mutex
+	res := askWorker(context.Background(), workerTarget{name: "mac", url: f.srv.URL, token: "tok",
+		tools: func(ev WorkerToolEvent) {
+			if ev.Kind == "text" {
+				mu.Lock()
+				words = append(words, ev.Text)
+				mu.Unlock()
+			}
+		}}, "memory?", nil)
+	if res.Failed {
+		t.Fatalf("%+v", res)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if got := strings.Join(words, ""); got != "内存一共32 GB，swap 快满了" {
+		t.Fatalf("words %q", words)
+	}
+	if len(words) < 2 || len(words) > 4 {
+		t.Fatalf("words came in %d pieces: %q", len(words), words)
+	}
+}

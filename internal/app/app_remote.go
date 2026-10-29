@@ -455,6 +455,8 @@ func (a *App) registerRemoteTools(svc *backend.Service, cfg backend.RemoteAgents
 			"required": []string{"agent", "prompt"},
 		},
 		func(ctx context.Context, args map[string]any) (any, error) {
+			// Its steps and words show on this turn while it works.
+			ctx = a.traceWorkers(ctx)
 			id := a.tasks().Start(str(args["agent"]), backend.TaskOut, str(args["prompt"]))
 			a.tasks().InSession(id, backend.ChatSessionFrom(ctx))
 			// The same route @name takes in the conversation: an agent linked

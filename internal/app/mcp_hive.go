@@ -118,6 +118,9 @@ func (a *App) startDelegation(tasks []backend.DelegateTask, caller string) (*del
 	}
 	st := &a.delegations
 	ctx = backend.WithWorkerTrace(ctx, func(ev backend.WorkerToolEvent) {
+		if ev.Kind == "text" {
+			return // words being written are not a step
+		}
 		if b, err := json.Marshal(ev.Args); err != nil || len(b) > delegationArgsKeep {
 			ev.Args = nil
 		}

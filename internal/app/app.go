@@ -1110,6 +1110,9 @@ func (a *App) ownTurn(requestID, sessionID, message string, imagePaths []string,
 		if n := a.mailbox().Unread(); n > 0 {
 			message += fmt.Sprintf("\n\n(You have %d unread hive message(s); hive_inbox shows them.)", n)
 		}
+		// The queen reads the report and answers the person herself, while
+		// they wait on both: what was asked, without a write-up around it.
+		message += "\n\n(Report to the queen: what was asked, plainly, without padding. She answers the person.)"
 	}
 
 	if taskID == "" {

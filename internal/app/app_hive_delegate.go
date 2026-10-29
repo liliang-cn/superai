@@ -442,6 +442,13 @@ func (a *App) emitWorkerTool(requestID string, ev backend.WorkerToolEvent) {
 	if requestID == "" {
 		return
 	}
+	if ev.Kind == "text" {
+		// What the worker is writing, as it writes it: shown under its
+		// steps on the turn, not taken for the queen's own words.
+		a.emit("chat:event", map[string]any{"requestId": requestID, "type": "worker_text",
+			"worker": ev.Worker, "content": ev.Text, "delegated": true})
+		return
+	}
 	p := map[string]any{
 		"requestId": requestID, "type": ev.Kind, "tool": ev.Label(),
 		"worker": ev.Worker, "workerTool": ev.Tool, "delegated": true,
