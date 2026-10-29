@@ -599,7 +599,9 @@ func (a *App) registerHiveTools(svc *backend.Service, cfg *backend.Settings) {
 	inner.AddToolWithMetadata("hive_members",
 		"Who can take work right now. members: the SuperLeo workers that joined the hive, live or lost, and where each is."+
 			" workers: every agent that can work, peers of each other: SuperLeo workers, named agents (openclaw, hermes, pi)"+
-			" and signed-in coding CLIs by machine (claude.mac), each with its host and whether it is up."+
+			" and signed-in coding CLIs by machine (claude.mac), each with its host and whether it is up. A SuperLeo worker also"+
+			" lists abilities, what its machine can do: desktop (operate its desktop apps), browser (the person's Chrome), files, exec"+
+			" (shell commands); a task that needs one goes to a worker that has it."+
 			" Look here before commanding or delegating, because a worker that is lost will not answer.",
 		map[string]any{"type": "object", "properties": map[string]any{}},
 		func(ctx context.Context, _ map[string]any) (any, error) {
@@ -645,7 +647,9 @@ func (a *App) registerHiveTools(svc *backend.Service, cfg *backend.Settings) {
 			" The workers are whoever has joined; call hive_members to see them. Give every live worker the same order with"+
 			" `prompt`, or split the work with `commands`, one entry per worker. Each worker gets a fresh conversation and"+
 			" has no idea what the others were told, so every order must stand alone. What comes back is one report per"+
-			" worker, and a worker that failed or was lost says so — read them all before you conclude anything.",
+			" worker, and a worker that failed or was lost says so — read them all before you conclude anything."+
+			"\n\nA task that needs one machine's own things (its desktop apps, its Chrome, its files, commands run there) goes to the"+
+			" SuperLeo on that machine: hive_members shows each worker's abilities.",
 		map[string]any{
 			"type": "object",
 			"properties": map[string]any{
@@ -708,6 +712,7 @@ func (a *App) rosterView() []map[string]any {
 
 // hiveCommand fans an order out to workers in parallel.
 func (a *App) hiveCommand(ctx context.Context, args map[string]any) (any, error) {
+	ctx = a.traceWorkers(ctx)
 	runner := a.remoteRunner()
 	live := runner.Workers()
 	names := make([]string, 0, len(live))

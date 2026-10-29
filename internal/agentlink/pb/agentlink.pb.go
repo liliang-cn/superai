@@ -273,7 +273,11 @@ type Hello struct {
 	// core's hands on that machine. Unset from an agent too old to say.
 	Thinks *bool `protobuf:"varint,11,opt,name=thinks,proto3,oneof" json:"thinks,omitempty"`
 	// The MCP servers it can call, when it thinks: what core routes by.
-	Mcp           []string `protobuf:"bytes,12,rep,name=mcp,proto3" json:"mcp,omitempty"`
+	Mcp []string `protobuf:"bytes,12,rep,name=mcp,proto3" json:"mcp,omitempty"`
+	// What this machine can do for core beyond running CLIs and agents:
+	// desktop, browser, files, exec. Core's queen routes a piece of work that
+	// needs one to a worker that has it. Unset from an older agent.
+	Abilities     []*Ability `protobuf:"bytes,13,rep,name=abilities,proto3" json:"abilities,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -392,6 +396,68 @@ func (x *Hello) GetMcp() []string {
 	return nil
 }
 
+func (x *Hello) GetAbilities() []*Ability {
+	if x != nil {
+		return x.Abilities
+	}
+	return nil
+}
+
+type Ability struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// desktop, browser, files or exec.
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// How it stands there, in a few words: the browser's mode, the directory
+	// files are kept in, the apps desktop control leaves alone.
+	About         string `protobuf:"bytes,2,opt,name=about,proto3" json:"about,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Ability) Reset() {
+	*x = Ability{}
+	mi := &file_agentlink_v1_agentlink_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Ability) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Ability) ProtoMessage() {}
+
+func (x *Ability) ProtoReflect() protoreflect.Message {
+	mi := &file_agentlink_v1_agentlink_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Ability.ProtoReflect.Descriptor instead.
+func (*Ability) Descriptor() ([]byte, []int) {
+	return file_agentlink_v1_agentlink_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *Ability) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *Ability) GetAbout() string {
+	if x != nil {
+		return x.About
+	}
+	return ""
+}
+
 type NamedAgent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
@@ -402,7 +468,7 @@ type NamedAgent struct {
 
 func (x *NamedAgent) Reset() {
 	*x = NamedAgent{}
-	mi := &file_agentlink_v1_agentlink_proto_msgTypes[3]
+	mi := &file_agentlink_v1_agentlink_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -414,7 +480,7 @@ func (x *NamedAgent) String() string {
 func (*NamedAgent) ProtoMessage() {}
 
 func (x *NamedAgent) ProtoReflect() protoreflect.Message {
-	mi := &file_agentlink_v1_agentlink_proto_msgTypes[3]
+	mi := &file_agentlink_v1_agentlink_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -427,7 +493,7 @@ func (x *NamedAgent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NamedAgent.ProtoReflect.Descriptor instead.
 func (*NamedAgent) Descriptor() ([]byte, []int) {
-	return file_agentlink_v1_agentlink_proto_rawDescGZIP(), []int{3}
+	return file_agentlink_v1_agentlink_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *NamedAgent) GetName() string {
@@ -454,7 +520,7 @@ type Welcome struct {
 
 func (x *Welcome) Reset() {
 	*x = Welcome{}
-	mi := &file_agentlink_v1_agentlink_proto_msgTypes[4]
+	mi := &file_agentlink_v1_agentlink_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -466,7 +532,7 @@ func (x *Welcome) String() string {
 func (*Welcome) ProtoMessage() {}
 
 func (x *Welcome) ProtoReflect() protoreflect.Message {
-	mi := &file_agentlink_v1_agentlink_proto_msgTypes[4]
+	mi := &file_agentlink_v1_agentlink_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -479,7 +545,7 @@ func (x *Welcome) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Welcome.ProtoReflect.Descriptor instead.
 func (*Welcome) Descriptor() ([]byte, []int) {
-	return file_agentlink_v1_agentlink_proto_rawDescGZIP(), []int{4}
+	return file_agentlink_v1_agentlink_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *Welcome) GetName() string {
@@ -508,7 +574,7 @@ type Call struct {
 
 func (x *Call) Reset() {
 	*x = Call{}
-	mi := &file_agentlink_v1_agentlink_proto_msgTypes[5]
+	mi := &file_agentlink_v1_agentlink_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -520,7 +586,7 @@ func (x *Call) String() string {
 func (*Call) ProtoMessage() {}
 
 func (x *Call) ProtoReflect() protoreflect.Message {
-	mi := &file_agentlink_v1_agentlink_proto_msgTypes[5]
+	mi := &file_agentlink_v1_agentlink_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -533,7 +599,7 @@ func (x *Call) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Call.ProtoReflect.Descriptor instead.
 func (*Call) Descriptor() ([]byte, []int) {
-	return file_agentlink_v1_agentlink_proto_rawDescGZIP(), []int{5}
+	return file_agentlink_v1_agentlink_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *Call) GetId() string {
@@ -586,7 +652,7 @@ type Reply struct {
 
 func (x *Reply) Reset() {
 	*x = Reply{}
-	mi := &file_agentlink_v1_agentlink_proto_msgTypes[6]
+	mi := &file_agentlink_v1_agentlink_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -598,7 +664,7 @@ func (x *Reply) String() string {
 func (*Reply) ProtoMessage() {}
 
 func (x *Reply) ProtoReflect() protoreflect.Message {
-	mi := &file_agentlink_v1_agentlink_proto_msgTypes[6]
+	mi := &file_agentlink_v1_agentlink_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -611,7 +677,7 @@ func (x *Reply) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Reply.ProtoReflect.Descriptor instead.
 func (*Reply) Descriptor() ([]byte, []int) {
-	return file_agentlink_v1_agentlink_proto_rawDescGZIP(), []int{6}
+	return file_agentlink_v1_agentlink_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *Reply) GetId() string {
@@ -654,7 +720,7 @@ type Event struct {
 
 func (x *Event) Reset() {
 	*x = Event{}
-	mi := &file_agentlink_v1_agentlink_proto_msgTypes[7]
+	mi := &file_agentlink_v1_agentlink_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -666,7 +732,7 @@ func (x *Event) String() string {
 func (*Event) ProtoMessage() {}
 
 func (x *Event) ProtoReflect() protoreflect.Message {
-	mi := &file_agentlink_v1_agentlink_proto_msgTypes[7]
+	mi := &file_agentlink_v1_agentlink_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -679,7 +745,7 @@ func (x *Event) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Event.ProtoReflect.Descriptor instead.
 func (*Event) Descriptor() ([]byte, []int) {
-	return file_agentlink_v1_agentlink_proto_rawDescGZIP(), []int{7}
+	return file_agentlink_v1_agentlink_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *Event) GetName() string {
@@ -705,7 +771,7 @@ type Ping struct {
 
 func (x *Ping) Reset() {
 	*x = Ping{}
-	mi := &file_agentlink_v1_agentlink_proto_msgTypes[8]
+	mi := &file_agentlink_v1_agentlink_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -717,7 +783,7 @@ func (x *Ping) String() string {
 func (*Ping) ProtoMessage() {}
 
 func (x *Ping) ProtoReflect() protoreflect.Message {
-	mi := &file_agentlink_v1_agentlink_proto_msgTypes[8]
+	mi := &file_agentlink_v1_agentlink_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -730,7 +796,7 @@ func (x *Ping) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Ping.ProtoReflect.Descriptor instead.
 func (*Ping) Descriptor() ([]byte, []int) {
-	return file_agentlink_v1_agentlink_proto_rawDescGZIP(), []int{8}
+	return file_agentlink_v1_agentlink_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *Ping) GetAtUnixMs() int64 {
@@ -749,7 +815,7 @@ type Pong struct {
 
 func (x *Pong) Reset() {
 	*x = Pong{}
-	mi := &file_agentlink_v1_agentlink_proto_msgTypes[9]
+	mi := &file_agentlink_v1_agentlink_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -761,7 +827,7 @@ func (x *Pong) String() string {
 func (*Pong) ProtoMessage() {}
 
 func (x *Pong) ProtoReflect() protoreflect.Message {
-	mi := &file_agentlink_v1_agentlink_proto_msgTypes[9]
+	mi := &file_agentlink_v1_agentlink_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -774,7 +840,7 @@ func (x *Pong) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Pong.ProtoReflect.Descriptor instead.
 func (*Pong) Descriptor() ([]byte, []int) {
-	return file_agentlink_v1_agentlink_proto_rawDescGZIP(), []int{9}
+	return file_agentlink_v1_agentlink_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *Pong) GetAtUnixMs() int64 {
@@ -800,7 +866,7 @@ const file_agentlink_v1_agentlink_proto_rawDesc = "" +
 	"\awelcome\x18\x01 \x01(\v2\x1e.superleo.agentlink.v1.WelcomeH\x00R\awelcome\x121\n" +
 	"\x04call\x18\x02 \x01(\v2\x1b.superleo.agentlink.v1.CallH\x00R\x04call\x121\n" +
 	"\x04ping\x18\x03 \x01(\v2\x1b.superleo.agentlink.v1.PingH\x00R\x04pingB\x06\n" +
-	"\x04kind\"\xb6\x02\n" +
+	"\x04kind\"\xf4\x02\n" +
 	"\x05Hello\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
 	"\x04host\x18\x02 \x01(\tR\x04host\x12\x0e\n" +
@@ -814,8 +880,12 @@ const file_agentlink_v1_agentlink_proto_rawDesc = "" +
 	"\x06parent\x18\n" +
 	" \x01(\tR\x06parent\x12\x1b\n" +
 	"\x06thinks\x18\v \x01(\bH\x00R\x06thinks\x88\x01\x01\x12\x10\n" +
-	"\x03mcp\x18\f \x03(\tR\x03mcpB\t\n" +
-	"\a_thinks\"6\n" +
+	"\x03mcp\x18\f \x03(\tR\x03mcp\x12<\n" +
+	"\tabilities\x18\r \x03(\v2\x1e.superleo.agentlink.v1.AbilityR\tabilitiesB\t\n" +
+	"\a_thinks\"3\n" +
+	"\aAbility\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
+	"\x05about\x18\x02 \x01(\tR\x05about\"6\n" +
 	"\n" +
 	"NamedAgent\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
@@ -860,35 +930,37 @@ func file_agentlink_v1_agentlink_proto_rawDescGZIP() []byte {
 	return file_agentlink_v1_agentlink_proto_rawDescData
 }
 
-var file_agentlink_v1_agentlink_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_agentlink_v1_agentlink_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_agentlink_v1_agentlink_proto_goTypes = []any{
 	(*AgentFrame)(nil), // 0: superleo.agentlink.v1.AgentFrame
 	(*CoreFrame)(nil),  // 1: superleo.agentlink.v1.CoreFrame
 	(*Hello)(nil),      // 2: superleo.agentlink.v1.Hello
-	(*NamedAgent)(nil), // 3: superleo.agentlink.v1.NamedAgent
-	(*Welcome)(nil),    // 4: superleo.agentlink.v1.Welcome
-	(*Call)(nil),       // 5: superleo.agentlink.v1.Call
-	(*Reply)(nil),      // 6: superleo.agentlink.v1.Reply
-	(*Event)(nil),      // 7: superleo.agentlink.v1.Event
-	(*Ping)(nil),       // 8: superleo.agentlink.v1.Ping
-	(*Pong)(nil),       // 9: superleo.agentlink.v1.Pong
+	(*Ability)(nil),    // 3: superleo.agentlink.v1.Ability
+	(*NamedAgent)(nil), // 4: superleo.agentlink.v1.NamedAgent
+	(*Welcome)(nil),    // 5: superleo.agentlink.v1.Welcome
+	(*Call)(nil),       // 6: superleo.agentlink.v1.Call
+	(*Reply)(nil),      // 7: superleo.agentlink.v1.Reply
+	(*Event)(nil),      // 8: superleo.agentlink.v1.Event
+	(*Ping)(nil),       // 9: superleo.agentlink.v1.Ping
+	(*Pong)(nil),       // 10: superleo.agentlink.v1.Pong
 }
 var file_agentlink_v1_agentlink_proto_depIdxs = []int32{
-	2, // 0: superleo.agentlink.v1.AgentFrame.hello:type_name -> superleo.agentlink.v1.Hello
-	6, // 1: superleo.agentlink.v1.AgentFrame.reply:type_name -> superleo.agentlink.v1.Reply
-	7, // 2: superleo.agentlink.v1.AgentFrame.event:type_name -> superleo.agentlink.v1.Event
-	9, // 3: superleo.agentlink.v1.AgentFrame.pong:type_name -> superleo.agentlink.v1.Pong
-	4, // 4: superleo.agentlink.v1.CoreFrame.welcome:type_name -> superleo.agentlink.v1.Welcome
-	5, // 5: superleo.agentlink.v1.CoreFrame.call:type_name -> superleo.agentlink.v1.Call
-	8, // 6: superleo.agentlink.v1.CoreFrame.ping:type_name -> superleo.agentlink.v1.Ping
-	3, // 7: superleo.agentlink.v1.Hello.agents:type_name -> superleo.agentlink.v1.NamedAgent
-	0, // 8: superleo.agentlink.v1.AgentLink.Connect:input_type -> superleo.agentlink.v1.AgentFrame
-	1, // 9: superleo.agentlink.v1.AgentLink.Connect:output_type -> superleo.agentlink.v1.CoreFrame
-	9, // [9:10] is the sub-list for method output_type
-	8, // [8:9] is the sub-list for method input_type
-	8, // [8:8] is the sub-list for extension type_name
-	8, // [8:8] is the sub-list for extension extendee
-	0, // [0:8] is the sub-list for field type_name
+	2,  // 0: superleo.agentlink.v1.AgentFrame.hello:type_name -> superleo.agentlink.v1.Hello
+	7,  // 1: superleo.agentlink.v1.AgentFrame.reply:type_name -> superleo.agentlink.v1.Reply
+	8,  // 2: superleo.agentlink.v1.AgentFrame.event:type_name -> superleo.agentlink.v1.Event
+	10, // 3: superleo.agentlink.v1.AgentFrame.pong:type_name -> superleo.agentlink.v1.Pong
+	5,  // 4: superleo.agentlink.v1.CoreFrame.welcome:type_name -> superleo.agentlink.v1.Welcome
+	6,  // 5: superleo.agentlink.v1.CoreFrame.call:type_name -> superleo.agentlink.v1.Call
+	9,  // 6: superleo.agentlink.v1.CoreFrame.ping:type_name -> superleo.agentlink.v1.Ping
+	4,  // 7: superleo.agentlink.v1.Hello.agents:type_name -> superleo.agentlink.v1.NamedAgent
+	3,  // 8: superleo.agentlink.v1.Hello.abilities:type_name -> superleo.agentlink.v1.Ability
+	0,  // 9: superleo.agentlink.v1.AgentLink.Connect:input_type -> superleo.agentlink.v1.AgentFrame
+	1,  // 10: superleo.agentlink.v1.AgentLink.Connect:output_type -> superleo.agentlink.v1.CoreFrame
+	10, // [10:11] is the sub-list for method output_type
+	9,  // [9:10] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_agentlink_v1_agentlink_proto_init() }
@@ -914,7 +986,7 @@ func file_agentlink_v1_agentlink_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_agentlink_v1_agentlink_proto_rawDesc), len(file_agentlink_v1_agentlink_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   10,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

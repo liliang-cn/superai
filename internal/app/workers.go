@@ -36,6 +36,9 @@ type HiveWorker struct {
 	Up bool `json:"up"`
 	// Via is the SuperLeo that runs a CLI or a named agent for core.
 	Via string `json:"via,omitempty"`
+	// Abilities is what its machine can do (desktop, browser, files, exec):
+	// the queen hands a task that needs one to a worker that has it.
+	Abilities []HostAbility `json:"abilities,omitempty"`
 }
 
 // HiveWorkers is every agent that can work, the queen's own SuperLeo aside:
@@ -54,7 +57,7 @@ func (a *App) HiveWorkers() []HiveWorker {
 				continue
 			}
 			seen[ag.Name] = true
-			out = append(out, HiveWorker{Name: ag.Name, Kind: ag.Kind, Host: h.Name, State: ag.State, Up: workerUp(ag.State), Via: ag.Via})
+			out = append(out, HiveWorker{Name: ag.Name, Kind: ag.Kind, Host: h.Name, State: ag.State, Up: workerUp(ag.State), Via: ag.Via, Abilities: ag.Abilities})
 		}
 	}
 	return out
@@ -94,6 +97,7 @@ func (a *App) linkedThinkers(roster map[string]bool) map[string]linkedThinker {
 			continue
 		}
 		have := append(append([]string{}, c.hello.GetMcp()...), c.hello.GetClis()...)
+		have = append(have, abilityNamesOf(c.hello)...)
 		out[c.name()] = linkedThinker{conn: c, have: have}
 	}
 	return out

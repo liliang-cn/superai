@@ -12,6 +12,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -58,6 +59,13 @@ func (a *App) liveWorkers() []backend.HiveMember {
 		}
 	}
 	return out
+}
+
+// hasWorkers is whether any SuperLeo can be handed a piece: a pod on the
+// roster, or a machine's agent with a model of its own over its link (a Mac
+// that joined the hive). Without either the queen keeps her tools.
+func (a *App) hasWorkers() bool {
+	return len(a.liveWorkers()) > 0 || len(a.linkedThinkers(map[string]bool{})) > 0
 }
 
 // delegateCandidates are the live workers that have every server a piece
@@ -145,7 +153,12 @@ func (a *App) delegateCandidates(needs []string) []string {
 
 // queenRunFilter is what a chat run on this instance must not have, by
 // delegation mode. Installed on every service; it says nothing off a queen.
-func (a *App) queenRunFilter(ctx context.Context, _ string, registry []string) []string {
+func (a *App) queenRunFilter(ctx context.Context, user string, registry []string) []string {
+	return append(a.unavailableTools(registry), a.delegationFilter(ctx, user, registry)...)
+}
+
+func (a *App) delegationFilter(ctx context.Context, _ string, registry []string) []string {
+	a.syncDelegateDescription()
 	mode := a.delegationMode()
 	if mode == backend.DelegationOff {
 		return nil
@@ -155,7 +168,7 @@ func (a *App) queenRunFilter(ctx context.Context, _ string, registry []string) [
 		// round again.
 		return []string{backend.DelegateToolName, "hive_command", "hive_map"}
 	}
-	if len(a.liveWorkers()) == 0 {
+	if !a.hasWorkers() {
 		// Nobody to give it to: she keeps her tools, and the tool that would
 		// only fall back to her is not offered.
 		return []string{backend.DelegateToolName}
@@ -169,7 +182,7 @@ func (a *App) queenRunFilter(ctx context.Context, _ string, registry []string) [
 // noteNoWorkers says, on a turn about to run in max mode with no live worker,
 // that the queen is doing it herself — in the log and on the turn's stream.
 func (a *App) noteNoWorkers(requestID string) {
-	if a.delegationMode() != backend.DelegationMax || len(a.liveWorkers()) > 0 {
+	if a.delegationMode() != backend.DelegationMax || a.hasWorkers() {
 		return
 	}
 	slog.Info("no live worker; the queen keeps her tools", "module", "hive", "request", requestID)
@@ -183,6 +196,46 @@ func (a *App) registerDelegateTool(inner *agent.Service, mode string) {
 	if mode == backend.DelegationOff {
 		return
 	}
+	a.delegateTool.mu.Lock()
+	a.delegateTool.inner, a.delegateTool.roster = inner, ""
+	a.delegateTool.mu.Unlock()
+	a.addDelegateTool(inner, "")
+}
+
+// delegateToolState is where the hive_delegate tool is registered, so its
+// description can follow who has joined and what their machines can do.
+type delegateToolState struct {
+	mu     sync.Mutex
+	inner  *agent.Service
+	roster string
+}
+
+// syncDelegateDescription re-registers hive_delegate when the abilities of the
+// workers have changed, so the description the queen's model reads says which
+// worker can do what. Asked per run (queenRunFilter), outside a.mu.
+func (a *App) syncDelegateDescription() {
+	roster := a.abilityRoster()
+	a.delegateTool.mu.Lock()
+	inner, last := a.delegateTool.inner, a.delegateTool.roster
+	if inner == nil || roster == last {
+		a.delegateTool.mu.Unlock()
+		return
+	}
+	a.delegateTool.roster = roster
+	a.delegateTool.mu.Unlock()
+	a.addDelegateTool(inner, roster)
+}
+
+func (a *App) addDelegateTool(inner *agent.Service, roster string) {
+	abilities := "\n\nA task that needs one machine's own things — its desktop apps (\"open WeChat\"), its browser (the person's Chrome," +
+		" signed-in sites), its files, running commands on it — goes to the SuperLeo on that machine, whole: set worker to it, or put" +
+		" the ability (desktop, browser, files, exec) in needs. It does the task with its own local tools; you do not have them." +
+		" hive_members lists each worker's abilities."
+	if roster != "" {
+		abilities += " Right now, by machine: " + roster + "."
+	} else {
+		abilities += " Right now no live worker has said it offers any."
+	}
 	inner.AddToolWithMetadata(backend.DelegateToolName,
 		"Have workers do the work that needs tools, and get their reports back: noted (calendar, to-dos, notes, goals,"+
 			" time, holdings), web search and pages, files and shell, CortexDB research, reports, checks."+
@@ -194,6 +247,7 @@ func (a *App) registerDelegateTool(inner *agent.Service, mode string) {
 			" \"hermes\", \"pi\"), and a signed-in coding CLI on a machine (\"claude.mac\", \"codex.sds-e\"). Name a coding"+
 			" CLI in needs (\"codex\") for coding work and it does the task itself; set worker to hand a task to one of them"+
 			" by name. A coding CLI takes one task at a time. hive_members lists who there is."+
+			abilities+
 			"\n\nA worker that fails or times out is replaced by another; when no worker can do a task the queen does it"+
 			" herself. The report says who did each task and which tools they called; tell the person in a few words.",
 		map[string]any{
@@ -207,9 +261,9 @@ func (a *App) registerDelegateTool(inner *agent.Service, mode string) {
 							"task": map[string]any{"type": "string", "description": "One self-contained instruction."},
 							"needs": map[string]any{
 								"type": "array", "items": map[string]any{"type": "string"},
-								"description": "MCP servers the task's tools come from, e.g. [\"noted\"], and coding CLIs it needs, e.g. [\"codex\"].",
+								"description": "MCP servers the task's tools come from, e.g. [\"noted\"], coding CLIs it needs, e.g. [\"codex\"], and machine abilities, e.g. [\"desktop\"], [\"browser\"].",
 							},
-							"worker": map[string]any{"type": "string", "description": "To hand the task to one worker by name (\"openclaw\", \"claude.mac\", \"superleo-worker-1\"); omit to let the hive choose."},
+							"worker": map[string]any{"type": "string", "description": "To hand the task to one worker by name (\"openclaw\", \"claude.mac\", \"superleo-worker-1\", or a machine's SuperLeo); omit to let the hive choose."},
 						},
 						"required": []string{"task"},
 					},
@@ -304,13 +358,7 @@ func (a *App) delegate(ctx context.Context, tasks []backend.DelegateTask, onAssi
 	}
 
 	requestID := chatRequestFrom(ctx)
-	outer := backend.WorkerTraceFrom(ctx)
-	ctx = backend.WithWorkerTrace(ctx, func(ev backend.WorkerToolEvent) {
-		a.emitWorkerTool(requestID, ev)
-		if outer != nil {
-			outer(ev)
-		}
-	})
+	ctx = a.traceWorkers(ctx)
 	queen := a.hiveName()
 	env := backend.DelegateEnv{
 		Candidates: a.delegateCandidates,
@@ -322,7 +370,20 @@ func (a *App) delegate(ctx context.Context, tasks []backend.DelegateTask, onAssi
 			}
 			return a.remoteRunner().Run(ctx, worker, prompt)
 		},
-		Self:     a.queenSelf,
+		Self: func(ctx context.Context, prompt string) (backend.RemoteResult, error) {
+			// A piece that needs a machine's ability the queen has not, and no
+			// worker offers it, is not for her to attempt with tools she lacks.
+			for _, t := range tasks {
+				if !strings.HasSuffix(prompt, t.Task) {
+					continue
+				}
+				if missing := a.unmetAbilities(t.Needs); len(missing) > 0 {
+					return backend.RemoteResult{Failed: true, Reason: fmt.Sprintf("nothing here can %s: this machine does not have it and no live worker offers it (workers and their abilities: %s)",
+						strings.Join(missing, ", "), noneIfEmpty(a.abilityRoster()))}, nil
+				}
+			}
+			return a.queenSelf(ctx, prompt)
+		},
 		SelfName: queen,
 		Timeout:  timeout,
 		OnAssign: func(i int, worker string, fallback bool) {
@@ -346,6 +407,23 @@ func (a *App) delegate(ctx context.Context, tasks []backend.DelegateTask, onAssi
 		}
 	}
 	return results, nil
+}
+
+// traceWorkers has every tool a worker calls for work done under ctx shown on
+// the turn ctx belongs to ("mac · exec_command"), and passed to any trace
+// already on ctx. hive_delegate and hive_command both hand work out under it.
+func (a *App) traceWorkers(ctx context.Context) context.Context {
+	if ctx == nil {
+		return ctx
+	}
+	requestID := chatRequestFrom(ctx)
+	outer := backend.WorkerTraceFrom(ctx)
+	return backend.WithWorkerTrace(ctx, func(ev backend.WorkerToolEvent) {
+		a.emitWorkerTool(requestID, ev)
+		if outer != nil {
+			outer(ev)
+		}
+	})
 }
 
 // emitWorkerTool puts one tool event of delegated work on the queen's turn,
@@ -456,7 +534,18 @@ func (a *App) relayWorkerApproval(ctx context.Context, worker string, p map[stri
 	now := time.Now()
 	dec, _ := a.askToolApproval(actx, backend.ApprovalRequest{
 		ID: uuid.NewString(), Tool: str(p["tool"]), Command: str(p["command"]), Args: args,
-		SessionID: backend.ChatSessionFrom(ctx), By: worker, AskedAt: now, ExpiresAt: now.Add(wait),
+		SessionID: backend.ChatSessionFrom(ctx), By: worker, Machine: a.machineOfWorker(worker), AskedAt: now, ExpiresAt: now.Add(wait),
 	})
 	return dec.Allowed
+}
+
+// machineOfWorker is the machine a worker runs on, for the card that asks
+// about its call ("on liang-mac").
+func (a *App) machineOfWorker(name string) string {
+	for _, w := range a.HiveWorkers() {
+		if w.Name == name {
+			return w.Host
+		}
+	}
+	return ""
 }

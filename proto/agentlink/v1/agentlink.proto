@@ -65,6 +65,18 @@ message Hello {
   optional bool thinks = 11;
   // The MCP servers it can call, when it thinks: what core routes by.
   repeated string mcp = 12;
+  // What this machine can do for core beyond running CLIs and agents:
+  // desktop, browser, files, exec. Core's queen routes a piece of work that
+  // needs one to a worker that has it. Unset from an older agent.
+  repeated Ability abilities = 13;
+}
+
+message Ability {
+  // desktop, browser, files or exec.
+  string name = 1;
+  // How it stands there, in a few words: the browser's mode, the directory
+  // files are kept in, the apps desktop control leaves alone.
+  string about = 2;
 }
 
 message NamedAgent {

@@ -193,6 +193,9 @@ func machineTools() []selfTool {
 			Name: "machine_act", Title: "Act on a machine",
 			Description: "Change something on a machine: start, stop or restart one of its services, or run a shell command there (action=exec)." +
 				" Look first with machine_inspect; prefer a service action to a command when one does the job." +
+				" This looks after the machine itself. When the person wants a task done on a machine whose SuperLeo is a worker (open an app," +
+				" use its browser or files, work that takes several steps), hand the whole task to that worker with hive_delegate instead;" +
+				" it does it with its own tools." +
 				" A command runs in /bin/sh from the home directory of the user the agent runs as (root on the Linux hosts), a minute by default." +
 				" Every call asks the person first (the approval gate) and waits for the answer; a denial or no answer in time means nothing was done.",
 			Params: map[string]any{

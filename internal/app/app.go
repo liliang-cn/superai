@@ -257,6 +257,9 @@ type App struct {
 	standingHost *standingHost
 	standingOnce sync.Once
 	approvals    map[string]*pendingApproval
+	// abilitiesCache is localAbilities for a few seconds (abilities.go).
+	abilitiesCache abilityCache
+	delegateTool   delegateToolState
 
 	// emitFn is an extra sink for frontend events. Tests set it, and serve mode
 	// points it at the SSE hub, where it is the only sink there is: the Wails

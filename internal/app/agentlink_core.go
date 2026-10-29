@@ -450,6 +450,9 @@ type LinkedAgent struct {
 	// where it has them, else from its processes. A CLI not running is not
 	// in it; absent when none is.
 	CLIActivity cliMap `json:"cliActivity,omitempty"`
+	// Abilities is what its machine can do for core's queen: desktop,
+	// browser, files, exec, each with how it stands.
+	Abilities []HostAbility `json:"abilities,omitempty"`
 }
 
 // LinkedAgents lists the machines connected to this core over the agent link:
@@ -479,6 +482,7 @@ func (a *App) LinkedAgentsAll() []LinkedAgent {
 		for _, n := range c.hello.GetAgents() {
 			la.Agents = append(la.Agents, map[string]string{"name": n.GetName(), "about": n.GetAbout()})
 		}
+		la.Abilities = abilitiesFrom(c.hello)
 		la.Activity = c.activity.Load()
 		if m := c.cliActivity(); len(m) > 0 {
 			la.CLIActivity = m

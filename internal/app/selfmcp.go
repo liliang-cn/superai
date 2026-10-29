@@ -88,6 +88,7 @@ func selfTools() []selfTool {
 		{
 			Name: "linked_agents", Title: "Linked agents", ReadOnly: true,
 			Description: "The agents connected to this SuperLeo over the agent link (host, OS, the coding CLIs and agents each offers, when last heard), and the ones that dropped recently without coming back." +
+				" abilities, when present, is what that machine's SuperLeo can do for the queen: desktop, browser, files, exec, each with how it stands." +
 				" Each says what it is: role machine (machine true) is a machine machine_inspect and machine_act look after; worker is a hive worker's pod, reached through the hive tools; relay is there only for the named agents it serves." +
 				" activity, when present, is what the interactive Claude Code sessions people run in that machine's terminals are doing (not SuperLeo's own runs): working and waiting counts, and per session its project (the directory's name), state (working, waiting — wait says permission or input — or idle), the tool it is on and since when. No prompts or tool arguments are ever in it." +
 				" cliActivity is the same for every coding CLI running there (claude, codex, opencode, pi, gemini, ...), by CLI: source plugin is the CLI's own plugin or hooks (precise), source process is the machine's look at its processes (working while it uses CPU, else idle). A CLI not running is not in it.",
@@ -96,7 +97,7 @@ func selfTools() []selfTool {
 		{
 			Name: "hosts", Title: "Hosts", ReadOnly: true,
 			Description: "Every host this SuperLeo knows of and what runs on each. A host is a pod, a container, a Mac, a VM or bare metal (kind), with parent the host it sits inside (a pod's k3s node) and state live, lost or configured (known from the settings only)." +
-				" Its agents are SuperLeo itself (kind superleo, with role queen, worker, machine, relay or standalone, and the MCP servers it can call), the coding CLIs installed there (kind cli, named cli.machine, with what they are doing) and named agents (kind agent, like openclaw) with via, the SuperLeo that runs them." +
+				" Its agents are SuperLeo itself (kind superleo, with role queen, worker, machine, relay or standalone, and the MCP servers it can call and the abilities of its machine: desktop, browser, files, exec), the coding CLIs installed there (kind cli, named cli.machine, with what they are doing) and named agents (kind agent, like openclaw) with via, the SuperLeo that runs them." +
 				" services are the HA services (provider haify): one copy runs on active and moves to a ready standby; reach it at vip. An agent such a service runs says service, and shows on standby hosts with state standby.",
 			Run: func(a *App, _ map[string]any) (any, error) { return a.fullTopology(), nil },
 		},

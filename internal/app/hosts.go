@@ -85,6 +85,9 @@ type HostAgent struct {
 	Via string `json:"via,omitempty"`
 	// MCP is the MCP servers a SuperLeo can call, where it has said.
 	MCP []string `json:"mcp,omitempty"`
+	// Abilities is what that SuperLeo's machine can do for the queen: desktop,
+	// browser, files, exec (abilities.go).
+	Abilities []HostAbility `json:"abilities,omitempty"`
 	// Service is the HA service it belongs to, when it is kept up as one:
 	// it runs on the service's active host and stands by on the others
 	// (state standby), and is reached at the service's IP.
@@ -333,7 +336,7 @@ func (a *App) hostsWith(services []backend.HAService) []Host {
 	if svc := a.svc; svc != nil {
 		mcp = svc.MCPServersWithTools()
 	}
-	b.agent(me, HostAgent{Name: selfName, Kind: hostAgentSuperLeo, Role: selfRole, State: "live", Version: buildVersion(), MCP: mcp})
+	b.agent(me, HostAgent{Name: selfName, Kind: hostAgentSuperLeo, Role: selfRole, State: "live", Version: buildVersion(), MCP: mcp, Abilities: a.localAbilities()})
 	b.clis(me, selfName, cliNames(a.localAgentNames()), a.CLIActivityAll()["core"])
 
 	// Hive workers, by what they said when they joined.
@@ -367,7 +370,7 @@ func (a *App) hostsWith(services []backend.HAService) []Host {
 		r := role(c.name(), helloRole(hello))
 		x := b.linked(c.name(), hello, r)
 		x.live(time.UnixMilli(c.lastSeen.Load()))
-		b.agent(x, HostAgent{Name: c.name(), Kind: hostAgentSuperLeo, Role: r, State: "live", Version: hello.GetVersion()})
+		b.agent(x, HostAgent{Name: c.name(), Kind: hostAgentSuperLeo, Role: r, State: "live", Version: hello.GetVersion(), Abilities: abilitiesFrom(hello)})
 		b.clis(x, c.name(), hello.GetClis(), c.cliActivity())
 		for _, n := range hello.GetAgents() {
 			b.agent(x, HostAgent{Name: n.GetName(), Kind: hostAgentNamed, About: n.GetAbout(), State: "live", Via: c.name()})
@@ -751,6 +754,9 @@ func (b *hostBook) agent(x *Host, g HostAgent) {
 		if e.MCP == nil {
 			e.MCP = g.MCP
 		}
+		if e.Abilities == nil {
+			e.Abilities = g.Abilities
+		}
 		return
 	}
 	x.Agents = append(x.Agents, g)
@@ -1012,6 +1018,9 @@ func hostsText(hs []Host) string {
 			}
 			if len(g.MCP) > 0 {
 				fmt.Fprintf(&b, ", mcp %s", strings.Join(g.MCP, " "))
+			}
+			if len(g.Abilities) > 0 {
+				fmt.Fprintf(&b, ", can %s", strings.Join(abilityLine(g.Abilities), " "))
 			}
 			if g.Service != "" {
 				fmt.Fprintf(&b, ", HA service %s", g.Service)

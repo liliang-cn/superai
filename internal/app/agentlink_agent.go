@@ -165,6 +165,7 @@ func (a *App) agentHello(o AgentLinkOptions) *agentlinkpb.Hello {
 	if svc != nil {
 		h.Mcp = svc.MCPServersWithTools()
 	}
+	h.Abilities = a.helloAbilities()
 	for _, c := range a.localAgentNames() {
 		h.Clis = append(h.Clis, c.Name)
 	}
@@ -285,12 +286,12 @@ func (a *App) agentLinkOnce(ctx context.Context, o AgentLinkOptions) error {
 	go func() {
 		t := time.NewTicker(time.Minute)
 		defer t.Stop()
-		last := fmt.Sprint(hello.GetClis(), hello.GetAgents(), hello.GetRole(), hello.GetThinks(), hello.GetMcp())
+		last := fmt.Sprint(hello.GetClis(), hello.GetAgents(), hello.GetRole(), hello.GetThinks(), hello.GetMcp(), helloAbilitiesKey(hello))
 		for {
 			select {
 			case <-t.C:
 				h := a.agentHello(o)
-				if now := fmt.Sprint(h.GetClis(), h.GetAgents(), h.GetRole(), h.GetThinks(), h.GetMcp()); now != last {
+				if now := fmt.Sprint(h.GetClis(), h.GetAgents(), h.GetRole(), h.GetThinks(), h.GetMcp(), helloAbilitiesKey(h)); now != last {
 					last = now
 					send(&agentlinkpb.AgentFrame{Kind: &agentlinkpb.AgentFrame_Hello{Hello: h}})
 				}
