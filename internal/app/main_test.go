@@ -15,5 +15,15 @@ func TestMain(m *testing.M) {
 	// about the browser set what they need.
 	os.Setenv("SUPERLEO_BROWSER_MODE", "off")
 	os.Setenv("SUPERLEO_DESKTOP", "off")
-	os.Exit(m.Run())
+	// Never touch the person's real ~/.superleo (or anything else under their
+	// home): every test runs against a throwaway home.
+	home, err := os.MkdirTemp("", "superleo-test-home-")
+	if err != nil {
+		panic(err)
+	}
+	os.Setenv("SUPERLEO_HOME", home)
+	os.Setenv("HOME", home)
+	code := m.Run()
+	os.RemoveAll(home)
+	os.Exit(code)
 }
