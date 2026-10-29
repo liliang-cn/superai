@@ -154,6 +154,14 @@ type Settings struct {
 	// "none", and dropped from the file it would come back as the default.
 	DesktopBlockedApps []string `json:"desktop_blocked_apps"`
 
+	// StartAtLogin opens the desktop app when this person logs in (a login
+	// item, app/desktop_resident.go), and KeepRunning leaves it running with
+	// its window closed, so this Mac stays in its hive. Both are the
+	// desktop app's own and off by default; KeepRunning is read when the
+	// app starts.
+	StartAtLogin bool `json:"start_at_login,omitempty"`
+	KeepRunning  bool `json:"desktop_keep_running,omitempty"`
+
 	// DisablePTC turns off Programmatic Tool Calling (the model writes JS that
 	// drives tools in a sandbox, so one round does several tool calls).
 	//

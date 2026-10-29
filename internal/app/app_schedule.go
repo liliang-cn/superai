@@ -31,6 +31,11 @@ const scheduleNotifyTitle = "SuperLeo"
 // A failure is not fatal: the app is still usable, it just will not fire
 // timers, which GetStatus reports.
 func (a *App) startScheduler() {
+	// A member of a hive: the queen fires the schedules.
+	if a.isHiveMember() {
+		a.stopScheduler()
+		return
+	}
 	// Standing agents run in the process that fires schedules, under the
 	// same lock; whatever happens below, they follow it.
 	defer a.startStanding()

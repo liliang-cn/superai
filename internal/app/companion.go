@@ -158,6 +158,11 @@ type companionServer struct {
 // a caller that is already in a browser has nothing to gain from it and should
 // not be able to open listeners.
 func (a *App) OpenInBrowser() (string, error) {
+	// A member's own web surface would answer from the wrong brain: the
+	// browser goes to the hive.
+	if m := a.member.cur.Load(); m != nil {
+		return m.URL, nil
+	}
 	c, err := a.ensureCompanion()
 	if err != nil {
 		return "", err
@@ -171,6 +176,9 @@ func (a *App) OpenInBrowser() (string, error) {
 }
 
 func (a *App) ensureCompanion() (*companionServer, error) {
+	if a.isHiveMember() {
+		return nil, errInAHive
+	}
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if a.companion != nil {

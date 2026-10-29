@@ -402,6 +402,7 @@ func ServeMain(argv []string) {
 	// workers join (app_localhive.go), and they are on this machine.
 	app.serveURL = fmt.Sprintf("http://127.0.0.1:%d", *port)
 	app.startupHeadless()
+	app.startMemberAtLaunch()
 	defer app.Shutdown(context.Background())
 
 	// Serve mode is the desktop app with the window replaced by a socket, and
@@ -428,7 +429,7 @@ func ServeMain(argv []string) {
 	}
 
 	// Core: agents dial in here.
-	if *agentPort > 0 {
+	if *agentPort > 0 && !app.isHiveMember() {
 		app.agentDoor.set(*port, *agentPort, nil)
 		agentAddr := net.JoinHostPort(*bind, fmt.Sprint(*agentPort))
 		go func() {

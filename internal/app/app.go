@@ -77,8 +77,15 @@ type App struct {
 	// electedTerm is the term this instance was elected queen in, for the
 	// roster made when it takes over (app_election.go).
 	electedTerm int64
-	// agentDoor is where agents come in (app_agentdoor.go).
+	// agentDoor is where agents come in (app_agentdoor.go); doorStop closes it.
 	agentDoor agentDoor
+	doorMu    sync.Mutex
+	doorStop  context.CancelFunc
+	// member is this process's place in a hive (hive_member.go).
+	member hiveMemberState
+	// launchedKeepRunning is the keep-running setting the window was made
+	// with (desktop_resident.go).
+	launchedKeepRunning atomic.Bool
 	// lanHive is a member's last roster from its queen (app_lanhive.go).
 	lanHive lanHive
 	// queenFor serialises becoming queen for the machines that joined
@@ -291,16 +298,22 @@ func NewApp() *App {
 // GetStatus so the Settings page can fix the config and rebuild.
 func (a *App) Startup(ctx context.Context) {
 	a.ctx = ctx
+	a.launchedKeepRunning.Store(KeepRunningWanted())
+	a.refreshMember()
 	a.startHiveLink()
 	a.boot()
+	a.holdResident()
+	a.startMemberAtLaunch()
+	go a.migrateHiveLink()
 	// Terminal Claude Code and the coding CLIs report here too, as they do to
 	// serve: without it a core on this Mac alone never sees them work. The
 	// CLI plugins stay pointed at whoever installed them (the node).
 	go a.serveCCHookSocket(ctx)
 	go a.firstRun()
 	go a.startPhoneLinkIfPaired()
-	// Other machines join this one as agents (app_agentdoor.go).
-	go a.openAgentDoor(ctx)
+	// Other machines join this one as agents (app_agentdoor.go), unless this
+	// Mac is a member of a hive, whose queen has the door.
+	a.startAgentDoor()
 }
 
 // startupHeadless boots the same backend with no Wails context: events go
@@ -312,6 +325,7 @@ func (a *App) startupHeadless() {
 }
 
 func (a *App) boot() {
+	a.refreshMember()
 	s, _ := backend.LoadSettings() // returns defaults even on error
 	a.settings = s
 	// Before anything reaches out: every request from here on asks it.
@@ -333,11 +347,16 @@ func (a *App) boot() {
 	// user is typically not at the machine, which is the whole point of a
 	// schedule.
 	a.initNotifications()
-	a.startScheduler()
-	a.startTelegram()
-	a.startHive()
-	a.startAlarmWatch()
-	a.lookForRemoteAgents()
+	// The queen's duties, unless this process is a member of a hive: its
+	// queen is elsewhere, and a second set would fork the conversations.
+	// The phone link and the agent door are the desktop's, started in Startup.
+	if !a.isHiveMember() {
+		a.startScheduler()
+		a.startTelegram()
+		a.startHive()
+		a.startAlarmWatch()
+		a.lookForRemoteAgents()
+	}
 }
 
 // syncProxy brings the embedded CLIProxyAPI in line with the current settings:
@@ -561,6 +580,7 @@ func (a *App) SaveSettings(s backend.Settings) error {
 	backend.ApplyProxy(s.Proxy)
 	a.syncProxy()
 	a.rebuild()
+	a.syncLoginItem(s.StartAtLogin)
 	// The scheduler runs turns against the service that was just replaced, and
 	// so does the Telegram bridge. Restarting the bridge here is also what
 	// makes turning Telegram on a settings change rather than a restart.

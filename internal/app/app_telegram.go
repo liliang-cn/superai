@@ -24,6 +24,10 @@ var telegramPolling atomic.Bool
 // unreachable bot is no reason for the app not to open.
 func (a *App) startTelegram() {
 	a.stopTelegram()
+	// A member of a hive: the bot belongs to the queen.
+	if a.isHiveMember() {
+		return
+	}
 
 	a.mu.Lock()
 	svc, settings := a.svc, a.settings

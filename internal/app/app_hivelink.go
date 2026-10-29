@@ -156,6 +156,11 @@ func (a *App) startHiveLink() {
 	if a.ctx == nil {
 		return
 	}
+	// A member's window follows its membership: one hive, no switch.
+	if m := a.member.cur.Load(); m != nil {
+		a.useHiveLink(m.asLink())
+		return
+	}
 	if l := loadHiveLink(); l != nil {
 		a.useHiveLink(l)
 	}
@@ -193,6 +198,9 @@ func (a *App) useHiveLink(l *hiveLink) {
 func (a *App) LinkHive(address, code string) (HiveLinkInfo, error) {
 	if a.ctx == nil {
 		return HiveLinkInfo{}, errOnlyInTheWindow
+	}
+	if a.isHiveMember() {
+		return HiveLinkInfo{}, errInAHive
 	}
 	base := strings.TrimRight(strings.TrimSpace(address), "/")
 	if base == "" || strings.TrimSpace(code) == "" {
@@ -254,6 +262,9 @@ func (a *App) UseHive(id string) error {
 	if a.ctx == nil {
 		return errOnlyInTheWindow
 	}
+	if a.isHiveMember() {
+		return errInAHive
+	}
 	a.hiveLink.book.Lock()
 	b := loadHiveBook()
 	var next *hiveLink
@@ -282,6 +293,9 @@ func (a *App) UseHive(id string) error {
 func (a *App) ForgetHive(id string) error {
 	if a.ctx == nil {
 		return errOnlyInTheWindow
+	}
+	if a.isHiveMember() {
+		return errInAHive
 	}
 	a.hiveLink.book.Lock()
 	b := loadHiveBook()
@@ -348,7 +362,13 @@ func (a *App) Remote(method string, args []any) (any, error) {
 	if l == nil {
 		return nil, errors.New("not linked to a hive")
 	}
-	return callQueen(*l, method, args)
+	out, err := callQueen(*l, method, args)
+	if err != nil && a.isHiveMember() {
+		// The hive is out of reach: say so. The engine in this process is
+		// not the queen and does not answer in her place.
+		return nil, a.hiveUnreachable(err)
+	}
+	return out, err
 }
 
 func callQueen(l hiveLink, method string, args []any) (any, error) {
@@ -462,7 +482,7 @@ func (a *App) followHiveEvents(ctx context.Context, l hiveLink) error {
 
 // localWhileLinked are the events this machine's own engine still sends to a
 // linked window: the ones about the machine, not the hive.
-var localWhileLinked = map[string]bool{"open:conversation": true, "hivelink:state": true}
+var localWhileLinked = map[string]bool{"open:conversation": true, "hivelink:state": true, "hive:membership": true}
 
 // quietWhileLinked reports whether a local event should stay out of a linked
 // window, which shows the hive's events instead.

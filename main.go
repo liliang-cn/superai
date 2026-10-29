@@ -107,9 +107,14 @@ func main() {
 				Message: "Your own agent, on your own machine.",
 			},
 		},
-		OnStartup:  a.Startup,
-		OnDomReady: a.DomReady,
-		OnShutdown: a.Shutdown,
+		// Kept running (Settings): the close button hides the app and the
+		// Dock icon brings it back; Cmd+Q still quits. A login item opens it
+		// hidden. Both are read now, so a change applies at the next start.
+		HideWindowOnClose: app.KeepRunningWanted(),
+		StartHidden:       app.StartHiddenWanted(os.Args[1:]),
+		OnStartup:         a.Startup,
+		OnDomReady:        a.DomReady,
+		OnShutdown:        a.Shutdown,
 		DragAndDrop: &options.DragAndDrop{
 			EnableFileDrop: true, // native OS file drop -> runtime.OnFileDrop (host paths)
 		},

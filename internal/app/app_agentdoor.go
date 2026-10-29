@@ -57,6 +57,13 @@ func (d *agentDoor) set(claim, link int, err error) {
 	}
 }
 
+// reset forgets the ports: the door is closed.
+func (d *agentDoor) reset() {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.claim, d.link, d.err = 0, 0, ""
+}
+
 func (d *agentDoor) get() (claim, link int, err string) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -84,7 +91,11 @@ func (a *App) openAgentDoor(ctx context.Context) {
 	s := newAgentLinkServer(a, credentialsCheck(creds))
 	go func() {
 		<-ctx.Done()
+		// Agents holding a stream open would keep a graceful stop waiting;
+		// the port is wanted back when this Mac leaves a hive.
+		t := time.AfterFunc(3*time.Second, s.Stop)
 		s.GracefulStop()
+		t.Stop()
 	}()
 	go func() {
 		slog.InfoContext(ctx, "agent door: agent link listening", "addr", linkAddr)
@@ -192,6 +203,10 @@ var cgnatNet = func() *net.IPNet { _, n, _ := net.ParseCIDR("100.64.0.0/10"); re
 // from then on (hive_delegate). Not a worker, not one already a queen, and
 // not one the person said is to stay on its own (Hive.Standalone).
 func (a *App) queenForWorkers(who string) {
+	// A member's queen is another SuperLeo; it never makes itself one.
+	if a.isHiveMember() {
+		return
+	}
 	// Two thinking machines joining at once make one queen, not two saves.
 	a.queenFor.Lock()
 	defer a.queenFor.Unlock()

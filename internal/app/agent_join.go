@@ -204,6 +204,18 @@ func agentJoin(argv []string) error {
 // claimAgentToken trades a pairing code for a token of this machine's own,
 // and returns where the core says agents reach its link, if it says.
 func claimAgentToken(base, code, device string) (token, link string, err error) {
+	c, err := claimAgent(base, code, device)
+	return c.Token, c.Link, err
+}
+
+// agentClaim is what a core hands back for a pairing code.
+type agentClaim struct {
+	Token    string
+	Link     string
+	DeviceID string
+}
+
+func claimAgent(base, code, device string) (agentClaim, error) {
 	body, _ := json.Marshal(map[string]string{"code": code, "device": device})
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
@@ -211,23 +223,24 @@ func claimAgentToken(base, code, device string) (token, link string, err error) 
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := cliRemoteHTTP.Do(req)
 	if err != nil {
-		return "", "", fmt.Errorf("cannot reach %s: %w", base, err)
+		return agentClaim{}, fmt.Errorf("cannot reach %s: %w", base, err)
 	}
 	defer resp.Body.Close()
 	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
 	var got struct {
 		Token     string `json:"token"`
+		DeviceID  string `json:"device_id"`
 		AgentLink string `json:"agent_link"`
 		Error     string `json:"error"`
 	}
 	_ = json.Unmarshal(raw, &got)
 	if resp.StatusCode != http.StatusOK || got.Token == "" {
 		if got.Error != "" {
-			return "", "", fmt.Errorf("%s: %s", base, got.Error)
+			return agentClaim{}, fmt.Errorf("%s: %s", base, got.Error)
 		}
-		return "", "", fmt.Errorf("%s refused the code: %s", base, resp.Status)
+		return agentClaim{}, fmt.Errorf("%s refused the code: %s", base, resp.Status)
 	}
-	return got.Token, strings.TrimSpace(got.AgentLink), nil
+	return agentClaim{Token: got.Token, DeviceID: got.DeviceID, Link: strings.TrimSpace(got.AgentLink)}, nil
 }
 
 // installWindowsTask runs args at every logon of this user, and now. The

@@ -370,6 +370,12 @@ func (a *App) handleHiveTask(w http.ResponseWriter, r *http.Request) {
 // changing the role or the join address is a settings change.
 func (a *App) startHive() {
 	a.stopHive()
+	// A member of a hive is a worker over its agent link (hive_member.go),
+	// neither a roster nor an announcing loop of its own.
+	if a.isHiveMember() {
+		a.stopLocalHive()
+		return
+	}
 	a.syncLocalHive()
 
 	a.mu.Lock()

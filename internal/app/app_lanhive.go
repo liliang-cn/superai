@@ -307,6 +307,11 @@ func (a *App) lanRoster() LanRoster {
 // from the last roster, passing over who is in skip. self means it is this
 // member, which has taken over; otherwise next is the queen to dial.
 func (a *App) lanElect(name string, skip map[string]bool) (next LanMember, self, ok bool) {
+	// A member of a hive never promotes itself: two queens are two sets of
+	// conversations. The queen being away is said, not covered for.
+	if a.isHiveMember() {
+		return LanMember{}, false, false
+	}
 	r := a.lanRoster()
 	if len(r.Members) == 0 || r.Key == "" || !a.hasModel() {
 		return LanMember{}, false, false

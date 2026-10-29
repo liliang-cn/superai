@@ -123,7 +123,8 @@ func (a *App) RunAgentLink(ctx context.Context, o AgentLinkOptions) {
 		}
 		// A member of a hive on a network that has lost its queen draws the
 		// next one (the pods' hive elects its own way, app_election.go).
-		if fails++; fails >= lanMisses*len(cores) && !electionOn() {
+		a.noteAgentLink(false, err)
+		if fails++; fails >= lanMisses*len(cores) && !electionOn() && !a.isHiveMember() {
 			fails = 0
 			if pick, self, ok := a.lanElect(o.Name, skip); ok {
 				if self {
@@ -256,6 +257,7 @@ func (a *App) agentLinkOnce(ctx context.Context, o AgentLinkOptions) error {
 		return errors.New("core did not welcome this agent")
 	}
 	slog.InfoContext(ctx, "agent link connected", "core", o.Core, "name", hello.GetName(), "clis", hello.GetClis())
+	a.noteAgentLink(true, nil)
 
 	// What this machine's event bus says goes up the line.
 	tap := func(name string, payload map[string]any) {
