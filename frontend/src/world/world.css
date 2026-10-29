@@ -532,6 +532,8 @@
   font: 500 10.5px/1.45 "Geist Mono", ui-monospace, "PingFang SC", "Noto Sans CJK SC", sans-serif; text-align: left;
   text-shadow: 0 0 6px var(--holo-glow); animation: wl-hw-in 0.35s ease-out; }
 .wl-hw-in::before { content: ""; position: absolute; left: -36px; bottom: -8px; width: 36px; height: 1px; background: rgba(47, 91, 234, 0.5); transform-origin: 0 0; transform: rotate(0deg); box-shadow: 0 0 6px var(--holo-glow); }
+.wl-hw-in.l { left: -276px; }
+.wl-hw-in.l::before { left: auto; right: -36px; }
 .wl-hw-body { max-height: 6.2em; overflow: hidden; white-space: pre-wrap; overflow-wrap: anywhere;
   -webkit-mask-image: linear-gradient(transparent, #000 30%); mask-image: linear-gradient(transparent, #000 30%); }
 .wl-hw-body .tool { font-weight: 700; }

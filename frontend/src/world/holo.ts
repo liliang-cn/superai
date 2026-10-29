@@ -9,7 +9,7 @@ import { actorOf } from "./bubbles";
 // there at all while the robot is idle.
 
 const MAX = 400;
-type Pane = { el: HTMLElement; body: HTMLElement; obj: CSS2DObject; actor: THREE.Object3D; text: string; timer: number };
+type Pane = { el: HTMLElement; body: HTMLElement; obj: CSS2DObject; actor: THREE.Object3D; text: string; timer: number; slot: number };
 const panes = new Map<string, Pane>();
 
 function open(key: string): Pane | null {
@@ -19,10 +19,16 @@ function open(key: string): Pane | null {
   let p = panes.get(key);
   if (p && p.actor !== actor) { p.obj.removeFromParent(); p.el.remove(); panes.delete(key); p = undefined; }
   if (p) return p;
+  // Robots stand close together: each pane takes the lowest free place, right then left of the robot, then higher so they do not cover one another.
+  const taken = new Set([...panes.values()].map((q) => q.slot));
+  let slot = 0;
+  while (taken.has(slot)) slot++;
   const el = document.createElement("div");
   el.className = "wl-hw";
   const inner = document.createElement("div");
   inner.className = "wl-hw-in";
+  inner.style.bottom = 8 + Math.floor(slot / 2) * 126 + "px";
+  if (slot % 2) inner.classList.add("l");
   const body = document.createElement("div");
   body.className = "wl-hw-body";
   inner.appendChild(body);
@@ -32,7 +38,7 @@ function open(key: string): Pane | null {
   const top = (box.max.y - actor.getWorldPosition(new THREE.Vector3()).y) / actor.scale.y;
   obj.position.set(0, top + 0.3, 0);
   actor.add(obj);
-  p = { el, body, obj, actor, text: "", timer: 0 };
+  p = { el, body, obj, actor, text: "", timer: 0, slot };
   panes.set(key, p);
   return p;
 }
