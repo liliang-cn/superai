@@ -1798,6 +1798,66 @@ export namespace app {
 	        this.duplicate = source["duplicate"];
 	    }
 	}
+	export class QueenEngineInfo {
+	    id: string;
+	    label: string;
+	    where: string;
+	    local: boolean;
+	    version?: string;
+	    state: string;
+	    reason?: string;
+	    enabled: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new QueenEngineInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.label = source["label"];
+	        this.where = source["where"];
+	        this.local = source["local"];
+	        this.version = source["version"];
+	        this.state = source["state"];
+	        this.reason = source["reason"];
+	        this.enabled = source["enabled"];
+	    }
+	}
+	export class QueenEngineListing {
+	    engines: QueenEngineInfo[];
+	    now: string;
+	    public_url: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new QueenEngineListing(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.engines = this.convertValues(source["engines"], QueenEngineInfo);
+	        this.now = source["now"];
+	        this.public_url = source["public_url"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class QueenKit {
 	    systemPrompt: string;
 	    servers: Record<string, any>;
@@ -2701,6 +2761,20 @@ export namespace backend {
 		    return a;
 		}
 	}
+	export class QueenEngineEntry {
+	    engine: string;
+	    enabled: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new QueenEngineEntry(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.engine = source["engine"];
+	        this.enabled = source["enabled"];
+	    }
+	}
 	export class SpawnerSettings {
 	    kind: string;
 	    namespace?: string;
@@ -2739,6 +2813,7 @@ export namespace backend {
 	    delegate_timeout_seconds?: number;
 	    queen_engine?: string;
 	    queen_fallback?: boolean;
+	    queen_engines?: QueenEngineEntry[];
 	    standalone?: boolean;
 	    public_url?: string;
 	
@@ -2761,6 +2836,7 @@ export namespace backend {
 	        this.delegate_timeout_seconds = source["delegate_timeout_seconds"];
 	        this.queen_engine = source["queen_engine"];
 	        this.queen_fallback = source["queen_fallback"];
+	        this.queen_engines = this.convertValues(source["queen_engines"], QueenEngineEntry);
 	        this.standalone = source["standalone"];
 	        this.public_url = source["public_url"];
 	    }

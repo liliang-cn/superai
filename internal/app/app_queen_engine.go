@@ -23,10 +23,11 @@ package app
 // them (queen_engine_cli.go). The conversation's next turn resumes the same
 // CLI session, for a CLI that keeps one.
 //
-// An engine that cannot take a turn — switched off, not installed, its
-// machine asleep, failed before it said or did anything — is stood in for by
-// SuperLeo's agent, whose answer opens with a line saying so, unless the
-// fallback is switched off; then the turn fails with the reason.
+// The engines are an ordered list (Hive.QueenEngines, queen_engine_chain.go).
+// One that cannot take a turn — not installed, its machine asleep, signed
+// out, failed before it said or did anything — hands the turn to the next
+// one switched on, whose answer opens with a line saying so; SuperLeo's own
+// agent is one of them. With none left the turn fails with the reasons.
 
 import (
 	"encoding/json"
@@ -133,25 +134,43 @@ func (a *App) StartQueenCLIRun(r QueenRunRequest) (CLIRun, error) {
 }
 
 // queenEngineFor is the engine a turn goes to, or "" for this app's model.
+// SuperLeo first in the list with no model to answer with hands the turn to
+// the first engine after it.
 func (a *App) queenEngineFor(sessionID string, imagePaths []string) string {
 	a.mu.Lock()
 	s := a.settings
 	a.mu.Unlock()
-	return queenEngineRoute(s, sessionID, len(imagePaths) > 0)
+	if engine := queenEngineRoute(s, sessionID, len(imagePaths) > 0); engine != "" {
+		return engine
+	}
+	if !queenTurn(s, sessionID, len(imagePaths) > 0) || a.hasModel() {
+		return ""
+	}
+	for _, e := range s.Hive.QueenEnginesOn() {
+		if e != backend.QueenEngineSuperLeo {
+			return e
+		}
+	}
+	return ""
 }
 
-// queenEngineRoute decides who thinks for a turn: the engine for a person's
-// own words in a conversation of theirs; this app's model for everything
-// else, and for pictures, which the CLI is not handed.
+// queenEngineRoute decides who thinks for a turn: the first engine in the
+// list for a person's own words in a conversation of theirs; this app's
+// model for everything else, and for pictures, which the CLI is not handed.
 func queenEngineRoute(s *backend.Settings, sessionID string, pictures bool) string {
-	if s == nil || s.Hive.Role == backend.HiveRoleWorker || pictures {
+	if !queenTurn(s, sessionID, pictures) {
 		return ""
 	}
-	engine := strings.TrimSpace(s.Hive.QueenEngine)
-	if engine == "" || !personalSession(sessionID) {
+	on := s.Hive.QueenEnginesOn()
+	if len(on) == 0 || on[0] == backend.QueenEngineSuperLeo {
 		return ""
 	}
-	return engine
+	return on[0]
+}
+
+// queenTurn is whether a turn is one the queen's engines may take.
+func queenTurn(s *backend.Settings, sessionID string, pictures bool) bool {
+	return s != nil && s.Hive.Role != backend.HiveRoleWorker && !pictures && personalSession(sessionID)
 }
 
 // ownSessionPrefixes mark conversations no person is typing in: the hive's
@@ -175,8 +194,11 @@ func personalSession(id string) bool {
 	return true
 }
 
-// routeToEngine answers a turn with the queen engine.
-func (a *App) routeToEngine(requestID, sessionID, engine, message string, fresh bool) {
+// routeToEngine answers a turn with the queen's engines, from engine on:
+// one at a time, each that cannot take the turn handing it to the next one
+// switched on (queenEnginesAfter). busy: the conversation's own session is
+// still answering, so an engine starts a session of its own for this turn.
+func (a *App) routeToEngine(requestID, sessionID, engine, message string, busy bool) {
 	a.mu.Lock()
 	var s backend.Settings
 	if a.settings != nil {
@@ -187,7 +209,8 @@ func (a *App) routeToEngine(requestID, sessionID, engine, message string, fresh 
 	started := time.Now()
 	a.openTurns.Store(requestID, backend.ChatSessionInfo{ID: sessionID, Title: firstLineOf(message, 80),
 		UpdatedAt: started.UTC().Format(time.RFC3339)})
-	// Stop works before the run has an id too: it is stopped as it starts.
+	// Stop works before the run has an id too: it is stopped as it starts,
+	// and no engine after it is tried.
 	var mu sync.Mutex
 	runID, stopped := "", false
 	a.trackRun(requestID, func() {
@@ -204,147 +227,219 @@ func (a *App) routeToEngine(requestID, sessionID, engine, message string, fresh 
 		a.untrackRun(requestID)
 		a.openTurns.Delete(requestID)
 	}
-	tag := func(m map[string]any) map[string]any {
-		m["requestId"], m["engine"] = requestID, engine
-		return m
-	}
-	label := engineLabel(engine)
-	a.setQueenNow(engine)
 
-	// standIn hands the turn to this app's model, or reports why not.
-	standIn := func(reason string) {
-		end()
+	rest := queenEnginesAfter(&s, engine)
+	var reasons []string
+	var attempt func(eng string)
+
+	// handOn gives the turn to the next engine switched on, or reports why
+	// none could take it.
+	handOn := func(failed, reason string) {
 		reason = cliClip(strings.TrimSpace(reason), 300)
-		if !s.Hive.QueenFallsBack() {
-			a.emit("chat:error", tag(map[string]any{"error": label + " could not answer: " + reason}))
-			return
-		}
-		a.setQueenNow(queenNowSuperLeo)
-		a.emit("chat:event", map[string]any{"requestId": requestID, "type": "state_update", "engine": "", "standInFor": engine, "failed": engine,
-			"content": label + " could not take this turn (" + reason + "); SuperLeo answers it"})
-		a.ownTurn(requestID, sessionID, message, nil, engine)
-	}
-
-	kit, err := a.queenKitFor(engine, &s)
-	if err != nil {
-		standIn(err.Error())
-		return
-	}
-	o := cliStart{Agent: engine, Prompt: message, Ask: !s.ExternalAgents.Unattended, Chat: sessionID, Queen: kit}
-	// fresh: the conversation's own session is still answering, so this
-	// turn starts one of its own and is handed the conversation instead.
-	// A CLI that keeps no session (hermes) is new to every turn.
-	if prev := a.lastChatRun(sessionID, engine, true); prev != nil && !fresh && queenCLIs[engineCLI(engine)].Resumes {
-		o.Thread, o.Session, o.Cwd, o.Model, o.Prev = prev.Thread, prev.Session, prev.Cwd, prev.Model, prev
-	}
-	// What was said here that the engine's session did not hear goes in
-	// front of the question: the whole conversation for a session new to
-	// it, the turns since its last answer for one it continues.
-	if earlier := handoffText(a.unseenTurns(sessionID, engine, o.Prev != nil)); earlier != "" {
-		o.Prompt = earlier + message
-	}
-
-	// The answer as it is written. Claude and pi send a message's text twice,
-	// as deltas while they write and whole once they have; a message whose
-	// deltas came is not written again.
-	var said strings.Builder
-	last, fresh := "", true
-	write := func(chunk string) {
-		if said.Len() > 0 && fresh {
-			chunk = "\n\n" + chunk
-		}
-		said.WriteString(chunk)
-		a.emit("chat:event", tag(map[string]any{"type": "partial", "content": chunk}))
-	}
-	// A CLI that prints only its last word (hermes) prints its failure the
-	// same way: what it says is held until it is known to be an answer.
-	holds := !queenCLIs[engineCLI(engine)].Streams
-	o.Watch = func(e CLIRunEvent) {
-		switch e.Kind {
-		case "delta":
-			write(e.Text)
-			fresh = false
-		case "text":
-			last = e.Text
-			if fresh && !holds {
-				write(e.Text)
-			}
-			fresh = true
-		case "tool":
-			a.emit("chat:event", tag(map[string]any{"type": "tool_call", "tool": shortTool(e.Tool),
-				"args": map[string]any{"detail": e.Detail}}))
-		case "result":
-			a.emit("chat:event", tag(map[string]any{"type": "tool_result", "tool": shortTool(e.Tool),
-				"result": map[string]any{"ok": !e.Failed, "output": e.Text}}))
-		case "note":
-			if e.Text == "waiting for approval" {
-				a.emit("chat:event", tag(map[string]any{"type": "state_update",
-					"content": fmt.Sprintf("%s wants to use %s — waiting for your approval", label, shortTool(e.Tool))}))
-			}
-		}
-	}
-	o.Done = func(r CLIRun) {
-		switch r.State {
-		case "cancelled":
-			end()
-			a.emit("chat:cancelled", tag(map[string]any{"final": said.String()}))
-			return
-		case "failed":
+		reasons = append(reasons, engineLabel(failed)+": "+reason)
+		for len(rest) > 0 {
+			next := rest[0]
+			rest = rest[1:]
 			mu.Lock()
-			byHand := stopped
+			halted := stopped
 			mu.Unlock()
-			// Nothing said and nothing done: the engine never got going (a
-			// login that ran out, a machine gone mid-start), and the person
-			// still has a question.
-			if said.Len() == 0 && r.Tools == 0 && !byHand {
-				standIn(r.Error)
+			if halted {
+				end()
+				a.emit("chat:cancelled", map[string]any{"requestId": requestID, "engine": failed, "final": ""})
 				return
 			}
-			end()
-			a.emit("chat:error", tag(map[string]any{"error": label + " did not finish: " + r.Error}))
+			if next == backend.QueenEngineSuperLeo {
+				if !a.hasModel() {
+					continue
+				}
+				end()
+				a.setQueenNow(queenNowSuperLeo)
+				a.emit("chat:event", map[string]any{"requestId": requestID, "type": "state_update", "engine": "", "standInFor": engine, "failed": failed,
+					"content": engineLabel(failed) + " could not take this turn (" + reason + "); SuperLeo answers it"})
+				a.ownTurn(requestID, sessionID, message, nil, engine)
+				return
+			}
+			a.emit("chat:event", map[string]any{"requestId": requestID, "type": "state_update", "engine": next, "failed": failed,
+				"content": engineLabel(failed) + " could not take this turn (" + reason + "); " + engineLabel(next) + " answers it"})
+			attempt(next)
 			return
 		}
 		end()
-		answer := strings.TrimSpace(r.Summary)
-		if answer == "" {
-			answer = strings.TrimSpace(last)
+		msg := engineLabel(failed) + " could not answer: " + reason
+		if len(reasons) > 1 {
+			msg = "No engine could answer: " + strings.Join(reasons, "; ")
 		}
-		if answer == "" {
-			answer = strings.TrimSpace(said.String())
-		}
-		if holds && said.Len() == 0 && answer != "" {
-			write(answer)
-		}
-		if err := a.appendExchange(sessionID, message, answer); err != nil {
-			slog.Warn("could not record the queen engine's answer", "session", sessionID, "error", err)
-		}
-		// Claude reports what the whole session has cost so far; this turn's
-		// share is what it added. The others report the turn's own.
-		cost := r.CostUSD
-		if engineCLI(engine) == "claude" && o.Prev != nil && r.Session == o.Prev.Session && cost >= o.Prev.CostUSD {
-			cost -= o.Prev.CostUSD
-		}
-		recordTurnTimeBy(sessionID, message, started, time.Since(started), turnBy{Engine: engine, CostUSD: cost})
-		done := tag(map[string]any{"final": answer})
-		if cost > 0 {
-			done["costUsd"] = cost
-		}
-		a.emit("chat:done", done)
+		a.emit("chat:error", map[string]any{"requestId": requestID, "engine": failed, "error": msg})
 	}
 
-	a.emit("chat:event", tag(map[string]any{"type": "state_update", "content": "starting " + label + "…"}))
-	run, err := a.startCLIRun(o)
-	if err != nil {
-		standIn(err.Error())
-		return
+	attempt = func(eng string) {
+		tag := func(m map[string]any) map[string]any {
+			m["requestId"], m["engine"] = requestID, eng
+			return m
+		}
+		label := engineLabel(eng)
+		// An engine answering in the place of the first one says so first.
+		inPlaceOf := ""
+		if eng != engine {
+			inPlaceOf = engine
+		}
+		a.setQueenNow(eng)
+
+		kit, err := a.queenKitFor(eng, &s)
+		if err != nil {
+			handOn(eng, err.Error())
+			return
+		}
+		o := cliStart{Agent: eng, Prompt: message, Ask: !s.ExternalAgents.Unattended, Chat: sessionID, Queen: kit}
+		// busy: the conversation's own session is still answering, so this
+		// turn starts one of its own and is handed the conversation instead.
+		// A CLI that keeps no session (hermes) is new to every turn.
+		if prev := a.lastChatRun(sessionID, eng, true); prev != nil && !busy && queenCLIs[engineCLI(eng)].Resumes {
+			o.Thread, o.Session, o.Cwd, o.Model, o.Prev = prev.Thread, prev.Session, prev.Cwd, prev.Model, prev
+		}
+		// What was said here that the engine's session did not hear goes in
+		// front of the question: the whole conversation for a session new to
+		// it, the turns since its last answer for one it continues.
+		if earlier := handoffText(a.unseenTurns(sessionID, eng, o.Prev != nil)); earlier != "" {
+			o.Prompt = earlier + message
+		}
+
+		// The answer as it is written. Claude and pi send a message's text
+		// twice, as deltas while they write and whole once they have; a
+		// message whose deltas came is not written again.
+		var said strings.Builder
+		last, fresh := "", true
+		write := func(chunk string) {
+			if said.Len() == 0 && inPlaceOf != "" {
+				a.emit("chat:event", tag(map[string]any{"type": "partial", "content": inPlaceNote(inPlaceOf, eng), "inPlaceOf": inPlaceOf}))
+			}
+			if said.Len() > 0 && fresh {
+				chunk = "\n\n" + chunk
+			}
+			said.WriteString(chunk)
+			a.emit("chat:event", tag(map[string]any{"type": "partial", "content": chunk}))
+		}
+		// A CLI that prints only its last word (hermes) prints its failure
+		// the same way: what it says is held until it is known to be an
+		// answer. So is a first whole message that came without deltas
+		// before anything was done: a signed-out Claude writes its refusal
+		// that way, then fails the turn (exiting 0), and the refusal is not
+		// the person's answer.
+		holds := !queenCLIs[engineCLI(eng)].Streams
+		held, holding := "", false
+		flush := func() {
+			if holding {
+				holding = false
+				write(held)
+			}
+		}
+		o.Watch = func(e CLIRunEvent) {
+			switch e.Kind {
+			case "delta":
+				flush()
+				write(e.Text)
+				fresh = false
+			case "text":
+				last = e.Text
+				if fresh && !holds {
+					if said.Len() == 0 && !holding {
+						held, holding = e.Text, true
+					} else {
+						flush()
+						write(e.Text)
+					}
+				}
+				fresh = true
+			case "tool":
+				flush()
+				a.emit("chat:event", tag(map[string]any{"type": "tool_call", "tool": shortTool(e.Tool),
+					"args": map[string]any{"detail": e.Detail}}))
+			case "result":
+				flush()
+				a.emit("chat:event", tag(map[string]any{"type": "tool_result", "tool": shortTool(e.Tool),
+					"result": map[string]any{"ok": !e.Failed, "output": e.Text}}))
+			case "note":
+				if e.Text == "waiting for approval" {
+					flush()
+					a.emit("chat:event", tag(map[string]any{"type": "state_update",
+						"content": fmt.Sprintf("%s wants to use %s — waiting for your approval", label, shortTool(e.Tool))}))
+				}
+			}
+		}
+		o.Done = func(r CLIRun) {
+			switch r.State {
+			case "cancelled":
+				flush()
+				end()
+				a.emit("chat:cancelled", tag(map[string]any{"final": said.String()}))
+				return
+			case "failed":
+				mu.Lock()
+				byHand := stopped
+				mu.Unlock()
+				// Nothing said and nothing done: the engine never got going
+				// (a login that ran out, a machine gone mid-start), and the
+				// person still has a question for the next one.
+				if said.Len() == 0 && r.Tools == 0 && !byHand {
+					handOn(eng, firstNonEmpty(r.Error, held, "it failed"))
+					return
+				}
+				flush()
+				end()
+				a.emit("chat:error", tag(map[string]any{"error": label + " did not finish: " + r.Error}))
+				return
+			}
+			flush()
+			end()
+			answer := strings.TrimSpace(r.Summary)
+			if answer == "" {
+				answer = strings.TrimSpace(last)
+			}
+			if answer == "" {
+				answer = strings.TrimSpace(said.String())
+			}
+			if holds && said.Len() == 0 && answer != "" {
+				write(answer)
+			}
+			if err := a.appendExchange(sessionID, message, answer); err != nil {
+				slog.Warn("could not record the queen engine's answer", "session", sessionID, "error", err)
+			}
+			// Claude reports what the whole session has cost so far; this
+			// turn's share is what it added. The others report the turn's own.
+			cost := r.CostUSD
+			if engineCLI(eng) == "claude" && o.Prev != nil && r.Session == o.Prev.Session && cost >= o.Prev.CostUSD {
+				cost -= o.Prev.CostUSD
+			}
+			recordTurnTimeBy(sessionID, message, started, time.Since(started), turnBy{Engine: eng, CostUSD: cost, InPlaceOf: inPlaceOf})
+			done := tag(map[string]any{"final": answer})
+			if inPlaceOf != "" {
+				done["final"] = inPlaceNote(inPlaceOf, eng) + answer
+				done["inPlaceOf"] = inPlaceOf
+			}
+			if cost > 0 {
+				done["costUsd"] = cost
+			}
+			a.emit("chat:done", done)
+		}
+
+		a.emit("chat:event", tag(map[string]any{"type": "state_update", "content": "starting " + label + "…"}))
+		mu.Lock()
+		runID = ""
+		mu.Unlock()
+		run, err := queenStartRun(a, o)
+		if err != nil {
+			handOn(eng, err.Error())
+			return
+		}
+		mu.Lock()
+		runID = run.ID
+		cancelNow := stopped
+		mu.Unlock()
+		if cancelNow {
+			a.CancelCLIRun(run.ID)
+		}
 	}
-	mu.Lock()
-	runID = run.ID
-	cancelNow := stopped
-	mu.Unlock()
-	if cancelNow {
-		a.CancelCLIRun(run.ID)
-	}
+	attempt(engine)
 }
 
 // queenNowSuperLeo is queenEngineNow while SuperLeo's own agent answers in
@@ -371,24 +466,28 @@ func (a *App) setQueenNow(engine string) {
 	}
 }
 
-// queenEngineNow is who took the queen's latest turn: the engine, or
-// queenNowSuperLeo when SuperLeo answered in its place; "" before any turn or
-// once the engine has been changed.
+// queenEngineNow is who took the queen's latest turn: an engine in her
+// list, or queenNowSuperLeo when SuperLeo answered in an engine's place; ""
+// before any turn, with SuperLeo first in the list, or once the engine
+// taking it is no longer in the list.
 func (a *App) queenEngineNow() string {
 	q := &a.queenNow
 	q.mu.Lock()
 	now := q.engine
 	q.mu.Unlock()
 	a.mu.Lock()
-	engine := ""
+	var h backend.HiveSettings
 	if a.settings != nil {
-		engine = strings.TrimSpace(a.settings.Hive.QueenEngine)
+		h = a.settings.Hive
 	}
 	a.mu.Unlock()
-	if engine == "" || (now != queenNowSuperLeo && now != engine) {
+	if now == "" || strings.TrimSpace(h.QueenEngine) == "" {
 		return ""
 	}
-	return now
+	if now == queenNowSuperLeo || slices.Contains(h.QueenEnginesOn(), now) {
+		return now
+	}
+	return ""
 }
 
 // queenKitFor puts together what the engine is handed for one turn.
@@ -478,6 +577,9 @@ func shortTool(t string) string {
 
 // engineLabel is how a person reads an engine's name.
 func engineLabel(engine string) string {
+	if engine == backend.QueenEngineSuperLeo {
+		return "SuperLeo"
+	}
 	agent, host, ok := splitRemoteCLI(engine)
 	if !ok {
 		agent = engine
@@ -589,8 +691,9 @@ func (a *App) QueenEngines() map[string]any {
 }
 
 // SetQueenEngine picks what the queen thinks with ("" is SuperLeo's own agent)
-// and whether SuperLeo answers a turn the engine cannot take. Saved like any
-// other settings change.
+// and whether SuperLeo answers a turn the engine cannot take: the engine goes
+// first in her list, and SuperLeo is switched on or off in it. Saved like any
+// other settings change. SetQueenEngineList sets the whole list.
 func (a *App) SetQueenEngine(engine string, fallback bool) (map[string]any, error) {
 	a.mu.Lock()
 	var next backend.Settings
@@ -600,46 +703,11 @@ func (a *App) SetQueenEngine(engine string, fallback bool) (map[string]any, erro
 		next = *s
 	}
 	a.mu.Unlock()
-	next.Hive.QueenEngine = strings.TrimSpace(engine)
-	next.Hive.QueenFallback = &fallback
+	next.Hive.PromoteQueenEngine(engine, fallback)
 	if err := a.SaveSettings(next); err != nil {
 		return nil, err
 	}
 	return a.QueenEngines(), nil
-}
-
-// validQueenEngine checks an engine before it is saved: a CLI that can think
-// for the queen (queenCLIs), here with External agents on, or on a machine
-// linked now. The engine already saved passes as it is, since its machine may
-// only be asleep.
-func (a *App) validQueenEngine(next *backend.Settings, prev string) error {
-	engine := strings.TrimSpace(next.Hive.QueenEngine)
-	if engine == "" || engine == strings.TrimSpace(prev) {
-		return nil
-	}
-	agentName, host, remote := splitRemoteCLI(engine)
-	if !remote {
-		agentName = engine
-	}
-	if !canThinkForQueen(agentName) {
-		return fmt.Errorf("%s cannot think for the queen: Claude Code, Codex, pi and Hermes can", engine)
-	}
-	label := agentLabel(agentName)
-	if remote {
-		if !a.isRemoteCLI(engine) {
-			return fmt.Errorf("no linked machine called %s has %s right now", host, label)
-		}
-		return nil
-	}
-	if !next.ExternalAgents.Enabled {
-		return fmt.Errorf("the queen engine is %s on this machine, so External agents has to be on", label)
-	}
-	for _, c := range installedCLIs(next.ExternalAgents.Binaries) {
-		if c.Name == agentName {
-			return nil
-		}
-	}
-	return fmt.Errorf("%s is not installed on this machine", label)
 }
 
 // How much of the earlier conversation an engine is handed: the last few

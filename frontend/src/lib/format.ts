@@ -161,8 +161,10 @@ export function engineByline(m: { engine?: string; standInFor?: string }): strin
   return m.engine ? engineLabel(m.engine) : "";
 }
 
-/** Who answers for the queen now when it is not her engine: "SuperLeo",
- *  answering in its place. Empty when the engine is answering. */
+/** Who answers for the queen now when it is not her first engine: "SuperLeo",
+ *  or the next engine in her list, answering in its place. Empty when the
+ *  first engine is answering. */
 export function queenEngineNote(engine?: string, now?: string): string {
-  return engine && now === "superleo" ? "SuperLeo" : "";
+  if (!engine || !now || now === engine) return "";
+  return now === "superleo" ? "SuperLeo" : engineLabel(now);
 }

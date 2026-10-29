@@ -112,6 +112,13 @@ type HiveSettings struct {
 	// cannot take (not installed, machine offline, failed before saying
 	// anything), with a note saying so. Nil is on.
 	QueenFallback *bool `json:"queen_fallback,omitempty"`
+	// QueenEngines is the queen's engines in the order they are tried: a
+	// turn goes to the first one switched on, and to the next when it cannot
+	// answer. "superleo" is SuperLeo's own agent. Empty is read from
+	// QueenEngine and QueenFallback; QueenEngine and QueenFallback are kept
+	// in step with it for clients that know only them. See
+	// queen_engine_settings.go.
+	QueenEngines []QueenEngineEntry `json:"queen_engines,omitempty"`
 	// Standalone is the person saying this SuperLeo is not to be a queen:
 	// a machine that can think joining it (app_agentdoor.go) does not make
 	// it one.

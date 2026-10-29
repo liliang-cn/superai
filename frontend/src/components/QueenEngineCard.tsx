@@ -1,90 +1,157 @@
-import { useEffect, useState } from "react";
-import { QueenEngines } from "../../wailsjs/go/app/App";
-import { translate } from "../lib/i18n";
-import { queenEngineNote } from "../lib/format";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ArrowDownIcon, ArrowUpIcon, CheckIcon, HexagonIcon, XIcon } from "lucide-react";
+import { QueenEngineList, SetQueenEngineList } from "../../wailsjs/go/app/App";
 import { EventsOn } from "../../wailsjs/runtime";
+import { translate } from "../lib/i18n";
+import { Block, Group, IconBtn, Note, Row, State, Text, Toggle } from "./settings/kit";
 
-type Choice = { name: string; label: string; online: boolean };
+type Engine = {
+  id: string;
+  label: string;
+  where: string;
+  local: boolean;
+  version?: string;
+  state: "online" | "installed" | "offline";
+  reason?: string;
+  enabled: boolean;
+};
+
+const SUPERLEO = "superleo";
+
+/** The rank in front of a row: the order turns are tried in, the first one
+ *  in the accent; a dash for an engine switched off. */
+function Rank({ n, first }: { n: number; first: boolean }) {
+  const style = n === 0
+    ? { background: "transparent", color: "var(--text-3)", boxShadow: "inset 0 0 0 1px var(--border)" }
+    : first
+      ? { background: "var(--accent)", color: "var(--on-accent, #fff)" }
+      : { background: "var(--bg-2, var(--accent-soft))", color: "var(--text-1)" };
+  return (
+    <span aria-hidden style={{
+      width: 22, height: 22, borderRadius: "50%", display: "grid", placeItems: "center", flex: "none",
+      font: "600 11.5px var(--font-mono)", ...style,
+    }}>{n === 0 ? "–" : n}</span>
+  );
+}
+
+/** The single engine and fallback the older settings fields carry, from the
+ *  list: the first engine on ("" for SuperLeo), and SuperLeo on after it. */
+function legacyOf(list: Engine[]): { engine: string; fallback: boolean } {
+  const on = list.filter((e) => e.enabled).map((e) => e.id);
+  const first = on[0] ?? SUPERLEO;
+  return { engine: first === SUPERLEO ? "" : first, fallback: first === SUPERLEO || on.slice(1).includes(SUPERLEO) };
+}
 
 /**
- * Who thinks for the queen when a person talks to her: SuperLeo's own agent,
- * or Claude Code here or on a linked machine. Edits the page's copy of the settings, saved with
- * the rest, like the queen's name above it.
+ * The queen's engines in the order a turn tries them: each switched on or
+ * off, moved up or down. Only engines this system has are listed (SuperLeo,
+ * the agent CLIs here and on linked machines); one in the list that is not
+ * there now shows offline and can be removed. Loads and saves itself; the
+ * older props are accepted, and onChange is told the single engine and
+ * fallback after each save so a page holding a copy of the settings follows.
  */
-export default function QueenEngineCard({ hidden, engine, fallback, publicURL, onChange }: {
-  hidden: boolean;
-  engine: string;
-  fallback: boolean;
-  publicURL: string;
-  onChange: (engine: string, fallback: boolean, publicURL: string) => void;
+export default function QueenEngineCard({ hidden, onChange }: {
+  hidden?: boolean;
+  engine?: string;
+  fallback?: boolean;
+  publicURL?: string;
+  onChange?: (engine: string, fallback: boolean, publicURL: string) => void;
 }) {
-  const [choices, setChoices] = useState<Choice[]>([]);
-  // Who took her latest turn, when the first choice could not.
+  const [list, setList] = useState<Engine[] | null>(null);
   const [now, setNow] = useState("");
+  const [publicURL, setPublicURL] = useState("");
+  const [error, setError] = useState("");
+  const saved = useRef<{ list: Engine[]; publicURL: string }>({ list: [], publicURL: "" });
+
+  const take = useCallback((r: any) => {
+    const engines = ((r?.engines ?? []) as Engine[]).map((e) => ({ ...e }));
+    setList(engines);
+    setNow(r?.now ?? "");
+    setPublicURL(r?.public_url ?? "");
+    saved.current = { list: engines, publicURL: r?.public_url ?? "" };
+  }, []);
 
   useEffect(() => {
     if (hidden) return;
-    QueenEngines()
-      .then((r: any) => {
-        setChoices((r?.choices ?? []) as Choice[]);
-        setNow(r?.now ?? "");
-      })
-      .catch(() => setChoices([{ name: "", label: "SuperLeo", online: true }]));
+    QueenEngineList().then(take).catch((e) => setError(String(e?.message ?? e)));
     const off = EventsOn("queen:engine", (p: { engine?: string }) => setNow(p?.engine ?? ""));
     return () => {
       if (typeof off === "function") off();
     };
-  }, [hidden]);
-  const inUse = queenEngineNote(engine, now);
+  }, [hidden, take]);
 
-  const remote = engine.includes(".");
+  const save = (next: Engine[], url: string) => {
+    setList(next);
+    setError("");
+    const entries = next.map((e) => ({ engine: e.id, enabled: e.enabled }));
+    SetQueenEngineList(entries as any, url)
+      .then((r: any) => {
+        take(r);
+        const l = legacyOf((r?.engines ?? []) as Engine[]);
+        onChange?.(l.engine, l.fallback, r?.public_url ?? url);
+      })
+      .catch((e) => {
+        setList(saved.current.list);
+        setPublicURL(saved.current.publicURL);
+        setError(`${translate("Could not save")}: ${String(e?.message ?? e)}`);
+      });
+  };
+
+  if (hidden) return null;
+  const rows = list ?? [];
+  const move = (i: number, by: number) => {
+    const j = i + by;
+    if (j < 0 || j >= rows.length) return;
+    const next = rows.slice();
+    [next[i], next[j]] = [next[j], next[i]];
+    save(next, publicURL);
+  };
+  const toggle = (i: number, on: boolean) => save(rows.map((e, k) => (k === i ? { ...e, enabled: on } : e)), publicURL);
+  const remove = (i: number) => save(rows.filter((_, k) => k !== i), publicURL);
+
+  const onIds = rows.filter((e) => e.enabled).map((e) => e.id);
+  const remote = rows.some((e) => e.enabled && !e.local);
+
   return (
-    <div className="card" hidden={hidden}>
-      <div className="card-title">{translate("Queen engine")}</div>
-      <div className="field">
-        <label>{translate("Engine")}</label>
-        <div className="seg" role="radiogroup" aria-label={translate("Engine")} style={{ flexWrap: "wrap", alignSelf: "flex-start" }}>
-          {choices.map((c) => (
-            <button
-              key={c.name || "superleo"}
-              type="button"
-              role="radio"
-              aria-checked={engine === c.name}
-              className={`seg-btn${engine === c.name ? " on" : ""}`}
-              title={c.online ? undefined : translate("Not reachable now")}
-              style={c.online ? undefined : { opacity: 0.55 }}
-              onClick={() => onChange(c.name, fallback, publicURL)}
-            >
-              {c.label}
-            </button>
-          ))}
-        </div>
-        {inUse && <span className="hint">{translate("In use: {engine}", { engine: inUse })}</span>}
-      </div>
-      {engine !== "" && (
-        <div className="field">
-          <label>{translate("When it cannot answer")}</label>
-          <div className="toggle" onClick={() => onChange(engine, !fallback, publicURL)} style={{ cursor: "pointer", marginTop: 2 }}>
-            <div className={`switch${fallback ? " on" : ""}`}><div className="knob" /></div>
-            <span style={{ fontSize: 13, color: "var(--text-1)" }}>
-              {fallback ? translate("SuperLeo answers, and says so") : translate("The turn fails")}
-            </span>
-          </div>
-        </div>
-      )}
+    <Group icon={HexagonIcon} title="Queen engine" testId="queen-engines">
+      {rows.map((e, i) => {
+        const rank = e.enabled ? onIds.indexOf(e.id) + 1 : 0;
+        const where = e.id === SUPERLEO ? translate("Built in") : e.local ? translate("This machine") : e.where;
+        const sub = [where, e.version].filter(Boolean).join(" · ");
+        const inUse = now !== "" && now === e.id && now !== onIds[0];
+        const reason = e.reason ? translate(e.reason) : undefined;
+        const state = !e.enabled
+          ? <State tone="off" title={reason}>{e.state === "offline" ? "Offline" : "Not used"}</State>
+          : e.state === "offline"
+            ? <State tone="bad" title={reason}>Offline</State>
+            : inUse
+              ? <State tone="busy">In use</State>
+              : <State tone="ok">Online</State>;
+        // Not there now, and not SuperLeo: it can be taken out of the list.
+        const gone = e.state === "offline" && e.id !== SUPERLEO && (e.reason === "not installed" || e.reason === "not reachable now");
+        return (
+          <Row key={e.id} lead={<Rank n={rank} first={rank === 1} />} label={e.label} sub={sub} dim={!e.enabled}
+            testId={`queen-engine-${e.id}`}>
+            {state}
+            <IconBtn icon={ArrowUpIcon} label="Move up" disabled={i === 0} onClick={() => move(i, -1)} />
+            <IconBtn icon={ArrowDownIcon} label="Move down" disabled={i === rows.length - 1} onClick={() => move(i, 1)} />
+            {gone && <IconBtn icon={XIcon} label={translate("Remove {name}", { name: `${e.label} · ${e.where}` })} tone="danger" onClick={() => remove(i)} />}
+            <Toggle on={e.enabled} label={translate("Enable {name}", { name: e.local ? e.label : `${e.label} · ${e.where}` })}
+              onChange={(v) => toggle(i, v)} testId={`queen-engine-${e.id}-on`} />
+          </Row>
+        );
+      })}
       {remote && (
-        <div className="field">
-          <label>{translate("Public address")}</label>
-          <input
-            className="input"
-            aria-label={translate("Public address")}
-            value={publicURL}
-            placeholder="https://ai.example.com"
-            autoComplete="off"
-            onChange={(e) => onChange(engine, fallback, e.target.value)}
-          />
-        </div>
+        <Row label="Public address">
+          <Text mono value={publicURL} placeholder="https://ai.example.com" label="Public address" width={264}
+            onChange={setPublicURL}
+            onEnter={() => publicURL !== saved.current.publicURL && save(rows, publicURL)} />
+          {publicURL !== saved.current.publicURL && (
+            <IconBtn icon={CheckIcon} label="Save" tone="accent" onClick={() => save(rows, publicURL)} />
+          )}
+        </Row>
       )}
-    </div>
+      {error && <Block><Note bad>{error}</Note></Block>}
+    </Group>
   );
 }

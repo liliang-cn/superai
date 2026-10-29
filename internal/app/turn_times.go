@@ -40,6 +40,9 @@ type turnBy struct {
 	Engine     string  `json:"e,omitempty"`
 	CostUSD    float64 `json:"c,omitempty"`
 	StoodInFor string  `json:"f,omitempty"`
+	// InPlaceOf is the engine first in the queen's list when another engine
+	// of hers answered for it (queen_engine_chain.go).
+	InPlaceOf string `json:"i,omitempty"`
 }
 
 var turnTimesMu sync.Mutex
@@ -132,6 +135,8 @@ func withTurnTimes(sessionID string, turns []backend.ChatTurn) []backend.ChatTur
 				t.Engine, t.CostUSD, t.StandInFor = open.Engine, open.CostUSD, open.StoodInFor
 				if open.StoodInFor != "" {
 					t.Content = standInNote(open.StoodInFor) + t.Content
+				} else if open.InPlaceOf != "" && open.Engine != "" {
+					t.Content = inPlaceNote(open.InPlaceOf, open.Engine) + t.Content
 				}
 				open = nil
 			}

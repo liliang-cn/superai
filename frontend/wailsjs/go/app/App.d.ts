@@ -276,6 +276,8 @@ export function Pulse():Promise<backend.PulseSnapshot>;
 
 export function QueenConsole():Promise<Record<string, string>>;
 
+export function QueenEngineList():Promise<app.QueenEngineListing>;
+
 export function QueenEngines():Promise<Record<string, any>>;
 
 export function QueenIdentity():Promise<Record<string, any>>;
@@ -353,6 +355,8 @@ export function SetHomeLayout(arg1:any,arg2:number):Promise<Record<string, any>>
 export function SetLocalHive(arg1:boolean,arg2:number,arg3:number):Promise<backend.Settings>;
 
 export function SetQueenEngine(arg1:string,arg2:boolean):Promise<Record<string, any>>;
+
+export function SetQueenEngineList(arg1:Array<backend.QueenEngineEntry>,arg2:string):Promise<app.QueenEngineListing>;
 
 export function SetQueenIdentity(arg1:string,arg2:Array<string>):Promise<Record<string, any>>;
 

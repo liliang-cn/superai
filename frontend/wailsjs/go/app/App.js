@@ -542,6 +542,10 @@ export function QueenConsole() {
   return window['go']['app']['App']['QueenConsole']();
 }
 
+export function QueenEngineList() {
+  return window['go']['app']['App']['QueenEngineList']();
+}
+
 export function QueenEngines() {
   return window['go']['app']['App']['QueenEngines']();
 }
@@ -696,6 +700,10 @@ export function SetLocalHive(arg1, arg2, arg3) {
 
 export function SetQueenEngine(arg1, arg2) {
   return window['go']['app']['App']['SetQueenEngine'](arg1, arg2);
+}
+
+export function SetQueenEngineList(arg1, arg2) {
+  return window['go']['app']['App']['SetQueenEngineList'](arg1, arg2);
 }
 
 export function SetQueenIdentity(arg1, arg2) {

@@ -158,8 +158,9 @@ func (j *turnJournal) record(name string, p map[string]any) {
 		switch typ {
 		case "partial":
 			c := str("content")
-			// The stand-in note SuperLeo opens with is not its answer starting.
-			if str("standInFor") != "" {
+			// The stand-in note SuperLeo or the next engine opens with is not
+			// its answer starting.
+			if str("standInFor") != "" || str("inPlaceOf") != "" {
 				break
 			}
 			if t.Chars == 0 && c != "" {
