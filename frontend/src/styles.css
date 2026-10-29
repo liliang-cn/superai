@@ -4204,3 +4204,17 @@ code, kbd, pre, .mono { font-family: var(--font-mono); }
 .calendar-agenda { margin-bottom:26px; }
 .calendar-agenda h2 { font-size:16px; font-weight:600; margin:0 0 14px; color:var(--text-0); }
 .calendar-agenda h2 span { font-size:12px; color:var(--text-2); margin-left:8px; }
+
+/* The files a sent message carried, above its words (SentFiles). */
+.sent-files { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+.sent-files:last-child { margin-bottom: 0; }
+.sent-thumb { display: block; max-width: 220px; max-height: 160px; border-radius: 8px; object-fit: cover; border: 1px solid var(--border, rgba(0,0,0,.08)); background: #fff; }
+.sent-chip { display: inline-flex; align-items: center; gap: 5px; max-width: 240px; font-size: 12px; padding: 3px 8px; border-radius: 8px; background: rgba(255,255,255,.18); border: 1px solid currentColor; opacity: .9; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Desktop control's list of apps left alone: one chip each, × allows it. */
+.dc-apps { display: flex; flex-wrap: wrap; gap: 6px; }
+.dc-app { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; padding: 3px 4px 3px 9px; border-radius: 8px; background: var(--bg-3); border: 1px solid var(--border-strong); color: var(--text-0); }
+.dc-app button { display: inline-flex; padding: 2px; border: 0; background: none; color: var(--text-2, inherit); cursor: pointer; border-radius: 5px; }
+.dc-app button:hover:not(:disabled) { background: var(--bg-hover); color: var(--text-0); }
+.dc-add { display: flex; gap: 6px; align-items: center; margin-top: 8px; max-width: 520px; }
+.dc-add .input { flex: 1; min-width: 0; }

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useStickToBottom } from "../lib/useStickToBottom";
 import { useAttachments } from "../lib/useAttachments";
 import AttachmentChips from "../components/AttachmentChips";
+import { SentMessage } from "../components/SentFiles";
 import { ArrowUpIcon, MessageSquareIcon, PlusIcon, MinusIcon, ChevronDownIcon, PaperclipIcon } from "lucide-react";
 import { ChatHistory, HiveRetire, HiveSpawn, SendChat } from "../../wailsjs/go/app/App";
 import { earlyError, requestSetup, useReady } from "../lib/ready";
@@ -190,7 +191,7 @@ export default function Command({ view, onConversation, onTyping, hosts }: {
     say("queen", "", "think", 120);
     attachToBubble("queen", null);
     attach.clear();
-    setLines((l) => [...l, { who: "you" as const, text: typed || s }].slice(-12));
+    setLines((l) => [...l, { who: "you" as const, text: s }].slice(-12));
     mine.current = s;
     try {
       const id = await SendChat(queenSession(), s, images);
@@ -232,7 +233,7 @@ export default function Command({ view, onConversation, onTyping, hosts }: {
               <div key={i} className={`wc-${l.who}`}>
                 {l.who === "queen" && l.by && <span className="msg-byline-engine">{l.by}</span>}
                 {browser(l.req, false)}
-                {l.who === "queen" ? <Response>{l.text}</Response> : l.text}
+                {l.who === "queen" ? <Response>{l.text}</Response> : <SentMessage content={l.text} />}
               </div>
             ))}
             {pending.map((p) => (

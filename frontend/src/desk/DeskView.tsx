@@ -41,6 +41,7 @@ import { ModeChip } from "../components/ModeChip";
 import { isPersonalConversation, loadQueenSession, queenSession, useQueenSession, withConsoleTitles } from "../lib/queenConsole";
 import { useDeskPane, useDeskTheme, useDeskWorld } from "./DeskShell";
 import { machine } from "../lib/machine";
+import { SentMessage } from "../components/SentFiles";
 
 type TabKey = string; // "hive" | "run:<id>" | "dash:<id>"
 
@@ -477,7 +478,7 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
           )}
           {msgs.map((m, index) =>
             m.role === "user" ? (
-              <div key={m.id} className="dk-u">{withoutCallNotes(m.content)}</div>
+              <div key={m.id} className="dk-u"><SentMessage content={withoutCallNotes(m.content)} /></div>
             ) : (
               <div key={m.id} className={m.error ? "dk-q bad" : "dk-q"}>
                 <LiveTurn m={m} trace={chat.trace} pulse={pulse} session={chat.sessionId} />

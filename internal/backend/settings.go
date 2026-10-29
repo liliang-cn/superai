@@ -148,10 +148,11 @@ type Settings struct {
 	// DesktopControl lets the agent operate this machine's desktop apps
 	// through their accessibility trees (desktop.go). Off unless chosen.
 	DesktopControl bool `json:"desktop_control,omitempty"`
-	// DesktopBlockedApps are the apps desktop control leaves alone; unset,
+	// DesktopBlockedApps are the apps desktop control leaves alone; null,
 	// desktopBlockedDefault (messages, mail, password stores, terminals,
-	// System Settings).
-	DesktopBlockedApps []string `json:"desktop_blocked_apps,omitempty"`
+	// System Settings). Not omitempty: an emptied list is the person saying
+	// "none", and dropped from the file it would come back as the default.
+	DesktopBlockedApps []string `json:"desktop_blocked_apps"`
 
 	// DisablePTC turns off Programmatic Tool Calling (the model writes JS that
 	// drives tools in a sandbox, so one round does several tool calls).

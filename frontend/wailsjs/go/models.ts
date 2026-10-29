@@ -2268,28 +2268,6 @@ export namespace backend {
 	        this.error = source["error"];
 	    }
 	}
-	export class DesktopStatus {
-	    enabled: boolean;
-	    ready: boolean;
-	    version: string;
-	    accessibility?: string;
-	    blocked: string[];
-	    error?: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new DesktopStatus(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.enabled = source["enabled"];
-	        this.ready = source["ready"];
-	        this.version = source["version"];
-	        this.accessibility = source["accessibility"];
-	        this.blocked = source["blocked"];
-	        this.error = source["error"];
-	    }
-	}
 	export class CLIProxyAccount {
 	    file: string;
 	    provider: string;
@@ -2425,6 +2403,30 @@ export namespace backend {
 		    }
 		    return a;
 		}
+	}
+	export class DesktopStatus {
+	    enabled: boolean;
+	    ready: boolean;
+	    version: string;
+	    accessibility?: string;
+	    blocked: string[];
+	    blockedIsDefault: boolean;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new DesktopStatus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.enabled = source["enabled"];
+	        this.ready = source["ready"];
+	        this.version = source["version"];
+	        this.accessibility = source["accessibility"];
+	        this.blocked = source["blocked"];
+	        this.blockedIsDefault = source["blockedIsDefault"];
+	        this.error = source["error"];
+	    }
 	}
 	export class DoctorCheck {
 	    name: string;

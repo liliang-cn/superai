@@ -10,6 +10,7 @@ import { visibleAnswer } from "../lib/format";
 import { Response } from "@/components/ai-elements/response";
 import { say, sayDone } from "./bubbles";
 import { useRequestBrowser } from "../components/BrowserCard";
+import { SentMessage } from "../components/SentFiles";
 
 /** Who a robot is, for talking to it. */
 export type Talker =
@@ -223,7 +224,7 @@ export default function Talk({ who, placeholder }: { who: Talker; placeholder: s
             browser(l.req, false),
             l.who === "it" && !l.bad
               ? <div key={i} className="wt-line wt-it"><Response>{l.text}</Response></div>
-              : <p key={i} className={`wt-line wt-${l.who}${l.bad ? " bad" : ""}`}>{l.text}</p>,
+              : <div key={i} className={`wt-line wt-plain wt-${l.who}${l.bad ? " bad" : ""}`}>{l.who === "you" ? <SentMessage content={l.text} /> : l.text}</div>,
           ])}
           {liveReq && browser(liveReq, true)}
           {streamed && <div className="wt-line wt-it"><Response>{streamed}</Response></div>}

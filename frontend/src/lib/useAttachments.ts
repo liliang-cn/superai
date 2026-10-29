@@ -3,7 +3,7 @@ import { OnFileDrop, OnFileDropOff } from "../../wailsjs/runtime";
 import { ImportFiles, ImportPastedFile, PickFiles } from "../../wailsjs/go/app/App";
 import { toast } from "./toasts";
 
-const IMAGE_RE = /\.(png|jpe?g|gif|webp|bmp|tiff?)$/i;
+export const IMAGE_RE = /\.(png|jpe?g|gif|webp|bmp|tiff?)$/i;
 
 /** The backend's own ceiling on one pasted file, kept in step with app_files.go. */
 const MAX_PASTE_BYTES = 16 << 20;

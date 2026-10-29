@@ -83,6 +83,12 @@ var desktopBlockedDefault = []string{
 	"System Settings", "系统设置",
 }
 
+// DesktopBlockedApps is the list desktop control leaves alone under these
+// settings, and whether it is the default one.
+func DesktopBlockedApps(s *Settings) ([]string, bool) {
+	return s.desktopBlocked(), s.DesktopBlockedApps == nil
+}
+
 func (s *Settings) desktopBlocked() []string {
 	if s.DesktopBlockedApps != nil {
 		return s.DesktopBlockedApps
@@ -99,7 +105,10 @@ type DesktopStatus struct {
 	// "granted", "denied", "unknown", or "" before it has been asked.
 	Accessibility string   `json:"accessibility,omitempty"`
 	Blocked       []string `json:"blocked"`
-	Error         string   `json:"error,omitempty"`
+	// BlockedIsDefault is whether Blocked is the default list, not the
+	// person's own.
+	BlockedIsDefault bool   `json:"blockedIsDefault"`
+	Error            string `json:"error,omitempty"`
 }
 
 type desktopRuntime struct {
@@ -131,12 +140,13 @@ func (d *desktopRuntime) setErr(err error) {
 
 // DesktopStatus reports desktop control on this service.
 func (s *Service) DesktopStatus() DesktopStatus {
-	st := DesktopStatus{Version: AgentDesktopVersion, Blocked: desktopBlockedDefault}
+	st := DesktopStatus{Version: AgentDesktopVersion, Blocked: desktopBlockedDefault, BlockedIsDefault: true}
 	if s == nil {
 		return st
 	}
 	if s.settings != nil {
 		st.Blocked = s.settings.desktopBlocked()
+		st.BlockedIsDefault = s.settings.DesktopBlockedApps == nil
 	}
 	d := s.desktop
 	if d == nil {

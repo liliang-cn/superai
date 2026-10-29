@@ -4,6 +4,7 @@ import remarkGfm from "remark-gfm";
 import { ChatMessage } from "../lib/types";
 import { copyText, engineByline } from "../lib/format";
 import { isExternallyOpenable, openExternal } from "../lib/openExternal";
+import { SentMessage } from "./SentFiles";
 
 function CodeBlock({ className, text }: { className?: string; text: string }) {
   const [copied, setCopied] = useState(false);
@@ -91,7 +92,7 @@ function Bubble({ msg }: { msg: ChatMessage }) {
             </div>
           )}
           {isUser ? (
-            <span style={{ whiteSpace: "pre-wrap" }}>{msg.content}</span>
+            <SentMessage content={msg.content} />
           ) : msg.content ? (
             <div className="md">
               <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>

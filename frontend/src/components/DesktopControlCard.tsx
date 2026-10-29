@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { DesktopRequestAccess, DesktopStatus, SetDesktopControl } from "../../wailsjs/go/app/App";
+import { XIcon } from "lucide-react";
+import { DesktopRequestAccess, DesktopStatus, SetDesktopBlockedApps, SetDesktopControl } from "../../wailsjs/go/app/App";
 import { backend } from "../../wailsjs/go/models";
 import { translate } from "../lib/i18n";
 
@@ -14,6 +15,8 @@ export default function DesktopControlCard({ onChanged }: { onChanged?: (on: boo
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [asking, setAsking] = useState(false);
+  const [adding, setAdding] = useState("");
+  const [saving, setSaving] = useState(false);
   // Turned on here: the permission is asked for once, as soon as it is up.
   const [askOnReady, setAskOnReady] = useState(false);
 
@@ -73,6 +76,31 @@ export default function DesktopControlCard({ onChanged }: { onChanged?: (on: boo
     }
   };
 
+  // The list is saved as it changes; the backend rebuilds around it.
+  const saveBlocked = async (list: string[], useDefault = false) => {
+    setSaving(true);
+    setErr("");
+    // Shown at once: the save rebuilds the backend and takes seconds.
+    if (!useDefault) setSt((cur) => (cur ? backend.DesktopStatus.createFrom({ ...cur, blocked: list, blockedIsDefault: false }) : cur));
+    else setSt((cur) => (cur ? backend.DesktopStatus.createFrom({ ...cur, blockedIsDefault: true }) : cur));
+    try {
+      await SetDesktopBlockedApps(list, useDefault);
+    } catch (e) {
+      setErr(String(e instanceof Error ? e.message : e));
+    } finally {
+      void load();
+      setSaving(false);
+    }
+  };
+  const blocked = st?.blocked ?? [];
+  const add = () => {
+    const name = adding.trim();
+    if (!name) return;
+    setAdding("");
+    if (blocked.some((b) => b.toLowerCase() === name.toLowerCase())) return;
+    void saveBlocked([...blocked, name]);
+  };
+
   const state = !st || !on ? ""
     : st.error ? st.error
     : !st.ready ? translate("Installing…")
@@ -99,10 +127,31 @@ export default function DesktopControlCard({ onChanged }: { onChanged?: (on: boo
           </button>
         )}
       </div>
-      {on && !!st?.blocked?.length && (
+      {on && st && (
         <div className="field">
           <label>{translate("Left alone")}</label>
-          <span className="hint" data-testid="desktop-blocked">{st.blocked.join(" · ")}</span>
+          <div className="dc-apps" data-testid="desktop-blocked">
+            {blocked.map((b) => (
+              <span key={b} className="dc-app">
+                {b}
+                <button type="button" aria-label={`${translate("Allow")} ${b}`} title={translate("Allow")} disabled={saving}
+                  onClick={() => void saveBlocked(blocked.filter((x) => x !== b))}>
+                  <XIcon size={12} />
+                </button>
+              </span>
+            ))}
+            {blocked.length === 0 && <span className="hint">{translate("None")}</span>}
+          </div>
+          <div className="dc-add">
+            <input className="input" value={adding} placeholder={translate("App name")} disabled={saving}
+              onChange={(e) => setAdding(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) { e.preventDefault(); add(); } }}
+              data-testid="desktop-block-input" />
+            <button type="button" className="btn ghost sm" disabled={saving || !adding.trim()} onClick={add}>{translate("Add")}</button>
+            {!st.blockedIsDefault && (
+              <button type="button" className="btn ghost sm" disabled={saving} onClick={() => void saveBlocked([], true)}>{translate("Reset to default")}</button>
+            )}
+          </div>
         </div>
       )}
     </div>

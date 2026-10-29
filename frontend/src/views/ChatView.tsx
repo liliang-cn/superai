@@ -5,6 +5,7 @@ import { useAttachments } from "../lib/useAttachments";
 import { AppStatus, ChatMessage } from "../lib/types";
 import { copyText, engineByline, withoutCallNotes } from "../lib/format";
 import AttachmentChips from "../components/AttachmentChips";
+import { SentMessage } from "../components/SentFiles";
 import RunTracePanel from "../components/RunTracePanel";
 import { AgentMenu, AddressedBanner } from "../components/AgentMenu";
 import { useAgentMentions } from "../lib/useAgentMentions";
@@ -330,9 +331,7 @@ export default function ChatView({
                                 )}
                               </>
                             ) : (
-                              <span style={{ whiteSpace: "pre-wrap" }}>
-                                {withoutCallNotes(m.content)}
-                              </span>
+                              <SentMessage content={withoutCallNotes(m.content)} />
                             )}
                           </MessageContent>
                         </Message>

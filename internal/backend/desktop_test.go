@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -167,6 +168,28 @@ func TestDesktopRefusesCombosThatQuit(t *testing.T) {
 	for _, c := range []string{"return", "escape", "cmd+c", "cmd+f", "shift+tab", "q", "w"} {
 		if isQuitCombo(c) {
 			t.Errorf("%s refused", c)
+		}
+	}
+}
+
+// An emptied list is the person's "none" and must survive the file; only a
+// null one is the default.
+func TestAnEmptiedBlockListIsKept(t *testing.T) {
+	for _, tc := range []struct {
+		in      []string
+		def     bool
+		blocked int
+	}{{nil, true, len(desktopBlockedDefault)}, {[]string{}, false, 0}, {[]string{"Notes"}, false, 1}} {
+		raw, err := json.Marshal(&Settings{DesktopBlockedApps: tc.in})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var back Settings
+		if err := json.Unmarshal(raw, &back); err != nil {
+			t.Fatal(err)
+		}
+		if (back.DesktopBlockedApps == nil) != tc.def || len(back.desktopBlocked()) != tc.blocked {
+			t.Errorf("%v came back as %v", tc.in, back.DesktopBlockedApps)
 		}
 	}
 }

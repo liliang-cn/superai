@@ -338,6 +338,8 @@ export function SetAway(arg1:boolean):Promise<app.CCPresence>;
 
 export function SetBrowserMode(arg1:string):Promise<void>;
 
+export function SetDesktopBlockedApps(arg1:Array<string>,arg2:boolean):Promise<void>;
+
 export function SetDesktopControl(arg1:boolean):Promise<void>;
 
 export function SetDashboardCron(arg1:string,arg2:string):Promise<Record<string, any>>;
