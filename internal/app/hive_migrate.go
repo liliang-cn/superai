@@ -231,8 +231,8 @@ func (a *App) MigrateHiveLink() HiveMembership {
 }
 
 // migrateHiveLink puts this Mac in the hive at the app's start, from what it
-// already has, with nothing asked of the person. The window is a client of
-// the one hive, so the old node beside it is stopped and its place taken
+// already has, with nothing asked of the person. A Mac is one SuperLeo, so
+// the old node beside it is stopped and its place taken
 // (MigrateHiveLink). A Mac with no old node but a window linked to the hive
 // asks the hive for a pairing code with that link and joins by it.
 func (a *App) migrateHiveLink() {
