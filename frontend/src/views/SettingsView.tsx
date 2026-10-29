@@ -8,6 +8,7 @@ import LocalHiveCard from "../components/LocalHiveCard";
 import QueenEngineCard from "../components/QueenEngineCard";
 import ProxyCard from "../components/ProxyCard";
 import BrowserModeCard from "../components/BrowserModeCard";
+import DesktopControlCard from "../components/DesktopControlCard";
 import AddAgentCard from "../components/AddAgentCard";
 import AddWorkerCard from "../components/AddWorkerCard";
 import { AppStatus } from "../lib/types";
@@ -1284,6 +1285,9 @@ export default function SettingsView({
               settings is told too: a later Save must not put the old mode back. */}
           {section === "runtime" && (
             <BrowserModeCard onChanged={(mode) => setS((cur) => (cur ? backend.Settings.createFrom({ ...cur, browser_mode: mode }) : cur))} />
+          )}
+          {section === "runtime" && (
+            <DesktopControlCard onChanged={(on) => setS((cur) => (cur ? backend.Settings.createFrom({ ...cur, desktop_control: on }) : cur))} />
           )}
           <ProxyCard
             hidden={section !== "runtime"}

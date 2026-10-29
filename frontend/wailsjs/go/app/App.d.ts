@@ -94,6 +94,8 @@ export function DeleteStandingAgent(arg1:string):Promise<void>;
 
 export function Deliverables(arg1:string):Promise<Array<agent.Deliverable>>;
 
+export function DesktopStatus():Promise<backend.DesktopStatus>;
+
 export function DetectAgents():Promise<Array<app.DetectedAgent>>;
 
 export function Doctor():Promise<backend.DoctorReport>;
@@ -333,6 +335,8 @@ export function SendChat(arg1:string,arg2:string,arg3:Array<string>):Promise<str
 export function SetAway(arg1:boolean):Promise<app.CCPresence>;
 
 export function SetBrowserMode(arg1:string):Promise<void>;
+
+export function SetDesktopControl(arg1:boolean):Promise<void>;
 
 export function SetDashboardCron(arg1:string,arg2:string):Promise<Record<string, any>>;
 

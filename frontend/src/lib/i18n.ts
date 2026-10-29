@@ -175,6 +175,7 @@ const zh: Record<string,string> = { "Sign in with your AI account":"用你的 AI
   "today":"今日", "all time":"累计", "tokens":"tokens", "calls":"调用", "mcp":"MCP", "memory":"记忆", "orders":"指令", "coding":"编程", "workers busy":"忙碌的工作节点", "failed today":"今日失败",
   "Browser":"浏览器", "Browser off":"浏览器已关闭", "Browser failed":"浏览器出错", "Installing browser…":"正在安装浏览器…", "Chrome not connected":"Chrome 未连接", "Connect Chrome":"连接 Chrome", "Type into the page":"在页面中输入", "Not connected":"未连接", "Reconnecting…":"正在重连…", "Own browser":"独立浏览器", "New tab":"新标签页",
   "My Chrome":"我的 Chrome", "Separate browser":"独立浏览器", "Turn on":"开启",
+  "Desktop apps":"桌面应用", "Control":"控制", "Left alone":"不碰的应用", "Needs Accessibility permission":"需要辅助功能权限",
 };
 // English is the keys; the other languages are looked up, and a string a
 // language has no translation for yet stays English.

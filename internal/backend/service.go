@@ -41,6 +41,7 @@ type Service struct {
 	svc *agent.Service
 	// browser is the built-in browser (browser.go); nil when it is off.
 	browser *browserRuntime
+	desktop *desktopRuntime
 	sb      sandbox.Sandbox
 	cortex  *cortexdb.DB
 	// sharedMem is the read-through store handed to agent-go, which does not
@@ -301,7 +302,7 @@ func NewService(s *Settings) (*Service, error) {
 	_, vitaMissing, _, vitaConfigured := findMCPServer(MCPConfigSources(), VitaServer, os.LookupEnv)
 	vitaConfigured = vitaConfigured && len(vitaMissing) == 0
 	b := agent.New("SuperLeo").
-		WithPrompt(buildPersona(time.Now(), !s.DisableSelfInstall, s.ExternalAgents.Enabled) + browserSection(s.browserMode()) + hiveSection(s.Hive) + queenNameSection(s) + homeLayoutSection(s.Hive) + notedSectionFor(notedConfigured, s.Hive.Role) + vitaSection(vitaConfigured) + uiRulesSection()).
+		WithPrompt(buildPersona(time.Now(), !s.DisableSelfInstall, s.ExternalAgents.Enabled) + browserSection(s.browserMode()) + desktopSection(s.desktopControl()) + hiveSection(s.Hive) + queenNameSection(s) + homeLayoutSection(s.Hive) + notedSectionFor(notedConfigured, s.Hive.Role) + vitaSection(vitaConfigured) + uiRulesSection()).
 		WithConfig(cfg).
 		WithLLM(brain).
 		WithSandbox(sb).
@@ -456,6 +457,9 @@ func NewService(s *Settings) (*Service, error) {
 	if browserMode != BrowserModeOff {
 		out.startBrowser(browserMode)
 	}
+	if s.desktopControl() {
+		out.startDesktop(s.desktopBlocked())
+	}
 	out.notifier = NewNotifier(s)
 	out.notices = NewNotices(out.notifier)
 	// The notification centre: the one subscriber that keeps what it is given,
@@ -579,6 +583,7 @@ func (s *Service) Close() error {
 		return nil
 	}
 	s.stopBrowser()
+	s.stopDesktop()
 	if s.store != nil {
 		s.store.save()
 	}

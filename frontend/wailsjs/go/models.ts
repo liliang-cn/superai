@@ -2250,6 +2250,7 @@ export namespace backend {
 	    version: string;
 	    mode: string;
 	    streamUrl: string;
+	    connected: boolean;
 	    error?: string;
 	
 	    static createFrom(source: any = {}) {
@@ -2263,6 +2264,29 @@ export namespace backend {
 	        this.version = source["version"];
 	        this.mode = source["mode"];
 	        this.streamUrl = source["streamUrl"];
+	        this.connected = source["connected"];
+	        this.error = source["error"];
+	    }
+	}
+	export class DesktopStatus {
+	    enabled: boolean;
+	    ready: boolean;
+	    version: string;
+	    accessibility?: string;
+	    blocked: string[];
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new DesktopStatus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.enabled = source["enabled"];
+	        this.ready = source["ready"];
+	        this.version = source["version"];
+	        this.accessibility = source["accessibility"];
+	        this.blocked = source["blocked"];
 	        this.error = source["error"];
 	    }
 	}
@@ -3387,6 +3411,8 @@ export namespace backend {
 	    long_task_max_tokens?: number;
 	    disable_browser: boolean;
 	    browser_mode?: string;
+	    desktop_control?: boolean;
+	    desktop_blocked_apps?: string[];
 	    disable_ptc: boolean;
 	    pii_redaction: boolean;
 	    avatar_port: number;
@@ -3447,6 +3473,8 @@ export namespace backend {
 	        this.long_task_max_tokens = source["long_task_max_tokens"];
 	        this.disable_browser = source["disable_browser"];
 	        this.browser_mode = source["browser_mode"];
+	        this.desktop_control = source["desktop_control"];
+	        this.desktop_blocked_apps = source["desktop_blocked_apps"];
 	        this.disable_ptc = source["disable_ptc"];
 	        this.pii_redaction = source["pii_redaction"];
 	        this.avatar_port = source["avatar_port"];

@@ -145,6 +145,13 @@ type Settings struct {
 	// person's own Chrome, "own" in one it launches, "off" — the default —
 	// has none.
 	BrowserMode string `json:"browser_mode,omitempty"`
+	// DesktopControl lets the agent operate this machine's desktop apps
+	// through their accessibility trees (desktop.go). Off unless chosen.
+	DesktopControl bool `json:"desktop_control,omitempty"`
+	// DesktopBlockedApps are the apps desktop control leaves alone; unset,
+	// desktopBlockedDefault (messages, mail, password stores, terminals,
+	// System Settings).
+	DesktopBlockedApps []string `json:"desktop_blocked_apps,omitempty"`
 
 	// DisablePTC turns off Programmatic Tool Calling (the model writes JS that
 	// drives tools in a sandbox, so one round does several tool calls).

@@ -14,5 +14,6 @@ func TestMain(m *testing.M) {
 	// No test here downloads agent-browser or drives a browser; the ones
 	// about the browser set what they need.
 	os.Setenv("SUPERLEO_BROWSER_MODE", "off")
+	os.Setenv("SUPERLEO_DESKTOP", "off")
 	os.Exit(m.Run())
 }
