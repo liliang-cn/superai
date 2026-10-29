@@ -392,23 +392,6 @@ function plug(color: number, size = 1) {
   return holder;
 }
 
-/** An exclamation mark that floats over whatever needs you: honey when it is
- *  waiting for a decision or a reply, red when something broke. */
-function beacon(bad: boolean) {
-  const g = new THREE.Group();
-  const color = bad ? 0xe2553f : 0xf2b416;
-  // Just the mark: a bar and a dot, glowing a little.
-  const m = ownMat(color, { emissive: color, glow: 0.5, rough: 0.3 });
-  const bar = rbox(0.3, 0.95, 0.3, m, 0.13);
-  bar.position.y = 0.55;
-  const dot = new THREE.Mesh(new THREE.SphereGeometry(0.17, 16, 12), m);
-  dot.position.y = 0.22;
-  bar.castShadow = dot.castShadow = true;
-  g.add(bar, dot);
-  g.scale.setScalar(0.85);
-  return g;
-}
-
 /** A low round stand an icon floats over. */
 function pedestal(r = 1.2) {
   const g = new THREE.Group();
@@ -609,7 +592,7 @@ export const cluster: District<WorldData> = {
     });
 
     // ── What needs you: a mark over the one it is about ─────────────────
-    const beacons = new Map<string, { obj: THREE.Group; anchor: THREE.Object3D; lift: number }>();
+    const badges = new Set<HTMLElement>();
     let beaconSig = "";
 
     // ── Bees: small standing agents circling the core ────────────────────
@@ -798,11 +781,6 @@ export const cluster: District<WorldData> = {
           b.scale.setScalar(Math.max(0.001, Math.min(1, L * 8) * (1 - smooth(Math.min(1, L)))));
           if (L > 1) { bits.remove(b); bitPool.push(b); }
         }
-      }
-      for (const b of beacons.values()) {
-        const at = b.anchor.getWorldPosition(new THREE.Vector3());
-        b.obj.position.set(at.x, at.y + b.lift + (ctx.reduced ? 0 : Math.sin(t * 2.6) * 0.15), at.z);
-        if (!ctx.reduced) b.obj.rotation.y = t * 1.4;
       }
       if (t - blinkAt > 0.5) {
         blinkAt = t;
@@ -1501,8 +1479,8 @@ export const cluster: District<WorldData> = {
         const bSig = JSON.stringify([needs.map((a) => [a.kind, a.ref, a.title]), workers.size, bees.size, machines.size, hostSig]);
         if (bSig !== beaconSig) {
           beaconSig = bSig;
-          for (const b of beacons.values()) g.remove(b.obj);
-          beacons.clear();
+          for (const badge of badges) badge.remove();
+          badges.clear();
           const cliRobot = (agent: string) => {
             const [cli, ...rest] = agent.split(".");
             const host = rest.join(".");
@@ -1530,18 +1508,32 @@ export const cluster: District<WorldData> = {
             }
             return null;
           };
-          const per = new Map<THREE.Object3D, number>();
+          const per = new Map<THREE.Object3D, AttentionItem[]>();
           for (const it of needs) {
             const anchor = whoFor(it);
             if (!anchor) continue;
-            const k = per.get(anchor) ?? 0;
-            per.set(anchor, k + 1);
-            const bad = it.kind === "failed" || it.kind === "lost" || it.kind === "run";
-            const obj = beacon(bad);
-            g.add(obj);
-            ctx.pickable(obj, { kind: it.kind, id: it.ref ?? "", title: it.title });
-            const size = new THREE.Box3().setFromObject(anchor);
-            beacons.set(`${it.kind}:${it.ref}`, { obj, anchor, lift: size.max.y - anchor.getWorldPosition(new THREE.Vector3()).y + 1.1 + k * 1.5 });
+            const items = per.get(anchor) ?? [];
+            items.push(it);
+            per.set(anchor, items);
+          }
+          for (const [anchor, items] of per) {
+            const badItem = items.find((it) => it.kind === "failed" || it.kind === "lost" || it.kind === "run");
+            // Machine labels can live on a separate plate from the device.
+            const label = anchor.children.find((child) => child instanceof CSS2DObject && child.element.classList.contains("wl-pill")) as CSS2DObject | undefined;
+            const pill = label?.element ?? [...machines.values()].find((m) => m.dev === anchor)?.label.object.element;
+            if (!pill) continue;
+            const badge = document.createElement("span");
+            badge.textContent = items.length > 1 ? `! ${items.length}` : "!";
+            badge.setAttribute("aria-label", `${items.length} needs attention`);
+            Object.assign(badge.style, {
+              display: "inline-flex", alignItems: "center", justifyContent: "center",
+              flexShrink: "0", marginLeft: "6px", padding: "2px 7px",
+              borderRadius: "999px", background: badItem ? "#c93426" : "#f2b416",
+              color: badItem ? "#fff" : "#241800", fontSize: "13px",
+              fontWeight: "800", lineHeight: "1.2", whiteSpace: "nowrap",
+            });
+            pill.append(badge);
+            badges.add(badge);
           }
         }
 
