@@ -4,6 +4,7 @@
 import './lib/webshim'
 import React, {useEffect, useState} from 'react'
 import {createRoot} from 'react-dom/client'
+import {bootAfterMount} from './lib/boot'
 import {HashRouter} from 'react-router-dom'
 import '@fontsource-variable/geist'
 import '@fontsource-variable/geist-mono'
@@ -109,3 +110,4 @@ root.render(
         <Root/>
     </React.StrictMode>
 )
+bootAfterMount()

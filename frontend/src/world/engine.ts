@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { bootDone } from "../lib/boot";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { CSS2DObject, CSS2DRenderer } from "three/examples/jsm/renderers/CSS2DRenderer.js";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
@@ -114,6 +115,7 @@ export class WorldEngine<D> {
     // blue, while highlights roll off instead of clipping flat.
     this.renderer.toneMapping = THREE.NeutralToneMapping;
     this.renderer.toneMappingExposure = 0.84;
+    this.renderer.domElement.dataset.engine = "world";
     host.appendChild(this.renderer.domElement);
     this.labels = new CSS2DRenderer();
     this.labels.domElement.className = "wl-labels";
@@ -752,6 +754,7 @@ export class WorldEngine<D> {
     this.placeCallout();
     this.renderer.render(this.scene, this.camera);
     this.labels.render(this.scene, this.camera);
+    if (this.frame === 1) bootDone();
     if (++this.frame % 6 === 0) this.declutter();
   }
 
