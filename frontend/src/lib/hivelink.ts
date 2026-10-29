@@ -10,12 +10,7 @@
 // dialogs, the link itself.
 
 const LOCAL = new Set([
-  "LinkHive",
-  "UnlinkHive",
   "HiveLinkStatus",
-  "HiveLinks",
-  "UseHive",
-  "ForgetHive",
   "Remote",
   // This Mac's place in a hive and how its app stays running: about the
   // machine, so never forwarded to the queen.
@@ -23,6 +18,12 @@ const LOCAL = new Set([
   "LeaveHive",
   "HiveMembership",
   "MigrateHiveLink",
+  "ReconnectHive",
+  "ThisMacAbilities",
+  // This Mac's conversations from before it joined: read from its own
+  // process, never the hive's.
+  "EarlierChats",
+  "EarlierChat",
   "OldNodeStatus",
   "RetireOldNode",
   "DesktopResidency",
@@ -79,21 +80,6 @@ export const isBridged = () => bridged;
 export function graphSrc(): string | null {
   const w = window as unknown as Record<string, unknown>;
   return w.superleoServed || bridged ? "/graph/" : null;
-}
-
-export interface HiveLinkInfo {
-  linked: boolean;
-  url?: string;
-  name?: string;
-  live: boolean;
-  error?: string;
-}
-
-export interface HiveLinkEntry {
-  id: string;
-  name: string;
-  url: string;
-  active: boolean;
 }
 
 /** A double-click on any strip the window is dragged by acts as the title

@@ -242,7 +242,6 @@
  "The idlest worker leaves the hive and its pod is deleted. Work it is doing now is handed back.": "Der inaktivste Worker verlässt den Hive und sein Pod wird gelöscht. Seine aktuellen Aufgaben werden zurückgegeben.",
  "Start a pod": "Pod starten",
  "Delete a pod": "Pod löschen",
- "Switch backend": "Backend wechseln",
  "Show the hive": "Hive anzeigen",
  "Hide this pane": "Bereich ausblenden",
  "Resize sidebar": "Seitenleistengröße anpassen",

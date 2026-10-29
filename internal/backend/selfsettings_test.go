@@ -186,7 +186,7 @@ func TestBoundaryKeysNeedApproval(t *testing.T) {
 	for _, key := range []string{
 		"disable_tool_approval", "desktop_control", "desktop_blocked_apps", "external_agents.unattended",
 		"llm_key", "embed_key", "shared_memory_token", "webhook_secret", "telegram_bot_token", "llm_base_url",
-		"shared_memory_endpoint", "hive.role", "hive.join_url", "hive.join_token", "local_hive", "hive_link.active",
+		"shared_memory_endpoint", "hive.role", "hive.join_url", "hive.join_token", "local_hive",
 		"channels", "channels.c1.bot_token", "channels.c1.url", "remote_agents.agents", "external_agents.roots",
 		"external_agents.binaries", "disable_self_install", "telegram_allowed_chats", "hive", "external_agents",
 		"ha.haify.token", "apns.key_path",

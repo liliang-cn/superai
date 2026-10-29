@@ -108,6 +108,10 @@ export function DetectAgents():Promise<Array<app.DetectedAgent>>;
 
 export function Doctor():Promise<backend.DoctorReport>;
 
+export function EarlierChat(arg1:string):Promise<Array<backend.ChatTurn>>;
+
+export function EarlierChats():Promise<Array<backend.ChatSessionInfo>>;
+
 export function EmitAvatarTest(arg1:string):Promise<void>;
 
 export function ExportWorkspaceFile(arg1:string):Promise<string>;
@@ -122,8 +126,6 @@ export function FlowTrace(arg1:string):Promise<Array<string>>;
 
 export function FollowUpCLIRun(arg1:string,arg2:string):Promise<app.CLIRun>;
 
-export function ForgetHive(arg1:string):Promise<void>;
-
 export function ForgetLife(arg1:string,arg2:string):Promise<void>;
 
 export function GetLocalHive():Promise<app.LocalHive>;
@@ -135,8 +137,6 @@ export function GetStatus():Promise<Record<string, any>>;
 export function GraphView():Promise<Record<string, any>>;
 
 export function HiveLinkStatus():Promise<app.HiveLinkInfo>;
-
-export function HiveLinks():Promise<Array<app.HiveLinkEntry>>;
 
 export function HiveMembers():Promise<Array<backend.HiveMember>>;
 
@@ -187,8 +187,6 @@ export function JoinHive(arg1:string,arg2:string):Promise<app.HiveMembership>;
 export function LeaveHive():Promise<app.HiveMembership>;
 
 export function Life():Promise<backend.LifeData>;
-
-export function LinkHive(arg1:string,arg2:string):Promise<app.HiveLinkInfo>;
 
 export function LinkSuperLeo(arg1:string,arg2:string,arg3:string):Promise<string>;
 
@@ -312,6 +310,8 @@ export function ReadWorkspaceFile(arg1:string):Promise<string>;
 
 export function ReadWorkspaceFileDataURL(arg1:string):Promise<string>;
 
+export function ReconnectHive():Promise<app.HiveMembership>;
+
 export function RefreshDashboard(arg1:string):Promise<Record<string, any>>;
 
 export function RegenerateChannelToken(arg1:string):Promise<backend.ChannelView>;
@@ -430,6 +430,8 @@ export function TestProxy(arg1:backend.ProxySettings):Promise<Record<string, any
 
 export function TestWebhook():Promise<string>;
 
+export function ThisMacAbilities():Promise<app.MacAbilities>;
+
 export function TitleBarDoubleClick():Promise<void>;
 
 export function ToolApprovalInfo(arg1:number):Promise<Record<string, any>>;
@@ -446,8 +448,6 @@ export function TurnTrace(arg1:string):Promise<app.TurnTrace>;
 
 export function TurnTraces(arg1:number):Promise<Array<app.TurnTrace>>;
 
-export function UnlinkHive():Promise<void>;
-
 export function UnlinkSuperLeo(arg1:string):Promise<void>;
 
 export function UnpairDevice(arg1:string):Promise<void>;
@@ -455,7 +455,5 @@ export function UnpairDevice(arg1:string):Promise<void>;
 export function UnreadNotifications():Promise<number>;
 
 export function Upcoming():Promise<Array<app.UpcomingItem>>;
-
-export function UseHive(arg1:string):Promise<void>;
 
 export function WakeStandingAgent(arg1:string,arg2:string):Promise<void>;

@@ -690,3 +690,9 @@ html[data-desk] body { background: transparent; }
 /* Menu mode draws no world, so at night the shell needs a ground of its own:
    the 3D scene's night floor, not the page's white. */
 .dk-shell.dk-dark.dk-flat { background: #0f151c; }
+
+/* This Mac's chats from before it joined a hive: read only, no composer. */
+.dk-chat[hidden] { display: none; }
+.dk-earlier { grid-template-rows: 58px minmax(0, 1fr); }
+.dk-earlier-entry { margin-top: 8px; flex: none; }
+.dk-earlier-row { width: 100%; }

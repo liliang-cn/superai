@@ -57,7 +57,7 @@ type SelfKey struct {
 	Tier    string `json:"tier"`
 	Desc    string `json:"description"`
 	// Virtual keys are not in settings.json: the app acts on them itself
-	// (local_hive, hive_link.active).
+	// (local_hive).
 	Virtual bool `json:"virtual,omitempty"`
 
 	// set replaces the generic setter, for a key with more to it than a
@@ -215,7 +215,6 @@ func selfKeys() []SelfKey {
 		{Key: "hive.join_url", Section: "hive", Tier: ap, Desc: "The queen a worker joins."},
 		{Key: "hive.join_token", Section: "hive", Tier: ap, Desc: "The token a worker joins with (secret)."},
 		{Key: "local_hive", Section: "hive", Tier: ap, Virtual: true, Desc: `This machine runs a hive of local workers: {"enabled", "min_workers", "max_workers"}.`},
-		{Key: "hive_link.active", Section: "hive", Tier: ap, Virtual: true, Desc: "Which saved hive the desktop window is connected to, by id; \"\" is this machine on its own (desktop only)."},
 
 		// --- notifications ---
 		{Key: "webhook_url", Section: "notifications", Tier: w, Desc: "Where a notice is POSTed (mirrors the first webhook channel). Blank turns it off."},

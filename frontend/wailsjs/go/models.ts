@@ -1247,45 +1247,6 @@ export namespace app {
 		    return a;
 		}
 	}
-	export class HiveLinkEntry {
-	    id: string;
-	    name: string;
-	    url: string;
-	    active: boolean;
-	    // Go type: time
-	    linkedAt: any;
-	
-	    static createFrom(source: any = {}) {
-	        return new HiveLinkEntry(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.id = source["id"];
-	        this.name = source["name"];
-	        this.url = source["url"];
-	        this.active = source["active"];
-	        this.linkedAt = this.convertValues(source["linkedAt"], null);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
 	export class HiveLinkInfo {
 	    linked: boolean;
 	    url?: string;
@@ -1410,6 +1371,20 @@ export namespace app {
 		    return a;
 		}
 	}
+	export class HostAbility {
+	    name: string;
+	    about?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new HostAbility(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.about = source["about"];
+	    }
+	}
 	export class HostAgent {
 	    name: string;
 	    kind: string;
@@ -1420,6 +1395,7 @@ export namespace app {
 	    version?: string;
 	    via?: string;
 	    mcp?: string[];
+	    abilities?: HostAbility[];
 	    service?: string;
 	    unrunnable?: boolean;
 	
@@ -1438,9 +1414,28 @@ export namespace app {
 	        this.version = source["version"];
 	        this.via = source["via"];
 	        this.mcp = source["mcp"];
+	        this.abilities = this.convertValues(source["abilities"], HostAbility);
 	        this.service = source["service"];
 	        this.unrunnable = source["unrunnable"];
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class Host {
 	    id: string;
@@ -1534,6 +1529,7 @@ export namespace app {
 	    state: string;
 	    up: boolean;
 	    via?: string;
+	    abilities?: HostAbility[];
 	
 	    static createFrom(source: any = {}) {
 	        return new HiveWorker(source);
@@ -1547,8 +1543,28 @@ export namespace app {
 	        this.state = source["state"];
 	        this.up = source["up"];
 	        this.via = source["via"];
+	        this.abilities = this.convertValues(source["abilities"], HostAbility);
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
+	
 	
 	
 	export class HostDisk {
@@ -1786,6 +1802,7 @@ export namespace app {
 	    role: string;
 	    activity?: CCActivity;
 	    cliActivity?: Record<string, CLIActivity>;
+	    abilities?: HostAbility[];
 	
 	    static createFrom(source: any = {}) {
 	        return new LinkedAgent(source);
@@ -1808,6 +1825,7 @@ export namespace app {
 	        this.role = source["role"];
 	        this.activity = this.convertValues(source["activity"], CCActivity);
 	        this.cliActivity = this.convertValues(source["cliActivity"], CLIActivity, true);
+	        this.abilities = this.convertValues(source["abilities"], HostAbility);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -1887,6 +1905,38 @@ export namespace app {
 	        this.command = source["command"];
 	        this.added = source["added"];
 	    }
+	}
+	export class MacAbilities {
+	    abilities: HostAbility[];
+	    clis: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new MacAbilities(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.abilities = this.convertValues(source["abilities"], HostAbility);
+	        this.clis = source["clis"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	
 	export class ModelCheck {
@@ -3222,6 +3272,20 @@ export namespace backend {
 	}
 	
 	
+	export class HiveAbility {
+	    name: string;
+	    about?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new HiveAbility(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.about = source["about"];
+	    }
+	}
 	export class HiveMember {
 	    name: string;
 	    role: string;
@@ -3239,6 +3303,7 @@ export namespace backend {
 	    host?: string;
 	    mcp: string[];
 	    clis?: string[];
+	    abilities?: HiveAbility[];
 	    state: string;
 	
 	    static createFrom(source: any = {}) {
@@ -3260,6 +3325,7 @@ export namespace backend {
 	        this.host = source["host"];
 	        this.mcp = source["mcp"];
 	        this.clis = source["clis"];
+	        this.abilities = this.convertValues(source["abilities"], HiveAbility);
 	        this.state = source["state"];
 	    }
 	

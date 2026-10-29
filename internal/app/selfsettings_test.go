@@ -150,7 +150,7 @@ func TestEveryBoundaryKeyWaitsForApproval(t *testing.T) {
 		"external_agents.unattended": true, "external_agents.roots": []any{"/tmp"}, "external_agents.binaries": map[string]any{"claude": "/bin/echo"},
 		"external_agents.custom": []any{}, "remote_agents.agents": map[string]any{"b2": map[string]any{"hosts": []any{"me@b2"}}},
 		"hive.role": "queen", "hive.join_url": "https://q2.example.invalid", "hive.join_token": "sk-NEW-6",
-		"local_hive": map[string]any{"enabled": true}, "hive_link.active": "", "channels": []any{},
+		"local_hive": map[string]any{"enabled": true}, "channels": []any{},
 		"webhook_secret": "sk-NEW-7", "telegram_bot_token": "sk-NEW-8", "telegram_allowed_chats": []any{42},
 		"disable_tool_approval": true, "disable_self_install": false, "tool_approval_decider_url": "https://d.example.invalid",
 		"tool_approval_decider_threshold": 0.5, "action_mcp_servers": []any{"noted"},

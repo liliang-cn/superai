@@ -7,10 +7,9 @@ package app
 // events are relayed into it; the local engine keeps running underneath for
 // what only this machine can do (file pickers, the window's own theme).
 //
-// The link is a paired device like a phone: a code shown by the queen,
-// exchanged once for a token, kept in hive-link.json beside the settings.
-// Several can be kept — the hive over the internet, the same queen on the
-// LAN, another hive — with one in use at a time, or none: this Mac alone.
+// The link is a paired device like a phone, now made by joining the hive
+// (hive_member.go). hive-link.json is what an older version kept; it is only
+// read, once, to turn into a membership (hive_migrate.go).
 
 import (
 	"bufio"
@@ -75,15 +74,6 @@ type HiveLinkInfo struct {
 	Error string `json:"error,omitempty"`
 }
 
-// HiveLinkEntry is one saved hive, for the switcher.
-type HiveLinkEntry struct {
-	ID       string    `json:"id"`
-	Name     string    `json:"name"`
-	URL      string    `json:"url"`
-	Active   bool      `json:"active"`
-	LinkedAt time.Time `json:"linkedAt"`
-}
-
 // hiveLinkState is the App's hold on the link and its relay.
 type hiveLinkState struct {
 	mu     sync.Mutex
@@ -95,8 +85,6 @@ type hiveLinkState struct {
 	err  atomic.Value // string
 	// on is read by emit on every event, so it is an atomic of its own.
 	on atomic.Bool
-	// book guards hive-link.json against two switches at once.
-	book sync.Mutex
 }
 
 func hiveLinkPath() string { return filepath.Join(backend.DataDir(), hiveLinkFile) }
@@ -190,151 +178,6 @@ func (a *App) useHiveLink(l *hiveLink) {
 		defer close(done)
 		a.relayHiveEvents(ctx, *l)
 	}(hl.done)
-}
-
-// LinkHive pairs this window with the queen at address, using a code the queen
-// is showing (Settings → Pair a device on any of her screens), and switches to
-// her. Pairing again with a queen already saved replaces her token.
-func (a *App) LinkHive(address, code string) (HiveLinkInfo, error) {
-	if a.ctx == nil {
-		return HiveLinkInfo{}, errOnlyInTheWindow
-	}
-	if a.isHiveMember() {
-		return HiveLinkInfo{}, errInAHive
-	}
-	base := strings.TrimRight(strings.TrimSpace(address), "/")
-	if base == "" || strings.TrimSpace(code) == "" {
-		return HiveLinkInfo{}, errors.New("the address and the code are both needed")
-	}
-	if !strings.Contains(base, "://") {
-		base = "https://" + base
-	}
-	host, _ := os.Hostname()
-	body, _ := json.Marshal(map[string]string{"code": strings.TrimSpace(code), "device": "SuperLeo on " + strings.TrimSuffix(host, ".local")})
-	resp, err := hiveLinkHTTP.Post(base+pairClaimPath, "application/json", bytes.NewReader(body))
-	if err != nil {
-		return HiveLinkInfo{}, fmt.Errorf("could not reach %s: %w", base, err)
-	}
-	defer resp.Body.Close()
-	var out struct {
-		Token    string `json:"token"`
-		DeviceID string `json:"device_id"`
-		Error    string `json:"error"`
-	}
-	_ = json.NewDecoder(io.LimitReader(resp.Body, 1<<16)).Decode(&out)
-	if resp.StatusCode != http.StatusOK || out.Token == "" {
-		if out.Error == "" {
-			out.Error = resp.Status
-		}
-		return HiveLinkInfo{}, errors.New(out.Error)
-	}
-	l := hiveLink{ID: base, Name: hostOf(base), URL: base, Token: out.Token, DeviceID: out.DeviceID, LinkedAt: time.Now().UTC()}
-	a.hiveLink.book.Lock()
-	b := loadHiveBook()
-	if i := b.find(l.ID); i >= 0 {
-		b.Links[i] = l
-	} else {
-		b.Links = append(b.Links, l)
-	}
-	b.Active = l.ID
-	err = saveHiveBook(b)
-	a.hiveLink.book.Unlock()
-	if err != nil {
-		return HiveLinkInfo{}, err
-	}
-	a.useHiveLink(&l)
-	return a.HiveLinkStatus(), nil
-}
-
-// HiveLinks lists the saved hives, the one in use marked.
-func (a *App) HiveLinks() []HiveLinkEntry {
-	b := loadHiveBook()
-	out := make([]HiveLinkEntry, 0, len(b.Links))
-	for _, l := range b.Links {
-		out = append(out, HiveLinkEntry{ID: l.ID, Name: l.Name, URL: l.URL, Active: l.ID == b.Active, LinkedAt: l.LinkedAt})
-	}
-	return out
-}
-
-// UseHive switches the window to a saved hive, or with "" to this Mac on its
-// own. The window reloads afterwards so every screen starts on the new one.
-func (a *App) UseHive(id string) error {
-	if a.ctx == nil {
-		return errOnlyInTheWindow
-	}
-	if a.isHiveMember() {
-		return errInAHive
-	}
-	a.hiveLink.book.Lock()
-	b := loadHiveBook()
-	var next *hiveLink
-	if id != "" {
-		i := b.find(id)
-		if i < 0 {
-			a.hiveLink.book.Unlock()
-			return errors.New("no such hive saved here")
-		}
-		l := b.Links[i]
-		next = &l
-	}
-	b.Active = id
-	err := saveHiveBook(b)
-	a.hiveLink.book.Unlock()
-	if err != nil {
-		return err
-	}
-	a.useHiveLink(next)
-	return nil
-}
-
-// ForgetHive removes a saved hive and asks her to forget this Mac too, so its
-// token stops working there. If it was the one in use, the window goes back
-// to this Mac.
-func (a *App) ForgetHive(id string) error {
-	if a.ctx == nil {
-		return errOnlyInTheWindow
-	}
-	if a.isHiveMember() {
-		return errInAHive
-	}
-	a.hiveLink.book.Lock()
-	b := loadHiveBook()
-	i := b.find(id)
-	if i < 0 {
-		a.hiveLink.book.Unlock()
-		return nil
-	}
-	gone := b.Links[i]
-	b.Links = append(b.Links[:i], b.Links[i+1:]...)
-	wasActive := b.Active == id
-	if wasActive {
-		b.Active = ""
-	}
-	err := saveHiveBook(b)
-	a.hiveLink.book.Unlock()
-	if err != nil {
-		return err
-	}
-	if wasActive {
-		a.useHiveLink(nil)
-	}
-	// Best effort: an unreachable queen keeps a dead device in her list,
-	// which she can remove herself.
-	if gone.DeviceID != "" {
-		_, _ = callQueen(gone, "UnpairDevice", []any{gone.DeviceID})
-	}
-	return nil
-}
-
-// UnlinkHive forgets the hive in use; the window goes back to this Mac.
-func (a *App) UnlinkHive() error {
-	a.hiveLink.mu.Lock()
-	l := a.hiveLink.link
-	a.hiveLink.mu.Unlock()
-	if l == nil {
-		return nil
-	}
-	return a.ForgetHive(l.ID)
 }
 
 // HiveLinkStatus reports whether this window is linked, and to where.

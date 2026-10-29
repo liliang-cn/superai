@@ -206,6 +206,14 @@ export function Doctor() {
   return window['go']['app']['App']['Doctor']();
 }
 
+export function EarlierChat(arg1) {
+  return window['go']['app']['App']['EarlierChat'](arg1);
+}
+
+export function EarlierChats() {
+  return window['go']['app']['App']['EarlierChats']();
+}
+
 export function EmitAvatarTest(arg1) {
   return window['go']['app']['App']['EmitAvatarTest'](arg1);
 }
@@ -234,10 +242,6 @@ export function FollowUpCLIRun(arg1, arg2) {
   return window['go']['app']['App']['FollowUpCLIRun'](arg1, arg2);
 }
 
-export function ForgetHive(arg1) {
-  return window['go']['app']['App']['ForgetHive'](arg1);
-}
-
 export function ForgetLife(arg1, arg2) {
   return window['go']['app']['App']['ForgetLife'](arg1, arg2);
 }
@@ -260,10 +264,6 @@ export function GraphView() {
 
 export function HiveLinkStatus() {
   return window['go']['app']['App']['HiveLinkStatus']();
-}
-
-export function HiveLinks() {
-  return window['go']['app']['App']['HiveLinks']();
 }
 
 export function HiveMembers() {
@@ -364,10 +364,6 @@ export function LeaveHive() {
 
 export function Life() {
   return window['go']['app']['App']['Life']();
-}
-
-export function LinkHive(arg1, arg2) {
-  return window['go']['app']['App']['LinkHive'](arg1, arg2);
 }
 
 export function LinkSuperLeo(arg1, arg2, arg3) {
@@ -614,6 +610,10 @@ export function ReadWorkspaceFileDataURL(arg1) {
   return window['go']['app']['App']['ReadWorkspaceFileDataURL'](arg1);
 }
 
+export function ReconnectHive() {
+  return window['go']['app']['App']['ReconnectHive']();
+}
+
 export function RefreshDashboard(arg1) {
   return window['go']['app']['App']['RefreshDashboard'](arg1);
 }
@@ -850,6 +850,10 @@ export function TestWebhook() {
   return window['go']['app']['App']['TestWebhook']();
 }
 
+export function ThisMacAbilities() {
+  return window['go']['app']['App']['ThisMacAbilities']();
+}
+
 export function TitleBarDoubleClick() {
   return window['go']['app']['App']['TitleBarDoubleClick']();
 }
@@ -882,10 +886,6 @@ export function TurnTraces(arg1) {
   return window['go']['app']['App']['TurnTraces'](arg1);
 }
 
-export function UnlinkHive() {
-  return window['go']['app']['App']['UnlinkHive']();
-}
-
 export function UnlinkSuperLeo(arg1) {
   return window['go']['app']['App']['UnlinkSuperLeo'](arg1);
 }
@@ -900,10 +900,6 @@ export function UnreadNotifications() {
 
 export function Upcoming() {
   return window['go']['app']['App']['Upcoming']();
-}
-
-export function UseHive(arg1) {
-  return window['go']['app']['App']['UseHive'](arg1);
 }
 
 export function WakeStandingAgent(arg1, arg2) {

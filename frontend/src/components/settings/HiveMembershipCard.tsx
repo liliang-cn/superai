@@ -1,11 +1,23 @@
 import { useEffect, useState } from "react";
 import { HexagonIcon, LogOutIcon, MonitorIcon, PlusIcon } from "lucide-react";
 import { toast } from "../../lib/toasts";
-import { HiveLinkStatus, JoinHive, LeaveHive, OldNodeStatus, RetireOldNode } from "../../../wailsjs/go/app/App";
+import { HiveLinkStatus, JoinHive, LeaveHive, OldNodeStatus, RetireOldNode, ThisMacAbilities } from "../../../wailsjs/go/app/App";
 import { useHosts } from "../../canvas/data";
 import { translate } from "../../lib/i18n";
 import { hiveHost, useMembership } from "../../lib/membership";
 import { Avatar, Block, Btn, ConfirmBtn, Note, Row, State, Text } from "./kit";
+
+type MacCan = { abilities: { name: string }[]; clis: number };
+
+/** "Browser · Desktop apps · 10 coding tools": what this Mac's own SuperLeo can do. */
+function canLine(c: MacCan | null): string {
+  if (!c) return "";
+  const names: Record<string, string> = { browser: "Browser", desktop: "Desktop apps", files: "Files", exec: "Commands" };
+  const order = ["browser", "desktop", "files", "exec"];
+  const have = order.filter((n) => c.abilities.some((a) => a.name === n)).map((n) => translate(names[n]));
+  if (c.clis > 0) have.push(translate("{n} coding tools", { n: c.clis }));
+  return have.join(" · ");
+}
 
 type OldNode = { present: boolean; running: boolean; retired: boolean; name?: string };
 
@@ -28,10 +40,14 @@ export default function HiveMembershipCard({ onMakeCode }: { onMakeCode: () => v
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [old, setOld] = useState<OldNode | null>(null);
+  const [can, setCan] = useState<MacCan | null>(null);
 
   useEffect(() => {
     OldNodeStatus().then((o) => setOld(o as OldNode)).catch(() => setOld(null));
   }, []);
+  useEffect(() => {
+    ThisMacAbilities().then((c) => setCan(c as MacCan)).catch(() => setCan(null));
+  }, [m?.joined, m?.connected]);
   useEffect(() => {
     if (m?.needsCode && !address) {
       // The hive this Mac was paired with before: only its code is missing.
@@ -88,14 +104,14 @@ export default function HiveMembershipCard({ onMakeCode }: { onMakeCode: () => v
             <ConfirmBtn icon={LogOutIcon} label="Leave the hive" title={translate("Leave {hive}?", { hive })}
               sub={translate("This Mac goes back to a hive of its own")} ok="Leave" onConfirm={leave} testId="hive-leave" />
           </Row>
-          <Row lead={<Avatar><MonitorIcon size={16} strokeWidth={1.8} /></Avatar>} label="This Mac" sub={m.name} testId="hive-this-mac">
+          <Row lead={<Avatar><MonitorIcon size={16} strokeWidth={1.8} /></Avatar>} label="This Mac" sub={[m.name, canLine(can)].filter(Boolean).join(" · ")} testId="hive-this-mac">
             <State tone="ok">In the hive</State>
           </Row>
         </>
       ) : (
         <>
           <Row lead={<Avatar><MonitorIcon size={16} strokeWidth={1.8} /></Avatar>} label="This Mac"
-            sub={translate("Queen · {n} machines", { n: machines })} testId="hive-alone">
+            sub={[translate("Queen · {n} machines", { n: machines }), canLine(can)].filter(Boolean).join(" · ")} testId="hive-alone">
             <State tone="ok">Running</State>
           </Row>
           <Block testId="hive-join">

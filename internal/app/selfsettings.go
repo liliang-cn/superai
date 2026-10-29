@@ -236,7 +236,6 @@ func (a *App) selfSectionState(sec string, cfg *backend.Settings) map[string]any
 			out["members"] = len(m)
 		}
 		out["local_hive"] = a.GetLocalHive()
-		out["links"] = a.HiveLinks()
 		out["link"] = a.HiveLinkStatus()
 		return out
 	case "notifications":
@@ -553,20 +552,6 @@ func checkVirtual(c selfChange) error {
 	case "local_hive":
 		_, err := parseLocalHive(c.Value)
 		return err
-	case "hive_link.active":
-		if _, ok := c.Value.(string); !ok && c.Value != nil {
-			return errors.New("hive_link.active: want a saved hive's id, or \"\"")
-		}
-		id := strings.TrimSpace(str(c.Value))
-		if id == "" {
-			return nil
-		}
-		for _, l := range loadHiveBook().Links {
-			if l.ID == id {
-				return nil
-			}
-		}
-		return fmt.Errorf("hive_link.active: no saved hive %q (settings_get section hive lists them)", id)
 	}
 	return fmt.Errorf("unknown setting %q", c.Key)
 }
@@ -580,8 +565,6 @@ func (a *App) applyVirtual(c selfChange) error {
 		}
 		_, err = a.SetLocalHive(v.Enabled, v.MinWorkers, v.MaxWorkers)
 		return err
-	case "hive_link.active":
-		return a.UseHive(strings.TrimSpace(str(c.Value)))
 	}
 	return fmt.Errorf("unknown setting %q", c.Key)
 }

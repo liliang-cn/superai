@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { TriangleAlertIcon } from "lucide-react";
+import { ReconnectHive } from "../../wailsjs/go/app/App";
 import { useI18n } from "../lib/i18n";
 import { isCutOff, useMembership, useRetryCountdown } from "../lib/membership";
 
@@ -22,7 +23,7 @@ export default function HiveBanner({ className }: { className?: string }) {
     <div className={`hive-banner${className ? ` ${className}` : ""}`} role="alert" data-testid="hive-banner">
       <TriangleAlertIcon size={16} strokeWidth={1.9} aria-hidden />
       <span>{t("The hive is out of reach · retrying in {n}s", { n: left })}</span>
-      <button type="button" onClick={() => { reset(); void recheck(); }} data-testid="hive-retry">{t("Retry")}</button>
+      <button type="button" onClick={() => { reset(); ReconnectHive().catch(() => {}).finally(() => void recheck()); }} data-testid="hive-retry">{t("Retry")}</button>
     </div>
   );
 }

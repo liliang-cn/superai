@@ -179,8 +179,8 @@ func TestJoiningAHiveMakesTheMacItsWorker(t *testing.T) {
 	if _, self, ok := mac.lanElect(st.Name, map[string]bool{}); ok || self {
 		t.Fatal("a member elected itself")
 	}
-	if _, err := mac.LinkHive("http://x", "123456"); err == nil {
-		t.Fatal("a member linked its window elsewhere")
+	if _, err := mac.JoinHive("http://x", "123456"); err == nil {
+		t.Fatal("a member joined a second hive")
 	}
 
 	// The window is on the queen.
@@ -374,5 +374,59 @@ func TestTheLoginItemIsAPlistThatOpensTheAppHidden(t *testing.T) {
 	}
 	if StartHiddenWanted([]string{HiddenArg}) {
 		t.Fatal("hidden start without keep-running")
+	}
+}
+
+// Retry redials at once: the agent link and the window's stream start over, and
+// the Mac stays a member. A Mac in no hive has nothing to redial.
+func TestReconnectingRedialsTheHive(t *testing.T) {
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
+	t.Setenv("SUPERLEO_AGENT_DOOR_PORT", strconv.Itoa(freePort(t)))
+	prev := windowEmit
+	windowEmit = func(context.Context, string, map[string]any) {}
+	t.Cleanup(func() { windowEmit = prev })
+
+	hive := newFakeHive(t)
+	mac := NewApp()
+	mac.ctx = context.Background()
+	mac.settings = &backend.Settings{}
+	mac.ownTurnFn = func(string, string, string, string) {}
+	t.Cleanup(func() { _, _ = mac.LeaveHive() })
+
+	if st, err := mac.ReconnectHive(); err != nil || st.Joined {
+		t.Fatalf("alone: %+v %v", st, err)
+	}
+	st, err := mac.JoinHive(hive.web.URL, "123456")
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "connected", func() bool { return mac.HiveMembership().Connected })
+	first := hive.core.agents().get(st.Name)
+
+	if _, err := mac.ReconnectHive(); err != nil {
+		t.Fatal(err)
+	}
+	if !mac.isHiveMember() {
+		t.Fatal("reconnecting left the hive")
+	}
+	waitFor(t, "the link to come back as a new connection", func() bool {
+		c := hive.core.agents().get(st.Name)
+		return c != nil && c != first && mac.HiveMembership().Connected
+	})
+}
+
+// The conversations a Mac kept before joining stay readable from the process
+// itself, minus the pieces it did for a queen; nothing is changed by reading.
+func TestEarlierChatsAreLocalAndReadOnly(t *testing.T) {
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
+	a := NewApp()
+	if got := a.EarlierChats(); got == nil || len(got) != 0 {
+		t.Fatalf("no service: %v", got)
+	}
+	if got := a.EarlierChat("x"); got == nil || len(got) != 0 {
+		t.Fatalf("no service: %v", got)
+	}
+	if got := a.ThisMacAbilities(); got.Abilities == nil {
+		t.Fatalf("abilities should be a list, not null: %+v", got)
 	}
 }

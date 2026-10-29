@@ -483,3 +483,68 @@ func (a *App) hiveUnreachable(err error) error {
 	}
 	return fmt.Errorf("%s is not reachable, so nothing can be done until it is", where)
 }
+
+// ReconnectHive redials the hive now: the agent link and the window's event
+// stream both start over without waiting out their backoff. It is a local call,
+// the window's own, and does nothing for a Mac in no hive.
+func (a *App) ReconnectHive() (HiveMembership, error) {
+	ms := &a.member
+	ms.mu.Lock()
+	defer ms.mu.Unlock()
+	m := ms.cur.Load()
+	if m == nil {
+		return a.HiveMembership(), nil
+	}
+	a.startMemberLink()
+	if a.ctx != nil {
+		a.useHiveLink(m.asLink())
+	}
+	return a.HiveMembership(), nil
+}
+
+// MacAbilities is what this Mac's own SuperLeo can do, as the hive is told.
+type MacAbilities struct {
+	Abilities []HostAbility `json:"abilities"`
+	// CLIs is how many coding tools are installed here.
+	CLIs int `json:"clis"`
+}
+
+// ThisMacAbilities reports this process's own abilities and coding tools,
+// whether or not it is in a hive. A local call.
+func (a *App) ThisMacAbilities() MacAbilities {
+	out := MacAbilities{Abilities: []HostAbility{}, CLIs: len(a.localAgentNames())}
+	out.Abilities = append(out.Abilities, a.localAbilities()...)
+	return out
+}
+
+// EarlierChats lists the conversations this process kept while it was its own
+// hive, newest first, so they stay readable after it joins another. Read-only,
+// and local: it never asks the hive.
+func (a *App) EarlierChats() []backend.ChatSessionInfo {
+	a.mu.Lock()
+	svc := a.svc
+	a.mu.Unlock()
+	if svc == nil {
+		return []backend.ChatSessionInfo{}
+	}
+	saved := svc.Sessions(200)
+	out := make([]backend.ChatSessionInfo, 0, len(saved))
+	for _, c := range saved {
+		// Pieces this Mac did for a queen are hers, not conversations of its own.
+		if !strings.HasPrefix(c.ID, backend.HiveSessionPrefix) {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+// EarlierChat is one of those conversations' messages, as ChatHistory gives them.
+func (a *App) EarlierChat(sessionID string) []backend.ChatTurn {
+	a.mu.Lock()
+	svc := a.svc
+	a.mu.Unlock()
+	if svc == nil {
+		return []backend.ChatTurn{}
+	}
+	return withChatActions(sessionID, withTurnTimes(sessionID, svc.SessionTurns(sessionID)))
+}

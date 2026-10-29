@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   ArrowUpIcon, HexagonIcon, 
   PlusIcon, SquareIcon, SquarePenIcon, CalendarIcon, AlarmClockIcon, TerminalIcon, TriangleAlertIcon, XIcon, ChevronRightIcon,
-  LayoutDashboardIcon, ActivityIcon, GaugeIcon, ScrollTextIcon, PaperclipIcon, PanelLeftCloseIcon, PanelLeftOpenIcon,
+  LayoutDashboardIcon, ActivityIcon, GaugeIcon, ScrollTextIcon, PaperclipIcon, PanelLeftCloseIcon, PanelLeftOpenIcon, HistoryIcon,
 } from "lucide-react";
 import RunTracePanel from "../components/RunTracePanel";
 import TraceChip from "../components/TraceChip";
@@ -33,6 +33,8 @@ import {
 } from "../../wailsjs/go/app/App";
 import { EventsOn } from "../../wailsjs/runtime";
 import HiveBanner, { useHiveCutOff } from "../components/HiveBanner";
+import EarlierChatsPane, { useEarlierCount } from "./EarlierChats";
+import { useMembership } from "../lib/membership";
 import LiveHive from "./LiveHive";
 import LiveRun, { useRun } from "./LiveRun";
 import LiveStatus from "./LiveStatus";
@@ -181,6 +183,9 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
   const pulse = usePulse();
   const recents = useRecents(chat.sending);
   const cutOff = useHiveCutOff();
+  const { m: membership } = useMembership();
+  const earlierCount = useEarlierCount(!!membership?.joined);
+  const [earlier, setEarlier] = useState(false);
   const attention = attentionItems;
   const [draft, setDraft] = useState("");
   const composerRef = useRef<HTMLTextAreaElement>(null);
@@ -326,6 +331,7 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
   };
 
   const pickSession = (id: string) => {
+    setEarlier(false);
     setOnQueen(id === queenSession());
     chat.loadSession(id).catch(() => {});
   };
@@ -374,7 +380,7 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
         <div className="dk-ws">
           <b>SuperLeo</b>
           <button className="dk-icon" title={t("Hide sidebar")} aria-label={t("Hide sidebar")} aria-controls="desk-sidebar" aria-expanded="true" onClick={() => foldSide(true)} style={{ marginLeft: "auto" }}><PanelLeftCloseIcon size={17} /></button>
-          <button className="dk-icon" title={t("New chat")} aria-label={t("New chat")} onClick={() => { chat.newSession(); setOnQueen(false); }}><SquarePenIcon size={17} /></button>
+          <button className="dk-icon" title={t("New chat")} aria-label={t("New chat")} onClick={() => { setEarlier(false); chat.newSession(); setOnQueen(false); }}><SquarePenIcon size={17} /></button>
         </div>
         <button className={onQueen ? "dk-row on" : "dk-row"} onClick={() => pickSession(queenId)}><span className="dk-qhex">Q</span>{queenTitle(queen)}</button>
         {(needs > 0 || attentionError) && (
@@ -429,6 +435,11 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
             );
           })}
         </div>
+        {earlierCount > 0 && (
+          <button className={earlier ? "dk-row on dk-earlier-entry" : "dk-row dk-earlier-entry"} onClick={() => setEarlier(true)} data-testid="earlier-entry">
+            <HistoryIcon size={16} /><span className="dk-row-t">{t("Earlier chats on this Mac")}</span>
+          </button>
+        )}
       </aside>
 
       {!sideFolded && <div className="dk-side-resizer" role="separator" tabIndex={0}
@@ -450,11 +461,12 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
         onPointerUp={(e) => { if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId); setResizing(false); }}
         onLostPointerCapture={() => setResizing(false)}
       />}
-      <section className="cv-glass dk-chat">
+      {earlier && <EarlierChatsPane onClose={() => setEarlier(false)} />}
+      <section className="cv-glass dk-chat" hidden={earlier}>
         <header className="dk-chead">
           {sideFolded && <>
             <button className="dk-icon" title={t("Show sidebar")} aria-label={t("Show sidebar")} aria-controls="desk-sidebar" aria-expanded="false" onClick={() => foldSide(false)}><PanelLeftOpenIcon size={17} /></button>
-            <button className="dk-icon" title={t("New chat")} aria-label={t("New chat")} onClick={() => { chat.newSession(); setOnQueen(false); }}><SquarePenIcon size={17} /></button>
+            <button className="dk-icon" title={t("New chat")} aria-label={t("New chat")} onClick={() => { setEarlier(false); chat.newSession(); setOnQueen(false); }}><SquarePenIcon size={17} /></button>
           </>}
           <span className="dk-qhex big">Q</span>
           <div><b title={title}>{title}</b><small><i className={hive.role ? "dk-ok" : "dk-off"} />{status}</small></div>

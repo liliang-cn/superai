@@ -242,7 +242,6 @@
  "The idlest worker leaves the hive and its pod is deleted. Work it is doing now is handed back.": "最もアイドル状態のワーカーがハイブから離脱し、その Pod が削除されます。進行中のタスクは差し戻されます。",
  "Start a pod": "Pod を作成",
  "Delete a pod": "Pod を削除",
- "Switch backend": "バックエンドを切り替え",
  "Show the hive": "ハイブを表示",
  "Hide this pane": "このペインを非表示",
  "Resize sidebar": "サイドバーのサイズを変更",

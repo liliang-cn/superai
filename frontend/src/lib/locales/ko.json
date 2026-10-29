@@ -242,7 +242,6 @@
  "The idlest worker leaves the hive and its pod is deleted. Work it is doing now is handed back.": "가장 유휴 상태인 워커가 하이브를 떠나고 해당 Pod가 삭제됩니다. 현재 진행 중인 작업은 반환됩니다.",
  "Start a pod": "Pod 시작",
  "Delete a pod": "Pod 삭제",
- "Switch backend": "백엔드 전환",
  "Show the hive": "하이브 표시",
  "Hide this pane": "이 창 숨기기",
  "Resize sidebar": "사이드바 크기 조절",
