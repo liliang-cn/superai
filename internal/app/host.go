@@ -102,9 +102,13 @@ func hostRun(ctx context.Context, d time.Duration, argv ...string) (string, int,
 	ctx, cancel := context.WithTimeout(ctx, d)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
+	ownGroup(cmd)
 	var buf bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &buf, &buf
 	err := cmd.Run()
+	if ctx.Err() != nil {
+		reapGroup(cmd)
+	}
 	out := buf.String()
 	if len(out) > hostOutputCap {
 		out = out[len(out)-hostOutputCap:]
@@ -516,12 +520,16 @@ func (a *App) HostExec(command string, timeoutSeconds int) (HostExecResult, erro
 	defer cancel()
 	name, argv := sandbox.HostShellCommand(command) // sh, or PowerShell on Windows
 	cmd := exec.CommandContext(ctx, name, argv...)
+	ownGroup(cmd)
 	if home, err := os.UserHomeDir(); err == nil {
 		cmd.Dir = home
 	}
 	var buf bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &buf, &buf
 	err := cmd.Run()
+	if ctx.Err() != nil {
+		reapGroup(cmd)
+	}
 	r := HostExecResult{Duration: time.Since(start).Milliseconds()}
 	r.Output = buf.String()
 	if len(r.Output) > hostOutputCap {

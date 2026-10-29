@@ -728,6 +728,12 @@ func (s *Service) Stream(ctx context.Context, sessionID, message string, imagePa
 // StreamTurn runs one turn and returns the answer with the tokens it used.
 func (s *Service) StreamTurn(ctx context.Context, sessionID, message string, imagePaths []string, emit func(ev *agent.Event)) (TurnResult, error) {
 	var turn TurnResult
+	// Whatever the turn started — a shell command, an MCP call — is bound to
+	// this context, and the turn ending is the end of it: a caller that never
+	// cancels (a channel, the hive, the MCP server) must not leave a tool call
+	// running after its turn's answer, or failure, has gone out.
+	ctx, endTurn := context.WithCancel(ctx)
+	defer endTurn()
 	// The turn is an entry point's flow, or joins the one it was asked in
 	// (flow.go). Whoever streams it hears the flow first, to show and link.
 	ctx, flow := beginTurnFlow(ctx, sessionID, message)

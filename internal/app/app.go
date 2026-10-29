@@ -376,6 +376,10 @@ func (a *App) syncProxy() {
 
 // shutdown releases backend resources.
 func (a *App) Shutdown(ctx context.Context) {
+	// The turns first: what they started — shell commands above all — is
+	// bound to their contexts, and the process going away does not end a
+	// child that has a process group of its own.
+	a.stopTurns(4 * time.Second)
 	// Before the lock: stopping the cron loop must not race the service it runs
 	// its turns against. The Telegram poller is stopped first and for exactly
 	// the same reason — it may be in the middle of a turn.
@@ -1105,7 +1109,21 @@ func (a *App) ownTurn(requestID, sessionID, message string, imagePaths []string,
 		}
 
 		pulser := backend.NewPulser(func(kind, tool string, n int) { board.Pulse(taskID, kind, tool, n) })
+		// Every way out of this turn first closes the tool calls it left open,
+		// so none keeps showing as running once the turn is over.
+		var open openTools
+		closeOpen := func(reason string) {
+			for _, ev := range open.closeEvents(requestID, reason) {
+				a.emit("chat:event", ev)
+			}
+		}
 		turn, err := svc.StreamTurn(ctx, sessionID, message, imagePaths, func(ev *agent.Event) {
+			switch ev.Type {
+			case agent.EventTypeToolCall:
+				open.call(ev.ToolName)
+			case agent.EventTypeToolResult:
+				open.result(ev.ToolName)
+			}
 			if taskID != "" {
 				resultLen := 0
 				if ev.ToolResult != nil {
@@ -1165,6 +1183,7 @@ func (a *App) ownTurn(requestID, sessionID, message string, imagePaths []string,
 		// nothing in it.
 		final := turn.Text
 		if a.runCancelled(requestID) || errors.Is(err, context.Canceled) || ctx.Err() != nil {
+			closeOpen("stopped")
 			driver.Emit(backend.AvatarEvent{Type: "state", State: backend.AvatarStateIdle})
 			partial, _ := backend.SplitEmotion(final)
 			board.Finish(taskID, backend.TaskCancelled, partial, "")
@@ -1173,12 +1192,14 @@ func (a *App) ownTurn(requestID, sessionID, message string, imagePaths []string,
 		}
 
 		if err != nil {
+			closeOpen("the turn failed before this finished")
 			driver.Emit(backend.AvatarEvent{Type: "state", State: backend.AvatarStateIdle})
 			board.Finish(taskID, backend.TaskFailed, "", err.Error())
 			a.emit("chat:error", map[string]any{"requestId": requestID, "error": err.Error()})
 			return
 		}
 
+		closeOpen("the turn ended before this finished")
 		reply, emotion := backend.SplitEmotion(final)
 		if emotion != "" {
 			driver.Emit(backend.AvatarEvent{Type: "emotion", Emotion: emotion})
@@ -1312,6 +1333,22 @@ func (a *App) CancelChat(requestID string) string {
 	// gained by holding up a second stop while they do.
 	r.cancel()
 	return "ok"
+}
+
+// stopTurns cancels every running turn and waits, up to wait, for them to wind
+// down, which is when the commands they started have been signalled.
+func (a *App) stopTurns(wait time.Duration) {
+	a.CancelAllChats()
+	deadline := time.Now().Add(wait)
+	for time.Now().Before(deadline) {
+		a.runMu.Lock()
+		n := len(a.runs)
+		a.runMu.Unlock()
+		if n == 0 {
+			return
+		}
+		time.Sleep(25 * time.Millisecond)
+	}
 }
 
 // CancelAllChats stops every streaming turn — the "stop everything" the user

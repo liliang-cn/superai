@@ -3,6 +3,7 @@ import { BookmarkCheckIcon, CheckIcon, ChevronDownIcon, XIcon } from "lucide-rea
 import { ChatMessage, TraceItem } from "../lib/types";
 import { fmtK, Snap } from "../components/Reactor";
 import { browserOp } from "../lib/browser";
+import { commandLine } from "../lib/trace";
 import "./liveturn.css";
 
 /**
@@ -58,6 +59,9 @@ const clock = (ms: number) => {
 
 /** The arguments in a few words: the values, not the keys. */
 function argsLine(args: Record<string, unknown>): string {
+  // A shell call is its command, not the command and its timeout.
+  const cmd = commandLine(args, 90);
+  if (cmd) return cmd;
   const parts: string[] = [];
   for (const v of Object.values(args ?? {})) {
     if (v == null || v === "") continue;

@@ -7,6 +7,7 @@ import { loadQueenSession, queenSession } from "../lib/queenConsole";
 import { useI18n } from "../lib/i18n";
 import { useImeGuard } from "../lib/ime";
 import { visibleAnswer } from "../lib/format";
+import { stepLabel } from "../lib/trace";
 import { Response } from "@/components/ai-elements/response";
 import { say, sayDone } from "./bubbles";
 import { useRequestBrowser } from "../components/BrowserCard";
@@ -124,7 +125,8 @@ export default function Talk({ who, placeholder }: { who: Talker; placeholder: s
       EventsOn("chat:cancelled", (p: any) => { others.delete(p?.requestId); }),
       EventsOn("chat:event", (p: any) => {
         if (!live.current || p?.requestId !== live.current) return;
-        if (p.type === "tool_call" && p.tool) setBusy(t("Using {tool}…", { tool: p.tool }));
+        if (p.type === "tool_call" && p.tool) setBusy(t("Using {tool}…", { tool: stepLabel(p.tool, p.args) }));
+        else if (p.type === "tool_result") setBusy(t("Thinking…"));
         else if (p.type === "partial" && p.content) {
           raw.current += p.content;
           const v = visibleAnswer(raw.current);

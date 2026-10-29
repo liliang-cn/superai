@@ -24,7 +24,7 @@ import type { Host } from "../canvas/data";
 import { mentionsOf } from "./mentions";
 import { BubbleBrowser, useRequestBrowser } from "../components/BrowserCard";
 import { browserOp } from "../lib/browser";
-import { traceIdOf } from "../lib/trace";
+import { stepLabel, traceIdOf } from "../lib/trace";
 import TraceChip from "../components/TraceChip";
 
 
@@ -161,14 +161,16 @@ export default function Command({ view, onConversation, onTyping, hosts }: {
       credit(p);
       if (p.type === "flow") { const tid = traceIdOf(p.content); if (tid) flows.current.set(id, tid); return; }
       // Work the queen handed out is drawn on the worker doing it.
-      if (p.type === "tool_call" && p.tool && p.worker) { patch(id, { step: p.tool }); say("worker:" + p.worker, p.workerTool || p.tool, "think", 60); }
+      if (p.type === "tool_call" && p.tool && p.worker) { patch(id, { step: stepLabel(p.tool, p.args) }); say("worker:" + p.worker, p.workerTool || p.tool, "think", 60); }
       else if (p.type === "tool_call" && p.tool) {
-        patch(id, { step: p.tool });
+        patch(id, { step: stepLabel(p.tool, p.args) });
         say("queen", p.tool, "think", 60);
         // A turn in the browser shows the page under what the queen says,
         // live while it runs; the card stays with the bubble to the end.
         if (browserOp(p.tool)) attachToBubble("queen", <BubbleBrowser req={id} />);
       }
+      // A call that has answered, or that the end of the turn closed, is no longer in use.
+      else if (p.type === "tool_result") patch(id, { step: "" });
       else if (p.type === "model_wire") { const k = p.wire?.kind; if (["queued", "retry", "restart", "waiting", "error"].includes(k)) patch(id, { wire: String(p.content ?? "") }); else if (k === "first_byte" || k === "slot" || k === "request" || (k === "response" && p.wire?.status < 400)) patch(id, { wire: "" }); }
       else if (p.type === "partial" && p.content) { const r = (raw.current.get(id) ?? "") + p.content; raw.current.set(id, r); const v = visibleAnswer(r); patch(id, { live: v, step: "", wire: "" }); if (v) say("queen", v, "say", 60); }
     });
