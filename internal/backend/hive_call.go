@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/liliang-cn/agent-go/v3/pkg/domain"
+	"github.com/liliang-cn/agent-go/v3/pkg/trace"
 
 	"github.com/google/uuid"
 )
@@ -126,11 +127,13 @@ type workerTarget struct {
 
 var workerHTTP = &http.Client{
 	// No overall Timeout: the SSE body legitimately stays open as long as the
-	// turn runs. Connect and header waits are bounded instead.
-	Transport: &http.Transport{
+	// turn runs. Connect and header waits are bounded instead. Every request
+	// carries the traceparent of the context it was made in, and a
+	// traceparent the worker answers with is noted as its child.
+	Transport: trace.HTTPTransport(&http.Transport{
 		ResponseHeaderTimeout: 30 * time.Second,
 		IdleConnTimeout:       90 * time.Second,
-	},
+	}),
 }
 
 type workerEvent struct {
@@ -278,7 +281,17 @@ func askWorker(ctx context.Context, t workerTarget, prompt string, progress func
 		streamErr <- sc.Err()
 	}()
 
-	raw, err := wire.Call(ctx, "SendChat", []any{session, prompt, []string{}})
+	// The order carries the flow it was given in (traceparent: a header on
+	// HTTP, a field of the call on the agent link), and the worker answers
+	// with the span its turn will be. That span is noted as this call's
+	// child, and the worker as the peer that holds the rest of the flow.
+	callCtx, links := trace.WithLinks(ctx)
+	raw, err := wire.Call(callCtx, "SendChat", []any{session, prompt, []string{}})
+	remote := links.List()
+	for _, tp := range remote {
+		trace.NoteChild(ctx, tp)
+	}
+	notePeer(ctx, t.name, strings.Join(remote, ","))
 	if err != nil {
 		return fail("the worker refused the command: %v", err)
 	}

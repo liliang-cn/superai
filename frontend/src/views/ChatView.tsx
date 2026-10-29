@@ -7,6 +7,7 @@ import { copyText, engineByline, withoutCallNotes } from "../lib/format";
 import AttachmentChips from "../components/AttachmentChips";
 import { SentMessage } from "../components/SentFiles";
 import RunTracePanel from "../components/RunTracePanel";
+import TraceChip from "../components/TraceChip";
 import { AgentMenu, AddressedBanner } from "../components/AgentMenu";
 import { useAgentMentions } from "../lib/useAgentMentions";
 import {
@@ -291,6 +292,7 @@ export default function ChatView({
                                   name="SuperLeo"
                                   meta={bylineMeta(m)}
                                   engine={engineByline(m)}
+                                  trace={m.traceId ? <TraceChip traceId={m.traceId} session={chat.sessionId} /> : undefined}
                                 />
                                 {/* Browser calls leave the step list for
                                     their own card, which shows the page. */}

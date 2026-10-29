@@ -12,7 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net"
 	"strings"
 	"sync"
@@ -75,7 +75,7 @@ func (s *Server) logf(format string, args ...any) {
 		s.Logf(format, args...)
 		return
 	}
-	log.Printf(format, args...)
+	slog.Info(fmt.Sprintf(format, args...), "module", "relay")
 }
 
 // Serve accepts connections until ln is closed.

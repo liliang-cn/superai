@@ -23,7 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -173,7 +173,7 @@ func (w *alarmWatcher) pushAll(ctx context.Context, version string) {
 	}
 	store, err := w.devices()
 	if err != nil {
-		log.Printf("alarms: no devices to push to: %v", err)
+		slog.WarnContext(ctx, "alarms: no devices to push to", "error", err)
 		return
 	}
 	data := map[string]any{"kind": "alarms", "version": version}
@@ -274,7 +274,7 @@ func (a *App) notedAlarmsVersion(ctx context.Context) (string, bool) {
 	a.alarmsMu.Lock()
 	if why != a.alarmsErr {
 		if why != "" {
-			log.Printf("alarms: list_alarms: %s", why)
+			slog.WarnContext(ctx, "alarms: list_alarms failed", "why", why)
 		}
 		a.alarmsErr = why
 	}
@@ -357,7 +357,7 @@ func (a *App) alarmPusher() alarmPusher {
 		missing = append(missing, "APNS_KEY_ID")
 	}
 	if len(missing) > 0 {
-		log.Printf("apns: pushes disabled: %s not set", strings.Join(missing, ", "))
+		slog.Info("apns: pushes disabled", "missing", strings.Join(missing, ", "))
 		return nil
 	}
 	c, err := apns.New(apns.Config{
@@ -369,10 +369,10 @@ func (a *App) alarmPusher() alarmPusher {
 		Env:     cfg.Env,
 	})
 	if err != nil {
-		log.Printf("apns: pushes disabled: %v", err)
+		slog.Warn("apns: pushes disabled", "error", err)
 		return nil
 	}
-	log.Printf("apns: pushes enabled for %s (default %s)", cfg.Topic, cfg.Env)
+	slog.Info("apns: pushes enabled", "topic", cfg.Topic, "env", cfg.Env)
 	a.pushV = c
 	return c
 }

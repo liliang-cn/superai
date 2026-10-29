@@ -332,11 +332,21 @@ func addAskMCPTools(s *mcp.Server, app *App) {
 				}
 			}
 		}
+		// The caller's flow (agent-go puts it in params._meta) is continued
+		// by the turn, and the span it will be goes back in the result's
+		// _meta, so the caller's trace reaches into this one (flow_link.go).
+		if strings.TrimSpace(in.Conversation) == "" {
+			in.Conversation = askNewConversationPrefix + uuid.NewString()
+		}
+		answered := acceptMCPFlow(req, in.Conversation)
 		out, err := app.ask(ctx, in, progress)
 		if err != nil {
 			return toolErr(err.Error())
 		}
-		return toolOK(out)
+		if answered == "" {
+			return toolOK(out)
+		}
+		return &mcp.CallToolResult{Meta: mcp.Meta{"traceparent": answered}}, out, nil
 	})
 
 	mcp.AddTool(s, &mcp.Tool{

@@ -5,7 +5,7 @@ package app
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -79,7 +79,7 @@ func (a *App) syncAbilities(ctx context.Context, ann *backend.Announcer) {
 		}
 		applied = ab.Hash
 		a.setAbilities(st)
-		log.Printf("hive: abilities from the queen: skills %v, mcp %v, skipped %v", res.Skills, res.MCP, res.Skipped)
+		slog.InfoContext(ctx, "abilities from the queen", "module", "hive", "skills", res.Skills, "mcp", res.MCP, "skipped", res.Skipped)
 	}
 }
 

@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"strings"
 	"sync"
 	"time"
@@ -553,7 +553,7 @@ func (a *App) routeToRemote(requestID, sessionID, name, prompt string) {
 // over its bookkeeping would take away the thing that did work.
 func (a *App) recordRoutedExchange(sessionID, name, prompt, reply string) {
 	if err := a.appendExchange(sessionID, "@"+name+" "+prompt, reply); err != nil {
-		log.Printf("superleo: could not record the @%s exchange in %s: %v", name, sessionID, err)
+		slog.Warn("could not record the routed exchange", "engine", name, "session", sessionID, "error", err)
 	}
 }
 

@@ -22,7 +22,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -469,9 +469,9 @@ func autoUpgradeCCHooks() {
 	added, err := installCCHooks(path, bin)
 	switch {
 	case err != nil:
-		log.Printf("cc relay: upgrading the Claude Code hooks in %s: %v", path, err)
+		slog.Warn("cc relay: upgrading the Claude Code hooks", "path", path, "error", err)
 	case len(added) > 0:
-		log.Printf("cc relay: Claude Code hooks %s set in %s (new sessions pick them up)", strings.Join(added, ", "), path)
+		slog.Info("cc relay: Claude Code hooks set; new sessions pick them up", "hooks", strings.Join(added, ", "), "path", path)
 	}
 }
 

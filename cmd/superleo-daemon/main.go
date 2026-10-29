@@ -28,7 +28,7 @@ import (
 	"flag"
 	"fmt"
 	_ "github.com/liliang-cn/superleo/internal/brand" // the old SuperLeo names keep working
-	"log"
+	"log/slog"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -49,19 +49,20 @@ func main() {
 	)
 	flag.Parse()
 
+	backend.SetupLogging("daemon")
 	if *logPath != "" {
 		f, err := os.OpenFile(*logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 		if err != nil {
-			log.Fatalf("open log %s: %v", *logPath, err)
+			slog.Error("open log", "path", *logPath, "error", err)
+			os.Exit(1)
 		}
 		defer f.Close()
-		log.SetOutput(f)
+		backend.SetupLogging("daemon", f)
 	}
-	log.SetPrefix("superleo-daemon ")
 
 	settings, err := backend.LoadSettings()
 	if err != nil {
-		log.Printf("settings: %v (continuing with defaults)", err)
+		slog.Warn("settings unreadable, continuing with defaults", "error", err)
 	}
 
 	// Nothing here needs a browser, and launching Chrome costs about a second of
@@ -72,7 +73,8 @@ func main() {
 
 	svc, err := backend.NewService(settings)
 	if err != nil {
-		log.Fatalf("build agent: %v", err)
+		slog.Error("build agent", "error", err)
+		os.Exit(1)
 	}
 	defer svc.Close()
 
@@ -90,14 +92,16 @@ func main() {
 		}),
 	)
 	if err != nil {
-		log.Fatalf("build scheduler: %v", err)
+		slog.Error("build scheduler", "error", err)
+		os.Exit(1)
 	}
 
 	// The one-shot modes only manage or run on demand, so they work even while
 	// another process owns the timers.
 	if *list || *once {
 		if err := sch.StartManageOnly(); err != nil {
-			log.Fatalf("open scheduler: %v", err)
+			slog.Error("open scheduler", "error", err)
+			os.Exit(1)
 		}
 		defer func() { _ = sch.Stop() }()
 		if *list {
@@ -112,7 +116,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 	ownTimers(ctx, svc, sch)
-	log.Print("stopping")
+	slog.Info("stopping")
 }
 
 // ownTimers runs the cron loop for as long as this process holds the lock,
@@ -129,14 +133,14 @@ func ownTimers(ctx context.Context, svc *backend.Service, sch *agent.PromptSched
 	for {
 		lock, err := backend.AcquireScheduleLock()
 		if err != nil {
-			log.Printf("schedule lock: %v (retrying in %s)", err, retry)
+			slog.WarnContext(ctx, "schedule lock", "error", err, "retry_in", retry)
 		} else if lock != nil {
 			runWithLock(ctx, svc, sch, lock)
 			return
 		} else if !waiting {
 			// Logged once, not every retry: this is the normal state while the
 			// user has the app open.
-			log.Printf("pid %d owns the timers; waiting for it to release them", backend.ScheduleLockHolder())
+			slog.InfoContext(ctx, "another process owns the timers; waiting for it to release them", "pid", backend.ScheduleLockHolder())
 			waiting = true
 		}
 
@@ -154,7 +158,7 @@ func runWithLock(ctx context.Context, svc *backend.Service, sch *agent.PromptSch
 	defer lock.Release()
 
 	if err := sch.Start(); err != nil {
-		log.Printf("start scheduler: %v", err)
+		slog.ErrorContext(ctx, "start scheduler", "error", err)
 		return
 	}
 	defer func() { _ = sch.Stop() }()
@@ -165,9 +169,9 @@ func runWithLock(ctx context.Context, svc *backend.Service, sch *agent.PromptSch
 	defer svc.UsePromptScheduler(nil)
 
 	schedules, _ := sch.List()
-	log.Printf("owning timers for %d schedule(s)", len(schedules))
+	slog.InfoContext(ctx, "owning timers", "schedules", len(schedules))
 	for _, s := range schedules {
-		log.Printf("  %s  %s  next=%s  %s", s.ID[:8], s.Schedule, formatTime(s.NextRun), s.Prompt)
+		slog.InfoContext(ctx, "schedule", "id", s.ID[:8], "cron", s.Schedule, "next", formatTime(s.NextRun), "prompt", s.Prompt)
 	}
 
 	<-ctx.Done()
@@ -176,7 +180,8 @@ func runWithLock(ctx context.Context, svc *backend.Service, sch *agent.PromptSch
 func printSchedules(sch *agent.PromptScheduler) {
 	schedules, err := sch.List()
 	if err != nil {
-		log.Fatalf("list: %v", err)
+		slog.Error("list schedules", "error", err)
+		os.Exit(1)
 	}
 	if len(schedules) == 0 {
 		fmt.Println("no schedules")
@@ -197,30 +202,31 @@ func printSchedules(sch *agent.PromptScheduler) {
 func runAllNow(sch *agent.PromptScheduler) {
 	schedules, err := sch.List()
 	if err != nil {
-		log.Fatalf("list: %v", err)
+		slog.Error("list schedules", "error", err)
+		os.Exit(1)
 	}
 	ran := 0
 	for _, s := range schedules {
 		if !s.Enabled {
 			continue
 		}
-		log.Printf("running %s: %s", s.ID[:8], s.Prompt)
+		slog.Info("running schedule", "id", s.ID[:8], "prompt", s.Prompt)
 		if _, err := sch.RunNow(s.ID); err != nil {
-			log.Printf("  failed: %v", err)
+			slog.Warn("schedule run failed", "id", s.ID[:8], "error", err)
 		}
 		ran++
 	}
 	if ran == 0 {
-		log.Print("nothing enabled to run")
+		slog.Info("nothing enabled to run")
 	}
 }
 
 func logRun(run agent.PromptRun) {
 	if run.Err != nil {
-		log.Printf("run failed after %s: %v — %s", run.Duration.Round(time.Millisecond), run.Err, run.Prompt)
+		slog.Warn("run failed", "took", run.Duration.Round(time.Millisecond), "error", run.Err, "prompt", run.Prompt)
 		return
 	}
-	log.Printf("run ok in %s: %s", run.Duration.Round(time.Millisecond), firstLine(run.Answer))
+	slog.Info("run ok", "took", run.Duration.Round(time.Millisecond), "answer", firstLine(run.Answer))
 }
 
 // notify posts a desktop notification through AppleScript.
@@ -244,7 +250,7 @@ func notify(run agent.PromptRun) {
 		quoteAppleScript(truncate(firstLine(run.Prompt), 60)),
 	)
 	if err := exec.Command("osascript", "-e", script).Run(); err != nil {
-		log.Printf("notification failed: %v", err)
+		slog.Warn("notification failed", "error", err)
 	}
 }
 

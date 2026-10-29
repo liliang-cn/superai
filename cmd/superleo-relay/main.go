@@ -10,8 +10,9 @@ package main
 import (
 	"flag"
 	_ "github.com/liliang-cn/superleo/internal/brand" // the old SuperLeo names keep working
-	"log"
+	"log/slog"
 	"net"
+	"os"
 
 	"github.com/liliang-cn/superleo/internal/relay"
 )
@@ -23,8 +24,11 @@ func main() {
 
 	ln, err := net.Listen("tcp", *addr)
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("cannot listen", "addr", *addr, "error", err)
+		os.Exit(1)
 	}
-	log.Printf("superleo-relay: %s for *.%s", ln.Addr(), *domain)
-	log.Fatal((&relay.Server{Domain: *domain}).Serve(ln))
+	slog.Info("relay listening", "addr", ln.Addr().String(), "domain", "*."+*domain)
+	err = (&relay.Server{Domain: *domain}).Serve(ln)
+	slog.Error("serve", "error", err)
+	os.Exit(1)
 }

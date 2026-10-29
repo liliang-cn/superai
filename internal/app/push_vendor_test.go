@@ -162,7 +162,7 @@ func TestUnconfiguredVendorsSayOnceAndDrop(t *testing.T) {
 				t.Errorf("%s: %v", p, err)
 			}
 		}
-		if n := strings.Count(buf.String(), "provider "+p+" not configured"); n != 1 {
+		if n := strings.Count(buf.String(), "provider not configured; device gets no push until it is provider="+p+" device=d1"); n != 1 {
 			t.Errorf("%s logged %d times: %s", p, n, buf.String())
 		}
 	}

@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -107,7 +107,7 @@ func StartCLIProxy(port int) (*CLIProxy, error) {
 		}
 		cfg.APIKeys = []string{key}
 		if serr := cpaconfig.SaveConfigPreserveComments(cfgPath, cfg); serr != nil {
-			log.Printf("superleo: cliproxy: persist generated api key: %v", serr)
+			slog.Warn("cliproxy: persist generated api key failed", "error", serr)
 		}
 	}
 

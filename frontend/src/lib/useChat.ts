@@ -13,6 +13,7 @@ import {
   TraceItem,
 } from "./types";
 import { visibleAnswer } from "./format";
+import { traceIdOf } from "./trace";
 
 /**
  * Where the id of the conversation on screen is kept across reloads.
@@ -260,6 +261,12 @@ function lintRetryLine(content: string | undefined): string {
         patchMessage(askId, (m) => (m.engine === engine ? m : { ...m, engine }));
       }
       switch (ev.type) {
+        case "flow": {
+          // The turn's flow, first thing it says: its traceparent.
+          const traceId = traceIdOf(ev.content);
+          if (traceId) patchMessage(askId, (m) => (m.traceId === traceId ? m : { ...m, traceId }));
+          break;
+        }
         case "partial": {
           if (!ev.content) return;
           const raw = (streamed.current.get(askId) || "") + ev.content;

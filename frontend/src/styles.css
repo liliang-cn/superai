@@ -4176,6 +4176,20 @@ code, kbd, pre, .mono { font-family: var(--font-mono); }
 .calendar-agenda h2 { font-size:16px; font-weight:600; margin:0 0 14px; color:var(--text-0); }
 .calendar-agenda h2 span { font-size:12px; color:var(--text-2); margin-left:8px; }
 
+/* An answer's trace id: the flow it ran in. Small, mono, out of the way. */
+.trace-chip { display: inline-flex; align-items: center; gap: 1px; margin-top: 4px; vertical-align: middle; font-family: var(--font-mono); font-size: 10px; line-height: 1; color: var(--muted-foreground, #6b7280); }
+.trace-chip button { all: unset; cursor: pointer; padding: 2px 4px; border-radius: 4px; }
+.trace-chip-id { letter-spacing: .02em; }
+.trace-chip button:hover { color: var(--foreground, #111827); background: color-mix(in srgb, currentColor 8%, transparent); }
+.trace-chip button:focus-visible { outline: 1px solid currentColor; }
+.msg-byline .trace-chip { margin-top: 0; margin-left: 6px; }
+/* A flow's runs and CortexDB calls in the waterfall. */
+.cr-wf .sw.run, .cr-wf-row.run .cr-wf-span { background: rgba(var(--cr-amber-rgb), .22); box-shadow: inset 0 0 0 1px var(--cr-amber); }
+.cr-wf-row.run.failed .cr-wf-span { box-shadow: inset 0 0 0 1px var(--cr-rose); }
+.cr-wf-row.run .cr-wf-label b { color: var(--cr-amber); }
+.cr-wf .sw.rpc, .cr-wf-row.rpc .cr-wf-span { background: var(--cr-dim); }
+.cr-wf-row.rpc.failed .cr-wf-span { background: var(--cr-rose); }
+
 /* The files a sent message carried, above its words (SentFiles). */
 .sent-files { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
 .sent-files:last-child { margin-bottom: 0; }

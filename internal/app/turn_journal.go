@@ -16,8 +16,9 @@ package app
 // that never ends on someone's screen.
 
 import (
+	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"slices"
 	"strings"
 	"sync"
@@ -146,12 +147,12 @@ func (j *turnJournal) record(name string, p map[string]any) {
 	if who == "" {
 		who = lastOf(t.Engines)
 	}
-	tag := fmt.Sprintf("turn %s", shortID(id))
+	turn := shortID(id)
 	switch name {
 	case "chat:turn":
 		t.Message = cliClip(str("message"), 200)
 		j.note(t, now, TraceEvent{Name: name, Text: t.Message})
-		log.Printf("%s start in %s: %q", tag, t.Session, cliClip(str("message"), 80))
+		slog.Info("turn started", "turn", turn, "session", t.Session, "message", cliClip(str("message"), 80))
 	case "chat:event":
 		typ := str("type")
 		switch typ {
@@ -164,7 +165,7 @@ func (j *turnJournal) record(name string, p map[string]any) {
 			if t.Chars == 0 && c != "" {
 				t.FirstWordsMs = now.Sub(t.started).Milliseconds()
 				j.note(t, now, TraceEvent{Name: name, Type: "first_words", Engine: who})
-				log.Printf("%s first words after %s%s", tag, now.Sub(t.started).Round(100*time.Millisecond), byWhom(who))
+				slog.Info("turn first words", "turn", turn, "after", now.Sub(t.started).Round(100*time.Millisecond), "engine", who)
 			}
 			t.Chars += len([]rune(c))
 			t.last, t.quietSaid = now, false
@@ -172,7 +173,7 @@ func (j *turnJournal) record(name string, p map[string]any) {
 			t.Tools++
 			tool := str("tool")
 			j.note(t, now, TraceEvent{Name: name, Type: typ, Engine: who, Tool: tool})
-			log.Printf("%s tool %s%s", tag, tool, byWhom(who))
+			slog.Debug("turn tool call", "turn", turn, "tool", tool, "engine", who)
 		case "tool_result":
 			ok := true
 			if r, _ := p["result"].(map[string]any); r != nil {
@@ -183,7 +184,7 @@ func (j *turnJournal) record(name string, p map[string]any) {
 			e := TraceEvent{Name: name, Type: typ, Engine: who, Tool: str("tool")}
 			if !ok {
 				e.Text = "failed"
-				log.Printf("%s tool %s failed%s", tag, e.Tool, byWhom(who))
+				slog.Warn("turn tool failed", "turn", turn, "tool", e.Tool, "engine", who)
 			}
 			j.note(t, now, e)
 		case "model_wire":
@@ -192,12 +193,16 @@ func (j *turnJournal) record(name string, p map[string]any) {
 			c := cliClip(str("content"), 300)
 			j.note(t, now, TraceEvent{Name: name, Type: typ, Engine: who, Text: c})
 			if wireWorthALine(p["wire"]) {
-				log.Printf("%s model: %s", tag, cliClip(c, 240))
+				slog.Warn("turn model call", "turn", turn, "wire", cliClip(c, 240), "engine", who)
 			}
 		case "state_update", "workflow_error", "workflow_blocked":
 			c := cliClip(str("content"), 300)
 			j.note(t, now, TraceEvent{Name: name, Type: typ, Engine: who, Text: c})
-			log.Printf("%s %s%s", tag, cliClip(c, 200), byWhom(who))
+			level := slog.LevelInfo
+			if typ != "state_update" {
+				level = slog.LevelWarn
+			}
+			slog.Log(context.Background(), level, "turn "+typ, "turn", turn, "content", cliClip(c, 200), "engine", who)
 		default:
 			// thinking, traces, workflow steps: a step, not worth a line.
 			t.last, t.quietSaid = now, false
@@ -215,23 +220,25 @@ func (j *turnJournal) record(name string, p map[string]any) {
 			e.Text = t.Error
 		}
 		j.note(t, now, e)
-		line := fmt.Sprintf("%s %s in %s", tag, t.State, now.Sub(t.started).Round(100*time.Millisecond))
+		attrs := []any{"turn", turn, "state", t.State, "took", now.Sub(t.started).Round(100 * time.Millisecond)}
 		if t.By != "" {
-			line += " by " + t.By
+			attrs = append(attrs, "by", t.By)
 		}
 		if len(t.Engines) > 1 {
-			line += " (tried " + strings.Join(t.Engines, " → ") + ")"
+			attrs = append(attrs, "tried", strings.Join(t.Engines, " → "))
 		}
 		if t.Tools > 0 {
-			line += fmt.Sprintf(", %d tools", t.Tools)
+			attrs = append(attrs, "tools", t.Tools)
 		}
 		if t.CostUSD > 0 {
-			line += fmt.Sprintf(", $%.4f", t.CostUSD)
+			attrs = append(attrs, "cost_usd", fmt.Sprintf("%.4f", t.CostUSD))
 		}
+		level := slog.LevelInfo
 		if t.Error != "" {
-			line += ": " + cliClip(t.Error, 200)
+			level = slog.LevelWarn
+			attrs = append(attrs, "error", cliClip(t.Error, 200))
 		}
-		log.Print(line)
+		slog.Log(context.Background(), level, "turn "+t.State, attrs...)
 	}
 }
 
@@ -263,13 +270,6 @@ func wireWorthALine(raw any) bool {
 	return kind != ""
 }
 
-func byWhom(engine string) string {
-	if engine == "" {
-		return ""
-	}
-	return " [" + engine + "]"
-}
-
 // turnByline is who answered, as the log and the trace say it.
 func turnByline(engine, standInFor string) string {
 	switch {
@@ -284,18 +284,26 @@ func turnByline(engine, standInFor string) string {
 // watchQuiet logs a turn that has gone quiet, once each time it does.
 func (j *turnJournal) watchQuiet() {
 	for range time.Tick(journalQuietTick) {
-		for _, line := range j.sweepQuiet(time.Now()) {
-			log.Print(line)
+		for _, q := range j.sweepQuiet(time.Now()) {
+			slog.Warn("turn quiet", "turn", q.Turn, "quiet", q.Quiet, "running", q.Running, "last", q.Last, "engine", q.Engine)
 		}
 	}
 }
 
-// sweepQuiet is what watchQuiet says at now: a line for each running turn
-// that has gone quiet since it last said one.
-func (j *turnJournal) sweepQuiet(now time.Time) []string {
+// quietTurn is a running turn that has gone quiet: how long for, how long it
+// has been running, and the last thing it did and who did it.
+type quietTurn struct {
+	Turn           string
+	Quiet, Running time.Duration
+	Last, Engine   string
+}
+
+// sweepQuiet is what watchQuiet says at now: one for each running turn that
+// has gone quiet since it last said one.
+func (j *turnJournal) sweepQuiet(now time.Time) []quietTurn {
 	j.mu.Lock()
 	defer j.mu.Unlock()
-	var out []string
+	var out []quietTurn
 	for _, id := range j.order {
 		t := j.turns[id]
 		if t.State != "running" || t.quietSaid || now.Sub(t.last) < journalQuietFor {
@@ -307,8 +315,8 @@ func (j *turnJournal) sweepQuiet(now time.Time) []string {
 			e := t.Events[n-1]
 			last = strings.Join(strings.Fields(e.Name+" "+e.Type+" "+e.Tool+" "+cliClip(e.Text, 80)), " ")
 		}
-		out = append(out, fmt.Sprintf("turn %s quiet for %s, running %s; last: %s%s", shortID(id), now.Sub(t.last).Round(time.Second),
-			now.Sub(t.started).Round(time.Second), last, byWhom(lastOf(t.Engines))))
+		out = append(out, quietTurn{Turn: shortID(id), Quiet: now.Sub(t.last).Round(time.Second),
+			Running: now.Sub(t.started).Round(time.Second), Last: last, Engine: lastOf(t.Engines)})
 	}
 	return out
 }

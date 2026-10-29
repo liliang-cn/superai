@@ -27,7 +27,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -96,7 +96,7 @@ func ensureHiveKey() string {
 	_, _ = rand.Read(b)
 	k := hex.EncodeToString(b)
 	if err := os.WriteFile(hiveKeyPath(), []byte(k+"\n"), 0o600); err != nil {
-		log.Printf("hive: could not keep the hive key: %v", err)
+		slog.Warn("could not keep the hive key", "module", "hive", "error", err)
 	}
 	return k
 }
@@ -257,10 +257,10 @@ func (a *App) stepDownToLanQueen(queen string, term int64, link string) {
 	if !ok || next.Hive.Role != backend.HiveRoleQueen {
 		return
 	}
-	log.Printf("hive: %s is queen on term %d; this one steps down and joins her", queen, term)
+	slog.Info("another member is queen on a later term; this one steps down and joins her", "module", "hive", "queen", queen, "term", term)
 	next.Hive.Role = ""
 	if err := a.SaveSettings(next); err != nil {
-		log.Printf("hive: could not step down: %v", err)
+		slog.Error("could not step down", "module", "hive", "error", err)
 		return
 	}
 	go a.RunAgentLink(context.Background(), AgentLinkOptions{Core: link, Token: hiveKey(), Name: next.Hive.Self()})
@@ -282,7 +282,7 @@ func (a *App) HiveRoster(r LanRoster) (map[string]any, error) {
 	}
 	if r.Devices != nil {
 		if err := adoptDevices(r.Devices); err != nil {
-			log.Printf("hive: could not keep the queen's devices: %v", err)
+			slog.Warn("could not keep the queen's devices", "module", "hive", "error", err)
 		}
 	}
 	_, link := doorPorts()
@@ -327,11 +327,11 @@ func (a *App) lanElect(name string, skip map[string]bool) (next LanMember, self,
 	a.lanHive.roster = r
 	a.lanHive.mu.Unlock()
 	if pick.Name == name {
-		log.Printf("hive: the queen is not answering; this member is queen now (term %d)", term)
+		slog.Info("the queen is not answering; this member is queen now", "module", "hive", "term", term)
 		a.becomeLanQueen(term)
 		return next, true, true
 	}
-	log.Printf("hive: the queen is not answering; %s is queen now (term %d)", pick.Name, term)
+	slog.Info("the queen is not answering; another member is queen now", "module", "hive", "queen", pick.Name, "term", term)
 	return next, false, true
 }
 
@@ -356,7 +356,7 @@ func (a *App) becomeLanQueen(term int64) {
 	next.Hive.Role = backend.HiveRoleQueen
 	next.Hive.Standalone = false
 	if err := a.SaveSettings(next); err != nil {
-		log.Printf("hive: could not take over as queen: %v", err)
+		slog.Error("could not take over as queen", "module", "hive", "error", err)
 		return
 	}
 	a.emit("hosts:changed", nil)

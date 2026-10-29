@@ -22,7 +22,7 @@ import (
 	"fmt"
 	_ "github.com/liliang-cn/superleo/internal/brand" // the old SuperLeo names keep working
 	"io"
-	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"strings"
@@ -96,12 +96,11 @@ func main() {
 	if !*browser {
 		_ = os.Setenv("SUPERLEO_NO_BROWSER", "1")
 	}
-	log.SetOutput(os.Stderr)
-	log.SetPrefix("superleo ")
+	backend.SetupLogging("cli")
 
 	settings, err := backend.LoadSettings()
 	if err != nil {
-		log.Printf("settings: %v (continuing with defaults)", err)
+		slog.Warn("settings unreadable, continuing with defaults", "error", err)
 	}
 	backend.InstallProxy()
 	backend.ApplyProxy(settings.Proxy)
@@ -156,7 +155,7 @@ func main() {
 		tools = append(tools, ev.ToolName)
 		mu.Unlock()
 		if *verbose {
-			log.Printf("tool: %s", ev.ToolName)
+			slog.InfoContext(ctx, "tool call", "tool", ev.ToolName)
 		}
 	})
 

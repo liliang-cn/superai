@@ -30,7 +30,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"sort"
 	"strings"
@@ -311,7 +311,7 @@ func (w *fireWatcher) check(ctx context.Context) {
 	}
 	for _, f := range fs {
 		if err := w.post(fireNotice(f, now.Location())); err != nil {
-			log.Printf("schedule: posting %s: %v", field(f, "id"), err)
+			slog.WarnContext(ctx, "schedule: posting a fire", "id", field(f, "id"), "error", err)
 		}
 	}
 }
@@ -362,7 +362,7 @@ func (a *App) notedFires(ctx context.Context, from, to time.Time) ([]map[string]
 	a.firesMu.Lock()
 	if why != a.firesErr {
 		if why != "" {
-			log.Printf("schedule: list_fires: %s", why)
+			slog.WarnContext(ctx, "schedule: list_fires failed", "why", why)
 		}
 		a.firesErr = why
 	}

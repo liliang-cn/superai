@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"os/exec"
 	"sort"
 	"strconv"
@@ -263,7 +263,7 @@ func (r *cliReach) deliver(ctx context.Context, cli, session, text string) (CCDe
 		if err := r.typeTmux(spot.Pane, text); err == nil {
 			return CCDelivery{Via: "tmux", Immediate: true}, nil
 		} else {
-			log.Printf("session reply: typing into tmux pane %s: %v", spot.Pane, err)
+			slog.WarnContext(ctx, "session reply: typing into tmux pane", "pane", spot.Pane, "error", err)
 		}
 	}
 	at := reach.For(sightings, r.liveTTYs(), key)
@@ -276,7 +276,7 @@ func (r *cliReach) deliver(ctx context.Context, cli, session, text string) (CCDe
 		if err := r.typeITerm(ctx, at.TTY, text); err == nil {
 			return CCDelivery{Via: "terminal", Immediate: true}, nil
 		} else {
-			log.Printf("session reply: typing into %s: %v", at.TTY, err)
+			slog.WarnContext(ctx, "session reply: typing into terminal", "tty", at.TTY, "error", err)
 		}
 	}
 	return CCDelivery{}, errors.New("cannot type into that session's terminal (tmux and iTerm2 can be reached; this one is neither)")

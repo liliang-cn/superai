@@ -1,7 +1,7 @@
 package app
 
 import (
-	"log"
+	"log/slog"
 
 	"github.com/liliang-cn/superleo/internal/backend"
 )
@@ -29,7 +29,7 @@ func (a *App) startTelegram() {
 		a.mu.Lock()
 		a.telegramErr = err.Error()
 		a.mu.Unlock()
-		log.Printf("superleo: telegram not started: %v", err)
+		slog.Warn("telegram not started", "error", err)
 		return
 	}
 	if bridge == nil {
@@ -44,7 +44,7 @@ func (a *App) startTelegram() {
 	if err != nil {
 		a.telegramErr = err.Error()
 		a.mu.Unlock()
-		log.Printf("superleo: telegram not started: %v", err)
+		slog.Warn("telegram not started", "error", err)
 		return
 	}
 	a.telegramErr = ""
@@ -52,12 +52,12 @@ func (a *App) startTelegram() {
 	a.mu.Unlock()
 
 	if started {
-		log.Printf("superleo: telegram bridge polling")
+		slog.Info("telegram bridge polling")
 	} else {
 		// Not an error, and said plainly so it is not read as one: the other
 		// process is answering, and this one would have split the updates with
 		// it. See backend/filelock.go.
-		log.Printf("superleo: telegram bridge idle — another process holds the poll")
+		slog.Info("telegram bridge idle: another process holds the poll")
 	}
 }
 

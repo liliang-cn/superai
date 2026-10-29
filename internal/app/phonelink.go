@@ -26,7 +26,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"math/big"
 	"net"
 	"net/http"
@@ -255,7 +255,7 @@ func (a *App) ensurePhoneLink() (*phoneLink, error) {
 	go func() {
 		defer close(p.done)
 		if err := p.srv.Serve(tlsLn); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Printf("phone link: %v", err)
+			slog.Warn("phone link", "error", err)
 		}
 	}()
 	if p.relay != "" {
@@ -291,7 +291,7 @@ func (a *App) startPhoneLinkIfPaired() {
 		return
 	}
 	if _, err := a.ensurePhoneLink(); err != nil {
-		log.Printf("phone link: %v", err)
+		slog.Warn("phone link", "error", err)
 	}
 }
 

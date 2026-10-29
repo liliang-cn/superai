@@ -17,7 +17,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"os"
 	"os/exec"
 	"regexp"
@@ -481,7 +481,7 @@ func (a *App) HostService(name, action string) (string, error) {
 	default:
 		return "", fmt.Errorf("services are not managed on %s", runtime.GOOS)
 	}
-	log.Printf("host: %s %s", action, name)
+	slog.Info("host service", "action", action, "service", name)
 	out, code, err := hostRun(ctx, 60*time.Second, argv...)
 	if err != nil {
 		return out, err
@@ -537,6 +537,6 @@ func (a *App) HostExec(command string, timeoutSeconds int) (HostExecResult, erro
 	case err != nil:
 		return r, err
 	}
-	log.Printf("host: ran a command (%d bytes), exit %d in %dms", len(command), r.Exit, r.Duration)
+	slog.Info("host: ran a command", "bytes", len(command), "exit", r.Exit, "ms", r.Duration)
 	return r, nil
 }

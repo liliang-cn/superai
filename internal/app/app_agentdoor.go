@@ -16,7 +16,7 @@ package app
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"sort"
@@ -77,7 +77,7 @@ func (a *App) openAgentDoor(ctx context.Context) {
 	linkAddr := fmt.Sprintf("0.0.0.0:%d", linkPort)
 	lis, err := net.Listen("tcp", linkAddr)
 	if err != nil {
-		log.Printf("agent door: %v", err)
+		slog.WarnContext(ctx, "agent door", "error", err)
 		a.agentDoor.set(0, 0, err)
 		return
 	}
@@ -87,9 +87,9 @@ func (a *App) openAgentDoor(ctx context.Context) {
 		s.GracefulStop()
 	}()
 	go func() {
-		log.Printf("agent door: agent link on %s", linkAddr)
+		slog.InfoContext(ctx, "agent door: agent link listening", "addr", linkAddr)
 		if err := s.Serve(lis); err != nil {
-			log.Printf("agent door: %v", err)
+			slog.WarnContext(ctx, "agent door", "error", err)
 		}
 	}()
 
@@ -100,7 +100,7 @@ func (a *App) openAgentDoor(ctx context.Context) {
 	srv := &http.Server{Addr: fmt.Sprintf("0.0.0.0:%d", claimPort), Handler: mux, ReadHeaderTimeout: 10 * time.Second}
 	claim, err := net.Listen("tcp", srv.Addr)
 	if err != nil {
-		log.Printf("agent door: %v", err)
+		slog.WarnContext(ctx, "agent door", "error", err)
 		a.agentDoor.set(0, linkPort, err)
 		return
 	}
@@ -207,9 +207,9 @@ func (a *App) queenForWorkers(who string) {
 	}
 	next.Hive.Role = backend.HiveRoleQueen
 	if err := a.SaveSettings(next); err != nil {
-		log.Printf("hive: %s can think, but this SuperLeo could not become its queen: %v", who, err)
+		slog.Warn("a thinking agent joined, but this SuperLeo could not become its queen", "module", "hive", "agent", who, "error", err)
 		return
 	}
-	log.Printf("hive: %s can think; this SuperLeo is the queen of the machines that joined it now", who)
+	slog.Info("a thinking agent joined; this SuperLeo is the queen of the machines that joined it now", "module", "hive", "agent", who)
 	a.emit("hosts:changed", nil)
 }

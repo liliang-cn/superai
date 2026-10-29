@@ -2,7 +2,7 @@ package backend
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"strings"
 	"sync"
 	"time"
@@ -203,7 +203,7 @@ func (p *Notices) Raise(ctx context.Context, n Notice) {
 		func(name string, sub Subscriber) {
 			defer func() {
 				if r := recover(); r != nil {
-					log.Printf("superleo: notice subscriber %q panicked: %v", name, r)
+					slog.ErrorContext(ctx, "notice subscriber panicked", "subscriber", name, "panic", r)
 				}
 			}()
 			sub(ctx, n)

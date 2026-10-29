@@ -12,7 +12,7 @@ package backend
 
 import (
 	"encoding/json"
-	"log"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -108,16 +108,16 @@ func installNpxPackage(npx, spec, dir string) {
 	go func() {
 		npm := filepath.Join(filepath.Dir(npx), "npm")
 		if err := os.MkdirAll(dir, 0o700); err != nil {
-			log.Printf("superleo: mcp package %s: %v", spec, err)
+			slog.Warn("mcp package", "package", spec, "error", err)
 			return
 		}
 		cmd := exec.Command(npm, "install", "--prefix", dir, "--no-audit", "--no-fund", "--loglevel=error", spec)
 		if out, err := cmd.CombinedOutput(); err != nil {
 			npxInstalls.Delete(dir) // let a later start try again
-			log.Printf("superleo: mcp package %s not installed: %v: %s", spec, err, strings.TrimSpace(string(out)))
+			slog.Warn("mcp package not installed", "package", spec, "error", err, "output", strings.TrimSpace(string(out)))
 			return
 		}
-		log.Printf("superleo: mcp package %s installed; it starts without npx from now on", spec)
+		slog.Info("mcp package installed; it starts without npx from now on", "package", spec)
 	}()
 }
 

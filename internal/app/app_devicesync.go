@@ -19,7 +19,7 @@ import (
 	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
-	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -97,7 +97,7 @@ func (a *App) shareDevices(ctx context.Context) {
 				}
 				last, sent = d, time.Now()
 				if ok > 0 {
-					log.Printf("hive: shared %d paired devices with %d members", len(list), ok)
+					slog.InfoContext(ctx, "shared paired devices", "module", "hive", "devices", len(list), "members", ok)
 				}
 			}
 		}

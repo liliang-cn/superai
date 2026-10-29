@@ -22,6 +22,7 @@ import { Response } from "@/components/ai-elements/response";
 import { withoutCallNotes } from "../lib/format";
 import type { ChatMessage, TraceItem } from "../lib/types";
 import { ChatTurnBrowser, newestBrowserTurn } from "../components/BrowserCard";
+import TraceChip from "../components/TraceChip";
 import { queenRef, queenTitle, useQueenName } from "../lib/queenName";
 import { translate } from "../lib/i18n";
 
@@ -407,6 +408,7 @@ function Conversation({ messages, trace }: { messages: ChatMessage[]; trace: Tra
           <ChatTurnBrowser m={m} trace={trace} newest={newestBrowser} />
           {m.content ? <Response>{withoutCallNotes(m.content)}</Response> : <span className="cv-quiet">{m.streaming ? "Working on it…" : m.cancelled ? "Stopped." : ""}</span>}
           {m.error && <p className="cv-conv-err">{m.error}</p>}
+          {m.traceId && <TraceChip traceId={m.traceId} />}
         </div>
       ))}
       </div>

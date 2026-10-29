@@ -496,7 +496,12 @@ type Call struct {
 	Id     string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Method string                 `protobuf:"bytes,2,opt,name=method,proto3" json:"method,omitempty"`
 	// A JSON array, one element per argument.
-	ArgsJson      string `protobuf:"bytes,3,opt,name=args_json,json=argsJson,proto3" json:"args_json,omitempty"`
+	ArgsJson string `protobuf:"bytes,3,opt,name=args_json,json=argsJson,proto3" json:"args_json,omitempty"`
+	// The W3C trace context of the flow core made the call in: the agent's
+	// work for it continues that flow as a child. Empty from a core too old
+	// to send it, or a call made outside any flow.
+	Traceparent   string `protobuf:"bytes,4,opt,name=traceparent,proto3" json:"traceparent,omitempty"`
+	Tracestate    string `protobuf:"bytes,5,opt,name=tracestate,proto3" json:"tracestate,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -552,12 +557,29 @@ func (x *Call) GetArgsJson() string {
 	return ""
 }
 
+func (x *Call) GetTraceparent() string {
+	if x != nil {
+		return x.Traceparent
+	}
+	return ""
+}
+
+func (x *Call) GetTracestate() string {
+	if x != nil {
+		return x.Tracestate
+	}
+	return ""
+}
+
 type Reply struct {
 	state      protoimpl.MessageState `protogen:"open.v1"`
 	Id         string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	ResultJson string                 `protobuf:"bytes,2,opt,name=result_json,json=resultJson,proto3" json:"result_json,omitempty"`
 	// Set when the method failed; result_json is then empty.
-	Error         string `protobuf:"bytes,3,opt,name=error,proto3" json:"error,omitempty"`
+	Error string `protobuf:"bytes,3,opt,name=error,proto3" json:"error,omitempty"`
+	// The span the agent's work for the call is (or will be), when it is in
+	// the caller's flow: core records it as the call's child.
+	Traceparent   string `protobuf:"bytes,4,opt,name=traceparent,proto3" json:"traceparent,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -609,6 +631,13 @@ func (x *Reply) GetResultJson() string {
 func (x *Reply) GetError() string {
 	if x != nil {
 		return x.Error
+	}
+	return ""
+}
+
+func (x *Reply) GetTraceparent() string {
+	if x != nil {
+		return x.Traceparent
 	}
 	return ""
 }
@@ -792,16 +821,21 @@ const file_agentlink_v1_agentlink_proto_rawDesc = "" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05about\x18\x02 \x01(\tR\x05about\"\x1d\n" +
 	"\aWelcome\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\"K\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\"\x8d\x01\n" +
 	"\x04Call\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
 	"\x06method\x18\x02 \x01(\tR\x06method\x12\x1b\n" +
-	"\targs_json\x18\x03 \x01(\tR\bargsJson\"N\n" +
+	"\targs_json\x18\x03 \x01(\tR\bargsJson\x12 \n" +
+	"\vtraceparent\x18\x04 \x01(\tR\vtraceparent\x12\x1e\n" +
+	"\n" +
+	"tracestate\x18\x05 \x01(\tR\n" +
+	"tracestate\"p\n" +
 	"\x05Reply\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1f\n" +
 	"\vresult_json\x18\x02 \x01(\tR\n" +
 	"resultJson\x12\x14\n" +
-	"\x05error\x18\x03 \x01(\tR\x05error\">\n" +
+	"\x05error\x18\x03 \x01(\tR\x05error\x12 \n" +
+	"\vtraceparent\x18\x04 \x01(\tR\vtraceparent\">\n" +
 	"\x05Event\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12!\n" +
 	"\fpayload_json\x18\x02 \x01(\tR\vpayloadJson\"$\n" +

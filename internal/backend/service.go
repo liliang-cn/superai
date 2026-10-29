@@ -4,14 +4,16 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	mimepkg "mime"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -200,7 +202,7 @@ func NewService(s *Settings) (*Service, error) {
 			BaseURL: s.EmbedBaseURL, APIKey: s.EmbedKey, EmbeddingModel: s.EmbedModel,
 		})
 		if eerr != nil {
-			log.Printf("superleo: embedder init failed, falling back to file memory: %v", eerr)
+			slog.Warn("embedder init failed, falling back to file memory", "error", eerr)
 		} else {
 			embedder = ep
 		}
@@ -258,10 +260,10 @@ func NewService(s *Settings) (*Service, error) {
 	// sources. Never fatal — embeddings are an enhancement, and refusing to
 	// start over one would be worse than starting without it.
 	if err := syncEmbeddingProvider(cfg, s); err != nil {
-		log.Printf("superleo: embedding settings not applied to the pool: %v", err)
+		slog.Warn("embedding settings not applied to the pool", "error", err)
 	}
 	if err := os.MkdirAll(s.WorkspaceDir, 0o755); err != nil {
-		log.Printf("superleo: mkdir workspace: %v", err)
+		slog.Warn("mkdir workspace", "error", err)
 	}
 
 	// --- Sandbox (local workspace). ---
@@ -274,7 +276,7 @@ func NewService(s *Settings) (*Service, error) {
 	// SuperLeo keeps the settings fields so existing config files still parse;
 	// browsing is now expected to come from an MCP server instead.
 	if s.DisableBrowser || strings.TrimSpace(os.Getenv("SUPERLEO_NO_BROWSER")) != "" {
-		log.Printf("superleo: browser disabled by configuration")
+		slog.Info("browser disabled by configuration")
 	}
 
 	// --- Tool approval gate. ---
@@ -346,14 +348,22 @@ func NewService(s *Settings) (*Service, error) {
 		}
 		memMode = "shared:" + cfg.Memory.DSN
 		// A private namespace (the hive's) still reads "default", where the
-		// person's own facts live; see readThroughMemoryStore.
-		if ns := strings.TrimSpace(s.SharedMemoryNamespace); ns != "" && ns != sharedNamespaceDefault {
-			rt, rerr := newReadThroughMemoryStore(cfg.Memory.DSN, cfg.Memory.Options["token"], ns, []string{sharedNamespaceDefault})
-			if rerr != nil {
-				return nil, rerr
-			}
-			sharedMem = rt
-			memOpts = append(memOpts, agent.WithMemoryStore(rt))
+		// person's own facts live; see readThroughMemoryStore. Either way the
+		// store is SuperLeo's own, so every call to the brain carries the
+		// flow it was made in (cortex_trace.go).
+		ns := strings.TrimSpace(s.SharedMemoryNamespace)
+		var also []string
+		if ns != "" && ns != sharedNamespaceDefault {
+			also = []string{sharedNamespaceDefault}
+		}
+		useTLS, _ := strconv.ParseBool(strings.TrimSpace(cfg.Memory.Options["tls"]))
+		rt, rerr := newSharedMemoryStore(cfg.Memory.DSN, cfg.Memory.Options["token"], ns, also, useTLS)
+		if rerr != nil {
+			return nil, rerr
+		}
+		sharedMem = rt
+		memOpts = append(memOpts, agent.WithMemoryStore(rt))
+		if len(also) > 0 {
 			memMode += " (" + ns + ", reads " + sharedNamespaceDefault + ")"
 		}
 		b = b.WithMemory(memOpts...)
@@ -401,18 +411,17 @@ func NewService(s *Settings) (*Service, error) {
 		}
 		shared, ferr := serversSharingMemory(src, owned)
 		if ferr != nil {
-			log.Printf("superleo: mcp config (%s): %v", src, ferr)
+			slog.Warn("mcp config", "path", src, "error", ferr)
 		}
 		if len(shared) > 0 {
-			log.Printf("superleo: memory backend owns %s; MCP server(s) %v share it, their memory tools are withheld",
-				owned, shared)
+			slog.Info("memory backend shared with MCP servers; their memory tools are withheld", "backend", owned, "servers", shared)
 		}
 		sharedMCP = append(sharedMCP, shared...)
 		// ${NAME} in an entry comes from this process's environment; agent-go
 		// reads an expanded copy (mcp_env.go).
 		path, rerr := resolveMCPConfig(src, os.LookupEnv)
 		if rerr != nil {
-			log.Printf("superleo: mcp config (%s): %v", src, rerr)
+			slog.Warn("mcp config", "path", src, "error", rerr)
 			path = src
 		}
 		mcpPaths = append(mcpPaths, path)
@@ -431,6 +440,12 @@ func NewService(s *Settings) (*Service, error) {
 	// observers, so the trace store (trace.go) records what the model was
 	// actually sent. It stays in this machine's own data directory.
 	b = b.WithObserverPayloads()
+	// SuperLeo's logger, at agent-go's own level (logging.go), and every run
+	// of every service in the process traced into the flow files (flow.go).
+	if l := AgentGoLogger(); l != nil {
+		b = b.WithLogger(l)
+	}
+	b = b.WithObserver(FlowTraceWriter())
 
 	svc, err := b.Build()
 	if err != nil {
@@ -478,7 +493,7 @@ func NewService(s *Settings) (*Service, error) {
 	searchBase, searchKey, searchModel := s.WebSearch()
 	searchNative, err := domain.ParseNativeWebSearchFormat(s.SearchNative)
 	if err != nil {
-		log.Printf("superleo: search_native: %v; sending both search fields", err)
+		slog.Warn("search_native; sending both search fields", "error", err)
 	}
 	// The brain's thinking effort goes along only when the search runs on the
 	// brain's own model; another model may not take the same values.
@@ -522,7 +537,7 @@ func NewService(s *Settings) (*Service, error) {
 		}); err != nil {
 			// Not fatal. A machine with no agent CLI installed is a normal
 			// machine, and the rest of the app has nothing to do with this.
-			log.Printf("superleo: external agents not registered: %v", err)
+			slog.Warn("external agents not registered", "error", err)
 		}
 	}
 
@@ -536,11 +551,11 @@ func NewService(s *Settings) (*Service, error) {
 
 	// --- CortexDB data-import + graphrag query + connector tools (best-effort). ---
 	if db, derr := cortexdb.Open(cortexdb.DefaultConfig(filepath.Join(cfg.DataDir(), "cortex.db"))); derr != nil {
-		log.Printf("superleo: cortexdb disabled (%v)", derr)
+		slog.Warn("cortexdb disabled", "error", derr)
 	} else {
 		out.cortex = db
 		if _, e := cortexbridge.RegisterImportFlow(svc, cortexbridge.NewImporter(db, brain)); e != nil {
-			log.Printf("superleo: import flow tools skipped: %v", e)
+			slog.Warn("import flow tools skipped", "error", e)
 		}
 		// Memory is agent-go's on both backends (WithMemory above), so
 		// Register leaves CortexDB's own memory_* tools out by itself — one
@@ -553,14 +568,14 @@ func NewService(s *Settings) (*Service, error) {
 		// hive, three workers each "saving to the shared brain" into their own
 		// pod. Then the shared one is the only one.
 		if len(sharedMCP) > 0 {
-			log.Printf("superleo: knowledge and graph tools come from %v (the shared brain), not the local file", sharedMCP)
+			slog.Info("knowledge and graph tools come from the shared brain, not the local file", "servers", sharedMCP)
 		} else if _, e := cortexbridge.Register(svc, db,
 			cortexbridge.WithArgDefaults(map[string]interface{}{"user_id": singleUserID}),
 		); e != nil {
-			log.Printf("superleo: graphrag tools skipped: %v", e)
+			slog.Warn("graphrag tools skipped", "error", e)
 		}
 		if _, e := connectorbridge.Register(svc, db, connector.ToolboxOptions{}); e != nil {
-			log.Printf("superleo: connector tools skipped: %v", e)
+			slog.Warn("connector tools skipped", "error", e)
 		}
 	}
 
@@ -699,6 +714,8 @@ func (s *Service) chatRunOptions(ctx context.Context, sessionID string, imagePat
 type TurnResult struct {
 	Text  string
 	Usage *domain.TokenUsage
+	// TraceID is the flow the turn ran in.
+	TraceID string
 }
 
 // Stream runs one turn, forwarding every agent event to emit, and returns the
@@ -711,6 +728,22 @@ func (s *Service) Stream(ctx context.Context, sessionID, message string, imagePa
 // StreamTurn runs one turn and returns the answer with the tokens it used.
 func (s *Service) StreamTurn(ctx context.Context, sessionID, message string, imagePaths []string, emit func(ev *agent.Event)) (TurnResult, error) {
 	var turn TurnResult
+	// The turn is an entry point's flow, or joins the one it was asked in
+	// (flow.go). Whoever streams it hears the flow first, to show and link.
+	ctx, flow := beginTurnFlow(ctx, sessionID, message)
+	var runErr error
+	defer func() {
+		switch {
+		case errors.Is(runErr, context.Canceled) || ctx.Err() != nil:
+			flow.End("cancelled", nil)
+		default:
+			flow.End("", runErr)
+		}
+	}()
+	if emit != nil && flow.Traceparent() != "" {
+		emit(&agent.Event{Type: FlowEventType, Content: flow.Traceparent()})
+	}
+	turn.TraceID = flow.TraceID()
 	opts := s.chatRunOptions(ctx, sessionID, imagePaths)
 	// Whatever the turn writes into the workspace belongs to this conversation.
 	root := ""
@@ -739,6 +772,7 @@ func (s *Service) StreamTurn(ctx context.Context, sessionID, message string, ima
 	// key. This is the same fact under a key of ours.
 	ch, err := s.svc.RunStreamWithOptions(withSessionID(ctx, sessionID), message, opts...)
 	if err != nil {
+		runErr = err
 		return turn, err
 	}
 	var final string
@@ -764,7 +798,8 @@ func (s *Service) StreamTurn(ctx context.Context, sessionID, message string, ima
 	// reason silently dropped (a gateway 502 looked identical to a model that
 	// said nothing). The error event is the explanation; return it as one.
 	if !sawTerminal && lastErr != "" {
-		return turn, fmt.Errorf("%s", lastErr)
+		runErr = fmt.Errorf("%s", lastErr)
+		return turn, runErr
 	}
 	turn.Text = final
 	return turn, nil

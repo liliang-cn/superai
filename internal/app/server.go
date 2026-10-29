@@ -26,10 +26,9 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/liliang-cn/superleo/internal/backend"
 	"io"
 	"io/fs"
-	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -40,6 +39,8 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // rpcDenied lists bound methods that only make sense with a native window on
@@ -227,6 +228,7 @@ func rpcCall(app *App, w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	acceptHTTPFlow(w, r, name, raw)
 	result, err := callMethod(app, name, raw)
 	if err != nil {
 		code := http.StatusInternalServerError
@@ -388,7 +390,7 @@ func ServeMain(argv []string) {
 	lf := addAgentLinkFlags(fl)
 	_ = fl.Parse(argv)
 
-	log.SetPrefix("superleo-serve ")
+	backend.SetupLogging("serve")
 	startPprof()
 
 	hub := newEventHub()
@@ -404,11 +406,13 @@ func ServeMain(argv []string) {
 	// the socket has no idea who is on the other end. See auth.go.
 	creds, err := loadOrCreateCredentials()
 	if err != nil {
-		log.Fatalf("auth: %v", err)
+		slog.Error("auth", "error", err)
+		os.Exit(1)
 	}
 	mux, err := newAPIMux(app, hub, creds, nil)
 	if err != nil {
-		log.Fatalf("assets: %v", err)
+		slog.Error("assets", "error", err)
+		os.Exit(1)
 	}
 	addr := net.JoinHostPort(*bind, fmt.Sprint(*port))
 	srv := &http.Server{Addr: addr, Handler: requireAuth(creds, mux)}
@@ -427,7 +431,7 @@ func ServeMain(argv []string) {
 		agentAddr := net.JoinHostPort(*bind, fmt.Sprint(*agentPort))
 		go func() {
 			if err := ServeAgentLink(ctx, app, agentAddr, credentialsCheck(creds)); err != nil {
-				log.Printf("agent link: %v", err)
+				slog.ErrorContext(ctx, "agent link", "error", err)
 			}
 		}()
 	}
@@ -453,9 +457,10 @@ func ServeMain(argv []string) {
 		_ = srv.Shutdown(shutCtx)
 	}()
 
-	log.Printf("serving on http://%s", addr)
+	slog.InfoContext(ctx, "serving", "url", "http://"+addr)
 	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		log.Fatalf("serve: %v", err)
+		slog.ErrorContext(ctx, "serve", "error", err)
+		os.Exit(1)
 	}
 	fmt.Fprintln(os.Stderr, "superleo-serve: stopped")
 }

@@ -21,7 +21,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -184,7 +184,7 @@ func resolveMCPConfig(src string, lookup func(string) (string, bool)) (string, e
 		}
 		resolved, missing := expandMCPEntry(entry, lookup)
 		if len(missing) > 0 {
-			log.Printf("superleo: mcp server %s (%s) left out: %s not set", name, src, strings.Join(missing, ", "))
+			slog.Warn("mcp server left out: variables not set", "server", name, "path", src, "missing", strings.Join(missing, ", "))
 			continue
 		}
 		// An npx server runs from its installed package (mcp_npx.go).

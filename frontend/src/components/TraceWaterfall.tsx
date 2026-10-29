@@ -17,7 +17,7 @@ import type { TraceRow } from "./RunTracePanel";
  * of that would squeeze every run to a sliver, so it is one run at a time.
  */
 
-type Kind = "model" | "tool" | "lint";
+type Kind = "run" | "model" | "tool" | "rpc" | "lint";
 
 interface Span {
   key: string;
@@ -39,6 +39,11 @@ interface Span {
   par: number;
   /** An auxiliary call that ran while the turn's own call did. */
   besideTurn?: boolean;
+  /** In a flow: how deep under the flow's root, and on which machine. */
+  depth?: number;
+  host?: string;
+  /** In a flow: the peer a call handed its work to. */
+  peer?: string;
   rows: TraceRow[];
 }
 
@@ -48,6 +53,8 @@ interface Run {
   start: number;
   end: number;
   calls: number;
+  /** A call has started in it, ended or not: a run still going counts. */
+  started: boolean;
 }
 
 const at = (r: TraceRow) => (r.ts ? Date.parse(r.ts) : NaN);
@@ -59,29 +66,33 @@ const overlaps = (a: Span, b: Span) => a.start < b.end && b.start < a.end;
 const STEPS = [100, 200, 500, 1000, 2000, 5000, 10000, 15000, 30000, 60000, 120000, 300000, 600000, 1800000, 3600000];
 
 /** Split the loaded lines into runs, newest first. A line with no run id
- *  (an older trace) falls into one run of its own. */
-function runsOf(rows: TraceRow[]): Run[] {
+ *  (an older trace) falls into one run of its own. A flow is one run: every
+ *  line of it, whichever process or run wrote it, on one axis. */
+function runsOf(rows: TraceRow[], flow?: boolean): Run[] {
   const by = new Map<string, Run>();
   for (const r of rows) {
     const t = at(r);
     if (isNaN(t)) continue;
-    const id = r.run_id ?? "";
+    const id = flow ? r.trace_id ?? "" : r.run_id ?? "";
     let run = by.get(id);
-    if (!run) by.set(id, (run = { id, rows: [], start: t, end: t, calls: 0 }));
+    if (!run) by.set(id, (run = { id, rows: [], start: t, end: t, calls: 0, started: false }));
     run.rows.push(r);
     run.start = Math.min(run.start, t - (r.event?.endsWith("_end") ? r.duration_ms ?? 0 : 0));
     run.end = Math.max(run.end, t);
-    if (r.event === "model_end" || r.event === "tool_end") run.calls++;
+    if (r.event === "model_end" || r.event === "tool_end" || (flow && r.event === "run_end")) run.calls++;
+    if (r.event === "model_start" || r.event === "tool_start") run.started = true;
   }
-  return [...by.values()].filter((r) => r.calls > 0).sort((a, b) => b.start - a.start);
+  return [...by.values()].filter((r) => r.calls > 0 || r.started).sort((a, b) => b.start - a.start);
 }
 
 /** Pair each call's start and end lines into one span: model calls by
  *  span_id, tool calls by call_id. Either half may be missing — the start
  *  scrolled out of the loaded page, or the end not written yet. */
-function spansOf(run: Run): Span[] {
+function spansOf(run: Run, flow?: boolean): Span[] {
   const models = new Map<string, { s?: TraceRow; e?: TraceRow }>();
   const tools = new Map<string, { s?: TraceRow; e?: TraceRow }>();
+  const runs = new Map<string, { s?: TraceRow; e?: TraceRow }>();
+  const peers = new Map<string, string>();
   const lints: TraceRow[] = [];
   for (const r of run.rows) {
     const pair = (m: Map<string, { s?: TraceRow; e?: TraceRow }>, id: string | undefined, end: boolean) => {
@@ -93,9 +104,14 @@ function spansOf(run: Run): Span[] {
     };
     if (r.event === "model_start") pair(models, r.span_id, false);
     else if (r.event === "model_end") pair(models, r.span_id, true);
-    else if (r.event === "tool_start") pair(tools, r.call_id, false);
-    else if (r.event === "tool_end") pair(tools, r.call_id, true);
+    // In a flow, tool calls of many runs share call ids ("call_1"); their
+    // span ids are unique.
+    else if (r.event === "tool_start") pair(tools, flow ? r.span_id ?? r.call_id : r.call_id, false);
+    else if (r.event === "tool_end") pair(tools, flow ? r.span_id ?? r.call_id : r.call_id, true);
     else if (r.event === "lint") lints.push(r);
+    else if (flow && r.event === "run_start") pair(runs, r.span_id, false);
+    else if (flow && r.event === "run_end") pair(runs, r.span_id, true);
+    else if (flow && r.event === "peer" && r.span_id && r.peer) peers.set(r.span_id, r.peer);
   }
 
   const bounds = (p: { s?: TraceRow; e?: TraceRow }) => {
@@ -105,6 +121,19 @@ function spansOf(run: Run): Span[] {
   };
 
   const out: Span[] = [];
+  for (const [id, p] of runs) {
+    const r = (p.s ?? p.e)!;
+    out.push({
+      key: `r:${id}`,
+      kind: "run",
+      label: r.agent || "run",
+      host: p.s?.host,
+      ...bounds(p),
+      failed: !!p.e?.error || p.e?.outcome === "failed",
+      par: 1,
+      rows: [p.s, p.e].filter(Boolean) as TraceRow[],
+    });
+  }
   for (const [id, p] of models) {
     const r = (p.e ?? p.s)!;
     const purpose = r.purpose || "model";
@@ -127,13 +156,15 @@ function spansOf(run: Run): Span[] {
     // A tool line carries no round; it belongs to the turn that asked for
     // it, the last one to have answered by the time it started.
     const asked = turns.filter((t) => !t.open && t.end <= b.start + 50).pop();
+    const label = r.tool || "tool";
     out.push({
       key: `t:${id}`,
-      kind: "tool",
-      label: r.tool || "tool",
-      round: asked?.round,
+      kind: label.startsWith("cortexdb.") ? "rpc" : "tool",
+      label,
+      round: flow ? undefined : asked?.round,
       ...b,
       failed: !!p.e?.error,
+      peer: flow && r.span_id ? peers.get(r.span_id) : undefined,
       par: 1,
       rows: [p.s, p.e].filter(Boolean) as TraceRow[],
     });
@@ -150,24 +181,60 @@ function spansOf(run: Run): Span[] {
   }
 
   // By start, and at the same instant a model call above the tools it led to.
-  const order: Record<Kind, number> = { model: 0, tool: 1, lint: 2 };
-  return out.sort((a, b) => a.start - b.start || order[a.kind] - order[b.kind]);
+  const order: Record<Kind, number> = { run: 0, model: 1, tool: 2, rpc: 3, lint: 4 };
+  const sorted = out.sort((a, b) => a.start - b.start || order[a.kind] - order[b.kind]);
+  return flow ? asTree(sorted) : sorted;
+}
+
+/** A flow's spans in tree order — each under the span that started it, by
+ *  parent_span_id — with their depth. A span whose parent is not in what was
+ *  loaded (a peer's caller, a run older than the files) is a root. */
+function asTree(spans: Span[]): Span[] {
+  const idOf = (s: Span) => s.rows[0]?.span_id ?? "";
+  const parentOf = (s: Span) => s.rows.find((r) => r.parent_span_id)?.parent_span_id ?? "";
+  const byId = new Map<string, Span>();
+  for (const s of spans) if (idOf(s)) byId.set(idOf(s), s);
+  const kids = new Map<string, Span[]>();
+  const roots: Span[] = [];
+  for (const s of spans) {
+    const p = parentOf(s);
+    if (p && byId.has(p) && byId.get(p) !== s) {
+      const list = kids.get(p) ?? [];
+      list.push(s);
+      kids.set(p, list);
+    } else roots.push(s);
+  }
+  const out: Span[] = [];
+  const seen = new Set<Span>();
+  const walk = (s: Span, depth: number) => {
+    if (seen.has(s)) return;
+    seen.add(s);
+    out.push({ ...s, depth });
+    for (const k of kids.get(idOf(s)) ?? []) walk(k, depth + 1);
+  };
+  for (const r of roots) walk(r, 0);
+  return out;
 }
 
 export default function TraceWaterfall({
   rows,
   renderDetail,
+  flow,
 }: {
   rows: TraceRow[];
   renderDetail: (rows: TraceRow[]) => ReactNode;
+  /** The rows are one flow: one axis for all of them, runs as spans, each
+   *  span under the one that started it. */
+  flow?: boolean;
 }) {
-  const runs = useMemo(() => runsOf(rows), [rows]);
+  const runs = useMemo(() => runsOf(rows, flow), [rows, flow]);
   // Empty follows the newest run, so a live panel moves on to the next turn
   // by itself; picking one pins it.
   const [runId, setRunId] = useState<string | null>(null);
   const [sel, setSel] = useState("");
   const run = runs.find((r) => r.id === runId) ?? runs[0];
-  const spans = useMemo(() => (run ? spansOf(run) : []), [run]);
+  const spans = useMemo(() => (run ? spansOf(run, flow) : []), [run, flow]);
+  const rootHost = spans.find((s) => s.kind === "run")?.host;
 
   if (!run) return <div className="cr-trace-rows"><div className="cr-note">No model or tool calls in what is loaded.</div></div>;
 
@@ -185,17 +252,21 @@ export default function TraceWaterfall({
   return (
     <div className="cr-wf">
       <div className="cr-trace-bar">
-        <select className="input cr-wf-run" value={run.id} onChange={(e) => { setRunId(e.target.value); setSel(""); }}>
-          {runs.map((r, i) => (
-            <option key={r.id || i} value={r.id}>
-              {hms(r.start)} · {dur(r.end - r.start)} · {r.calls} calls{i === 0 ? " · latest" : ""}
-            </option>
-          ))}
-        </select>
+        {!flow && (
+          <select className="input cr-wf-run" value={run.id} onChange={(e) => { setRunId(e.target.value); setSel(""); }}>
+            {runs.map((r, i) => (
+              <option key={r.id || i} value={r.id}>
+                {hms(r.start)} · {dur(r.end - r.start)} · {r.calls} calls{i === 0 ? " · latest" : ""}
+              </option>
+            ))}
+          </select>
+        )}
         <span className="cr-wf-legend">
+          {flow && <span><i className="sw run" />run</span>}
           <span><i className="sw model" />turn</span>
           <span><i className="sw aux" />auxiliary</span>
           <span><i className="sw tool" />tool</span>
+          {flow && <span><i className="sw rpc" />cortexdb</span>}
           <span><i className="sw failed" />failed{failed ? ` ${failed}` : ""}</span>
           <span><i className="sw lint" />lint{lints ? ` ${lints}` : ""}</span>
           <span><em className="cr-wf-par">∥</em>overlapping{peak > 1 ? ` · peak ${peak}` : ""}</span>
@@ -226,8 +297,10 @@ export default function TraceWaterfall({
           ].filter(Boolean).join("\n");
           return (
             <div key={s.key} className={`cr-wf-row ${cls}`} onClick={() => setSel(sel === s.key ? "" : s.key)} title={title}>
-              <span className="cr-wf-label">
+              <span className="cr-wf-label" style={s.depth ? { paddingLeft: `${Math.min(s.depth, 8) * 10}px` } : undefined}>
                 <b>{s.label}</b>
+                {s.peer && <i>→ {s.peer}</i>}
+                {s.host && s.host !== rootHost && <i>@{s.host}</i>}
                 {s.round !== undefined && <i>r{s.round}</i>}
                 {s.par > 1 && <em className="cr-wf-par">∥{s.par}</em>}
                 {s.besideTurn && <em className="cr-wf-par">∥turn</em>}

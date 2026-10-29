@@ -18,7 +18,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -231,7 +231,7 @@ func (l *ccLocal) deliver(ctx context.Context, sessionID, text string) (CCDelive
 			l.setState(sessionID, ccWorking)
 			return CCDelivery{Via: "tmux", Immediate: true}, nil
 		}
-		log.Printf("cc relay: typing into tmux pane %s: %v", snap.Pane, err)
+		slog.WarnContext(ctx, "cc relay: typing into tmux pane", "pane", snap.Pane, "error", err)
 	}
 	if l.ottyPane != nil {
 		if pane := l.ottyPane(ctx, sessionID); pane != "" {
@@ -240,7 +240,7 @@ func (l *ccLocal) deliver(ctx context.Context, sessionID, text string) (CCDelive
 				l.setState(sessionID, ccWorking)
 				return CCDelivery{Via: "otty", Immediate: true}, nil
 			}
-			log.Printf("cc relay: typing into otty pane %s: %v", pane, err)
+			slog.WarnContext(ctx, "cc relay: typing into otty pane", "pane", pane, "error", err)
 			if errors.Is(err, errOttyLocked) && snap.State != ccWorking {
 				return CCDelivery{}, err
 			}
@@ -256,7 +256,7 @@ func (l *ccLocal) deliver(ctx context.Context, sessionID, text string) (CCDelive
 			l.setState(sessionID, ccWorking)
 			return CCDelivery{Via: "terminal", Immediate: true}, nil
 		}
-		log.Printf("cc relay: typing into %s: %v", at.TTY, err)
+		slog.WarnContext(ctx, "cc relay: typing into terminal", "tty", at.TTY, "error", err)
 	}
 	if snap.State == ccWorking {
 		l.queue.Push(sessionID, text)
@@ -290,9 +290,9 @@ func (a *App) ReplyToSession(sessionID, text string) (CCDelivery, error) {
 	defer cancel()
 	d, err := ccLocalState().deliver(ctx, sessionID, text)
 	if err != nil {
-		log.Printf("cc relay: reply to %s not delivered: %v", sessionID, err)
+		slog.WarnContext(ctx, "cc relay: reply not delivered", "session", sessionID, "error", err)
 	} else {
-		log.Printf("cc relay: reply to %s delivered via %s (%d chars)", sessionID, d.Via, utf8.RuneCountInString(text))
+		slog.InfoContext(ctx, "cc relay: reply delivered", "session", sessionID, "via", d.Via, "chars", utf8.RuneCountInString(text))
 	}
 	return d, err
 }
@@ -370,18 +370,18 @@ func (a *App) serveCCHookSocket(ctx context.Context) {
 	if _, err := os.Stat(path); err == nil {
 		if c, err := net.DialTimeout("unix", path, time.Second); err == nil {
 			c.Close()
-			log.Printf("cc relay: another SuperLeo already listens on %s; hooks go there", path)
+			slog.InfoContext(ctx, "cc relay: another SuperLeo already listens; hooks go there", "path", path)
 			return
 		}
 		_ = os.Remove(path) // left behind by a process that is gone
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		log.Printf("cc relay: %v", err)
+		slog.WarnContext(ctx, "cc relay", "error", err)
 		return
 	}
 	lis, err := net.Listen("unix", path)
 	if err != nil {
-		log.Printf("cc relay: listening on %s: %v", path, err)
+		slog.WarnContext(ctx, "cc relay: listening", "path", path, "error", err)
 		return
 	}
 	_ = os.Chmod(path, 0o600)
@@ -396,9 +396,9 @@ func (a *App) serveCCHookSocket(ctx context.Context) {
 	}()
 	a.startCCActivity(ctx)
 	a.startCLIActivity(ctx)
-	log.Printf("cc relay: hooks on %s", path)
+	slog.InfoContext(ctx, "cc relay: hooks listening", "path", path)
 	if err := srv.Serve(lis); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		log.Printf("cc relay: %v", err)
+		slog.WarnContext(ctx, "cc relay", "error", err)
 	}
 }
 

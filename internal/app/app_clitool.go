@@ -10,6 +10,7 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -102,6 +103,9 @@ func (a *App) runCodingAgent(ctx context.Context, name, prompt, cwd, cont string
 	unattended := a.settings != nil && a.settings.ExternalAgents.Unattended
 	a.mu.Unlock()
 
+	// The coding agent's run is a span of the flow that asked for it: under
+	// the tool call that handed it out, with how it came out.
+	_, span := backend.StartSpan(ctx, "coding."+name, prompt)
 	done := make(chan CLIRun, 1)
 	o := cliStart{Agent: name, Prompt: prompt, Cwd: cwd, Ask: !unattended,
 		Done: func(r CLIRun) { done <- r }}
@@ -117,6 +121,7 @@ func (a *App) runCodingAgent(ctx context.Context, name, prompt, cwd, cont string
 	}
 	run, err := a.startCLIRun(o)
 	if err != nil {
+		span.End("failed", err)
 		return fail(err.Error())
 	}
 	var r CLIRun
@@ -125,6 +130,14 @@ func (a *App) runCodingAgent(ctx context.Context, name, prompt, cwd, cont string
 	case <-ctx.Done():
 		a.CancelCLIRun(run.ID)
 		r = <-done
+	}
+	switch {
+	case r.State == "done":
+		span.End("completed", nil)
+	case r.State == "cancelled" || ctx.Err() != nil:
+		span.End("cancelled", nil)
+	default:
+		span.End("failed", errors.New(firstNonEmpty(r.Error, r.State)))
 	}
 	out := map[string]any{
 		"ok": r.State == "done", "agent": name, "run": r.ID, "state": r.State,

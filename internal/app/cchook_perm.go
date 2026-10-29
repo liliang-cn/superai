@@ -23,7 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -283,7 +283,7 @@ func (a *App) handleCCPermission(w http.ResponseWriter, r *http.Request) {
 	if ans.Behavior != "" {
 		l.setState(ev.Session, ccWorking)
 		observeCCActivity(ccHookEvent{Event: ccPermissionAnswered, Session: ev.Session})
-		log.Printf("cc relay: %s in %s: %s from the phone", ev.Tool, ev.Session, ans.Behavior)
+		slog.InfoContext(r.Context(), "cc relay: permission answered from the phone", "tool", ev.Tool, "session", ev.Session, "behavior", ans.Behavior)
 	}
 	writeJSON(w, ans)
 }
@@ -480,7 +480,7 @@ func (a *App) askCCPermissionCore(agent string, r ccReport) {
 	}
 	say := func(verdict, msg string) {
 		if err := a.answerCCPermission(agent, r.Request, verdict, msg); err != nil {
-			log.Printf("cc relay: answering %s's permission request: %v", orThis(agent), err)
+			slog.Warn("cc relay: answering a permission request", "agent", orThis(agent), "error", err)
 		}
 	}
 	// YOLO, or the approval gate switched off, covers the terminals too: a
@@ -586,12 +586,12 @@ func ccPermAuditLine(e ccPermAudit) {
 	defer ccPermAuditMu.Unlock()
 	p := ccPermAuditPath()
 	if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
-		log.Printf("cc relay: audit: %v", err)
+		slog.Warn("cc relay: audit", "error", err)
 		return
 	}
 	f, err := os.OpenFile(p, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
 	if err != nil {
-		log.Printf("cc relay: audit: %v", err)
+		slog.Warn("cc relay: audit", "error", err)
 		return
 	}
 	defer f.Close()

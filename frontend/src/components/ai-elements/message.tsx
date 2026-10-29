@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import type { HTMLAttributes } from "react";
+import type { HTMLAttributes, ReactNode } from "react";
 
 /**
  * One turn in the transcript, and the two very different shapes a turn takes.
@@ -43,6 +43,8 @@ export type MessageBylineProps = {
   meta?: string;
   /** Who thought for the queen, as engineByline puts it, when it was not SuperLeo's own agent alone. */
   engine?: string;
+  /** The answer's trace id chip, once its flow is known. */
+  trace?: ReactNode;
 };
 
 /**
@@ -53,11 +55,12 @@ export type MessageBylineProps = {
  * rest, and the meta beside it is the one thing worth knowing about a reply
  * that has already finished: how long it took and how much work it was.
  */
-export const MessageByline = ({ name, meta, engine }: MessageBylineProps) => (
+export const MessageByline = ({ name, meta, engine, trace }: MessageBylineProps) => (
   <div className="msg-byline-wrap">
     <div className="msg-byline">
       <span className="msg-byline-name">{name}</span>
       {meta && <span className="msg-byline-meta">{meta}</span>}
+      {trace}
     </div>
     {engine && <span className="msg-byline-engine">{engine}</span>}
   </div>

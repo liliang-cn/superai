@@ -11,7 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -67,13 +67,13 @@ func (a *App) syncLocalHive() {
 	}
 	queenURL, err := a.localQueenURL()
 	if err != nil {
-		log.Printf("local hive: no address for the workers to join: %v", err)
+		slog.Warn("local hive: no address for the workers to join", "error", err)
 		a.stopLocalHive()
 		return
 	}
 	creds, err := loadOrCreateCredentials()
 	if err != nil {
-		log.Printf("local hive: %v", err)
+		slog.Warn("local hive", "error", err)
 		a.stopLocalHive()
 		return
 	}
@@ -125,7 +125,7 @@ func (a *App) syncLocalHive() {
 	a.mu.Lock()
 	a.localHive, a.localHiveKey = l, key
 	a.mu.Unlock()
-	log.Printf("local hive: keeping %d worker(s), up to %d, joining %s", l.Min(), l.Max(), queenURL)
+	slog.Info("local hive: keeping workers", "min", l.Min(), "max", l.Max(), "queen", queenURL)
 }
 
 // stopLocalHive stops every local worker and waits for them to go.

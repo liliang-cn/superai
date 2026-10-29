@@ -4,12 +4,14 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"runtime/debug"
 	"strings"
 	"syscall"
+
+	"github.com/liliang-cn/superleo/internal/backend"
 )
 
 // buildVersion is this binary's module version, or its VCS revision.
@@ -57,7 +59,7 @@ func (f agentLinkFlags) options() (AgentLinkOptions, bool) {
 		if b, err := os.ReadFile(p); err == nil {
 			token = strings.TrimSpace(string(b))
 		} else {
-			log.Printf("agent link: reading %s: %v", p, err)
+			slog.Warn("agent link: reading", "path", p, "error", err)
 		}
 	}
 	return AgentLinkOptions{Core: strings.TrimSpace(*f.core), Token: token, Name: strings.TrimSpace(*f.name),
@@ -96,7 +98,7 @@ func AgentMain(argv []string) {
 		fmt.Fprintln(os.Stderr, "superleo agent: -core-token is required (or SUPERLEO_CORE_TOKEN, or SUPERLEO_CORE_TOKEN_FILE)")
 		os.Exit(2)
 	}
-	log.SetPrefix("superleo-agent ")
+	backend.SetupLogging("agent")
 
 	app := NewApp()
 	app.startupHeadless()

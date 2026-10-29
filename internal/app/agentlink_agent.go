@@ -10,7 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"runtime"
 	"strings"
@@ -69,6 +69,9 @@ var agentCallable = map[string]bool{
 	// The machine itself (host.go): how it is, its services and logs, and —
 	// unless its owner turned it off — service actions and commands.
 	"HostStatus": true, "HostServices": true, "HostLogs": true, "HostService": true, "HostExec": true,
+	// This machine's half of a flow core started, for core's timeline
+	// (app_trace.go).
+	"FlowLines": true,
 }
 
 // agentQuiet are events too frequent to be worth the line.
@@ -128,11 +131,11 @@ func (a *App) RunAgentLink(ctx context.Context, o AgentLinkOptions) {
 				}
 				cores, next, wait = []string{pick.Link}, 0, time.Second
 				o.Token = hiveKey()
-				log.Printf("agent link: following %s at %s", pick.Name, pick.Link)
+				slog.InfoContext(ctx, "agent link: following a new core", "core", pick.Name, "link", pick.Link)
 				continue
 			}
 		}
-		log.Printf("agent link to %s: %v; again in %s", one.Core, err, wait)
+		slog.WarnContext(ctx, "agent link failed", "core", one.Core, "error", err, "retry_in", wait)
 		select {
 		case <-ctx.Done():
 			return
@@ -252,7 +255,7 @@ func (a *App) agentLinkOnce(ctx context.Context, o AgentLinkOptions) error {
 	if first.GetWelcome() == nil {
 		return errors.New("core did not welcome this agent")
 	}
-	log.Printf("agent link: connected to %s as %s, clis %v", o.Core, hello.GetName(), hello.GetClis())
+	slog.InfoContext(ctx, "agent link connected", "core", o.Core, "name", hello.GetName(), "clis", hello.GetClis())
 
 	// What this machine's event bus says goes up the line.
 	tap := func(name string, payload map[string]any) {
@@ -347,6 +350,8 @@ func (a *App) answerCall(c *agentlinkpb.Call) *agentlinkpb.Reply {
 			return r
 		}
 	}
+	// Core's flow, continued by the work this call starts (flow_link.go).
+	r.Traceparent = acceptCallFlow(c.GetMethod(), raw, "", c.GetTraceparent(), c.GetTracestate())
 	result, err := callMethod(a, c.GetMethod(), raw)
 	if err != nil {
 		r.Error = err.Error()

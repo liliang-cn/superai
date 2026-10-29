@@ -8,7 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"slices"
 	"sort"
 	"strings"
@@ -172,7 +172,7 @@ func (a *App) noteNoWorkers(requestID string) {
 	if a.delegationMode() != backend.DelegationMax || len(a.liveWorkers()) > 0 {
 		return
 	}
-	log.Printf("hive: no live worker; the queen keeps her tools for request %s", requestID)
+	slog.Info("no live worker; the queen keeps her tools", "module", "hive", "request", requestID)
 	a.emit("chat:event", map[string]any{"requestId": requestID, "type": "state_update",
 		"content": "no worker is live; the queen does this herself"})
 }
@@ -342,7 +342,7 @@ func (a *App) delegate(ctx context.Context, tasks []backend.DelegateTask, onAssi
 	results := backend.RunDelegated(ctx, env, tasks)
 	for _, r := range results {
 		if r.Fallback {
-			log.Printf("hive: piece %d done by the queen herself: %s", r.Index+1, r.Why)
+			slog.InfoContext(ctx, "piece done by the queen herself", "module", "hive", "piece", r.Index+1, "why", r.Why)
 		}
 	}
 	return results, nil

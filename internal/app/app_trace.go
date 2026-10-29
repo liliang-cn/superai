@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"time"
 
 	"github.com/liliang-cn/superleo/internal/backend"
@@ -42,4 +43,23 @@ func (a *App) ToolStats(days int) backend.ToolStatsReport {
 		days = 7
 	}
 	return backend.ToolStats(backend.TracesDir(), time.Now().AddDate(0, 0, -days))
+}
+
+// FlowTrace is one flow, by its trace id, as raw JSONL lines oldest first:
+// every run, model call, tool call and CortexDB call this machine traced
+// under it, and the lines of each peer the flow handed work to, asked for
+// over the same wire the order went out on while they answer.
+//
+// It is what an answer's trace id opens: the entry point at the root, the
+// queen's runs under it, a worker's turn under the call that ordered it.
+func (a *App) FlowTrace(traceID string) []string {
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+	return backend.FlowTrace(ctx, traceID, a.remoteRunner().PeerFlowLines)
+}
+
+// FlowLines is this machine's own lines of a flow, for the core or queen that
+// started it to merge into its timeline.
+func (a *App) FlowLines(traceID string) []string {
+	return backend.FlowLines(traceID)
 }

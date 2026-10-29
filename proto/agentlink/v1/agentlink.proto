@@ -84,6 +84,11 @@ message Call {
   string method = 2;
   // A JSON array, one element per argument.
   string args_json = 3;
+  // The W3C trace context of the flow core made the call in: the agent's
+  // work for it continues that flow as a child. Empty from a core too old
+  // to send it, or a call made outside any flow.
+  string traceparent = 4;
+  string tracestate = 5;
 }
 
 message Reply {
@@ -91,6 +96,9 @@ message Reply {
   string result_json = 2;
   // Set when the method failed; result_json is then empty.
   string error = 3;
+  // The span the agent's work for the call is (or will be), when it is in
+  // the caller's flow: core records it as the call's child.
+  string traceparent = 4;
 }
 
 // Event is one thing the agent's event bus said (cli:run, cli:event,

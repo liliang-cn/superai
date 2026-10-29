@@ -17,7 +17,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
@@ -300,7 +300,7 @@ func hintCCAwayTo(c *agentConn, away bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := c.call(ctx, "CCAwayHint", []any{away}, nil); err != nil {
-		log.Printf("cc relay: away hint to %s: %v", c.name(), err)
+		slog.Warn("cc relay: away hint", "agent", c.name(), "error", err)
 	}
 }
 
@@ -391,12 +391,12 @@ func ccAudit(e ccAuditEntry) {
 	defer ccAuditMu.Unlock()
 	p := ccAuditPath()
 	if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
-		log.Printf("cc relay: audit: %v", err)
+		slog.Warn("cc relay: audit", "error", err)
 		return
 	}
 	f, err := os.OpenFile(p, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
 	if err != nil {
-		log.Printf("cc relay: audit: %v", err)
+		slog.Warn("cc relay: audit", "error", err)
 		return
 	}
 	defer f.Close()

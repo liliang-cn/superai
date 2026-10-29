@@ -1,7 +1,7 @@
 package app
 
 import (
-	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/http/pprof"
@@ -19,7 +19,7 @@ func startPprof() {
 	}
 	host, _, err := net.SplitHostPort(addr)
 	if ip := net.ParseIP(host); err != nil || ip == nil || !ip.IsLoopback() {
-		log.Printf("SUPERLEO_PPROF=%q ignored: it must be a loopback address such as 127.0.0.1:46061", addr)
+		slog.Warn("SUPERLEO_PPROF ignored: it must be a loopback address such as 127.0.0.1:46061", "addr", addr)
 		return
 	}
 	mux := http.NewServeMux()
@@ -28,5 +28,5 @@ func startPprof() {
 	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
 	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
 	mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
-	go func() { log.Printf("pprof: %v", http.ListenAndServe(addr, mux)) }()
+	go func() { slog.Warn("pprof stopped", "error", http.ListenAndServe(addr, mux)) }()
 }

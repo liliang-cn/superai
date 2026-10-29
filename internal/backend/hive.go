@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -286,9 +286,9 @@ func (h *Hive) Join(hello HiveHello) (HiveWelcome, error) {
 	if !ok {
 		m = &HiveMember{Name: hello.Name, JoinedAt: now}
 		h.members[hello.Name] = m
-		log.Printf("hive: %s joined at %s", hello.Name, hello.URL)
+		slog.Info("member joined", "module", "hive", "member", hello.Name, "url", hello.URL)
 	} else if m.URL != hello.URL || h.stateLocked(m, now) == "lost" {
-		log.Printf("hive: %s is back at %s", hello.Name, hello.URL)
+		slog.Info("member is back", "module", "hive", "member", hello.Name, "url", hello.URL)
 	}
 	m.Role, m.URL, m.Version, m.token, m.LastSeen = hello.Role, strings.TrimRight(hello.URL, "/"), hello.Version, hello.Token, now
 	m.StartedAt, m.Engine, m.about, m.Node = hello.StartedAt, hello.Engine, hello.About, hello.Node
@@ -324,7 +324,7 @@ func (h *Hive) Leave(name string, startedAt time.Time) bool {
 		return false
 	}
 	delete(h.members, name)
-	log.Printf("hive: %s left", name)
+	slog.Info("member left", "module", "hive", "member", name)
 	return true
 }
 
@@ -337,7 +337,7 @@ func (h *Hive) Retire(names []string) {
 		if m, ok := h.members[n]; ok {
 			h.retired[n] = m.StartedAt
 			delete(h.members, n)
-			log.Printf("hive: %s retired", n)
+			slog.Info("member retired", "module", "hive", "member", n)
 		}
 	}
 }
@@ -436,7 +436,7 @@ func (a *Announcer) Hold(d time.Duration) {
 	a.mu.Lock()
 	a.holdUntil = time.Now().Add(d)
 	a.mu.Unlock()
-	log.Printf("hive: the queen is restarting; waiting up to %s for her", d.Round(time.Second))
+	slog.Info("the queen is restarting; waiting for her", "module", "hive", "up_to", d.Round(time.Second))
 }
 
 func (a *Announcer) holding() bool {
@@ -641,7 +641,7 @@ func (a *Announcer) Run(ctx context.Context) {
 		switch {
 		case err == nil:
 			if !joined {
-				log.Printf("hive: joined %q as %s", w.Queen, a.Name())
+				slog.InfoContext(ctx, "joined the queen", "module", "hive", "queen", w.Queen, "as", a.Name())
 				joined = true
 			}
 			misses, skip = 0, map[string]bool{}
@@ -652,9 +652,9 @@ func (a *Announcer) Run(ctx context.Context) {
 			}
 		default:
 			if joined {
-				log.Printf("hive: lost the queen: %v", err)
+				slog.WarnContext(ctx, "lost the queen", "module", "hive", "error", err)
 			} else if backoff == first {
-				log.Printf("hive: cannot join yet: %v", err)
+				slog.WarnContext(ctx, "cannot join yet", "module", "hive", "error", err)
 			}
 			joined = false
 			wait = backoff
@@ -860,7 +860,7 @@ func (a *Announcer) unpin() bool {
 	if a.target == "" || a.target == a.Settings.JoinURL {
 		return false
 	}
-	log.Printf("hive: %s is not queen any more; following %s", a.queen, a.Settings.JoinURL)
+	slog.Info("the queen is not queen any more; following the new one", "module", "hive", "queen", a.queen, "join_url", a.Settings.JoinURL)
 	a.target = ""
 	return true
 }
@@ -891,10 +891,10 @@ func (a *Announcer) elect(skip map[string]bool) bool {
 	}
 	a.mu.Unlock()
 	if self {
-		log.Printf("hive: %q is not answering; this member is queen now (term %d)", gone, term)
+		slog.Info("the queen is not answering; this member is queen now", "module", "hive", "gone", gone, "term", term)
 		a.OnPromote(term)
 		return true
 	}
-	log.Printf("hive: %q is not answering; %s is queen now (term %d)", gone, pick.Name, term)
+	slog.Info("the queen is not answering; another member is queen now", "module", "hive", "gone", gone, "queen", pick.Name, "term", term)
 	return false
 }

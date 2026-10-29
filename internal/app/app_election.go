@@ -16,7 +16,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/exec"
@@ -65,7 +65,7 @@ func (a *App) promoteToQueen(term int64) {
 		}
 	}
 	if err := a.SaveSettings(next); err != nil {
-		log.Printf("hive: could not take over as queen: %v", err)
+		slog.Error("could not take over as queen", "module", "hive", "error", err)
 		return
 	}
 	a.mu.Lock()
@@ -76,7 +76,7 @@ func (a *App) promoteToQueen(term int64) {
 	}
 	a.wearQueenLabel(context.Background(), term)
 	a.emit("hosts:changed", nil)
-	log.Printf("hive: queen now, term %d", term)
+	slog.Info("queen now", "module", "hive", "term", term)
 }
 
 // stepDown makes a queen that was passed over a worker of the queen after
@@ -84,7 +84,7 @@ func (a *App) promoteToQueen(term int64) {
 func (a *App) stepDown(why string) {
 	join := electionJoinURL()
 	if join == "" {
-		log.Printf("hive: should step down (%s) but $SUPERLEO_QUEEN_URL says nowhere to go", why)
+		slog.Warn("should step down but $SUPERLEO_QUEEN_URL says nowhere to go", "module", "hive", "why", why)
 		return
 	}
 	a.mu.Lock()
@@ -96,16 +96,16 @@ func (a *App) stepDown(why string) {
 	if next.Hive.Role != backend.HiveRoleQueen {
 		return
 	}
-	log.Printf("hive: stepping down: %s", why)
+	slog.Info("stepping down", "module", "hive", "why", why)
 	if label, pod := queenLabel(); label != "" && pod != "" {
 		if _, err := kubectl(context.Background(), "label", "pod", pod, label+"-"); err != nil {
-			log.Printf("hive: %v", err)
+			slog.Warn("taking off the queen label", "module", "hive", "error", err)
 		}
 	}
 	next.Hive.Role = backend.HiveRoleWorker
 	next.Hive.JoinURL = join
 	if err := a.SaveSettings(next); err != nil {
-		log.Printf("hive: could not step down: %v", err)
+		slog.Error("could not step down", "module", "hive", "error", err)
 		return
 	}
 	a.emit("hosts:changed", nil)
@@ -139,10 +139,10 @@ func (a *App) wearQueenLabel(ctx context.Context, term int64) {
 		return
 	}
 	if _, err := kubectl(ctx, "annotate", "pod", pod, "--overwrite", fmt.Sprintf("%s=%d", queenTermAnnotation, term)); err != nil {
-		log.Printf("hive: %v", err)
+		slog.WarnContext(ctx, "annotating the queen term", "module", "hive", "error", err)
 	}
 	if _, err := kubectl(ctx, "label", "pod", pod, "--overwrite", label+"=yes"); err != nil {
-		log.Printf("hive: %v", err)
+		slog.WarnContext(ctx, "wearing the queen label", "module", "hive", "error", err)
 	}
 }
 
@@ -190,7 +190,7 @@ func (a *App) keepQueenLabel(ctx context.Context) {
 		term := h.Term()
 		pods, err := labelledQueens(ctx, label)
 		if err != nil {
-			log.Printf("hive: %v", err)
+			slog.WarnContext(ctx, "listing labelled queens", "module", "hive", "error", err)
 			return
 		}
 		for other, t := range pods {
@@ -202,9 +202,9 @@ func (a *App) keepQueenLabel(ctx context.Context) {
 				return
 			}
 			if _, err := kubectl(ctx, "label", "pod", other, label+"-"); err != nil {
-				log.Printf("hive: %v", err)
+				slog.WarnContext(ctx, "taking the queen label off another pod", "module", "hive", "pod", other, "error", err)
 			} else {
-				log.Printf("hive: took the queen's label off %s (term %d, before this one's %d)", other, t, term)
+				slog.InfoContext(ctx, "took the queen's label off an earlier queen", "module", "hive", "pod", other, "its_term", t, "term", term)
 			}
 		}
 		if t, ok := pods[pod]; !ok || t != term {
@@ -273,7 +273,7 @@ func (a *App) announceRestart() {
 		}(m.URL)
 	}
 	wg.Wait()
-	log.Printf("hive: told %d members the queen is restarting", len(h.Roster()))
+	slog.Info("told the members the queen is restarting", "module", "hive", "members", len(h.Roster()))
 }
 
 // handleHiveHold is a member hearing that its queen is restarting: it waits
@@ -320,6 +320,6 @@ func loadTerm() int64 {
 
 func saveTerm(t int64) {
 	if err := os.WriteFile(termPath(), []byte(strconv.FormatInt(t, 10)+"\n"), 0o644); err != nil {
-		log.Printf("hive: could not keep the term: %v", err)
+		slog.Warn("could not keep the term", "module", "hive", "error", err)
 	}
 }

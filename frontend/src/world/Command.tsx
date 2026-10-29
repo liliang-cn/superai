@@ -24,6 +24,8 @@ import type { Host } from "../canvas/data";
 import { mentionsOf } from "./mentions";
 import { BubbleBrowser, useRequestBrowser } from "../components/BrowserCard";
 import { browserOp } from "../lib/browser";
+import { traceIdOf } from "../lib/trace";
+import TraceChip from "../components/TraceChip";
 
 
 /** A district's own actions: the things a person does there that are not
@@ -70,7 +72,7 @@ export default function Command({ view, onConversation, onTyping, hosts }: {
   // by: who answered for the queen, when not SuperLeo's own agent alone
   // (engineByline): the engine, or SuperLeo in its place.
   // `req` is the request that wrote an answer, for the browser card under it.
-  const [lines, setLines] = useState<{ who: "you" | "queen"; text: string; by?: string; req?: string }[]>([]);
+  const [lines, setLines] = useState<{ who: "you" | "queen"; text: string; by?: string; req?: string; trace?: string }[]>([]);
   const [open, setOpen] = useState(false);
   // A pod about to come or go, waiting for the person's yes.
   const [pod, setPod] = useState<{ change: PodChange; go: () => void } | null>(null);
@@ -143,6 +145,8 @@ export default function Command({ view, onConversation, onTyping, hosts }: {
   // model call is stuck on when it is (a queue, a retry, a quiet provider).
   const raw = useRef(new Map<string, string>());
   const who = useRef(new Map<string, { engine?: string; standInFor?: string }>());
+  // Each turn's flow, from its first event, for the trace id under the answer.
+  const flows = useRef(new Map<string, string>());
   const patch = (id: string, p: Partial<Turn>) => setPending((l) => l.map((x) => x.id === id ? { ...x, ...p } : x));
   useEffect(() => {
     const ours = (p: any) => !!p?.requestId && mineIds.current.has(p.requestId);
@@ -155,6 +159,7 @@ export default function Command({ view, onConversation, onTyping, hosts }: {
       if (!ours(p)) return;
       const id = p.requestId;
       credit(p);
+      if (p.type === "flow") { const tid = traceIdOf(p.content); if (tid) flows.current.set(id, tid); return; }
       // Work the queen handed out is drawn on the worker doing it.
       if (p.type === "tool_call" && p.tool && p.worker) { patch(id, { step: p.tool }); say("worker:" + p.worker, p.workerTool || p.tool, "think", 60); }
       else if (p.type === "tool_call" && p.tool) {
@@ -169,9 +174,10 @@ export default function Command({ view, onConversation, onTyping, hosts }: {
     });
     const finish = (id: string, text: string) => {
       const by = engineByline(who.current.get(id) ?? {}) || undefined;
-      mineIds.current.delete(id); raw.current.delete(id); who.current.delete(id);
+      const trace = flows.current.get(id);
+      mineIds.current.delete(id); raw.current.delete(id); who.current.delete(id); flows.current.delete(id);
       sayDone("queen", text);
-      setLines((l) => [...l, { who: "queen" as const, text, by, req: id }].slice(-12));
+      setLines((l) => [...l, { who: "queen" as const, text, by, req: id, trace }].slice(-12));
       setPending((l) => l.filter((x) => x.id !== id));
     };
     const b = EventsOn("chat:done", (p: any) => { if (!ours(p)) return; credit(p); finish(p.requestId, String(p.final ?? visibleAnswer(raw.current.get(p.requestId) ?? ""))); });
@@ -234,6 +240,7 @@ export default function Command({ view, onConversation, onTyping, hosts }: {
                 {l.who === "queen" && l.by && <span className="msg-byline-engine">{l.by}</span>}
                 {browser(l.req, false)}
                 {l.who === "queen" ? <Response>{l.text}</Response> : <SentMessage content={l.text} />}
+                {l.who === "queen" && l.trace && <TraceChip traceId={l.trace} />}
               </div>
             ))}
             {pending.map((p) => (

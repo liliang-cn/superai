@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"sort"
@@ -83,7 +83,7 @@ func (a *App) reportToQueen(v any) {
 					err = ann.SendToQueen(ctx, x)
 				}
 				if err != nil {
-					log.Printf("hive: could not report to the queen: %v", err)
+					slog.WarnContext(ctx, "could not report to the queen", "module", "hive", "error", err)
 				}
 				cancel()
 			}
@@ -403,7 +403,7 @@ func (a *App) startHive() {
 
 	creds, err := loadOrCreateCredentials()
 	if err != nil {
-		log.Printf("hive: not joining: %v", err)
+		slog.Warn("not joining", "module", "hive", "error", err)
 		return
 	}
 	ann := &backend.Announcer{Settings: s.Hive, Token: creds.Token}
@@ -427,7 +427,7 @@ func (a *App) startHive() {
 		ann.OnPromote = func(term int64) { go a.promoteToQueen(term) }
 	}
 	if err := ann.Validate(); err != nil {
-		log.Printf("hive: not joining: %v", err)
+		slog.Warn("not joining", "module", "hive", "error", err)
 		return
 	}
 	ctx, cancel := context.WithCancel(context.Background())

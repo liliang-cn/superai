@@ -3,7 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"strings"
 
 	"github.com/google/uuid"
@@ -158,7 +158,7 @@ func (a *App) onScheduledRun(run agent.PromptRun) {
 			prompt := run.Prompt
 			go func() {
 				if n := svc.DropFinishedOneShots(prompt); n > 0 {
-					log.Printf("superleo: removed %d one-shot reminder(s) after firing", n)
+					slog.Info("removed one-shot reminders after firing", "count", n)
 				}
 			}()
 		}

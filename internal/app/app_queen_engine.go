@@ -32,7 +32,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"slices"
 	"strings"
 	"sync"
@@ -316,7 +316,7 @@ func (a *App) routeToEngine(requestID, sessionID, engine, message string, fresh 
 			write(answer)
 		}
 		if err := a.appendExchange(sessionID, message, answer); err != nil {
-			log.Printf("superleo: could not record the queen engine's answer in %s: %v", sessionID, err)
+			slog.Warn("could not record the queen engine's answer", "session", sessionID, "error", err)
 		}
 		// Claude reports what the whole session has cost so far; this turn's
 		// share is what it added. The others report the turn's own.

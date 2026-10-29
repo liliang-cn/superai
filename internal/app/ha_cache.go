@@ -2,7 +2,7 @@ package app
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"os"
 	"reflect"
 	"sync"
@@ -75,7 +75,7 @@ func (a *App) refreshHA(src backend.HaifySource) {
 		// Keep what was known: a controller that blinked has not moved
 		// anything. Say so once, not every half minute.
 		if !c.failed {
-			log.Printf("ha: %v", err)
+			slog.Warn("ha refresh", "error", err)
 		}
 		c.failed = true
 	} else {

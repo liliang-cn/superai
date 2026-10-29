@@ -37,7 +37,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -111,7 +111,7 @@ func loadOrCreateCredentials() (*credentials, error) {
 			if err := writeCredentials(p, &c); err != nil {
 				return nil, fmt.Errorf("adding a session key to %s: %w", p, err)
 			}
-			log.Printf("added a session signing key to %s", p)
+			slog.Info("added a session signing key", "path", p)
 		}
 		return &c, nil
 	} else if !os.IsNotExist(err) {
@@ -140,13 +140,14 @@ func loadOrCreateCredentials() (*credentials, error) {
 	// A local worker's credentials are its queen's business only: she reads
 	// the token from its hello, nobody logs in to it, and its log is a file.
 	if os.Getenv(backend.ExitWithStdinEnv) == "1" {
-		log.Printf("generated credentials in %s", p)
+		slog.Info("generated credentials", "path", p)
 		return c, nil
 	}
-	log.Printf("no credentials found — generated a set and wrote %s", p)
-	log.Printf("  browser:  password %s", password)
-	log.Printf("  programs: Authorization: Bearer %s", c.Token)
-	log.Printf("  change them by editing that file (password_hash is bcrypt) and restarting")
+	slog.Info("no credentials found; generated a set", "path", p)
+	// The two secrets go to the terminal only, never into a log file.
+	fmt.Fprintf(os.Stderr, "  browser:  password %s\n", password)
+	fmt.Fprintf(os.Stderr, "  programs: Authorization: Bearer %s\n", c.Token)
+	slog.Info("change them by editing that file (password_hash is bcrypt) and restarting", "path", p)
 	return c, nil
 }
 
@@ -357,8 +358,13 @@ func requireAuth(c *credentials, next http.Handler) http.Handler {
 		}
 		if bearer, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); ok {
 			bearer = strings.TrimSpace(bearer)
-			if subtle.ConstantTimeCompare([]byte(bearer), want) == 1 || (c.devices != nil && c.devices.authenticate(bearer)) {
+			if subtle.ConstantTimeCompare([]byte(bearer), want) == 1 {
 				next.ServeHTTP(w, r)
+				return
+			}
+			// A paired phone or watch: its turns are flows of their own kind.
+			if c.devices != nil && c.devices.authenticate(bearer) {
+				next.ServeHTTP(w, r.WithContext(withClientKind(r.Context(), "device")))
 				return
 			}
 			// An integration's token opens one door. Known, so not a 401

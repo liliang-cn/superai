@@ -7,7 +7,7 @@ package app
 
 import (
 	"encoding/json"
-	"log"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -136,7 +136,7 @@ func (a *App) ringCalendar(now time.Time, days int) (cal *alarmplan.Calendar, ve
 				c.years[y] = fresh
 				c.mu.Unlock()
 			} else {
-				log.Printf("alarms: holidays %d: %v", y, err)
+				slog.Warn("alarms: holidays", "year", y, "error", err)
 			}
 		}
 		if !ok {

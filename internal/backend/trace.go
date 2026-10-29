@@ -327,6 +327,21 @@ func (t *TraceStore) OnSegment(ctx context.Context, info agent.SegmentInfo) {
 	}
 }
 
+// A run's own start and end: its span, with the flow's trace id, and its
+// totals. They are what joins a conversation's file to the flow a turn ran
+// in (flow.go).
+func (t *TraceStore) OnRunBegin(ctx context.Context, info agent.RunStartInfo) {
+	if w := t.writer(info.TaskID, info.SessionID); w != nil {
+		w.OnRunBegin(ctx, info)
+	}
+}
+
+func (t *TraceStore) OnRunFinish(ctx context.Context, info agent.RunEndInfo) {
+	if w := t.writer(info.TaskID, info.SessionID); w != nil {
+		w.OnRunFinish(ctx, info)
+	}
+}
+
 // OnModelDelta is deliberately not forwarded. A delta carries no task id, so
 // there is nothing to route it by — and TraceWriter has them off by default
 // anyway, because a reasoning model emits thousands per turn and a trace that

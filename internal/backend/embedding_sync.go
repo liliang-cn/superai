@@ -2,7 +2,7 @@ package backend
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"strings"
 
 	"github.com/liliang-cn/agent-go/v3/pkg/config"
@@ -46,8 +46,7 @@ func syncEmbeddingProvider(cfg *config.Config, s *Settings) error {
 			if derr := db.DeleteEmbeddingProvider(settingsEmbeddingProviderName); derr != nil {
 				return fmt.Errorf("remove embedding provider: %w", derr)
 			}
-			log.Printf("superleo: embeddings not configured in settings; removed %q from the embedding pool",
-				settingsEmbeddingProviderName)
+			slog.Info("embeddings not configured in settings; removed the provider from the embedding pool", "provider", settingsEmbeddingProviderName)
 		}
 		return nil
 	}
@@ -74,6 +73,6 @@ func syncEmbeddingProvider(cfg *config.Config, s *Settings) error {
 		}
 	}
 
-	log.Printf("superleo: embedding provider %q -> %s (%s)", settingsEmbeddingProviderName, baseURL, model)
+	slog.Info("embedding provider", "provider", settingsEmbeddingProviderName, "base_url", baseURL, "model", model)
 	return nil
 }

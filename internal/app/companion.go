@@ -24,7 +24,7 @@ import (
 	"crypto/subtle"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
@@ -206,7 +206,7 @@ func (a *App) ensureCompanion() (*companionServer, error) {
 	go func() {
 		defer close(c.done)
 		if err := c.srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Printf("open-in-browser: %v", err)
+			slog.Warn("open-in-browser", "error", err)
 		}
 	}()
 	return c, nil

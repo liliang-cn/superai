@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 	"sync"
@@ -135,7 +135,7 @@ func (n *Notifier) Send(ctx context.Context, p WebhookPayload) {
 
 	body, err := json.Marshal(p)
 	if err != nil {
-		log.Printf("superleo: webhook payload: %v", err)
+		slog.WarnContext(ctx, "webhook payload", "error", err)
 		return
 	}
 
@@ -147,7 +147,7 @@ func (n *Notifier) Send(ctx context.Context, p WebhookPayload) {
 
 	req, err := http.NewRequestWithContext(sendCtx, http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
-		log.Printf("superleo: webhook request: %v", err)
+		slog.WarnContext(ctx, "webhook request", "error", err)
 		return
 	}
 	req.Header.Set("Content-Type", "application/json")
@@ -160,12 +160,12 @@ func (n *Notifier) Send(ctx context.Context, p WebhookPayload) {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Printf("superleo: webhook post failed: %v", err)
+		slog.WarnContext(ctx, "webhook post failed", "error", err)
 		return
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 300 {
-		log.Printf("superleo: webhook returned %s", resp.Status)
+		slog.WarnContext(ctx, "webhook returned an error status", "status", resp.Status)
 	}
 }
 

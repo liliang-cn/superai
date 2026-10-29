@@ -210,6 +210,14 @@ export function FinishOnboarding(arg1, arg2) {
   return window['go']['app']['App']['FinishOnboarding'](arg1, arg2);
 }
 
+export function FlowLines(arg1) {
+  return window['go']['app']['App']['FlowLines'](arg1);
+}
+
+export function FlowTrace(arg1) {
+  return window['go']['app']['App']['FlowTrace'](arg1);
+}
+
 export function FollowUpCLIRun(arg1, arg2) {
   return window['go']['app']['App']['FollowUpCLIRun'](arg1, arg2);
 }
@@ -666,16 +674,16 @@ export function SetBrowserMode(arg1) {
   return window['go']['app']['App']['SetBrowserMode'](arg1);
 }
 
+export function SetDashboardCron(arg1, arg2) {
+  return window['go']['app']['App']['SetDashboardCron'](arg1, arg2);
+}
+
 export function SetDesktopBlockedApps(arg1, arg2) {
   return window['go']['app']['App']['SetDesktopBlockedApps'](arg1, arg2);
 }
 
 export function SetDesktopControl(arg1) {
   return window['go']['app']['App']['SetDesktopControl'](arg1);
-}
-
-export function SetDashboardCron(arg1, arg2) {
-  return window['go']['app']['App']['SetDashboardCron'](arg1, arg2);
 }
 
 export function SetHomeLayout(arg1, arg2) {

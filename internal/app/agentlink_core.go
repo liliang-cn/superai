@@ -13,7 +13,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net"
 	"sort"
 	"strings"
@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/liliang-cn/agent-go/v3/pkg/trace"
 	agentlinkpb "github.com/liliang-cn/superleo/internal/agentlink/pb"
 	"github.com/liliang-cn/superleo/internal/backend"
 	"google.golang.org/grpc"
@@ -80,7 +81,18 @@ func (c *agentConn) call(ctx context.Context, method string, args []any, out any
 		delete(c.pending, id)
 		c.mu.Unlock()
 	}()
-	frame := &agentlinkpb.CoreFrame{Kind: &agentlinkpb.CoreFrame_Call{Call: &agentlinkpb.Call{Id: id, Method: method, ArgsJson: string(raw)}}}
+	call := &agentlinkpb.Call{Id: id, Method: method, ArgsJson: string(raw)}
+	// The flow the call is made in goes with it, and the span the agent
+	// answers with is recorded as its child (flow_link.go).
+	trace.Inject(ctx, func(k, v string) {
+		switch k {
+		case trace.TraceparentHeader:
+			call.Traceparent = v
+		case trace.TracestateHeader:
+			call.Tracestate = v
+		}
+	})
+	frame := &agentlinkpb.CoreFrame{Kind: &agentlinkpb.CoreFrame_Call{Call: call}}
 	select {
 	case c.out <- frame:
 	case <-c.done:
@@ -90,6 +102,9 @@ func (c *agentConn) call(ctx context.Context, method string, args []any, out any
 	}
 	select {
 	case r := <-ch:
+		if tp := r.GetTraceparent(); tp != "" {
+			trace.NoteChild(ctx, tp)
+		}
 		if r.GetError() != "" {
 			return errors.New(r.GetError())
 		}
@@ -536,7 +551,7 @@ func ServeAgentLink(ctx context.Context, app *App, addr string, ok tokenCheck) e
 		<-ctx.Done()
 		s.GracefulStop()
 	}()
-	log.Printf("agent link on %s", addr)
+	slog.InfoContext(ctx, "agent link listening", "addr", addr)
 	return s.Serve(lis)
 }
 
@@ -571,7 +586,7 @@ func (s *agentLinkServer) Connect(stream agentlinkpb.AgentLink_ConnectServer) er
 	delete(hub.lostHello, hello.GetName())
 	hub.mu.Unlock()
 	s.app.agentsChanged()
-	log.Printf("agent %s connected from %s (%s/%s), clis %v, role %s", hello.GetName(), hello.GetHost(), hello.GetOs(), hello.GetArch(), hello.GetClis(), s.app.agentRole(c))
+	slog.InfoContext(stream.Context(), "agent connected", "agent", hello.GetName(), "host", hello.GetHost(), "os", hello.GetOs(), "arch", hello.GetArch(), "clis", hello.GetClis(), "role", s.app.agentRole(c))
 	if helloRole(hello) == agentRoleWorker {
 		go s.app.queenForWorkers(hello.GetName())
 	}
@@ -596,7 +611,7 @@ func (s *agentLinkServer) Connect(stream agentlinkpb.AgentLink_ConnectServer) er
 		hub.mu.Unlock()
 		c.closeOnce()
 		s.app.agentsChanged()
-		log.Printf("agent %s disconnected", hello.GetName())
+		slog.InfoContext(stream.Context(), "agent disconnected", "agent", hello.GetName())
 	}()
 
 	if err := stream.Send(&agentlinkpb.CoreFrame{Kind: &agentlinkpb.CoreFrame_Welcome{Welcome: &agentlinkpb.Welcome{Name: hello.GetName()}}}); err != nil {
@@ -620,7 +635,7 @@ func (s *agentLinkServer) Connect(stream agentlinkpb.AgentLink_ConnectServer) er
 				}
 			case <-ping.C:
 				if quiet := time.Since(time.UnixMilli(c.lastSeen.Load())); quiet > hub.silence {
-					log.Printf("agent %s silent for %s; dropping it", c.name(), quiet.Round(time.Second))
+					slog.WarnContext(stream.Context(), "agent silent; dropping it", "agent", c.name(), "quiet", quiet.Round(time.Second))
 					sendErr <- status.Errorf(codes.DeadlineExceeded, "no word from the agent for %s", quiet.Round(time.Second))
 					return
 				}

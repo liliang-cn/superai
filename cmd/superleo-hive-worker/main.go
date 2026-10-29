@@ -47,6 +47,7 @@ import (
 	"fmt"
 	_ "github.com/liliang-cn/superleo/internal/brand" // the old SuperLeo names keep working
 	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
@@ -92,24 +93,28 @@ func main() {
 		os.Exit(2)
 	}
 	if *queenToken == "" {
-		log.Fatal("no queen token: pass -queen-token or set $SUPERLEO_HIVE_TOKEN")
+		slog.Error("no queen token: pass -queen-token or set $SUPERLEO_HIVE_TOKEN")
+		os.Exit(1)
 	}
 
 	var engine backend.Engine
 	switch {
 	case *oaBase != "":
 		if *oaModel == "" {
-			log.Fatal("-openai-base needs -openai-model")
+			slog.Error("-openai-base needs -openai-model")
+			os.Exit(1)
 		}
 		engine = &backend.OpenAIEngine{BaseURL: *oaBase, Key: *oaKey, Model: *oaModel, System: *oaSystem}
 	case flag.NArg() > 0:
 		e := &backend.ExecEngine{Argv: flag.Args(), Dir: *dir, Mode: *mode, Stdin: *stdin, StreamInput: *streamIn}
 		if err := e.Validate(); err != nil {
-			log.Fatalf("the command is not usable: %v", err)
+			slog.Error("the command is not usable", "error", err)
+			os.Exit(1)
 		}
 		engine = e
 	default:
-		log.Fatal("nothing to run: give a command after -- (with {prompt} in it), or -openai-base")
+		slog.Error("nothing to run: give a command after -- (with {prompt} in it), or -openai-base")
+		os.Exit(1)
 	}
 
 	// A token nobody chose is one nobody has to keep: the queen is handed it in
@@ -117,21 +122,24 @@ func main() {
 	if *token == "" {
 		b := make([]byte, 24)
 		if _, err := rand.Read(b); err != nil {
-			log.Fatal(err)
+			slog.Error("cannot make a token", "error", err)
+			os.Exit(1)
 		}
 		*token = hex.EncodeToString(b)
 	}
 
 	ln, err := net.Listen("tcp", *listen)
 	if err != nil {
-		log.Fatalf("cannot listen on %s: %v", *listen, err)
+		slog.Error("cannot listen", "addr", *listen, "error", err)
+		os.Exit(1)
 	}
 	port := ln.Addr().(*net.TCPAddr).Port
 	adv := strings.TrimRight(*advertise, "/")
 	if adv == "" {
 		host, err := outboundHost(*queen)
 		if err != nil {
-			log.Fatalf("cannot tell which of this machine's addresses the queen can reach (%v): pass -advertise", err)
+			slog.Error("cannot tell which of this machine's addresses the queen can reach: pass -advertise", "queen", *queen, "error", err)
+			os.Exit(1)
 		}
 		adv = fmt.Sprintf("http://%s:%d", host, port)
 	}
@@ -146,7 +154,8 @@ func main() {
 			}
 			f, err := os.CreateTemp("", "hive-mcp-*.json")
 			if err != nil {
-				log.Fatal(err)
+				slog.Error("cannot write the hive mcp config", "error", err)
+				os.Exit(1)
 			}
 			local := fmt.Sprintf("http://127.0.0.1:%d/mcp", port)
 			json.NewEncoder(f).Encode(map[string]any{"mcpServers": map[string]any{"hive": map[string]any{
@@ -165,17 +174,19 @@ func main() {
 		About:    *about,
 	}
 	if err := ann.Validate(); err != nil {
-		log.Fatalf("cannot join: %v", err)
+		slog.Error("cannot join", "error", err)
+		os.Exit(1)
 	}
 	ad := &backend.Adapter{Token: *token, Engine: engine, Concurrency: *concurrency, Name: *name, Announcer: ann, Tell: *tell}
 	srv := &http.Server{Handler: ad.Handler()}
 	go func() {
 		if err := srv.Serve(ln); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("serve: %v", err)
+			slog.Error("serve", "error", err)
+			os.Exit(1)
 		}
 	}()
 
-	log.Printf("%s (%s) listening on %s, joining %s", *name, engine.Describe(), adv, *queen)
+	slog.Info("worker listening", "worker", *name, "engine", engine.Describe(), "advertise", adv, "queen", *queen)
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()

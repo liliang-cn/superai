@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { TraceCall, TraceLines, TurnTrace, TurnTraces } from "../../wailsjs/go/app/App";
+import { FlowTrace, TraceCall, TraceLines, TurnTrace, TurnTraces } from "../../wailsjs/go/app/App";
 import { EventsOn } from "../../wailsjs/runtime";
 import { useImeGuard } from "@/lib/ime";
 import { ChevronDown, ChevronRight, RotateCw, ScrollText, X } from "lucide-react";
@@ -56,6 +56,17 @@ export interface TraceRow {
   span_id?: string;
   call_id?: string;
   run_id?: string;
+  /** The flow: shared by every span of one request, across processes. */
+  trace_id?: string;
+  parent_span_id?: string;
+  session_id?: string;
+  agent?: string;
+  host?: string;
+  goal?: string;
+  outcome?: string;
+  /** A peer line: the worker a call handed its work to. */
+  peer?: string;
+  remote?: string[];
   model?: string;
   purpose?: string;
   args?: Record<string, unknown>;
@@ -116,7 +127,7 @@ const answered = (r: TraceRow) =>
   r.response?.tool_calls?.length ? "→ " + r.response.tool_calls.map((c) => c.name).join(", ") : r.response?.content ?? "";
 
 // what the row says, if anything: an error beats a reason beats a result.
-const detail = (r: TraceRow) => r.error ?? r.reason ?? r.message ?? r.result ?? answered(r);
+const detail = (r: TraceRow) => r.error ?? r.reason ?? r.message ?? r.result ?? (answered(r) || r.goal || (r.peer ? `→ ${r.peer}` : ""));
 
 type Turn = {
   id: string;
@@ -213,10 +224,14 @@ function TurnsStrip({ session, live }: { session: string; live?: boolean }) {
 
 export default function RunTracePanel({
   taskId,
+  flowId,
   live,
   onClose,
 }: {
   taskId: string;
+  /** Open one flow by its trace id instead of a task's or conversation's
+   *  file: every span of the request, peers' included, on one axis. */
+  flowId?: string;
   live?: boolean;
   onClose: () => void;
 }) {
@@ -225,19 +240,19 @@ export default function RunTracePanel({
   const [filter, setFilter] = useState("");
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState<string>("");
-  const [view, setView] = useState<View>("rows");
+  const [view, setView] = useState<View>(flowId ? "waterfall" : "rows");
   const ime = useImeGuard();
 
   const load = useCallback(async () => {
     setBusy(true);
     try {
-      setLines((await TraceLines(taskId, limit)) ?? []);
+      setLines((flowId ? await FlowTrace(flowId) : await TraceLines(taskId, limit)) ?? []);
     } catch {
       /* keep what is on screen */
     } finally {
       setBusy(false);
     }
-  }, [taskId, limit]);
+  }, [taskId, flowId, limit]);
 
   useEffect(() => {
     load();
@@ -288,7 +303,7 @@ export default function RunTracePanel({
       <div className="cr-trace" onClick={(e) => e.stopPropagation()}>
         <div className="cr-panel-h">
           <ScrollText size={13} />
-          <span className="cr-eyebrow">Trace · {view === "tools" ? "every tool" : taskId}</span>
+          <span className="cr-eyebrow">{flowId ? `Flow · ${flowId}` : `Trace · ${view === "tools" ? "every tool" : taskId}`}</span>
           <span className="cr-trace-views">
             {VIEWS.map((v) => (
               <button key={v.k} className={`cr-btn tiny${view === v.k ? " primary" : ""}`} onClick={() => setView(v.k)}>
@@ -304,7 +319,7 @@ export default function RunTracePanel({
 
         {view === "tools" && <ToolStatsPanel />}
 
-        {view !== "tools" && <TurnsStrip session={taskId} live={live} />}
+        {view !== "tools" && !flowId && <TurnsStrip session={taskId} live={live} />}
 
         {view !== "tools" && (
           <div className="cr-trace-bar">
@@ -326,7 +341,7 @@ export default function RunTracePanel({
               />
             )}
             {view === "waterfall" && <span className="cr-wf-grow" />}
-            {PAGES.map((n) => (
+            {!flowId && PAGES.map((n) => (
               <button
                 key={n}
                 className={`cr-btn tiny${limit === n ? " primary" : ""}`}
@@ -343,7 +358,11 @@ export default function RunTracePanel({
         )}
 
         {view === "waterfall" && (
-          <TraceWaterfall rows={all} renderDetail={(rs) => rs.map((r, i) => <TraceDetail key={`${r.event}:${i}`} id={taskId} row={r} />)} />
+          <TraceWaterfall
+            rows={all}
+            flow={!!flowId}
+            renderDetail={(rs) => rs.map((r, i) => <TraceDetail key={`${r.event}:${i}`} id={flowId ? r.session_id || taskId : taskId} row={r} />)}
+          />
         )}
 
         {view === "rows" && (
@@ -388,7 +407,7 @@ export default function RunTracePanel({
                 </span>
                 <span className="x" title={detail(r)}>{detail(r) || sent(r)}</span>
               </div>
-              {isOpen && <TraceDetail id={taskId} row={r} />}
+              {isOpen && <TraceDetail id={flowId ? r.session_id || taskId : taskId} row={r} />}
               </div>
               );
             })}

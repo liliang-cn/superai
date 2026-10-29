@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
@@ -304,6 +304,6 @@ func (b *Inbox) writeLocked(items []Notification) error {
 // file it would be worse than one that quietly loses a row.
 func logInboxError(err error) {
 	if err != nil {
-		log.Printf("superleo: notification centre: %v", err)
+		slog.Warn("notification centre", "error", err)
 	}
 }

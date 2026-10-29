@@ -9,7 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/exec"
@@ -249,7 +249,7 @@ func (a *Adapter) run(ctx context.Context, cancel context.CancelFunc, id string,
 	// listening on the stream (a turn woken by a message has no caller), and
 	// without these a failing agent fails in silence.
 	started := time.Now()
-	log.Printf("turn %s: started: %s", id[:8], oneLine(prompt, 100))
+	slog.InfoContext(ctx, "turn started", "turn", id[:8], "prompt", oneLine(prompt, 100))
 	var final string
 	var err error
 	if se, ok := a.Engine.(SteerableEngine); ok && se.Steerable() {
@@ -267,11 +267,11 @@ func (a *Adapter) run(ctx context.Context, cancel context.CancelFunc, id string,
 	took := time.Since(started).Round(time.Second)
 	switch {
 	case ctx.Err() != nil:
-		log.Printf("turn %s: cancelled after %s", id[:8], took)
+		slog.InfoContext(ctx, "turn cancelled", "turn", id[:8], "took", took)
 	case err != nil:
-		log.Printf("turn %s: failed after %s: %v", id[:8], took, err)
+		slog.WarnContext(ctx, "turn failed", "turn", id[:8], "took", took, "error", err)
 	default:
-		log.Printf("turn %s: answered after %s: %s", id[:8], took, oneLine(final, 160))
+		slog.InfoContext(ctx, "turn answered", "turn", id[:8], "took", took, "answer", oneLine(final, 160))
 	}
 	switch {
 	case ctx.Err() != nil:

@@ -141,6 +141,9 @@ export interface ChatMessage {
   /** The engine SuperLeo's own agent answered for, when no engine could. */
   standInFor?: string;
   costUsd?: number;
+  /** The flow this answer ran in: one trace id across its runs, tools,
+   *  workers and CortexDB calls. */
+  traceId?: string;
 }
 
 export interface TraceItem {

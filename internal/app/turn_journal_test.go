@@ -16,15 +16,15 @@ func TestATurnThatGoesQuietIsSaidOnce(t *testing.T) {
 	j.record("chat:event", map[string]any{"requestId": "abcdef123456", "type": "state_update", "engine": "claude", "content": "starting Claude Code…"})
 	later := time.Now().Add(2 * journalQuietFor)
 	got := j.sweepQuiet(later)
-	if len(got) != 1 || !strings.Contains(got[0], "turn abcdef12 quiet for") || !strings.Contains(got[0], "starting Claude Code…") || !strings.Contains(got[0], "[claude]") {
-		t.Fatalf("%q", got)
+	if len(got) != 1 || got[0].Turn != "abcdef12" || got[0].Quiet < journalQuietFor || !strings.Contains(got[0].Last, "starting Claude Code…") || got[0].Engine != "claude" {
+		t.Fatalf("%+v", got)
 	}
 	if again := j.sweepQuiet(later.Add(time.Minute)); len(again) != 0 {
-		t.Fatalf("said twice: %q", again)
+		t.Fatalf("said twice: %+v", again)
 	}
 	j.record("chat:done", map[string]any{"requestId": "abcdef123456", "final": "ok", "engine": "claude"})
 	if done := j.sweepQuiet(later.Add(time.Hour)); len(done) != 0 {
-		t.Fatalf("a finished turn called quiet: %q", done)
+		t.Fatalf("a finished turn called quiet: %+v", done)
 	}
 	if tr := (&App{turnLog: turnJournal{}}).TurnTraces(5); len(tr) != 0 {
 		t.Fatalf("a fresh app has turns: %+v", tr)
@@ -56,7 +56,7 @@ func TestAModelCallsWireIsInTheTimelineAndItsTroubleInTheLog(t *testing.T) {
 		t.Fatalf("%d events in the timeline", n)
 	}
 	got := logs.String()
-	if strings.Count(got, "model: step") != 3 || !strings.Contains(got, "step retry") || !strings.Contains(got, "step waiting") || strings.Contains(got, "step first_byte") {
+	if strings.Count(got, "turn model call") != 3 || !strings.Contains(got, "step retry") || !strings.Contains(got, "step waiting") || strings.Contains(got, "step first_byte") {
 		t.Fatal(got)
 	}
 }

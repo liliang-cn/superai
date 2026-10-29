@@ -24,7 +24,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -350,9 +350,9 @@ func autoInstallCLIHooks() {
 	}
 	done, errs := installCLIHooks(defaultCLIHookTargets(bin))
 	for _, err := range errs {
-		log.Printf("cli activity: %v", err)
+		slog.Warn("cli activity hooks", "error", err)
 	}
 	if len(done) > 0 {
-		log.Printf("cli activity: set %s (new sessions pick them up)", strings.Join(done, "; "))
+		slog.Info("cli activity hooks set; new sessions pick them up", "hooks", strings.Join(done, "; "))
 	}
 }

@@ -24,7 +24,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"log"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -259,7 +259,7 @@ func (p *postedKeys) claim(source, key, id string) (string, bool, error) {
 	if b, err := os.ReadFile(p.path); err == nil {
 		if err := json.Unmarshal(b, &keys); err != nil {
 			// A broken file loses the window, not the notification.
-			log.Printf("notifications: %s unreadable, starting over: %v", p.path, err)
+			slog.Warn("notifications: posted keys unreadable, starting over", "path", p.path, "error", err)
 			keys = map[string]postedKey{}
 		}
 	} else if !errors.Is(err, os.ErrNotExist) {
@@ -356,7 +356,7 @@ func (np noticePush) send(ctx context.Context, n backend.Notice) {
 func (np noticePush) deliver(ctx context.Context, alert apns.Alert, badge bool) {
 	store, err := np.devices()
 	if err != nil {
-		log.Printf("notifications: no devices to push to: %v", err)
+		slog.WarnContext(ctx, "notifications: no devices to push to", "error", err)
 		return
 	}
 	// Android phones first: their channels need no APNs client.
@@ -463,12 +463,12 @@ func pushToDevices(ctx context.Context, store *deviceStore, what string, send fu
 		cancel()
 		switch {
 		case errors.Is(err, apns.ErrDeviceGone):
-			log.Printf("%s: device %s's push token is dead, dropped: %v", what, t.DeviceID, err)
+			slog.InfoContext(ctx, "push token is dead, dropped", "module", what, "device", t.DeviceID, "error", err)
 			if derr := store.dropPushToken(t.DeviceID, t.Token); derr != nil {
-				log.Printf("%s: dropping device %s's push token: %v", what, t.DeviceID, derr)
+				slog.WarnContext(ctx, "dropping a push token", "module", what, "device", t.DeviceID, "error", derr)
 			}
 		case err != nil:
-			log.Printf("%s: push to device %s: %v", what, t.DeviceID, err)
+			slog.WarnContext(ctx, "push to device", "module", what, "device", t.DeviceID, "error", err)
 		}
 	}
 }

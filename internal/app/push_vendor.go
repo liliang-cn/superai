@@ -21,7 +21,7 @@ package app
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"sync"
 )
 
@@ -51,9 +51,9 @@ type unconfiguredSender struct {
 	once     sync.Once
 }
 
-func (s *unconfiguredSender) Send(_ context.Context, t pushTarget, _ vendorPush) error {
+func (s *unconfiguredSender) Send(ctx context.Context, t pushTarget, _ vendorPush) error {
 	s.once.Do(func() {
-		log.Printf("push: provider %s not configured; device %s gets no push until it is", s.provider, t.DeviceID)
+		slog.WarnContext(ctx, "push: provider not configured; device gets no push until it is", "provider", s.provider, "device", t.DeviceID)
 	})
 	return nil
 }
@@ -99,7 +99,7 @@ func pushToVendors(ctx context.Context, store *deviceStore, what string, senders
 			continue
 		}
 		if err := s.Send(ctx, t, p); err != nil {
-			log.Printf("%s: %s push to device %s: %v", what, t.Provider, t.DeviceID, err)
+			slog.WarnContext(ctx, "push to device", "module", what, "provider", t.Provider, "device", t.DeviceID, "error", err)
 		}
 	}
 }

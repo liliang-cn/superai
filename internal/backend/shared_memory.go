@@ -9,6 +9,7 @@ import (
 
 	"github.com/liliang-cn/agent-go/v3/pkg/domain"
 	"github.com/liliang-cn/agent-go/v3/pkg/store"
+	"google.golang.org/grpc"
 )
 
 // sharedNamespaceDefault is the namespace every other client of the shared
@@ -33,24 +34,46 @@ var errReadOnlyMemory = errors.New("shared memory: that memory belongs to anothe
 type readThroughMemoryStore struct {
 	*store.CortexRemoteMemoryStore
 	extra []*store.CortexRemoteMemoryStore
+	// conn is the one connection every namespace's store shares, dialled
+	// with the flow on every call (cortex_trace.go). The stores do not own
+	// it; this does.
+	conn *grpc.ClientConn
 
 	foreign sync.Map // memory id → struct{}, ids seen only through extra
 }
 
 func newReadThroughMemoryStore(endpoint, token, namespace string, extraNamespaces []string) (*readThroughMemoryStore, error) {
+	return newSharedMemoryStore(endpoint, token, namespace, extraNamespaces, false)
+}
+
+// newSharedMemoryStore is the shared brain's store: namespace written and
+// read, extraNamespaces read too, every call over one traced connection.
+func newSharedMemoryStore(endpoint, token, namespace string, extraNamespaces []string, useTLS bool) (*readThroughMemoryStore, error) {
+	if strings.TrimSpace(endpoint) == "" {
+		return nil, errors.New("shared memory: the memory endpoint is required")
+	}
+	if strings.TrimSpace(namespace) == "" {
+		namespace = sharedNamespaceDefault
+	}
+	conn, err := dialCortex(endpoint, useTLS)
+	if err != nil {
+		return nil, err
+	}
 	open := func(ns string) (*store.CortexRemoteMemoryStore, error) {
 		return store.NewCortexRemoteMemoryStore(store.CortexRemoteConfig{
 			Endpoint:  endpoint,
 			Token:     token,
 			Namespace: ns,
 			Scope:     "global",
+			Conn:      conn,
 		})
 	}
 	primary, err := open(namespace)
 	if err != nil {
+		_ = conn.Close()
 		return nil, err
 	}
-	rt := &readThroughMemoryStore{CortexRemoteMemoryStore: primary}
+	rt := &readThroughMemoryStore{CortexRemoteMemoryStore: primary, conn: conn}
 	seen := map[string]bool{strings.TrimSpace(namespace): true}
 	for _, ns := range extraNamespaces {
 		ns = strings.TrimSpace(ns)
@@ -147,6 +170,11 @@ func (r *readThroughMemoryStore) Close() error {
 	err := r.CortexRemoteMemoryStore.Close()
 	for _, s := range r.extra {
 		_ = s.Close()
+	}
+	if r.conn != nil {
+		if cerr := r.conn.Close(); err == nil {
+			err = cerr
+		}
 	}
 	return err
 }

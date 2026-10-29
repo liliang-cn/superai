@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/liliang-cn/superleo/internal/app"
+	"github.com/liliang-cn/superleo/internal/backend"
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
@@ -59,6 +60,9 @@ func main() {
 		app.AndroidMain(os.Args[2:])
 		return
 	}
+
+	// SuperLeo's logger, for the window's process (backend/logging.go).
+	backend.SetupLogging("desktop")
 
 	// Create an instance of the app structure
 	a := app.NewApp()
