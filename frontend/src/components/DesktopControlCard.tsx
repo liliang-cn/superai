@@ -10,7 +10,12 @@ import { translate } from "../lib/i18n";
  * the backend rebuilds around it, and the status is followed until the
  * binary is in place.
  */
-export default function DesktopControlCard({ onChanged }: { onChanged?: (on: boolean) => void }) {
+export default function DesktopControlCard({ onChanged, onBlockedChanged }: {
+  onChanged?: (on: boolean) => void;
+  /** The list as saved, null for the default: the page's own copy of the
+   *  settings must hear it, or its next save writes the old list back. */
+  onBlockedChanged?: (list: string[] | null) => void;
+}) {
   const [st, setSt] = useState<backend.DesktopStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -85,6 +90,7 @@ export default function DesktopControlCard({ onChanged }: { onChanged?: (on: boo
     else setSt((cur) => (cur ? backend.DesktopStatus.createFrom({ ...cur, blockedIsDefault: true }) : cur));
     try {
       await SetDesktopBlockedApps(list, useDefault);
+      onBlockedChanged?.(useDefault ? null : list);
     } catch (e) {
       setErr(String(e instanceof Error ? e.message : e));
     } finally {
