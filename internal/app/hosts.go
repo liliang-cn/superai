@@ -984,25 +984,32 @@ func orNone(s string) string {
 }
 
 // hostsText is the host list as the queen reads it: one line per host, its
-// agents under it, indented by how deep the host sits.
+// agents under it. A host inside another says which one in words: the list
+// is sorted by depth, so the pods come after every top-level host and an
+// indent alone reads as "inside the host above".
 func hostsText(hs []Host) string {
 	if len(hs) == 0 {
 		return "No hosts."
 	}
-	depth := map[string]int{}
+	names := map[string]string{}
+	for _, h := range hs {
+		names[h.ID] = h.Name
+	}
 	var b strings.Builder
 	for _, h := range hs {
-		d := 0
-		if h.Parent != "" {
-			d = depth[h.Parent] + 1
-		}
-		depth[h.ID] = d
-		pad := strings.Repeat("  ", d)
+		pad := ""
 		kind := h.Kind
 		if kind == "" {
 			kind = "host"
 		}
-		fmt.Fprintf(&b, "%s%s (%s", pad, h.Name, kind)
+		fmt.Fprintf(&b, "%s (%s", h.Name, kind)
+		if h.Parent != "" {
+			p := names[h.Parent]
+			if p == "" {
+				p = h.Parent
+			}
+			fmt.Fprintf(&b, " on %s", p)
+		}
 		if h.OS != "" {
 			fmt.Fprintf(&b, ", %s/%s", h.OS, h.Arch)
 		}
