@@ -11,9 +11,9 @@
 // Reading is everything a status screen shows, minus what is a secret: keys
 // and tokens are reported as set or not, a bee's hook path (its secret is in
 // the URL) is left out, and an MCP server is named but not its command line.
-// Writing is the preference whitelist in backend/selftools.go and pausing a
-// bee; the safety gates, credentials and addresses stay out of reach for the
-// reasons given there.
+// Writing is every setting, in the two tiers of backend/selfsettings.go (a
+// boundary change waits for the person on an approval card), and pausing a
+// bee.
 
 package app
 
@@ -21,7 +21,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -40,6 +39,17 @@ type selfTool struct {
 	Required []string
 	ReadOnly bool
 	Run      func(a *App, args map[string]any) (any, error)
+	// RunBy, when set, is used instead of Run, with who is asking: "" for
+	// SuperLeo's own agent, the MCP caller on /mcp.
+	RunBy func(a *App, by string, args map[string]any) (any, error)
+}
+
+// run calls the tool, as by.
+func (t selfTool) run(a *App, by string, args map[string]any) (any, error) {
+	if t.RunBy != nil {
+		return t.RunBy(a, by, args)
+	}
+	return t.Run(a, args)
 }
 
 func (t selfTool) schema() map[string]any {
@@ -63,7 +73,7 @@ func selfTools() []selfTool {
 			Description: "How this SuperLeo is doing: whether it is ready (and the error if not), the model and provider it thinks with, " +
 				"the embedding model, memory mode, skills, MCP servers and tools running, scheduler and Telegram state, its role in a hive " +
 				"and how many members and linked agents it has, and anything that needs attention. Start here for any question about itself.",
-			Run: func(a *App, _ map[string]any) (any, error) { return a.selfStatus(), nil },
+			Run: func(a *App, _ map[string]any) (any, error) { return scrubStrings(toJSONAny(a.selfStatus())), nil },
 		},
 		{
 			Name: "doctor", Title: "Health check", ReadOnly: true,
@@ -145,21 +155,34 @@ func selfTools() []selfTool {
 		},
 		{
 			Name: "settings_get", Title: "Read settings", ReadOnly: true,
-			Description: "SuperLeo's own configuration. Secrets are reported as whether they are set, never as their value. Also lists what settings_set may change, and any change still waiting to be applied.",
-			Run:         func(a *App, _ map[string]any) (any, error) { return a.selfSettings(), nil },
+			Description: "SuperLeo's own settings and the state the Settings page shows, all of it: model source (signed-in accounts or custom API) and accounts, " +
+				"the queen's engines in order, proxy (mode, address, and the proxy in use now), browser, desktop control (apps left alone, Accessibility), " +
+				"memory and embeddings, coding tools, remote agents, hive role, links and local hive, paired devices, notification channels, " +
+				"tool approval, budgets, workspace, privacy. Secrets read only \"set\" or \"not set\". " +
+				"No arguments: the whole picture (sections holds each section's settings and state). " +
+				"section: one of " + strings.Join(selfSettingsSections(), ", ") + " (settings is every key in settings.json, keys is every key's tier and meaning, requests the approval requests). " +
+				"key: one key, e.g. proxy.url. request: the outcome of a settings_set that needed approval.",
+			Params: map[string]any{
+				"section": map[string]any{"type": "string", "enum": selfSettingsSections(), "description": "one section instead of the whole picture"},
+				"key":     map[string]any{"type": "string", "description": "one key, e.g. proxy.url or channels.<id>.enabled"},
+				"request": map[string]any{"type": "string", "description": "a settings_set approval request's id"},
+			},
+			Run: func(a *App, args map[string]any) (any, error) { return a.selfSettingsGet(args) },
 		},
 		{
-			Name: "settings_set", Title: "Change a setting",
-			Description: "Change one of SuperLeo's own settings. Only preferences can be changed (settings_get lists them): the approval gate, the credentials and the addresses of the model and the memory are not writable from here. " +
-				"The change is saved at once and applied as soon as no conversation is mid-turn, since applying it restarts the agent.",
+			Name: "settings_set", Title: "Change settings",
+			Description: "Change SuperLeo's own settings: one key (key + value) or several at once (changes: {key: value}). " +
+				"Writable keys are validated and applied at once, the way the Settings page saves them (under a running turn: as soon as it ends); " +
+				"nothing not named changes. Keys that need approval (credentials, addresses data is sent to, and anything that widens what the agent may do) " +
+				"are put to the person on an approval card, whatever the approval gate or YOLO says; the answer has needs_approval with an id and " +
+				"nothing changes until they say yes; settings_get {\"request\": id} shows the outcome. Never ask the person to type a secret into a chat for this. " +
+				"A value of null clears a key. Lists of objects are addressed by id, e.g. channels.<id>.enabled.\n\n" + backend.SelfKeyTable(),
 			Params: map[string]any{
-				"key":   map[string]any{"type": "string", "description": "setting name, e.g. llm_model or max_rounds"},
-				"value": map[string]any{"description": "new value: a string, number or boolean as the setting requires"},
+				"key":     map[string]any{"type": "string", "description": "setting name, e.g. proxy.url or max_rounds"},
+				"value":   map[string]any{"description": "new value: a string, number, boolean, list or object as the setting requires"},
+				"changes": map[string]any{"type": "object", "description": "several changes at once, {key: value}; all are checked before any is applied"},
 			},
-			Required: []string{"key", "value"},
-			Run: func(a *App, args map[string]any) (any, error) {
-				return a.selfSetSetting(strings.TrimSpace(str(args["key"])), args["value"])
-			},
+			RunBy: func(a *App, by string, args map[string]any) (any, error) { return a.selfSetSettings(by, args) },
 		},
 	}, machineTools()...)
 }
@@ -179,7 +202,7 @@ func (a *App) registerSelfTools(svc *backend.Service) {
 		}
 		inner.AddToolWithMetadata(t.Name, t.Description, t.schema(),
 			func(_ context.Context, args map[string]any) (any, error) {
-				out, err := t.Run(a, args)
+				out, err := t.run(a, "", args)
 				if err != nil {
 					return map[string]any{"ok": false, "error": err.Error()}, nil
 				}
@@ -207,7 +230,7 @@ func addSelfMCPTools(s *mcp.Server, app *App, caller string) {
 			if refused := app.mcpGate(ctx, caller, tool.Name, args); refused != nil {
 				return refused, nil
 			}
-			out, err := t.Run(app, args)
+			out, err := t.run(app, caller, args)
 			if err != nil {
 				return selfErr(err.Error()), nil
 			}
@@ -231,7 +254,7 @@ func (a *App) selfStatus() map[string]any {
 	a.mu.Unlock()
 	if cfg != nil {
 		st["model"] = cfg.LLMModel
-		st["provider"] = cfg.LLMBaseURL
+		st["provider"] = backend.RedactValue("llm_base_url", cfg.LLMBaseURL)
 		st["embedModel"] = cfg.EmbedModel
 		st["maxRounds"] = cfg.MaxRounds
 	}
@@ -290,18 +313,6 @@ func (a *App) selfCodingRuns(n int) []CLIRun {
 	return runs
 }
 
-func (a *App) selfSettings() map[string]any {
-	cfg := a.GetSettings()
-	out := backend.SettingsSnapshot(&cfg)
-	if p := a.pendingSettings(); len(p) > 0 {
-		out["pending"] = p
-	}
-	if os.Getenv("SUPERLEO_SETTINGS_JSON") != "" {
-		out["note"] = "This instance takes its settings from its deployment: a change here lasts until it restarts."
-	}
-	return out
-}
-
 // Settings changes wait for a quiet moment: applying one rebuilds the agent,
 // and a rebuild closes the service a turn is running on — including the turn
 // that asked for the change, which would never get to say it was done.
@@ -315,55 +326,4 @@ func (a *App) pendingSettings() map[string]any {
 		out[k] = v
 	}
 	return out
-}
-
-func (a *App) selfSetSetting(key string, value any) (any, error) {
-	// Checked against the current settings now, so a bad key or value is the
-	// answer to this call rather than a silent failure later.
-	cfg := a.GetSettings()
-	applied, err := backend.SetWritableSetting(&cfg, key, value)
-	if err != nil {
-		return nil, err
-	}
-	a.selfPendingMu.Lock()
-	if a.selfPending == nil {
-		a.selfPending = map[string]any{}
-	}
-	a.selfPending[key] = applied
-	a.selfPendingMu.Unlock()
-	go a.applyWhenIdle(key, applied)
-
-	out := map[string]any{"key": key, "value": applied,
-		"note": "Accepted; saved and applied as soon as no conversation is mid-turn, usually right after this reply."}
-	if os.Getenv("SUPERLEO_SETTINGS_JSON") != "" {
-		out["note"] = out["note"].(string) + " This instance takes its settings from its deployment, so the change lasts until it restarts."
-	}
-	return out, nil
-}
-
-// applyWhenIdle applies one change once no turn is running, on top of
-// whatever the settings are by then, and gives up after ten minutes of
-// nobody being idle.
-func (a *App) applyWhenIdle(key string, value any) {
-	defer func() {
-		a.selfPendingMu.Lock()
-		if v, ok := a.selfPending[key]; ok && fmt.Sprint(v) == fmt.Sprint(value) {
-			delete(a.selfPending, key)
-		}
-		a.selfPendingMu.Unlock()
-	}()
-	deadline := time.Now().Add(10 * time.Minute)
-	for a.turnsRunning() > 0 {
-		if time.Now().After(deadline) {
-			return
-		}
-		time.Sleep(500 * time.Millisecond)
-	}
-	selfSettingsMu.Lock()
-	defer selfSettingsMu.Unlock()
-	cfg := a.GetSettings()
-	if _, err := backend.SetWritableSetting(&cfg, key, value); err != nil {
-		return
-	}
-	_ = a.SaveSettings(cfg)
 }

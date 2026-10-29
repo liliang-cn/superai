@@ -31,7 +31,11 @@ import (
 // still a number rather than no number.
 const selfMaxRoundsCeiling = 2000
 
-// settingsWritable is every setting the agent may change about itself.
+// settingsWritable is every setting a bare Service's own settings_set may
+// change: the one-shot `superleo` with no app around it. The app replaces
+// settings_get and settings_set with the complete pair (selfsettings.go here
+// and in app/), where every key is settable and the ones kept off this list are
+// put to the person on an approval card instead.
 //
 // The list is what it does not contain that matters:
 //

@@ -86,14 +86,27 @@ func TestSelfSettingsHideSecretsAndKeepTheWhitelist(t *testing.T) {
 		t.Fatalf("snapshot: %v %s", err, out)
 	}
 
+	// Out of range and unknown are refused; a boundary key is not refused
+	// but waits for the person, and changes nothing meanwhile.
 	for _, bad := range []map[string]any{
-		{"key": "disable_tool_approval", "value": true},
-		{"key": "llm_key", "value": "sk-other"},
 		{"key": "max_rounds", "value": 0},
+		{"key": "no_such_setting", "value": 1},
 	} {
 		if out, isErr := callSelf(t, ss, "superleo_settings_set", bad); !isErr {
 			t.Errorf("settings_set accepted %v: %s", bad, out)
 		}
+	}
+	for _, boundary := range []map[string]any{
+		{"key": "disable_tool_approval", "value": true},
+		{"key": "llm_key", "value": "sk-other"},
+	} {
+		out, isErr := callSelf(t, ss, "superleo_settings_set", boundary)
+		if isErr || !strings.Contains(out, `"needs_approval"`) || strings.Contains(out, "sk-other") {
+			t.Errorf("settings_set %v: %v %s", boundary["key"], isErr, out)
+		}
+	}
+	if s := app.GetSettings(); s.DisableToolApproval || s.LLMKey != "sk-very-secret" {
+		t.Fatalf("a boundary key changed without approval: %+v", s)
 	}
 }
 
