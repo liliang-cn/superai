@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   ArrowUpIcon, HexagonIcon, 
   PlusIcon, SquareIcon, SquarePenIcon, CalendarIcon, AlarmClockIcon, TerminalIcon, TriangleAlertIcon, XIcon, ChevronRightIcon,
-  LayoutDashboardIcon, ActivityIcon, GaugeIcon, ScrollTextIcon, PaperclipIcon,
+  LayoutDashboardIcon, ActivityIcon, GaugeIcon, ScrollTextIcon, PaperclipIcon, PanelLeftCloseIcon, PanelLeftOpenIcon,
 } from "lucide-react";
 import RunTracePanel from "../components/RunTracePanel";
 import TraceChip from "../components/TraceChip";
@@ -172,6 +172,9 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
   const clampWidth = (n: number) => Math.round(Math.max(200, Math.min(480, (layoutRef.current?.clientWidth ?? 1200) - (folded || window.matchMedia("(max-width: 1240px)").matches ? 418 : 760), n)));
   const resizeSide = (n: number) => setSideWidth(clampWidth(n));
   useEffect(() => { try { localStorage.setItem("superleo-desk-side-width", String(sideWidth)); } catch { /* private window */ } }, [sideWidth]);
+  // The conversation list folds away to give the conversation the room; kept per device.
+  const [sideFolded, setSideFolded] = useState(() => { try { return localStorage.getItem("superleo-desk-side-folded") === "1"; } catch { return false; } });
+  const foldSide = (on: boolean) => { setSideFolded(on); try { localStorage.setItem("superleo-desk-side-folded", on ? "1" : "0"); } catch { /* private window */ } };
   useEffect(() => {
     const fit = () => setSideWidth((n) => clampWidth(n));
     window.addEventListener("resize", fit);
@@ -380,10 +383,11 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
   const title = onQueen ? queenTitle(queen) : recents.find((s) => s.id === chat.sessionId)?.title || t("Conversation");
 
   return (
-    <div ref={layoutRef} className={`${folded ? "dk folded" : "dk"}${resizing ? " dk-resizing" : ""}`} style={{ "--dk-side-width": `${sideWidth}px` } as CSSProperties}>
+    <div ref={layoutRef} className={`${folded ? "dk folded" : "dk"}${sideFolded ? " side-folded" : ""}${resizing ? " dk-resizing" : ""}`} style={{ "--dk-side-width": sideFolded ? "0px" : `${sideWidth}px` } as CSSProperties}>
       <aside id="desk-sidebar" className="cv-glass dk-side">
         <div className="dk-ws">
           <b>SuperLeo</b>
+          <button className="dk-icon" title={t("Hide sidebar")} aria-label={t("Hide sidebar")} aria-controls="desk-sidebar" aria-expanded="true" onClick={() => foldSide(true)} style={{ marginLeft: "auto" }}><PanelLeftCloseIcon size={17} /></button>
           <button className="dk-icon" title={t("New chat")} aria-label={t("New chat")} onClick={() => { chat.newSession(); setOnQueen(false); }}><SquarePenIcon size={17} /></button>
         </div>
         <button className={onQueen ? "dk-row on" : "dk-row"} onClick={() => pickSession(queenId)}><span className="dk-qhex">Q</span>{queenTitle(queen)}</button>
@@ -450,7 +454,7 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
         </div>
       </aside>
 
-      <div className="dk-side-resizer" role="separator" tabIndex={0}
+      {!sideFolded && <div className="dk-side-resizer" role="separator" tabIndex={0}
         aria-label={t("Resize sidebar")} aria-orientation="vertical" aria-controls="desk-sidebar"
         aria-valuemin={200} aria-valuemax={480} aria-valuenow={sideWidth}
         title={t("Drag to resize · double-click to reset")}
@@ -468,9 +472,13 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
         }}
         onPointerUp={(e) => { if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId); setResizing(false); }}
         onLostPointerCapture={() => setResizing(false)}
-      />
+      />}
       <section className="cv-glass dk-chat">
         <header className="dk-chead">
+          {sideFolded && <>
+            <button className="dk-icon" title={t("Show sidebar")} aria-label={t("Show sidebar")} aria-controls="desk-sidebar" aria-expanded="false" onClick={() => foldSide(false)}><PanelLeftOpenIcon size={17} /></button>
+            <button className="dk-icon" title={t("New chat")} aria-label={t("New chat")} onClick={() => { chat.newSession(); setOnQueen(false); }}><SquarePenIcon size={17} /></button>
+          </>}
           <span className="dk-qhex big">Q</span>
           <div><b title={title}>{title}</b><small><i className={hive.role ? "dk-ok" : "dk-off"} />{status}</small></div>
           {/* What this conversation's runs sent the model, and what each tool
