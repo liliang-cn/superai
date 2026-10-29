@@ -227,7 +227,7 @@ func (a *App) alarmsMayHaveChanged() { a.alarmWatch().poke() }
 // startAlarmWatch runs the watcher, except on a hive worker: the phones are
 // paired to the queen, and the queen is the one watching.
 func (a *App) startAlarmWatch() {
-	if !a.queenHere() {
+	if a.isHiveMember() {
 		return
 	}
 	a.mu.Lock()

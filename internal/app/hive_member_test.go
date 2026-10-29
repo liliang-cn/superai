@@ -130,10 +130,10 @@ func TestJoiningAHiveMakesTheMacItsWorker(t *testing.T) {
 	mac.ownTurnFn = func(string, string, string, string) {}
 	t.Cleanup(func() { _, _ = mac.LeaveHive() })
 
-	// Not in the hive yet it is still no queen: the window is a client.
+	// On its own it is its own queen: the duties run.
 	mac.startAlarmWatch()
 	mac.startAgentDoor()
-	if d := mac.localDuties(); len(d) != 0 {
+	if d := mac.localDuties(); !contains(d, "alarms") || !contains(d, "door") {
 		t.Fatalf("duties alone: %v", d)
 	}
 
@@ -218,7 +218,7 @@ func TestJoiningAHiveMakesTheMacItsWorker(t *testing.T) {
 }
 
 // Leaving asks the hive to forget the Mac and gives the duties back.
-func TestLeavingAHiveLeavesTheMacNoQueen(t *testing.T) {
+func TestLeavingAHiveRestoresTheMacAsItsOwnQueen(t *testing.T) {
 	t.Setenv("SUPERLEO_HOME", t.TempDir())
 	t.Setenv("SUPERLEO_AGENT_DOOR_PORT", strconv.Itoa(freePort(t)))
 	prev := windowEmit
@@ -246,7 +246,7 @@ func TestLeavingAHiveLeavesTheMacNoQueen(t *testing.T) {
 	if mac.HiveLinkStatus().Linked {
 		t.Fatal("the window is still on the hive")
 	}
-	if d := mac.localDuties(); len(d) != 0 {
+	if d := mac.localDuties(); !contains(d, "alarms") || !contains(d, "door") {
 		t.Fatalf("duties after leaving: %v", d)
 	}
 	waitFor(t, "the queen to lose the Mac", func() bool { return hive.core.agents().get(st.Name) == nil && !mac.HiveMembership().Connected })

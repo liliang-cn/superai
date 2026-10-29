@@ -1,9 +1,9 @@
 package app
 
-// One hive, and its queen is a served core. The desktop window is a client
-// of it: a member of the hive, or not yet joined, and never a queen of its
-// own, nor one that quietly takes over because the real one is out of reach,
-// since two queens are two sets of conversations and memories.
+// One hive: this process is either a hive of one machine (its own queen), or
+// a member of a hive whose queen is elsewhere. Never both, and never a queen
+// that quietly takes over because the real one is out of reach, since two
+// queens are two sets of conversations and memories.
 //
 // Membership is what is on disk, in the app's own home:
 //
@@ -119,11 +119,6 @@ type hiveMemberState struct {
 // isHiveMember is whether this process is a member of a hive whose queen is
 // another SuperLeo. It is true from the moment a join is saved until a leave.
 func (a *App) isHiveMember() bool { return a.member.cur.Load() != nil }
-
-// queenHere is whether this process does the queen's duties. There is one
-// hive and its queen is a served core: the desktop window (a.ctx set) is a
-// client of it, joined or not, and never a hive of its own.
-func (a *App) queenHere() bool { return a.ctx == nil && !a.isHiveMember() }
 
 // refreshMember reads the membership from disk.
 func (a *App) refreshMember() { a.member.cur.Store(loadHiveMember()) }
@@ -337,9 +332,10 @@ func (a *App) enterHive(m *hiveMember) {
 	a.emitMembership()
 }
 
-// LeaveHive takes this Mac out of its hive: the hive is asked to forget it
-// and the link stops. The window waits to join again; the conversations it
-// held stay with the hive.
+// LeaveHive takes this Mac out of its hive: the hive is asked to forget it,
+// the link stops, and the queen's duties start again here — this Mac is its
+// own hive, as before it joined. The conversations it held stay with the
+// hive.
 func (a *App) LeaveHive() (HiveMembership, error) {
 	ms := &a.member
 	ms.mu.Lock()
@@ -423,7 +419,7 @@ func (a *App) stopQueenDuties() {
 // startQueenDuties starts them, for a Mac that is not in a hive: at boot, and
 // after leaving.
 func (a *App) startQueenDuties() {
-	if !a.queenHere() {
+	if a.isHiveMember() {
 		return
 	}
 	a.startScheduler()
@@ -440,7 +436,7 @@ func (a *App) startQueenDuties() {
 // startAgentDoor opens the door other machines join this one by, unless this
 // Mac is in a hive, whose queen has the door.
 func (a *App) startAgentDoor() {
-	if !a.queenHere() {
+	if a.isHiveMember() || a.ctx == nil {
 		return
 	}
 	a.doorMu.Lock()

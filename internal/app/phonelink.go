@@ -215,7 +215,7 @@ func (a *App) ensurePhoneLink() (*phoneLink, error) {
 	if a.ctx == nil {
 		return nil, errors.New("only the desktop app opens a phone link")
 	}
-	if !a.queenHere() {
+	if a.isHiveMember() {
 		return nil, errors.New("phones pair with the hive's queen, not with this Mac")
 	}
 	c, err := a.ensureCompanion()
@@ -289,7 +289,7 @@ func (a *App) stopPhoneLink() {
 
 // startPhoneLinkIfPaired opens the link at startup for phones paired before.
 func (a *App) startPhoneLinkIfPaired() {
-	if !a.queenHere() {
+	if a.isHiveMember() {
 		return
 	}
 	s, err := openDevices(devicesPath())

@@ -176,7 +176,7 @@ func (a *App) OpenInBrowser() (string, error) {
 }
 
 func (a *App) ensureCompanion() (*companionServer, error) {
-	if !a.queenHere() {
+	if a.isHiveMember() {
 		return nil, errInAHive
 	}
 	a.mu.Lock()

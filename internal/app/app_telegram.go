@@ -25,7 +25,7 @@ var telegramPolling atomic.Bool
 func (a *App) startTelegram() {
 	a.stopTelegram()
 	// A member of a hive: the bot belongs to the queen.
-	if !a.queenHere() {
+	if a.isHiveMember() {
 		return
 	}
 

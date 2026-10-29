@@ -204,7 +204,7 @@ var cgnatNet = func() *net.IPNet { _, n, _ := net.ParseCIDR("100.64.0.0/10"); re
 // not one the person said is to stay on its own (Hive.Standalone).
 func (a *App) queenForWorkers(who string) {
 	// A member's queen is another SuperLeo; it never makes itself one.
-	if !a.queenHere() {
+	if a.isHiveMember() {
 		return
 	}
 	// Two thinking machines joining at once make one queen, not two saves.
