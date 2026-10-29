@@ -72,6 +72,7 @@ func (a *App) registerCodingAgentTools(svc *backend.Service, cfg *backend.Settin
 		func(ctx context.Context, args map[string]any) (any, error) {
 			id := a.tasks().Start(str(args["agent"]), backend.TaskOut, str(args["prompt"]))
 			a.tasks().InSession(id, backend.ChatSessionFrom(ctx))
+			ctx = withBoardTask(ctx, id)
 			out := a.runCodingAgent(ctx, str(args["agent"]), str(args["prompt"]), str(args["cwd"]), str(args["continue_run"]))
 			a.finishDelegated(id, out["ok"] == true, fmt.Sprint(orEmpty(out["answer"])), fmt.Sprint(orEmpty(out["error"])))
 			return out, nil
@@ -90,6 +91,8 @@ func (a *App) codingAgents() []map[string]string {
 	return out
 }
 
+// runCodingAgent is told which board entry it works for through ctx
+// (withBoardTask); the run's events then feed that entry as they come.
 func (a *App) runCodingAgent(ctx context.Context, name, prompt, cwd, cont string) map[string]any {
 	fail := func(msg string) map[string]any { return map[string]any{"ok": false, "error": msg} }
 	if !a.isDrivenCLI(name) {
@@ -108,7 +111,8 @@ func (a *App) runCodingAgent(ctx context.Context, name, prompt, cwd, cont string
 	_, span := backend.StartSpan(ctx, "coding."+name, prompt)
 	done := make(chan CLIRun, 1)
 	o := cliStart{Agent: name, Prompt: prompt, Cwd: cwd, Ask: !unattended,
-		Done: func(r CLIRun) { done <- r }}
+		Watch: a.cliTaskFeed(boardTaskFrom(ctx)),
+		Done:  func(r CLIRun) { done <- r }}
 	if cont != "" {
 		s := a.cliStore()
 		s.mu.Lock()
@@ -170,7 +174,7 @@ func (a *App) delegateOutside(ctx context.Context, name, prompt string) (text st
 	case a.isDrivenCLI(name):
 		id := a.tasks().Start(name, backend.TaskOut, prompt)
 		a.tasks().InSession(id, backend.ChatSessionFrom(ctx))
-		out := a.runCodingAgent(ctx, name, prompt, "", "")
+		out := a.runCodingAgent(withBoardTask(ctx, id), name, prompt, "", "")
 		ok := out["ok"] == true
 		answer, errMsg := fmt.Sprint(orEmpty(out["answer"])), fmt.Sprint(orEmpty(out["error"]))
 		a.finishDelegated(id, ok, answer, errMsg)
