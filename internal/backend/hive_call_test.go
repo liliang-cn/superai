@@ -189,3 +189,34 @@ func TestRunRoutesAURLEntryToTheWorker(t *testing.T) {
 		t.Fatalf("got %+v, %v", res, err)
 	}
 }
+
+// A worker's turn waiting for its browser is queued on the queen's board, and
+// working again when its turn comes.
+func TestAWorkerWaitingForItsBrowserShowsAsQueued(t *testing.T) {
+	f := newFakeWorker(t, "")
+	f.onSend = func(_, _ string, r *fakeWorker) string {
+		go func() {
+			time.Sleep(50 * time.Millisecond)
+			r.emit("chat:event", map[string]any{"requestId": "req-1", "type": "state_update", "content": BrowserQueued + ": browser chrome is in use by chat-A; waiting for it"})
+			r.emit("chat:event", map[string]any{"requestId": "req-1", "type": "state_update", "content": BrowserFree + ": chrome is this run's after 2s in the queue"})
+			r.emit("chat:event", map[string]any{"requestId": "req-1", "type": "state_update", "content": "something else"})
+			r.emit("chat:done", map[string]any{"requestId": "req-1", "final": "ok"})
+		}()
+		return "req-1"
+	}
+	var mu sync.Mutex
+	var phases []string
+	res := askWorker(context.Background(), workerTarget{name: "w", url: f.srv.URL}, "x", func(phase, tool string) {
+		mu.Lock()
+		phases = append(phases, phase+":"+tool)
+		mu.Unlock()
+	})
+	if res.Failed {
+		t.Fatalf("got %+v", res)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if got := strings.Join(phases, ","); got != PhaseQueued+":browser,"+PhaseThinking+":" {
+		t.Fatalf("phases %s", got)
+	}
+}

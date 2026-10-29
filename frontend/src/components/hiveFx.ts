@@ -94,7 +94,7 @@ export function runningOn(id: string, role: string, tasks: StageTask[]): StageTa
 
 /** What a node is doing, in a few words: "thinking 12s", "⚙ bash 30s". */
 export function doing(task: StageTask, withTime = true): string {
-  const what = task.phase === "tool" ? `⚙ ${task.tool || "tool"}` : task.phase === "writing" ? "writing" : "thinking";
+  const what = task.phase === "tool" ? `⚙ ${task.tool || "tool"}` : task.phase === "writing" ? "writing" : task.phase === "queued" ? "排队中" : "thinking";
   if (!withTime) return what;
   const secs = Math.max(0, Math.round((Date.now() - Date.parse(task.started_at)) / 1000));
   return `${what} ${secs}s`;

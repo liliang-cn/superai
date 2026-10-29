@@ -588,7 +588,7 @@ const HiveHex3D = forwardRef<StageHandle, Props>(function HiveHex3D({ role, self
         let subColor = pal.dim;
         if (task) {
           const secs = Math.max(0, Math.round((Date.now() - Date.parse(task.started_at)) / 1000));
-          sub = `${task.phase === "tool" ? `⚙ ${task.tool || "tool"}` : task.phase === "writing" ? "writing…" : "thinking…"}  ${secs}s`;
+          sub = `${task.phase === "tool" ? `⚙ ${task.tool || "tool"}` : task.phase === "writing" ? "writing…" : task.phase === "queued" ? "排队中…" : "thinking…"}  ${secs}s`;
           subColor = pal.accent;
         }
         const name = n.id === QUEEN ? (rl === "worker" ? "queen" : me || "queen") : n.id === SELF ? me || "worker" : short(n.id);

@@ -95,6 +95,8 @@ type BrowserStatus struct {
 	// page shows a connect button instead of dialling the stream in a loop.
 	Connected bool   `json:"connected"`
 	Error     string `json:"error,omitempty"`
+	// Queue is which run has the browser and which wait for it.
+	Queue *BrowserQueueStatus `json:"queue,omitempty"`
 }
 
 // browserRuntime is one service's browser and how far getting it running has
@@ -123,6 +125,9 @@ type browserRuntime struct {
 
 	tabMu        sync.Mutex // one ensureOwnTab at a time
 	attachFailed time.Time  // when reaching Chrome last failed, under tabMu
+
+	// queue lines up the runs that want this browser (browser_queue.go).
+	queue *browserQueue
 }
 
 func (b *browserRuntime) setErr(err error) {
@@ -144,6 +149,11 @@ func (s *Service) BrowserStatus() BrowserStatus {
 	b := s.browser
 	st.Enabled, st.Mode = true, b.mode
 	st.Ready = b.ready.Load()
+	if b.queue != nil {
+		if q := b.queue.status(); q.Holder != "" || len(q.Waiting) > 0 {
+			st.Queue = &q
+		}
+	}
 	if st.Ready {
 		if addr, connected, err := b.streamInfo(); err == nil {
 			st.StreamURL = "ws://" + addr + "/"
@@ -367,9 +377,25 @@ func (b *browserRuntime) forgetStream() {
 func (s *Service) startBrowser(mode string) {
 	ctx, cancel := context.WithCancel(context.Background())
 	b := &browserRuntime{mode: mode, env: browserEnv(mode), cancel: cancel}
+	b.queue = browserQueueFor(browserKey(mode, b.env))
 	s.browser = b
 	if mode == BrowserModeChrome {
 		s.guardPersonsChrome(b)
+	}
+	if s.gate != nil {
+		// Every browser call first waits until its run has the browser to
+		// itself (takeBrowser); in the person's Chrome it then makes sure the
+		// session is in its own tab and not the one the person has in front
+		// (ensureOwnTab).
+		s.gate.Guard(BrowserTool(""), func(ctx context.Context) error {
+			if err := b.takeBrowser(ctx); err != nil {
+				return err
+			}
+			if b.mode == BrowserModeChrome {
+				return b.ensureOwnTab(ctx)
+			}
+			return nil
+		})
 	}
 	go func() {
 		bin, err := EnsureAgentBrowser(ctx)
@@ -422,9 +448,6 @@ func (s *Service) guardPersonsChrome(b *browserRuntime) {
 	if s.gate != nil {
 		s.gate.Forbid(BrowserTool("close"), why)
 		s.gate.Forbid(BrowserTool("tab_close"), why)
-		// Every browser call first makes sure the session is in its own tab
-		// and not in the one the person has in front (ensureOwnTab).
-		s.gate.Guard(BrowserTool(""), b.ensureOwnTab)
 	}
 	b.env["AGENT_BROWSER_PIN_TAB"] = "1"
 	policy := filepath.Join(DataDir(), "browser-policy.json")

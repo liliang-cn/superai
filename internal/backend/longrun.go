@@ -148,6 +148,15 @@ func (s *Service) StreamLong(ctx context.Context, goal string, o LongRunOptions,
 	}
 	before := snapshotWorkspace(root)
 
+	// One browser claim for the whole task, across its segments.
+	emit = serialEmit(emit)
+	session := "long-run"
+	if o.TaskID != "" {
+		session = "long-run:" + o.TaskID
+	}
+	ctx, releaseBrowser := s.withBrowserTurn(ctx, session, emit)
+	defer releaseBrowser()
+
 	began := time.Now()
 	stream := s.svc.RunSegmentsStream(ctx, goal, cfg, opts...)
 	for ev := range stream.Events {

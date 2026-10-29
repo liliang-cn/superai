@@ -321,6 +321,12 @@ export function BrowserPanel({ onClose }: { onClose: () => void }) {
           <span>{s.socket === "open" && s.connected !== false ? t("Connected") : t(block.label || "Not connected")}</span>
           {s.status?.mode && s.status.mode !== "off" && <span>{s.status.mode === "chrome" ? "Chrome" : t("Own browser")}</span>}
           {s.meta && <span>{s.meta.deviceWidth}×{s.meta.deviceHeight}</span>}
+          {s.status?.queue?.holder && (
+            <span title={[s.status.queue.holder, ...(s.status.queue.waiting ?? [])].join("\n")}>
+              {t("In use by")} {s.status.queue.holder}
+              {s.status.queue.waiting?.length ? ` · 排队中 ${s.status.queue.waiting.length}` : ""}
+            </span>
+          )}
           {s.status?.version && <span className="bw-ver">agent-browser {s.status.version}</span>}
         </div>
       </div>

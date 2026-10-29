@@ -273,6 +273,14 @@ func askWorker(ctx context.Context, t workerTarget, prompt string, progress func
 					phase = PhaseThinking
 				case "partial":
 					phase = PhaseWriting
+				case "state_update":
+					// The worker's turn in line for its browser, and out of it.
+					content, _ := ev.Payload["content"].(string)
+					if strings.HasPrefix(content, BrowserQueued) {
+						phase = PhaseQueued
+					} else if strings.HasPrefix(content, BrowserFree) {
+						phase = PhaseThinking
+					}
 				case "tool_result":
 					// Not a phase, but how a call came out is part of the
 					// picture the queen shows while she waits, and its data
@@ -369,6 +377,16 @@ func askWorker(ctx context.Context, t workerTarget, prompt string, progress func
 						progress(PhaseThinking, "")
 					case "partial":
 						progress(PhaseWriting, "")
+					case "state_update":
+						content, _ := ev.Payload["content"].(string)
+						if strings.HasPrefix(content, BrowserQueued) {
+							progress(PhaseQueued, "browser")
+							if t.live != nil {
+								t.live(content)
+							}
+						} else if strings.HasPrefix(content, BrowserFree) {
+							progress(PhaseThinking, "")
+						}
 					}
 				}
 				continue

@@ -734,6 +734,10 @@ func (s *Service) StreamTurn(ctx context.Context, sessionID, message string, ima
 	// running after its turn's answer, or failure, has gone out.
 	ctx, endTurn := context.WithCancel(ctx)
 	defer endTurn()
+	// The browser this turn takes, if it takes it, is free again when it ends.
+	emit = serialEmit(emit)
+	ctx, releaseBrowser := s.withBrowserTurn(ctx, sessionID, emit)
+	defer releaseBrowser()
 	// The turn is an entry point's flow, or joins the one it was asked in
 	// (flow.go). Whoever streams it hears the flow first, to show and link.
 	ctx, flow := beginTurnFlow(ctx, sessionID, message)

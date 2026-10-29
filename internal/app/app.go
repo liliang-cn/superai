@@ -1187,6 +1187,16 @@ func (a *App) ownTurn(requestID, sessionID, message string, imagePaths []string,
 			case agent.EventTypeSteerDropped:
 				// Hive mail put into this turn that it ended without reading.
 				a.steerDropped(ev.Content)
+			case agent.EventTypeStateUpdate:
+				// Waiting in line for the browser (backend/browser_queue.go):
+				// the order shows as queued, not working, until its turn.
+				switch {
+				case strings.HasPrefix(ev.Content, backend.BrowserQueued):
+					board.Progress(taskID, backend.PhaseQueued, "browser")
+					board.Live(taskID, ev.Content)
+				case strings.HasPrefix(ev.Content, backend.BrowserFree):
+					board.Progress(taskID, backend.PhaseThinking, "")
+				}
 			}
 			// Every type is forwarded, unfiltered: "thinking" and "state_update"
 			// are the only progress the UI has while PTC writes its code.

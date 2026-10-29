@@ -249,7 +249,7 @@ export default function HiveView() {
     ? `${short(t.from ?? "")} ⇄ ${short(t.worker)}`
     : t.dir === "out" ? short(t.worker) : "queen";
   const phase = (t: Task) => (t.state === "running"
-    ? t.phase === "tool" ? `⚙ ${t.tool || "tool"}` : t.phase === "writing" ? "writing…" : "thinking…"
+    ? t.phase === "tool" ? `⚙ ${t.tool || "tool"}` : t.phase === "writing" ? "writing…" : t.phase === "queued" ? "排队中…" : "thinking…"
     : t.state) + (t.tools > 0 ? ` · ${t.tools} tool${t.tools === 1 ? "" : "s"}` : "");
 
   const overview = (

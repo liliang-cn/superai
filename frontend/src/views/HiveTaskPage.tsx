@@ -38,6 +38,8 @@ const stepLabel = (e: TaskStep) => {
       return "thinking";
     case "writing":
       return "writing the answer";
+    case "queued":
+      return "排队中 · waiting for the browser";
     case "done":
       return "done";
     case "failed":
@@ -150,7 +152,7 @@ export default function HiveTaskPage({
                     <span className="hive-step-dot" />
                     <span className="hive-step-what">{stepLabel(e)}</span>
                     <span className="hive-dim hive-step-at">+{span(at - Date.parse(t.started_at))}</span>
-                    {(e.phase === "thinking" || e.phase === "tool" || e.phase === "writing") && (
+                    {(e.phase === "thinking" || e.phase === "tool" || e.phase === "writing" || e.phase === "queued") && (
                       <span className="hive-dim hive-step-for">{span(next - at)}</span>
                     )}
                   </li>

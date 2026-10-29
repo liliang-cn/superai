@@ -409,7 +409,7 @@ const HiveHex = forwardRef<StageHandle, Props>(function HiveHex({ role, self, wo
         if (task) {
           const secs = Math.max(0, Math.round((Date.now() - Date.parse(task.started_at)) / 1000));
           sub =
-            task.phase === "tool" ? `⚙ ${task.tool || "tool"}` : task.phase === "writing" ? "writing…" : "thinking…";
+            task.phase === "tool" ? `⚙ ${task.tool || "tool"}` : task.phase === "writing" ? "writing…" : task.phase === "queued" ? "排队中…" : "thinking…";
           sub += `  ${secs}s`;
           ctx.fillStyle = pal.accent;
         }

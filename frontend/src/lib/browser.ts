@@ -20,6 +20,8 @@ export interface BrowserStatus {
   /** Attached to its browser. False in the person's Chrome until a connect. */
   connected?: boolean;
   error?: string;
+  /** Which run has the browser and which wait in line for it. */
+  queue?: { holder?: string; holderSince?: string; waiting?: string[] };
 }
 
 const OFF: BrowserStatus = { enabled: false, ready: false, version: "", mode: "off", streamUrl: "" };
