@@ -1,6 +1,8 @@
 package app
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/liliang-cn/superleo/internal/backend"
@@ -101,5 +103,19 @@ func TestWithNoModelABusyEngineTakesTheNextAskToo(t *testing.T) {
 	id := h.a.SendChat(conv, "and this?", nil)
 	if name, p := h.ev.wait(t, id); name != "chat:done" {
 		t.Fatalf("ended with %s: %v", name, p)
+	}
+}
+
+// opencode keeps its keys in its config as often as in `opencode auth`: a
+// provider there with an apiKey makes it something to think with.
+func TestOpencodeWithAKeyInItsConfigCanWork(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	dir := t.TempDir()
+	if opencodeHasKey(dir) {
+		t.Fatal("no config, no credentials, and still a key")
+	}
+	os.WriteFile(filepath.Join(dir, "opencode.jsonc"), []byte(`{"provider":{"anthropic":{"options":{"apiKey":"sk-x"}}}}`), 0o600)
+	if !opencodeHasKey(dir) {
+		t.Fatal("the key in the config was not seen")
 	}
 }

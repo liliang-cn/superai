@@ -198,6 +198,43 @@ var signedInChecks = map[string]func(bin string) bool{
 		out, err := askAgent(bin, true, "login", "status")
 		return err == nil && strings.Contains(strings.ToLower(string(out)), "logged in")
 	},
+	// A provider with a key in its config, or a credential `opencode auth`
+	// saved: either is something to think with.
+	"opencode": func(string) bool { return opencodeHasKey(opencodeConfigDir()) },
+}
+
+// opencodeHasKey reports whether opencode has a model it can call: a
+// provider in opencode.json(c) under dir with an apiKey, or a credential in
+// its auth.json.
+func opencodeHasKey(dir string) bool {
+	for _, name := range []string{"opencode.json", "opencode.jsonc"} {
+		raw, err := os.ReadFile(filepath.Join(dir, name))
+		if err != nil {
+			continue
+		}
+		var cfg struct {
+			Provider map[string]struct {
+				Options struct {
+					APIKey string `json:"apiKey"`
+				} `json:"options"`
+			} `json:"provider"`
+		}
+		if json.Unmarshal(raw, &cfg) != nil {
+			continue
+		}
+		for _, p := range cfg.Provider {
+			if strings.TrimSpace(p.Options.APIKey) != "" {
+				return true
+			}
+		}
+	}
+	h, err := os.UserHomeDir()
+	if err != nil {
+		return false
+	}
+	raw, err := os.ReadFile(filepath.Join(h, ".local", "share", "opencode", "auth.json"))
+	var creds map[string]json.RawMessage
+	return err == nil && json.Unmarshal(raw, &creds) == nil && len(creds) > 0
 }
 
 // askAgent runs one short command of an agent's CLI and returns what it
