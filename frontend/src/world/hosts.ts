@@ -174,7 +174,7 @@ export function planHosts(hosts: Host[], services: HAService[]): HostPlan {
   ring(plots);
 
   const coreParent = core?.parent ? plots.find((p) => p.host.id === top(core).id) : undefined;
-  const coreCrew = core && !coreIsPlot ? best(core.agents.filter((a) => a.kind !== "superleo" && !isStandby(a)), 4) : [];
+  const coreCrew = core && !coreIsPlot ? best(core.agents.filter((a) => a.kind !== "superleo" && !isStandby(a)), 8) : [];
   const spots = placeServices(services, plots);
   // The core, every plot and every service, in one circle: a pin with room
   // for its label beside it, and the lines bowing out to their standbys.

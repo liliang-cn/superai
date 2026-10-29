@@ -1055,10 +1055,14 @@ export const cluster: District<WorldData> = {
           const from = to.clone().setY(0).normalize().multiplyScalar(7.7);
           hostLayer.add(floorLink(from, to, "parent"));
         }
-        pl.coreCrew.slice(0, 3).forEach((a, k) => {
+        // Every agent on this machine stands on its dais, along the front
+        // edge; more of them only close the spacing.
+        const crew = pl.coreCrew;
+        const step = crew.length > 4 ? 16 : 20;
+        crew.forEach((a, k) => {
           const n = a.kind === "cli" ? cliName(a) : a.name;
           const r = robot("cli", trim(n));
-          const ang = THREE.MathUtils.degToRad(4 + k * 20);
+          const ang = THREE.MathUtils.degToRad(4 + k * step);
           r.position.set(Math.cos(ang) * 5.7, 0.35, Math.sin(ang) * 5.7);
           r.userData.base = 0.35;
           r.rotation.y = Math.atan2(-r.position.x, -r.position.z) + Math.PI;
