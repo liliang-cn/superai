@@ -17,6 +17,17 @@ const LOCAL = new Set([
   "UseHive",
   "ForgetHive",
   "Remote",
+  // This Mac's place in a hive and how its app stays running: about the
+  // machine, so never forwarded to the queen.
+  "JoinHive",
+  "LeaveHive",
+  "HiveMembership",
+  "MigrateHiveLink",
+  "OldNodeStatus",
+  "RetireOldNode",
+  "DesktopResidency",
+  "SetStartAtLogin",
+  "SetKeepRunning",
   "SetWindowTheme",
   "PickFiles",
   "OpenInBrowser",

@@ -1156,6 +1156,28 @@ export namespace app {
 		    return a;
 		}
 	}
+	export class DesktopResident {
+	    startAtLogin: boolean;
+	    keepRunning: boolean;
+	    loginItem: boolean;
+	    restartToApply: boolean;
+	    menuBar: boolean;
+	    supported: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new DesktopResident(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.startAtLogin = source["startAtLogin"];
+	        this.keepRunning = source["keepRunning"];
+	        this.loginItem = source["loginItem"];
+	        this.restartToApply = source["restartToApply"];
+	        this.menuBar = source["menuBar"];
+	        this.supported = source["supported"];
+	    }
+	}
 	export class DetectedAgent {
 	    name: string;
 	    label: string;
@@ -1282,6 +1304,36 @@ export namespace app {
 	        this.name = source["name"];
 	        this.live = source["live"];
 	        this.error = source["error"];
+	    }
+	}
+	export class HiveMembership {
+	    joined: boolean;
+	    hive?: string;
+	    link?: string;
+	    name?: string;
+	    connected: boolean;
+	    unreachable: boolean;
+	    error?: string;
+	    windowLive: boolean;
+	    needsCode?: boolean;
+	    localDuties: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new HiveMembership(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.joined = source["joined"];
+	        this.hive = source["hive"];
+	        this.link = source["link"];
+	        this.name = source["name"];
+	        this.connected = source["connected"];
+	        this.unreachable = source["unreachable"];
+	        this.error = source["error"];
+	        this.windowLive = source["windowLive"];
+	        this.needsCode = source["needsCode"];
+	        this.localDuties = source["localDuties"];
 	    }
 	}
 	export class MemberPulse {
@@ -1894,6 +1946,30 @@ export namespace app {
 		    }
 		    return a;
 		}
+	}
+	export class OldNodeInfo {
+	    present: boolean;
+	    running: boolean;
+	    retired: boolean;
+	    name?: string;
+	    hive?: string;
+	    core?: string;
+	    home?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new OldNodeInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.present = source["present"];
+	        this.running = source["running"];
+	        this.retired = source["retired"];
+	        this.name = source["name"];
+	        this.hive = source["hive"];
+	        this.core = source["core"];
+	        this.home = source["home"];
+	    }
 	}
 	export class PairCode {
 	    code: string;
@@ -3938,6 +4014,8 @@ export namespace backend {
 	    browser_mode?: string;
 	    desktop_control?: boolean;
 	    desktop_blocked_apps: string[];
+	    start_at_login?: boolean;
+	    desktop_keep_running?: boolean;
 	    disable_ptc: boolean;
 	    pii_redaction: boolean;
 	    avatar_port: number;
@@ -4001,6 +4079,8 @@ export namespace backend {
 	        this.browser_mode = source["browser_mode"];
 	        this.desktop_control = source["desktop_control"];
 	        this.desktop_blocked_apps = source["desktop_blocked_apps"];
+	        this.start_at_login = source["start_at_login"];
+	        this.desktop_keep_running = source["desktop_keep_running"];
 	        this.disable_ptc = source["disable_ptc"];
 	        this.pii_redaction = source["pii_redaction"];
 	        this.avatar_port = source["avatar_port"];

@@ -100,6 +100,8 @@ export function Deliverables(arg1:string):Promise<Array<agent.Deliverable>>;
 
 export function DesktopRequestAccess():Promise<void>;
 
+export function DesktopResidency():Promise<app.DesktopResident>;
+
 export function DesktopStatus():Promise<backend.DesktopStatus>;
 
 export function DetectAgents():Promise<Array<app.DetectedAgent>>;
@@ -137,6 +139,8 @@ export function HiveLinkStatus():Promise<app.HiveLinkInfo>;
 export function HiveLinks():Promise<Array<app.HiveLinkEntry>>;
 
 export function HiveMembers():Promise<Array<backend.HiveMember>>;
+
+export function HiveMembership():Promise<app.HiveMembership>;
 
 export function HivePulse():Promise<app.HivePulse>;
 
@@ -177,6 +181,10 @@ export function ImportPastedFile(arg1:string,arg2:string):Promise<string>;
 export function InstallMCPServer(arg1:string,arg2:string,arg3:Array<string>,arg4:Record<string, string>):Promise<string>;
 
 export function InstallSkill(arg1:string,arg2:string):Promise<string>;
+
+export function JoinHive(arg1:string,arg2:string):Promise<app.HiveMembership>;
+
+export function LeaveHive():Promise<app.HiveMembership>;
 
 export function Life():Promise<backend.LifeData>;
 
@@ -228,6 +236,8 @@ export function MemoryRecall(arg1:string):Promise<string>;
 
 export function MemorySkills():Promise<Array<string>>;
 
+export function MigrateHiveLink():Promise<app.HiveMembership>;
+
 export function NotedAlarms():Promise<any>;
 
 export function NotedHoldings():Promise<any>;
@@ -249,6 +259,8 @@ export function NotedUpcoming(arg1:number):Promise<any>;
 export function Notifications():Promise<Array<backend.Notification>>;
 
 export function Notify(arg1:string,arg2:string,arg3:string):Promise<string>;
+
+export function OldNodeStatus():Promise<app.OldNodeInfo>;
 
 export function OnboardingNeeded():Promise<boolean>;
 
@@ -328,6 +340,8 @@ export function ResolveToolApprovalRemember(arg1:string,arg2:boolean,arg3:backen
 
 export function ResumeStandingAgent(arg1:string):Promise<void>;
 
+export function RetireOldNode():Promise<app.OldNodeInfo>;
+
 export function RevealChannelToken(arg1:string):Promise<string>;
 
 export function RevokeIntegrationToken(arg1:string):Promise<void>;
@@ -374,6 +388,8 @@ export function SetDesktopControl(arg1:boolean):Promise<void>;
 
 export function SetHomeLayout(arg1:any,arg2:number):Promise<Record<string, any>>;
 
+export function SetKeepRunning(arg1:boolean):Promise<app.DesktopResident>;
+
 export function SetLocalHive(arg1:boolean,arg2:number,arg3:number):Promise<backend.Settings>;
 
 export function SetQueenEngine(arg1:string,arg2:boolean):Promise<Record<string, any>>;
@@ -383,6 +399,8 @@ export function SetQueenEngineList(arg1:Array<backend.QueenEngineEntry>,arg2:str
 export function SetQueenIdentity(arg1:string,arg2:Array<string>):Promise<Record<string, any>>;
 
 export function SetScheduledPromptEnabled(arg1:string,arg2:boolean):Promise<string>;
+
+export function SetStartAtLogin(arg1:boolean):Promise<app.DesktopResident>;
 
 export function SetUIRules(arg1:string):Promise<string>;
 

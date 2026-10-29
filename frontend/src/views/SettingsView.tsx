@@ -17,6 +17,7 @@ import AddAgentCard from "../components/AddAgentCard";
 import AddWorkerCard from "../components/AddWorkerCard";
 import CodingToolsCard from "../components/settings/CodingToolsCard";
 import ChannelsCard from "../components/settings/ChannelsCard";
+import ResidentGroup from "../components/settings/ResidentGroup";
 import { ACCENTS } from "../components/ThemePicker";
 import {
   Avatar, Block, Btn, Chips, ConfirmBtn, Group, IconBtn, Menu, Note, Num, Row, Secret, Seg, Select, State, Text, Toggle,
@@ -509,6 +510,7 @@ export default function SettingsView({ onSaved, theme, onTheme, accent, onAccent
               </Group>
 
               {!served && <OpenInBrowserGroup />}
+              {!served && <ResidentGroup />}
             </>
           )}
 

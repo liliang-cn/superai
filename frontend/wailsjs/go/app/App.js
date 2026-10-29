@@ -190,6 +190,10 @@ export function DesktopRequestAccess() {
   return window['go']['app']['App']['DesktopRequestAccess']();
 }
 
+export function DesktopResidency() {
+  return window['go']['app']['App']['DesktopResidency']();
+}
+
 export function DesktopStatus() {
   return window['go']['app']['App']['DesktopStatus']();
 }
@@ -264,6 +268,10 @@ export function HiveLinks() {
 
 export function HiveMembers() {
   return window['go']['app']['App']['HiveMembers']();
+}
+
+export function HiveMembership() {
+  return window['go']['app']['App']['HiveMembership']();
 }
 
 export function HivePulse() {
@@ -344,6 +352,14 @@ export function InstallMCPServer(arg1, arg2, arg3, arg4) {
 
 export function InstallSkill(arg1, arg2) {
   return window['go']['app']['App']['InstallSkill'](arg1, arg2);
+}
+
+export function JoinHive(arg1, arg2) {
+  return window['go']['app']['App']['JoinHive'](arg1, arg2);
+}
+
+export function LeaveHive() {
+  return window['go']['app']['App']['LeaveHive']();
 }
 
 export function Life() {
@@ -446,6 +462,10 @@ export function MemorySkills() {
   return window['go']['app']['App']['MemorySkills']();
 }
 
+export function MigrateHiveLink() {
+  return window['go']['app']['App']['MigrateHiveLink']();
+}
+
 export function NotedAlarms() {
   return window['go']['app']['App']['NotedAlarms']();
 }
@@ -488,6 +508,10 @@ export function Notifications() {
 
 export function Notify(arg1, arg2, arg3) {
   return window['go']['app']['App']['Notify'](arg1, arg2, arg3);
+}
+
+export function OldNodeStatus() {
+  return window['go']['app']['App']['OldNodeStatus']();
 }
 
 export function OnboardingNeeded() {
@@ -646,6 +670,10 @@ export function ResumeStandingAgent(arg1) {
   return window['go']['app']['App']['ResumeStandingAgent'](arg1);
 }
 
+export function RetireOldNode() {
+  return window['go']['app']['App']['RetireOldNode']();
+}
+
 export function RevealChannelToken(arg1) {
   return window['go']['app']['App']['RevealChannelToken'](arg1);
 }
@@ -738,6 +766,10 @@ export function SetHomeLayout(arg1, arg2) {
   return window['go']['app']['App']['SetHomeLayout'](arg1, arg2);
 }
 
+export function SetKeepRunning(arg1) {
+  return window['go']['app']['App']['SetKeepRunning'](arg1);
+}
+
 export function SetLocalHive(arg1, arg2, arg3) {
   return window['go']['app']['App']['SetLocalHive'](arg1, arg2, arg3);
 }
@@ -756,6 +788,10 @@ export function SetQueenIdentity(arg1, arg2) {
 
 export function SetScheduledPromptEnabled(arg1, arg2) {
   return window['go']['app']['App']['SetScheduledPromptEnabled'](arg1, arg2);
+}
+
+export function SetStartAtLogin(arg1) {
+  return window['go']['app']['App']['SetStartAtLogin'](arg1);
 }
 
 export function SetUIRules(arg1) {
