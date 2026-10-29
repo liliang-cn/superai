@@ -1,16 +1,14 @@
-import { ChevronDownIcon, LanguagesIcon } from "lucide-react";
 import { LANGUAGES, Language, useI18n } from "../lib/i18n";
+import { Row, Select } from "./settings/kit";
 
-/** The interface language: a small picker beside the Settings title. */
+/** The interface language, as a row of the Appearance group in Settings. */
 export default function LanguageSettings() {
-  const { language, setLanguage, t } = useI18n();
+  const { language, setLanguage } = useI18n();
   return (
-    <label className="lang-pick" title={t("Interface language")}>
-      <LanguagesIcon size={15} />
-      <select aria-label={t("Interface language")} value={language} onChange={(e) => setLanguage(e.target.value as Language)}>
-        {LANGUAGES.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-      </select>
-      <ChevronDownIcon size={13} />
-    </label>
+    <Row label="Language">
+      <Select label="Interface language" testId="language" value={language}
+        options={LANGUAGES.map((l) => ({ value: l.id, label: l.name }))}
+        onChange={(v) => setLanguage(v as Language)} />
+    </Row>
   );
 }

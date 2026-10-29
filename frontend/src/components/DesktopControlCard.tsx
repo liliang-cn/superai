@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
-import { XIcon } from "lucide-react";
+import { RotateCcwIcon } from "lucide-react";
 import { DesktopRequestAccess, DesktopStatus, SetDesktopBlockedApps, SetDesktopControl } from "../../wailsjs/go/app/App";
 import { backend } from "../../wailsjs/go/models";
 import { translate } from "../lib/i18n";
+import { Btn, Chips, IconBtn, Row, State, Toggle } from "./settings/kit";
 
 /**
  * Whether the agent may operate this machine's desktop apps (agent-desktop,
- * through the accessibility API). Applied at once like the browser's mode:
- * the backend rebuilds around it, and the status is followed until the
- * binary is in place.
+ * through the accessibility API), and the apps it leaves alone. Applied at
+ * once like the browser's mode: the backend rebuilds around it, and the
+ * status is followed until the binary is in place.
  */
 export default function DesktopControlCard({ onChanged, onBlockedChanged }: {
   onChanged?: (on: boolean) => void;
@@ -20,7 +21,6 @@ export default function DesktopControlCard({ onChanged, onBlockedChanged }: {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [asking, setAsking] = useState(false);
-  const [adding, setAdding] = useState("");
   const [saving, setSaving] = useState(false);
   // Turned on here: the permission is asked for once, as soon as it is up.
   const [askOnReady, setAskOnReady] = useState(false);
@@ -99,67 +99,38 @@ export default function DesktopControlCard({ onChanged, onBlockedChanged }: {
     }
   };
   const blocked = st?.blocked ?? [];
-  const add = () => {
-    const name = adding.trim();
-    if (!name) return;
-    setAdding("");
+  const add = (name: string) => {
     if (blocked.some((b) => b.toLowerCase() === name.toLowerCase())) return;
     void saveBlocked([...blocked, name]);
   };
 
-  const state = !st || !on ? ""
-    : st.error ? st.error
-    : !st.ready ? translate("Installing…")
-    : st.accessibility && st.accessibility !== "granted" ? translate("Needs Accessibility permission")
-    : `${translate("Ready")} · agent-desktop ${st.version}`;
-  const bad = !!err || !!st?.error || (on && st?.ready && st.accessibility !== undefined && st.accessibility !== "" && st.accessibility !== "granted");
+  const state = !st || !on ? null
+    : st.error ? <State tone="bad" title={st.error}>Failed to start</State>
+    : !st.ready ? <State tone="busy">Installing…</State>
+    : needsAccess ? <State tone="bad">Needs Accessibility permission</State>
+    : <State tone="ok">Allowed</State>;
+  const sub = err || st?.error || (on && st?.ready && st.version ? `agent-desktop ${st.version}` : "");
   return (
-    <div className="card" data-testid="desktop-control-card">
-      <div className="card-title">{translate("Desktop apps")}</div>
-      <div className="field">
-        <label>{translate("Control")}</label>
-        <div className="seg" role="radiogroup" aria-label={translate("Desktop apps")} style={{ alignSelf: "flex-start" }}>
-          {[false, true].map((v) => (
-            <button key={String(v)} type="button" role="radio" aria-checked={on === v} data-testid={v ? "desktop-on" : "desktop-off"}
-              className={`seg-btn${on === v ? " on" : ""}`} disabled={busy} onClick={() => void pick(v)}>
-              {translate(v ? "On" : "Off")}
-            </button>
-          ))}
-        </div>
-        {(state || err) && <span className="hint" style={bad ? { color: "var(--danger, #c0262f)" } : undefined}>{err || state}</span>}
+    <>
+      <Row label="Desktop apps" testId="desktop-control-card"
+        sub={sub ? <span className={err || st?.error ? "st-note bad" : undefined}>{sub}</span> : undefined}>
+        {state}
         {needsAccess && (
-          <button type="button" className="btn sm" style={{ alignSelf: "flex-start" }} disabled={asking} onClick={() => void ask()} data-testid="desktop-grant">
-            {translate(asking ? "Opening…" : "Grant access")}
-          </button>
+          <Btn disabled={asking} onClick={() => void ask()} data-testid="desktop-grant">{asking ? "Opening…" : "Grant access"}</Btn>
         )}
-      </div>
+        <Toggle label="Desktop apps" on={on} disabled={busy || !st} onChange={(v) => void pick(v)} testId="desktop-switch" />
+      </Row>
       {on && st && (
-        <div className="field">
-          <label>{translate("Left alone")}</label>
-          <div className="dc-apps" data-testid="desktop-blocked">
-            {blocked.map((b) => (
-              <span key={b} className="dc-app">
-                {b}
-                <button type="button" aria-label={`${translate("Allow")} ${b}`} title={translate("Allow")} disabled={saving}
-                  onClick={() => void saveBlocked(blocked.filter((x) => x !== b))}>
-                  <XIcon size={12} />
-                </button>
-              </span>
-            ))}
-            {blocked.length === 0 && <span className="hint">{translate("None")}</span>}
-          </div>
-          <div className="dc-add">
-            <input className="input" value={adding} placeholder={translate("App name")} disabled={saving}
-              onChange={(e) => setAdding(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) { e.preventDefault(); add(); } }}
-              data-testid="desktop-block-input" />
-            <button type="button" className="btn ghost sm" disabled={saving || !adding.trim()} onClick={add}>{translate("Add")}</button>
-            {!st.blockedIsDefault && (
-              <button type="button" className="btn ghost sm" disabled={saving} onClick={() => void saveBlocked([], true)}>{translate("Reset to default")}</button>
-            )}
-          </div>
-        </div>
+        <Row stack label={
+          <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ flex: 1 }}>{translate("Left alone")}</span>
+            {!st.blockedIsDefault && <IconBtn icon={RotateCcwIcon} label="Reset to default" disabled={saving} onClick={() => void saveBlocked([], true)} />}
+          </span>
+        }>
+          <Chips testId="desktop-blocked" items={blocked} removeLabel="Remove" addLabel="Add an app" placeholder="App name"
+            disabled={saving} max={12} onRemove={(b) => void saveBlocked(blocked.filter((x) => x !== b))} onAdd={add} />
+        </Row>
       )}
-    </div>
+    </>
   );
 }

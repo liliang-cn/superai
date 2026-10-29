@@ -490,6 +490,10 @@ export function PairedDevices() {
   return window['go']['app']['App']['PairedDevices']();
 }
 
+export function PatchSettings(arg1) {
+  return window['go']['app']['App']['PatchSettings'](arg1);
+}
+
 export function PauseStandingAgent(arg1) {
   return window['go']['app']['App']['PauseStandingAgent'](arg1);
 }

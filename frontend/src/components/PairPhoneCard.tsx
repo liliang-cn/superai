@@ -1,17 +1,20 @@
 import { useCallback, useEffect, useState } from "react";
 import QRCode from "qrcode";
+import { QrCodeIcon, SmartphoneIcon, Unlink2Icon, XIcon } from "lucide-react";
 import { PairPhone, PairedDevices, UnpairDevice } from "../../wailsjs/go/app/App";
 import { app } from "../../wailsjs/go/models";
 import { toast } from "../lib/toasts";
+import { translate } from "../lib/i18n";
+import { Avatar, Block, Btn, ConfirmBtn, Group, IconBtn, Row, State } from "./settings/kit";
 
 /**
- * Pairing the SuperLeo phone app with this server.
+ * Pairing the SuperLeo phone app (and other SuperLeos) with this server.
  *
  * A code is asked for here, by someone already signed in, and shown two ways:
  * as six digits to type, and as a QR code that also carries this page's
  * address — the phone's camera opens the app with both filled in. The phone
  * trades the code for a token of its own (internal/app/pairing.go), so each
- * phone is listed below and can be unpaired without touching anything else.
+ * device is listed and can be unpaired without touching anything else.
  *
  * In the desktop app the link comes from the backend: the window has no
  * address a phone could reach, and the app opens one for phones, on the local
@@ -23,10 +26,12 @@ export default function PairPhoneCard() {
   const [left, setLeft] = useState(0);
   const [devices, setDevices] = useState<app.PairedDevice[]>([]);
   const [busy, setBusy] = useState(false);
+  const [now, setNow] = useState(Date.now());
 
   const load = useCallback(async () => {
     try {
       setDevices((await PairedDevices()) || []);
+      setNow(Date.now());
     } catch (e: any) {
       toast.error(String(e?.message || e));
     }
@@ -74,56 +79,46 @@ export default function PairPhoneCard() {
   const unpair = async (d: app.PairedDevice) => {
     try {
       await UnpairDevice(d.id);
-      toast.success(`已解除配对：${d.name}`);
+      toast.success(translate("Unpaired {name}", { name: d.name }));
       await load();
     } catch (e: any) {
       toast.error(String(e?.message || e));
     }
   };
 
-  const when = (t: unknown) => {
+  const seen = (t: unknown) => {
     const d = new Date(t as string);
-    return isNaN(d.getTime()) || d.getFullYear() < 2000 ? "—" : d.toLocaleString();
+    return isNaN(d.getTime()) || d.getFullYear() < 2000 ? null : d;
   };
 
   return (
-    <div className="card">
-      <div className="card-title">Phones and other SuperLeos</div>
-
-      {code ? (
-        <div style={{ display: "flex", gap: 20, alignItems: "center", flexWrap: "wrap", marginBottom: 14 }}>
-          <img src={qr} alt="Pairing QR code" width={180} height={180} style={{ borderRadius: 8, background: "#fff" }} />
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <span style={{ fontSize: 34, fontWeight: 600, letterSpacing: "0.18em", fontVariantNumeric: "tabular-nums" }}>
-              {code.code.slice(0, 3)} {code.code.slice(3)}
-            </span>
-            {!code.link && <span className="card-desc" style={{ margin: 0 }}>{window.location.origin}</span>}
-            <span className="card-desc" style={{ margin: 0 }}>
-              Expires in {Math.floor(left / 60)}:{String(left % 60).padStart(2, "0")}
-            </span>
-          </div>
-        </div>
-      ) : (
-        <div className="field">
-          <button className="btn" onClick={start} disabled={busy} style={{ alignSelf: "flex-start" }}>
-            {busy ? <><span className="spinner" /> …</> : "Pair a device"}
-          </button>
-        </div>
-      )}
-
-      {devices.length > 0 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 6 }}>
-          {devices.map((d) => (
-            <div key={d.id} className="url-box" style={{ alignItems: "center" }}>
-              <span style={{ flex: 1 }}>
-                {d.name}
-                <span className="card-desc" style={{ margin: "0 0 0 10px" }}>last seen {when(d.last_seen)}</span>
-              </span>
-              <button className="btn" onClick={() => void unpair(d)}>Unpair</button>
+    <Group icon={SmartphoneIcon} title="Devices" testId="devices"
+      action={<Btn icon={QrCodeIcon} disabled={busy || !!code} onClick={() => void start()} data-testid="pair-device">Pair a device</Btn>}>
+      {code && (
+        <Block testId="pair-code">
+          <div className="st-qr">
+            <img src={qr} alt={translate("Pairing QR code")} width={150} height={150} />
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1, minWidth: 0 }}>
+              <span className="st-qr-code">{code.code.slice(0, 3)} {code.code.slice(3)}</span>
+              {!code.link && <span className="st-note mono">{window.location.origin}</span>}
+              <State tone="busy">{translate("Expires in {time}", { time: `${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}` })}</State>
             </div>
-          ))}
-        </div>
+            <IconBtn icon={XIcon} label="Close" onClick={() => { setCode(null); setQr(""); }} />
+          </div>
+        </Block>
       )}
-    </div>
+      {devices.map((d) => {
+        const last = seen(d.last_seen);
+        const recent = !!last && now - last.getTime() < 10 * 60 * 1000;
+        return (
+          <Row key={d.id} lead={<Avatar><SmartphoneIcon size={15} strokeWidth={1.8} /></Avatar>} label={d.name}
+            sub={last ? translate("Last seen {time}", { time: last.toLocaleString() }) : undefined}>
+            {recent ? <State tone="ok">Online</State> : <State tone="off">Offline</State>}
+            <ConfirmBtn icon={Unlink2Icon} label="Unpair" title={translate("Unpair {name}?", { name: d.name })} onConfirm={() => unpair(d)} testId="unpair" />
+          </Row>
+        );
+      })}
+      {!code && devices.length === 0 && <Row label="No devices" dim />}
+    </Group>
   );
 }

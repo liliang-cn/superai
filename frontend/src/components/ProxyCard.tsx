@@ -1,46 +1,52 @@
 import { useEffect, useState } from "react";
+import { PlugZapIcon } from "lucide-react";
 import { ProxyStatus, TestProxy } from "../../wailsjs/go/app/App";
 import { backend } from "../../wailsjs/go/models";
 import { translate } from "../lib/i18n";
+import { IconBtn, Row, Seg, Text } from "./settings/kit";
 
-const MODES: { id: string; label: string }[] = [
-  { id: "", label: "Environment" },
-  { id: "system", label: "Follow system" },
-  { id: "manual", label: "Manual" },
-  { id: "off", label: "Off" },
+const MODES = [
+  { value: "", label: "Environment" },
+  { value: "system", label: "Follow system" },
+  { value: "manual", label: "Manual" },
+  { value: "off", label: "Off" },
 ];
 
-type State = { mode: string; using: string; system?: string; error?: string };
+type Now = { mode: string; using: string; system?: string; error?: string };
 
 /**
- * The proxy SuperLeo's own requests and the CLIs it starts go through. Edits
- * the page's copy of the settings, saved with the rest; the line under it is
- * the setting in use, and Test tries the one on screen without saving it.
+ * The proxy SuperLeo's own requests and the CLIs it starts go through: the
+ * mode, and in manual mode the address (http, https or socks5). Edits the
+ * page's copy of the settings; the page's Save applies it at once (the
+ * backend sets the proxy as it saves). The line under it is the proxy in use
+ * and the last test, which tries the one on screen without saving it.
  */
-export default function ProxyCard({ hidden, proxy, onChange }: {
-  hidden: boolean;
+export default function ProxyCard({ proxy, saved, onChange }: {
   proxy: backend.ProxySettings;
+  /** The proxy as last saved: "in use" is asked again when it changes. */
+  saved?: unknown;
   onChange: (p: backend.ProxySettings) => void;
 }) {
-  const [now, setNow] = useState<State | null>(null);
+  const [now, setNow] = useState<Now | null>(null);
   const [test, setTest] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const mode = proxy.mode ?? "";
   const url = proxy.url ?? "";
 
+  // Asked again whenever the saved proxy changes, so "in use" follows Save.
   useEffect(() => {
-    if (hidden) return;
-    ProxyStatus().then((s: any) => setNow(s as State)).catch(() => setNow(null));
-  }, [hidden]);
+    ProxyStatus().then((s: any) => setNow(s as Now)).catch(() => setNow(null));
+  }, [JSON.stringify(saved ?? null)]);
   useEffect(() => setTest(null), [mode, url]);
 
   const set = (next: Partial<backend.ProxySettings>) => onChange(new backend.ProxySettings({ mode, url, ...next }));
   const run = async () => {
     setBusy(true);
+    setTest(null);
     try {
       const r: any = await TestProxy(new backend.ProxySettings({ mode, url }));
-      const via = r?.state?.using ? ` · ${r.state.using}` : ` · ${translate("direct")}`;
-      setTest(r?.ok ? { ok: true, text: `${r.result}${via}` } : { ok: false, text: String(r?.error ?? "failed") });
+      const via = r?.state?.using || translate("direct");
+      setTest(r?.ok ? { ok: true, text: `${translate("Passed")} ${r.result} · ${via}` } : { ok: false, text: String(r?.error ?? "failed") });
     } catch (e) {
       setTest({ ok: false, text: String(e instanceof Error ? e.message : e) });
     } finally {
@@ -48,59 +54,29 @@ export default function ProxyCard({ hidden, proxy, onChange }: {
     }
   };
 
+  const using = now ? `${translate("In use: {engine}", { engine: now.using || translate("direct") })}${now.error ? ` · ${now.error}` : ""}` : "";
+  const line = (
+    <span data-testid="proxy-now">
+      {using}
+      {busy && <> · {translate("Testing…")}</>}
+      {test && <> · <span className={`st-note ${test.ok ? "ok" : "bad"}`} style={{ display: "inline" }} data-testid="proxy-test">{test.text}</span></>}
+    </span>
+  );
+  const tester = <IconBtn icon={PlugZapIcon} label="Test the proxy" disabled={busy || (mode === "manual" && !url.trim())} onClick={() => void run()} data-testid="proxy-test-btn" />;
+  const manual = mode === "manual";
+
   return (
-    <div className="card" hidden={hidden}>
-      <div className="card-title">{translate("Proxy")}</div>
-      <div className="field">
-        <label>{translate("Mode")}</label>
-        <div className="seg" role="radiogroup" aria-label={translate("Proxy")} style={{ flexWrap: "wrap", alignSelf: "flex-start" }}>
-          {MODES.map((m) => (
-            <button
-              key={m.id || "env"}
-              type="button"
-              role="radio"
-              aria-checked={mode === m.id}
-              className={`seg-btn${mode === m.id ? " on" : ""}`}
-              onClick={() => set({ mode: m.id })}
-            >
-              {translate(m.label)}
-            </button>
-          ))}
-        </div>
-        {now && (
-          <span className="hint" data-testid="proxy-now">
-            {translate("In use: {engine}", { engine: now.using || translate("direct") })}
-            {now.system ? ` · ${translate("Follow system")}: ${now.system}` : ""}
-            {now.error ? ` · ${now.error}` : ""}
-          </span>
-        )}
-      </div>
-      {mode === "manual" && (
-        <div className="field">
-          <label>{translate("Address")}</label>
-          <input
-            className="input"
-            aria-label={translate("Address")}
-            value={url}
-            placeholder="http://127.0.0.1:7897"
-            autoComplete="off"
-            spellCheck={false}
-            onChange={(e) => set({ url: e.target.value })}
-          />
-        </div>
+    <>
+      <Row label="Proxy" sub={manual ? undefined : line}>
+        <Seg label="Proxy" value={mode} options={MODES} onChange={(m) => set({ mode: m })} testId="proxy-mode" />
+        {!manual && tester}
+      </Row>
+      {manual && (
+        <Row label="Proxy address" sub={line}>
+          <Text mono label="Proxy address" value={url} placeholder="http://127.0.0.1:7890" onChange={(v) => set({ url: v })} testId="proxy-url" />
+          {tester}
+        </Row>
       )}
-      <div className="field">
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <button type="button" className="btn" onClick={run} disabled={busy}>
-            {busy ? translate("Testing…") : translate("Test")}
-          </button>
-          {test && (
-            <span className="hint" style={{ color: test.ok ? "var(--ok, #12805c)" : "var(--danger, #c0392b)" }} data-testid="proxy-test">
-              {test.text}
-            </span>
-          )}
-        </div>
-      </div>
-    </div>
+    </>
   );
 }

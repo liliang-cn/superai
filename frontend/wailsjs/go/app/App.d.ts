@@ -250,6 +250,8 @@ export function PairPhone():Promise<app.PairCode>;
 
 export function PairedDevices():Promise<Array<app.PairedDevice>>;
 
+export function PatchSettings(arg1:Record<string, any>):Promise<backend.Settings>;
+
 export function PauseStandingAgent(arg1:string):Promise<void>;
 
 export function PendingToolApprovals():Promise<Array<Record<string, any>>>;

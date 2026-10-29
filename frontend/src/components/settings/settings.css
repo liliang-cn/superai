@@ -1,0 +1,307 @@
+/* Settings: a nav of four sections beside titled groups of rows, a name on
+   the left and its control on the right, hairlines between rows. Built on the
+   app's tokens, so the accent finish and the dark variant carry over. */
+
+/* Surfaces that must show on any ground: the desk paints its panels
+   see-through, so sunk and raised parts are mixed from the ink rather than
+   taken from the --bg-* steps. */
+.st-page, .st-pop, .st-menu, .st-tip {
+  --st-sunk: color-mix(in srgb, var(--text-0) 5%, transparent);
+  --st-sunk-2: color-mix(in srgb, var(--text-0) 9%, transparent);
+  --st-raised: #fff;
+  --st-hover: color-mix(in srgb, var(--text-0) 6%, transparent);
+}
+[data-theme="dark"] .st-page, [data-theme="dark"] .st-pop, [data-theme="dark"] .st-menu, [data-theme="dark"] .st-tip {
+  --st-raised: color-mix(in srgb, var(--text-0) 13%, #15171a);
+}
+
+/* The page. The nav and the content wrap rather than switch at a breakpoint:
+   with too little room for both the nav goes on top, wherever the page sits
+   (a window, a panel in the desk, a phone). */
+.st-page, .view.st-page {
+  flex-direction: row;
+  flex: 1; min-height: 0; min-width: 0; overflow-y: auto; overflow-x: hidden;
+  display: flex; flex-wrap: wrap; align-content: flex-start;
+  font-family: var(--font-sans); color: var(--text-0);
+}
+.st-nav {
+  flex: 1 1 200px; max-width: 240px; box-sizing: border-box;
+  padding: 30px 14px 20px 18px; display: flex; flex-direction: column; gap: 3px;
+  position: sticky; top: 0; align-self: flex-start;
+}
+.st-nav-h { font-size: 24px; font-weight: 650; letter-spacing: -0.02em; padding: 0 10px 18px; color: var(--text-0); margin: 0; }
+.st-nav-i {
+  all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 10px;
+  height: 36px; padding: 0 11px; border-radius: 9px; cursor: pointer;
+  font: 500 13.5px var(--font-sans); color: var(--text-2);
+  transition: background .12s, color .12s;
+}
+.st-nav-i:hover { color: var(--text-0); background: var(--st-hover); }
+.st-nav-i.on { background: var(--st-raised); color: var(--text-0); font-weight: 600; box-shadow: 0 1px 2px rgba(14, 26, 34, .06), 0 0 0 1px var(--border); }
+.st-nav-i:focus-visible { box-shadow: 0 0 0 2px var(--accent-border, var(--accent)); }
+
+.st-main { flex: 999 1 520px; min-width: 0; box-sizing: border-box; padding: 30px 40px 0 18px; container-type: inline-size; }
+
+/* The nav on top once the two no longer fit side by side. */
+.st-page.narrow .st-nav {
+  max-width: none; flex-basis: 100%; position: static;
+  flex-direction: row; flex-wrap: wrap; padding: 18px 16px 4px; gap: 4px;
+}
+.st-page.narrow .st-nav-h { flex-basis: 100%; padding: 0 4px 10px; font-size: 22px; }
+.st-page.narrow .st-nav-i { flex: 1 1 auto; justify-content: center; padding: 0 10px; }
+.st-page.narrow .st-main { padding: 14px 16px 0; }
+
+.st { max-width: 760px; display: flex; flex-direction: column; gap: 26px; }
+
+.st-group-h { display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 0 4px 8px; color: var(--text-2); }
+.st-group-h h3 { margin: 0; font-size: 13px; font-weight: 600; letter-spacing: .01em; color: var(--text-1); }
+.st-group-a { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+.st-group-a .st-lab { font-size: 12.5px; font-weight: 500; color: var(--text-2); }
+
+.st-panel {
+  background: var(--st-raised);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+/* The desk paints its panels see-through; settings keep a solid sheet. */
+.st-panel { background: var(--st-raised); }
+
+.st-row {
+  display: flex; align-items: center; gap: 12px;
+  min-height: 54px; padding: 10px 16px; box-sizing: border-box;
+}
+.st-row + .st-row { border-top: 1px solid var(--border); }
+.st-row.stack { flex-direction: column; align-items: stretch; gap: 10px; padding: 12px 16px 14px; }
+.st-row.st-block { display: block; padding: 12px 16px 14px; }
+.st-row-lead { flex: none; display: grid; }
+.st-row-l { flex: 1; min-width: 0; }
+.st-row-t { font-size: 13.5px; color: var(--text-0); font-weight: 500; overflow-wrap: anywhere; }
+.st-row-t.mono { font-family: var(--font-mono); font-size: 12.5px; }
+.st-row-s { margin-top: 2px; font-size: 12px; color: var(--text-3); overflow-wrap: anywhere; }
+.st-row-s.mono, .st-row-s .mono { font-family: var(--font-mono); font-size: 11.5px; }
+.st-row.dim .st-row-t { color: var(--text-3); }
+.st-row-c { display: flex; align-items: center; justify-content: flex-end; gap: 6px; flex: 0 1 auto; min-width: 0; flex-wrap: wrap; }
+.st-row.stack .st-row-c { justify-content: flex-start; }
+
+/* Inputs sit flush right and take the width they are given. */
+.st-in {
+  box-sizing: border-box; height: 34px; width: 300px; max-width: 100%;
+  padding: 0 11px; border: 1px solid var(--border); border-radius: 9px;
+  background: var(--st-sunk); color: var(--text-0);
+  font: 13px var(--font-sans); outline: none;
+  transition: border-color .12s, background .12s, box-shadow .12s;
+}
+.st-in.mono { font-family: var(--font-mono); font-size: 12.5px; }
+.st-in::placeholder { color: var(--text-3); }
+.st-in:hover { border-color: var(--border-strong, var(--border)); }
+.st-in:focus { border-color: var(--accent); background: var(--st-raised); box-shadow: 0 0 0 3px var(--accent-soft); }
+.st-in:disabled, .st-in[readonly] { color: var(--text-2); }
+.st-row.stack .st-in:not(.fixed) { width: 100%; }
+.st-secret { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.st-secret .st-in { width: 266px; }
+
+.st-select { position: relative; display: inline-flex; align-items: center; min-width: 0; max-width: 100%; }
+.st-select select {
+  appearance: none; -webkit-appearance: none; box-sizing: border-box;
+  height: 34px; min-width: 200px; max-width: 100%; padding: 0 32px 0 11px;
+  border: 1px solid var(--border); border-radius: 9px; background: var(--st-raised); color: var(--text-0);
+  font: 13px var(--font-sans); cursor: pointer; outline: none;
+}
+.st-select.mono select { font-family: var(--font-mono); font-size: 12.5px; }
+.st-select select:hover { border-color: var(--border-strong, var(--border)); }
+.st-select select:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.st-select svg { position: absolute; right: 10px; pointer-events: none; color: var(--text-3); }
+
+/* Switch. */
+.st-switch {
+  all: unset; box-sizing: border-box; flex: none;
+  width: 38px; height: 22px; border-radius: 999px;
+  background: var(--st-sunk-2); position: relative; cursor: pointer;
+  transition: background .15s;
+}
+.st-switch[data-state="checked"] { background: var(--accent); }
+.st-switch:focus-visible { box-shadow: 0 0 0 3px var(--accent-soft); }
+.st-switch:disabled { opacity: .45; cursor: default; }
+.st-switch-k {
+  display: block; width: 18px; height: 18px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 3px rgba(14, 26, 34, .25);
+  transform: translateX(2px); transition: transform .15s;
+}
+.st-switch-k[data-state="checked"] { transform: translateX(18px); }
+
+/* Icon buttons. */
+.st-ib {
+  all: unset; box-sizing: border-box; flex: none;
+  width: 30px; height: 30px; border-radius: 8px;
+  display: grid; place-items: center; cursor: pointer;
+  color: var(--text-2); transition: background .12s, color .12s;
+}
+.st-ib:hover:not(:disabled), .st-ib.on { background: var(--st-hover); color: var(--text-0); }
+.st-ib.danger:hover:not(:disabled), .st-ib.danger.on { background: color-mix(in srgb, var(--red) 10%, transparent); color: var(--red); }
+.st-ib.accent { color: var(--accent); }
+.st-ib:focus-visible { box-shadow: 0 0 0 2px var(--accent-border, var(--accent)); }
+.st-ib:disabled { opacity: .4; cursor: default; }
+.st-spin { animation: st-spin 1s linear infinite; }
+@keyframes st-spin { to { transform: rotate(360deg); } }
+
+/* Text buttons. */
+.st-btn {
+  all: unset; box-sizing: border-box; display: inline-flex; align-items: center; gap: 6px; flex: none;
+  height: 30px; padding: 0 12px; border-radius: 8px; cursor: pointer; white-space: nowrap;
+  font: 500 12.5px var(--font-sans); color: var(--text-1);
+  border: 1px solid var(--border); background: var(--st-raised);
+  transition: background .12s, border-color .12s;
+}
+.st-btn:hover:not(:disabled) { background: var(--st-hover); border-color: var(--border-strong, var(--border)); }
+.st-btn.pri { background: var(--accent); border-color: var(--accent); color: var(--on-accent, #fff); }
+.st-btn.pri:hover:not(:disabled) { background: var(--accent-hover, var(--accent)); border-color: var(--accent-hover, var(--accent)); }
+.st-btn.danger { background: var(--red); border-color: var(--red); color: #fff; }
+.st-btn.danger:hover:not(:disabled) { filter: brightness(1.06); background: var(--red); }
+.st-btn:disabled { opacity: .45; cursor: default; }
+.st-btn:focus-visible { box-shadow: 0 0 0 3px var(--accent-soft); }
+
+/* Segmented choice. */
+.st-seg { display: inline-flex; flex-wrap: wrap; padding: 2px; border-radius: 9px; background: var(--st-sunk); gap: 2px; max-width: 100%; }
+.st-seg button {
+  all: unset; box-sizing: border-box; height: 28px; padding: 0 11px; border-radius: 7px;
+  font: 500 12.5px var(--font-sans); color: var(--text-2); cursor: pointer; white-space: nowrap;
+}
+.st-seg button:hover:not(:disabled) { color: var(--text-0); }
+.st-seg button.on { background: var(--st-raised); color: var(--text-0); box-shadow: 0 1px 2px rgba(14, 26, 34, .12); }
+.st-seg button:disabled { cursor: default; opacity: .6; }
+.st-seg button:focus-visible { box-shadow: 0 0 0 2px var(--accent-border, var(--accent)); }
+
+/* State dot. */
+.st-state { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-2); white-space: nowrap; }
+.st-state i { width: 7px; height: 7px; border-radius: 50%; background: var(--text-3); flex: none; }
+.st-state.ok i { background: var(--green); }
+.st-state.bad i { background: var(--red); }
+.st-state.bad { color: var(--red); }
+.st-state.busy i { background: var(--amber, var(--accent)); animation: st-pulse 1.2s ease-in-out infinite; }
+@keyframes st-pulse { 50% { opacity: .35; } }
+
+/* Floating parts: tooltip, confirm, menu. They are portalled, so not under .st. */
+.st-tip {
+  z-index: 1000; padding: 5px 8px; border-radius: 6px;
+  background: var(--text-0); color: var(--st-raised); font: 500 11.5px var(--font-sans);
+  box-shadow: 0 4px 14px rgba(14, 26, 34, .18);
+}
+.st-pop {
+  z-index: 1000; width: 248px; max-width: calc(100vw - 24px); box-sizing: border-box; padding: 13px; border-radius: 12px;
+  background: var(--st-raised); border: 1px solid var(--border);
+  box-shadow: 0 12px 32px rgba(14, 26, 34, .16);
+  font-family: var(--font-sans);
+}
+.st-pop-t { font-size: 13.5px; color: var(--text-0); font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; }
+.st-pop-s { margin-top: 3px; font-size: 12.5px; color: var(--text-3); overflow-wrap: anywhere; }
+.st-pop-b { display: flex; justify-content: flex-end; gap: 6px; margin-top: 14px; }
+.st-menu {
+  z-index: 1000; min-width: 210px; max-width: calc(100vw - 24px); box-sizing: border-box; padding: 5px; border-radius: 12px;
+  background: var(--st-raised); border: 1px solid var(--border);
+  box-shadow: 0 12px 32px rgba(14, 26, 34, .16);
+  font-family: var(--font-sans);
+}
+.st-menu-i {
+  display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 9px; border-radius: 8px;
+  font-size: 13px; color: var(--text-0); cursor: pointer; outline: none;
+}
+.st-menu-i[data-highlighted] { background: var(--st-hover); }
+.st-menu-i[data-disabled] { color: var(--text-3); cursor: default; }
+.st-menu-l { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.st-menu .st-avatar { width: 22px; height: 22px; border-radius: 6px; font-size: 11px; }
+
+.st-avatar {
+  width: 32px; height: 32px; border-radius: 9px; flex: none;
+  display: grid; place-items: center;
+  background: var(--st-sunk); color: var(--text-1); font: 650 13px var(--font-sans);
+}
+.st-avatar.accent { background: var(--accent-soft); color: var(--accent); }
+.st-avatar.muted { color: var(--text-3); }
+
+.st-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: flex-end; min-width: 0; }
+.st-row.stack .st-chips { justify-content: flex-start; }
+.st-chip {
+  box-sizing: border-box; display: inline-flex; align-items: center; gap: 2px; height: 28px; padding: 0 4px 0 10px; border-radius: 999px;
+  font: 500 12.5px var(--font-sans); color: var(--text-1); border: 1px solid var(--border); background: var(--st-raised);
+  max-width: 100%;
+}
+.st-chip.mono { font-family: var(--font-mono); font-size: 12px; }
+.st-chip button {
+  all: unset; box-sizing: border-box; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center;
+  color: var(--text-3); cursor: pointer;
+}
+.st-chip button:hover:not(:disabled) { background: var(--st-hover); color: var(--red); }
+.st-chip-more { all: unset; cursor: pointer; height: 28px; padding: 0 8px; font-size: 12.5px; color: var(--text-3); }
+.st-chip-more:hover { color: var(--text-0); }
+.st-in.st-chip-in { width: 140px; height: 28px; border-radius: 999px; }
+
+.st-swatches { display: flex; gap: 10px; flex-wrap: wrap; }
+.st-swatch {
+  all: unset; box-sizing: border-box; width: 22px; height: 22px; border-radius: 50%; cursor: pointer;
+  background: var(--sw); border: 2px solid var(--st-raised); box-shadow: 0 0 0 1px var(--border);
+}
+.st-swatch.on { box-shadow: 0 0 0 2px var(--text-0); }
+.st-swatch:focus-visible { box-shadow: 0 0 0 2px var(--accent); }
+
+.st-step { display: inline-flex; align-items: center; height: 30px; border: 1px solid var(--border); border-radius: 8px; background: var(--st-raised); }
+.st-step button { all: unset; width: 28px; height: 28px; display: grid; place-items: center; cursor: pointer; color: var(--text-2); border-radius: 7px; }
+.st-step button:hover:not(:disabled) { color: var(--text-0); background: var(--st-hover); }
+.st-step button:disabled { opacity: .35; cursor: default; }
+.st-step span { min-width: 22px; text-align: center; font: 500 12.5px var(--font-mono); color: var(--text-0); }
+.st-lab { font-size: 12px; color: var(--text-3); white-space: nowrap; }
+
+.st-note { font-size: 12px; color: var(--text-3); overflow-wrap: anywhere; }
+.st-note.bad { color: var(--red); }
+.st-note.ok { color: var(--green); }
+
+/* A form opened under a row: its fields as rows of their own. */
+.st-form { display: grid; grid-template-columns: minmax(110px, auto) 1fr; gap: 8px 14px; align-items: center; }
+.st-form > label { font-size: 13px; color: var(--text-1); font-weight: 500; }
+.st-form .st-in { width: 100%; }
+.st-form-b { grid-column: 1 / -1; display: flex; justify-content: flex-end; align-items: center; gap: 6px; flex-wrap: wrap; }
+.st-form-b .st-note { flex: 1; min-width: 0; }
+
+.st-cmd { display: flex; align-items: center; gap: 6px; }
+.st-cmd code {
+  flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; padding: 7px 10px; border-radius: 8px;
+  background: var(--st-sunk); font: 12px var(--font-mono); color: var(--text-1);
+}
+.st-cmd.spent { opacity: .45; }
+
+.st-qr { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+.st-qr img { border-radius: 8px; background: #fff; border: 1px solid var(--border); }
+.st-qr-code { font: 600 30px var(--font-mono); letter-spacing: .14em; color: var(--text-0); }
+
+.st-audit { display: flex; flex-direction: column; font: 12px var(--font-mono); }
+.st-audit-r { display: flex; gap: 10px; align-items: center; padding: 5px 0; color: var(--text-1); min-width: 0; }
+.st-audit-r + .st-audit-r { border-top: 1px dashed var(--border); }
+.st-audit-r .c { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-2); }
+.st-audit-r .w { color: var(--text-3); }
+.st-audit-r.denied { color: var(--red); }
+
+/* The one Save: there while something on the page is unsaved. */
+.st-save {
+  position: sticky; bottom: 0; z-index: 2; display: flex; justify-content: flex-end; align-items: center; gap: 10px;
+  max-width: 760px; padding: 14px 0 18px; margin-top: 4px;
+  background: linear-gradient(to bottom, transparent, var(--st-raised) 45%);
+}
+.st-save .st-note { margin-right: auto; }
+
+/* Room enough for the controls beside the names? A wide control (a field,
+   a choice, a list) goes under its name; a switch, a number or an icon
+   stays beside it. */
+@container (max-width: 560px) {
+  .st-row:not(.stack):not(.st-block):has(> .st-row-c :is(.st-in:not(.fixed), .st-secret, .st-select, .st-seg, .st-chips, .st-step)) {
+    flex-direction: column; align-items: stretch; gap: 8px;
+  }
+  .st-row:has(> .st-row-c :is(.st-in:not(.fixed), .st-secret, .st-select, .st-seg, .st-chips, .st-step)) > .st-row-c { justify-content: flex-start; }
+  .st-row-c .st-in:not(.fixed), .st-row-c .st-secret, .st-row-c .st-select, .st-row-c .st-select select { width: 100%; flex: 1 1 auto; }
+  .st-secret .st-in { width: auto; flex: 1; min-width: 0; }
+  .st-row-c:has(> :is(.st-in:not(.fixed), .st-secret, .st-select)) { flex-wrap: nowrap; }
+  .st-chips { justify-content: flex-start; }
+  .st-form { grid-template-columns: 1fr; }
+}
+
+/* On a phone the chat button sits bottom right; Save keeps clear of it. */
+.st-page.narrow .st-save { justify-content: flex-start; padding-right: 72px; }
+.st-page.narrow .st-save .st-note { margin-right: 0; order: 3; }

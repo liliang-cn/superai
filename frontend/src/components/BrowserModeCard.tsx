@@ -1,25 +1,28 @@
 import { useState } from "react";
 import { translate } from "../lib/i18n";
 import { setBrowserMode, useBrowserStatus, useBrowserSwitching } from "../lib/browser";
+import { Row, Seg } from "./settings/kit";
 
 const MODES = [
-  { id: "off", label: "Off" },
-  { id: "chrome", label: "My Chrome" },
-  { id: "own", label: "Separate browser" },
+  { value: "off", label: "Off" },
+  { value: "chrome", label: "My Chrome" },
+  { value: "own", label: "Separate browser" },
 ] as const;
+
+type Mode = (typeof MODES)[number]["value"];
 
 /**
  * Which browser the agent drives: none, the person's own Chrome (with their
  * sign-ins), or a separate one agent-browser launches. Applied at once, not
- * with the page's Save: the backend rebuilds around it, and the status line
- * follows it until the browser is up.
+ * with the page's Save: the backend rebuilds around it, and the line under
+ * the name follows it until the browser is up.
  */
 export default function BrowserModeCard({ onChanged }: { onChanged?: (mode: string) => void }) {
   const st = useBrowserStatus();
   const switching = useBrowserSwitching();
   const [err, setErr] = useState("");
-  const current = switching || (st?.enabled ? st.mode : "off");
-  const pick = async (mode: "off" | "chrome" | "own") => {
+  const current = (switching || (st?.enabled ? st.mode : "off")) as Mode;
+  const pick = async (mode: Mode) => {
     if (mode === current) return;
     setErr("");
     try {
@@ -29,23 +32,13 @@ export default function BrowserModeCard({ onChanged }: { onChanged?: (mode: stri
       setErr(String(e instanceof Error ? e.message : e));
     }
   };
-  const state = !st ? "" : switching || (st.enabled && !st.ready && !st.error) ? translate("Installing browser…")
-    : st.error ? st.error : st.enabled && st.ready ? `${translate("Ready")}${st.version ? ` · agent-browser ${st.version}` : ""}` : "";
+  const state = err || (!st ? "" : switching || (st.enabled && !st.ready && !st.error) ? translate("Installing browser…")
+    : st.error ? st.error : st.enabled && st.ready && st.version ? `agent-browser ${st.version}` : "");
+  const bad = !!err || !!st?.error;
   return (
-    <div className="card" data-testid="browser-mode-card">
-      <div className="card-title">{translate("Browser")}</div>
-      <div className="field">
-        <label>{translate("Mode")}</label>
-        <div className="seg" role="radiogroup" aria-label={translate("Browser")} style={{ flexWrap: "wrap", alignSelf: "flex-start" }}>
-          {MODES.map((m) => (
-            <button key={m.id} type="button" role="radio" aria-checked={current === m.id}
-              className={`seg-btn${current === m.id ? " on" : ""}`} disabled={!!switching} onClick={() => void pick(m.id)}>
-              {translate(m.label)}
-            </button>
-          ))}
-        </div>
-        {(state || err) && <span className="hint" style={st?.error || err ? { color: "var(--danger, #c0262f)" } : undefined}>{err || state}</span>}
-      </div>
-    </div>
+    <Row label="Browser" testId="browser-mode-card"
+      sub={state ? <span className={bad ? "st-note bad" : undefined}>{state}</span> : undefined}>
+      <Seg label="Browser" value={current} options={[...MODES]} disabled={!!switching} onChange={(m) => void pick(m)} />
+    </Row>
   );
 }

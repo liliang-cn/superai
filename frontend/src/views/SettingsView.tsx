@@ -1,4 +1,9 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import {
+  BellIcon, ChevronDownIcon, ChevronUpIcon, DatabaseIcon, ExternalLinkIcon, GlobeIcon, HexagonIcon, LaptopIcon,
+  LogOutIcon, MonitorIcon, NetworkIcon, PauseIcon, PencilIcon, PlayIcon, PlusIcon, RadarIcon, SendIcon,
+  SettingsIcon, ShieldCheckIcon, SparklesIcon, SunIcon, Trash2Icon, WebhookIcon, WrenchIcon,
+} from "lucide-react";
 import { translate, useI18n } from "../lib/i18n";
 import LanguageSettings from "../components/LanguageSettings";
 import PairPhoneCard from "../components/PairPhoneCard";
@@ -10,6 +15,11 @@ import BrowserModeCard from "../components/BrowserModeCard";
 import DesktopControlCard from "../components/DesktopControlCard";
 import AddAgentCard from "../components/AddAgentCard";
 import AddWorkerCard from "../components/AddWorkerCard";
+import { ACCENTS } from "../components/ThemePicker";
+import {
+  Avatar, Block, Btn, Chips, ConfirmBtn, Group, IconBtn, Menu, Note, Num, Row, Secret, Seg, Select, State, Text, Toggle,
+} from "../components/settings/kit";
+import "../components/settings/settings.css";
 import {
   CLIProxyAccounts,
   CLIProxyLogin,
@@ -22,7 +32,7 @@ import {
   GetSettings,
   OpenInBrowser,
   CheckRemoteAgents,
-  SaveSettings,
+  PatchSettings,
   TestWebhook,
   ToolApprovalInfo,
 } from "../../wailsjs/go/app/App";
@@ -30,6 +40,10 @@ import { BrowserOpenURL, EventsOff, EventsOn } from "../../wailsjs/runtime/runti
 import { app, backend } from "../../wailsjs/go/models";
 import { toast } from "../lib/toasts";
 import { DEFAULT_QUEEN, setQueenName } from "../lib/queenName";
+import { clientKind } from "../lib/hivelink";
+import { useDeskTheme } from "../desk/DeskShell";
+import { COLORS, ColorName } from "../canvas/theme";
+import { Accent, Theme } from "../lib/types";
 
 type ProxyStatus = {
   running: boolean;
@@ -57,133 +71,52 @@ type ApprovalInfo = {
   entries: AuditEntry[];
 };
 
-/**
- * The tail of the audit log.
- *
- * On the Settings page rather than behind a menu because it is the evidence for
- * the switch sitting above it: someone deciding whether to leave the gate on
- * wants to see what it has actually been stopping. The full record is the file
- * whose path is printed underneath — this is a window onto it, not the record.
- */
-function AuditTail({ info }: { info: ApprovalInfo | null }) {
-  if (!info) return null;
-  return (
-    <div className="field">
-      <label>Recent tool decisions</label>
-      {info.entries.length === 0 ? (
-        <span className="hint">{translate("None")}</span>
-      ) : (
-        <div className="audit-list">
-          {/* Newest first on screen; the file itself is append-order. */}
-          {[...info.entries].reverse().map((e, i) => (
-            <div key={`${e.at}-${i}`} className={`audit-row${e.allowed ? "" : " denied"}`}>
-              <span>{e.allowed ? "allow" : "deny "}</span>
-              <span>{e.tool}</span>
-              <span className="audit-cmd" title={e.summary || e.reason || ""}>
-                {e.summary || e.reason || ""}
-              </span>
-              <span>{e.decided_by}</span>
-            </div>
-          ))}
-        </div>
-      )}
-      <span className="hint"><code>{info.auditPath}</code></span>
-    </div>
-  );
+// ── Saving ──────────────────────────────────────────────────────────────
+//
+// The page keeps the settings as last loaded or saved, and the copy being
+// edited. Save sends the difference between them as a JSON merge patch
+// (PatchSettings), so a field this page did not touch, such as one a card
+// saved on its own a moment ago, cannot be put back by it.
+
+type Json = Record<string, any>;
+
+const plain = (v: unknown): Json => JSON.parse(JSON.stringify(v ?? {}));
+const isObj = (v: unknown): v is Json => !!v && typeof v === "object" && !Array.isArray(v);
+
+/** What turns a into b, as a merge patch: lists replace whole, objects merge
+ *  key by key, and a key b no longer has is null. */
+export function mergeDiff(a: Json, b: Json): Json {
+  const out: Json = {};
+  for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) {
+    const av = a[k];
+    const bv = b[k];
+    if (JSON.stringify(av) === JSON.stringify(bv)) continue;
+    if (isObj(av) && isObj(bv)) {
+      const d = mergeDiff(av, bv);
+      if (Object.keys(d).length) out[k] = d;
+    } else {
+      out[k] = bv === undefined ? null : bv;
+    }
+  }
+  return out;
 }
 
-function PasswordField({
-  label,
-  value,
-  onChange,
-  hint,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  hint?: string;
-}) {
-  const [show, setShow] = useState(false);
-  return (
-    <div className="field">
-      <label>{translate(label)}</label>
-      <div className="input-pw">
-        <input
-          className="input"
-          type={show ? "text" : "password"}
-          value={value}
-          aria-label={translate(label)}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder="••••••••"
-          autoComplete="off"
-        />
-        <button type="button" className="pw-toggle" onClick={() => setShow((s) => !s)}>
-          {translate(show ? "hide" : "show")}
-        </button>
-      </div>
-      {hint && <span className="hint">{hint}</span>}
-    </div>
-  );
-}
-
-function TextField({
-  label,
-  value,
-  onChange,
-  placeholder,
-  hint,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-  hint?: string;
-}) {
-  return (
-    <div className="field">
-      <label>{translate(label)}</label>
-      <input className="input" aria-label={translate(label)} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} autoComplete="off" />
-      {hint && <span className="hint">{hint}</span>}
-    </div>
-  );
-}
-
-/**
- * The queen's name and aliases. Display and address only: the role and the
- * agent stay "queen". Aliases are typed as one comma-separated line, so the
- * text is kept as typed and split on the way into the settings.
- */
-function QueenNameCard({ name, aliases, onChange, hidden }: {
-  hidden: boolean;
-  name: string;
-  aliases: string[];
-  onChange: (name: string, aliases: string[]) => void;
-}) {
-  const [text, setText] = useState(aliases.join(", "));
-  useEffect(() => {
-    const parsed = text.split(/[,，\s]+/).filter(Boolean);
-    if (parsed.join() !== aliases.join()) setText(aliases.join(", "));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [aliases.join()]);
-  return (
-    <div className="card" hidden={hidden}>
-      <div className="card-title">{translate("Queen's name")}</div>
-      <TextField label="Name" value={name} placeholder={DEFAULT_QUEEN} onChange={(v) => onChange(v, aliases)} />
-      <div className="field">
-        <label>{translate("Also answers to")}</label>
-        <input className="input" aria-label={translate("Also answers to")} value={text} autoComplete="off"
-          placeholder={translate("Comma-separated, e.g. bee, 小蜂")}
-          onChange={(e) => { setText(e.target.value); onChange(name, e.target.value.split(/[,，\s]+/).filter(Boolean)); }} />
-      </div>
-    </div>
-  );
+/** Applies a merge patch to a copy of doc. */
+function mergeApply(doc: Json, patch: Json): Json {
+  const out: Json = { ...doc };
+  for (const [k, v] of Object.entries(patch)) {
+    if (v === null) delete out[k];
+    else if (isObj(v) && isObj(out[k])) out[k] = mergeApply(out[k], v);
+    else out[k] = v;
+  }
+  return out;
 }
 
 // Only the desktop window has anywhere to go. Served, this is the tab you are
-// already reading it in, so the card is not rendered at all.
+// already reading it in, so the group is not rendered at all.
 const served = Boolean((window as unknown as Record<string, unknown>).superleoServed);
 
-function OpenInBrowserCard() {
+function OpenInBrowserGroup() {
   const [origin, setOrigin] = useState("");
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
@@ -206,42 +139,21 @@ function OpenInBrowserCard() {
   };
 
   return (
-    <div className="card">
-      <div className="card-title">Open in Browser</div>
-      {origin && (
-        <div className="url-box" style={{ marginBottom: 14 }}>
-          <span className="url-label">LOCAL</span>
-          <span style={{ flex: 1 }}>{origin}</span>
-        </div>
-      )}
-      <div className="field">
-        <button className="btn" onClick={open} disabled={busy} style={{ alignSelf: "flex-start" }}>
-          {busy ? (
-            <><span className="spinner" /> Starting…</>
-          ) : origin ? (
-            "Open another tab ↗"
-          ) : (
-            "Open in Browser ↗"
-          )}
-        </button>
-        {err && <span className="save-note err">⚠ {err}</span>}
-      </div>
-    </div>
+    <Group icon={GlobeIcon} title="Open in browser">
+      <Row label="Open in browser" sub={err ? <span className="st-note bad">{err}</span> : origin ? <span className="mono">{origin}</span> : undefined}>
+        <Btn icon={ExternalLinkIcon} disabled={busy} onClick={() => void open()}>{busy ? "Starting…" : origin ? "Open another tab" : "Open"}</Btn>
+      </Row>
+    </Group>
   );
 }
 
-/**
- * The settings, in three groups: what it thinks and remembers with, what it
- * can reach and who decides, and everything else. Embeddings and the memory
- * backend are one decision made in two places, so they sit together; the hive
- * is an ability like the browser, so it sits with the browser.
- */
-type SectionID = "model" | "abilities" | "general";
+type SectionID = "general" | "model" | "abilities" | "notify";
 
-const SECTIONS: { id: SectionID; label: string }[] = [
-  { id: "model", label: "Model" },
-  { id: "abilities", label: "Abilities" },
-  { id: "general", label: "General" },
+const SECTIONS: { id: SectionID; label: string; icon: typeof SettingsIcon }[] = [
+  { id: "general", label: "General", icon: SettingsIcon },
+  { id: "model", label: "Model", icon: SparklesIcon },
+  { id: "abilities", label: "Abilities", icon: WrenchIcon },
+  { id: "notify", label: "Notifications", icon: BellIcon },
 ];
 
 /** The agent CLIs SuperLeo can hand a task to, in the order they are listed. */
@@ -428,132 +340,142 @@ function ExternalAgentsCard({
   );
 }
 
-
 /**
- * The agents on other machines, and one button that finds out whether any of
- * them actually answers.
- *
- * The check asks a real question rather than looking for a binary or a port,
- * because everything this feature has taught so far is that reachable and
- * usable are different: a CLI with a revoked token, a node that no longer
- * holds the volume and a model whose tier was withdrawn all look healthy right
- * up until something is asked. It costs a token per agent, so it is a button.
+ * The agents on other machines, each with what it said the last time every
+ * agent was asked something (the check in the Hive group's header: it asks a
+ * real question, because reachable and usable are different things).
  */
-function RemoteAgentsCard({
-  ra,
-  onChange,
-  statuses,
-  checking,
-  onCheck,
-}: {
+function RemoteAgentRows({ ra, statuses, checking, onRemove }: {
   ra: backend.RemoteAgents;
-  onChange: (patch: Partial<backend.RemoteAgents>) => void;
   statuses: app.RemoteAgentStatus[];
   checking: boolean;
-  onCheck: () => void;
+  onRemove: (name: string) => Promise<void>;
 }) {
   const configured = Object.entries(ra.agents ?? {});
-  const stateOf = (name: string) => statuses.find((st) => st.name === name);
-
   return (
-    <div className="card">
-      <div className="card-title">Agents on other machines</div>
-
-      <div className="field">
-        <label>Reach agents over the network</label>
-        <div className="toggle" onClick={() => onChange({ enabled: !ra.enabled })} style={{ cursor: "pointer", marginTop: 2 }}>
-          <div className={`switch${ra.enabled ? " on" : ""}`}><div className="knob" /></div>
-          <span style={{ fontSize: 13, color: "var(--text-1)" }}>
-            {ra.enabled ? "On — @pi and the rest resolve, here and in chat" : "Off — only the CLIs on this machine"}
-          </span>
-        </div>
-      </div>
-
-      {configured.length > 0 && (
-        <div className="field">
-          <label>Configured</label>
-          <div className="ea-agents">
-            {configured.map(([name, a]) => {
-              const st = stateOf(name);
-              return (
-                <div key={name} className={`ea-agent${st && !st.reachable ? " missing" : ""}`}>
-                  <div className="ea-agent-head">
-                    <span className="ea-agent-name">@{name}</span>
-                    <span className="ea-agent-state">
-                      {checking && !st
-                        ? "asking…"
-                        : st
-                          ? st.reachable
-                            ? `answered from ${st.where} in ${(st.ms / 1000).toFixed(1)}s`
-                            : "no answer"
-                          : "not checked"}
-                    </span>
-                  </div>
-                  <div className="hint ra-about">{a.about}</div>
-                  {/* The reason, verbatim. Every failure this has produced so
-                      far named its own cause — a revoked token, a withdrawn
-                      tier, a config read from the wrong directory — and
-                      summarising them would have thrown that away. */}
-                  {st && !st.reachable && st.detail && <span className="hint ea-bad">{st.detail}</span>}
-                  {/* The nodes it may be on, in the order they are tried.
-                      Monospaced because half of them are ssh options. */}
-                  <div className="ea-agent-path">{(a.hosts ?? []).join("   ·   ")}</div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      <div className="row" style={{ marginTop: 8 }}>
-        <button className="btn ghost sm" onClick={onCheck} disabled={checking}>
-          {checking ? "Asking every agent…" : "Save and ask each one"}
-        </button>
-      </div>
-    </div>
+    <>
+      {configured.map(([name, a]) => {
+        const st = statuses.find((x) => x.name === name);
+        const hosts = (a.hosts ?? []).join(" · ");
+        return (
+          <Row key={name} lead={<Avatar>@</Avatar>} label={name} dim={!ra.enabled}
+            sub={<span className="mono" title={a.about}>{hosts}</span>}
+            sub2={st && !st.reachable && st.detail ? <div className="st-note bad">{st.detail}</div> : undefined}>
+            {checking && !st ? <State tone="busy">Asking…</State>
+              : st ? st.reachable
+                ? <State tone="ok">{translate("{s}s to answer", { s: (st.ms / 1000).toFixed(1) })}</State>
+                : <State tone="bad">No answer</State>
+              : null}
+            <ConfirmBtn icon={Trash2Icon} label="Remove" title={translate("Remove @{name}?", { name })} onConfirm={() => onRemove(name)} />
+          </Row>
+        );
+      })}
+    </>
   );
 }
 
-export default function SettingsView({ onSaved }: { onSaved: () => void }) {
+/** The tail of the approval audit log, behind a button: the evidence for the
+ *  switch above it, for whoever wants to look. */
+function AuditRows({ info }: { info: ApprovalInfo | null }) {
+  const [open, setOpen] = useState(false);
+  if (!info) return null;
+  const allowed = info.entries.filter((e) => e.allowed).length;
+  const denied = info.entries.length - allowed;
+  return (
+    <>
+      <Row label="Recent decisions" sub={translate("{a} allowed · {d} denied", { a: allowed, d: denied })}>
+        <Btn trail={open ? ChevronUpIcon : ChevronDownIcon} onClick={() => setOpen((v) => !v)} data-testid="audit-toggle" aria-expanded={open}>
+          {open ? "Hide" : "Details"}
+        </Btn>
+      </Row>
+      {open && (
+        <Block testId="audit-list">
+          {info.entries.length === 0 ? <Note>{translate("None")}</Note> : (
+            <div className="st-audit">
+              {/* Newest first on screen; the file itself is append-order. */}
+              {[...info.entries].reverse().map((e, i) => (
+                <div key={`${e.at}-${i}`} className={`st-audit-r${e.allowed ? "" : " denied"}`}>
+                  <span>{e.allowed ? "allow" : "deny "}</span>
+                  <span>{e.tool}</span>
+                  <span className="c" title={e.summary || e.reason || ""}>{e.summary || e.reason || ""}</span>
+                  <span className="w">{e.decided_by}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          <Note><span className="mono">{info.auditPath}</span></Note>
+        </Block>
+      )}
+    </>
+  );
+}
+
+/** Light or dark, and the finish. The desktop window's look is the desk's
+ *  (colour and mode); a browser tab's is the app's theme and accent. */
+function AppearanceRows({ theme, onTheme, accent, onAccent }: {
+  theme?: Theme;
+  onTheme?: (t: Theme) => void;
+  accent?: Accent;
+  onAccent?: (a: Accent) => void;
+}) {
+  const desk = useDeskTheme();
+  const onDesk = clientKind() === "desktop";
+  const mode = onDesk ? desk.theme.mode : theme ?? "light";
+  const setMode = (m: "light" | "dark") => (onDesk ? desk.setTheme({ ...desk.theme, mode: m }) : onTheme?.(m));
+  const swatches = onDesk
+    ? (Object.keys(COLORS) as ColorName[]).map((k) => ({ key: k, label: COLORS[k].label, swatch: `rgb(${COLORS[k].rgb.join(",")})` }))
+    : ACCENTS.map((a) => ({ key: a.key as string, label: a.label, swatch: a.swatch }));
+  const current = onDesk ? desk.theme.color : accent;
+  const pick = (k: string) => (onDesk ? desk.setTheme({ ...desk.theme, color: k as ColorName }) : onAccent?.(k as Accent));
+  return (
+    <>
+      <LanguageSettings />
+      <Row label="Theme">
+        <Seg label="Theme" value={mode} onChange={setMode} testId="theme"
+          options={[{ value: "light", label: "Light" }, { value: "dark", label: "Dark" }]} />
+      </Row>
+      <Row label="Accent">
+        <div className="st-swatches" role="radiogroup" aria-label={translate("Accent")}>
+          {swatches.map((s) => (
+            <button key={s.key} type="button" role="radio" aria-checked={current === s.key} aria-label={s.label} title={s.label}
+              className={`st-swatch${current === s.key ? " on" : ""}`} style={{ ["--sw" as string]: s.swatch }} onClick={() => pick(s.key)} />
+          ))}
+        </div>
+      </Row>
+    </>
+  );
+}
+
+export default function SettingsView({ onSaved, theme, onTheme, accent, onAccent }: {
+  onSaved: () => void;
+  theme?: Theme;
+  onTheme?: (t: Theme) => void;
+  accent?: Accent;
+  onAccent?: (a: Accent) => void;
+}) {
   const { t } = useI18n();
+  // As last loaded or saved, and as being edited. Save sends the difference.
+  const [orig, setOrig] = useState<Json | null>(null);
   const [s, setS] = useState<backend.Settings | null>(null);
   const [saving, setSaving] = useState(false);
-  // Which group of settings is on screen. Not in the URL and not persisted:
-  // the page is opened to change one thing, and coming back to whatever was
-  // last poked at is less useful than starting where the accounts are.
-  const [section, setSection] = useState<SectionID>("model");
+  // Which section is on screen. Not in the URL and not persisted: the page
+  // always opens on General.
+  const [section, setSection] = useState<SectionID>("general");
+  const [narrow, setNarrow] = useState(false);
+  const pageRef = useRef<HTMLDivElement | null>(null);
   const [proxy, setProxy] = useState<ProxyStatus | null>(null);
   const [providers, setProviders] = useState<backend.CLIProxyProvider[]>([]);
+  const [projectFor, setProjectFor] = useState<backend.CLIProxyProvider | null>(null);
   const [projectID, setProjectID] = useState("");
   const [login, setLogin] = useState<{ status: string; provider: string; message: string } | null>(null);
   const [pasted, setPasted] = useState("");
+  const [editEmbed, setEditEmbed] = useState(false);
+  const [adding, setAdding] = useState<"" | "machine" | "link" | "worker">("");
 
   const [webhookTesting, setWebhookTesting] = useState(false);
-  const [webhookResult, setWebhookResult] = useState("");
-
-  /**
-   * A webhook is configured once and then relied on at 08:00 while nobody is
-   * watching, which is the worst moment to find out the URL was wrong — so the
-   * settings screen can prove it now. Saves first: the backend sends through
-   * the notifier built from the last save, not from what is on screen.
-   */
-  async function testWebhook() {
-    if (!s) return;
-    setWebhookTesting(true);
-    setWebhookResult("");
-    try {
-      await SaveSettings(s);
-      const res = await TestWebhook();
-      setWebhookResult(res === "ok" ? "Delivered." : res);
-    } catch (e) {
-      setWebhookResult(String(e));
-    } finally {
-      setWebhookTesting(false);
-    }
-  }
+  const [webhookResult, setWebhookResult] = useState<{ ok: boolean; text: string } | null>(null);
 
   const [accounts, setAccounts] = useState<backend.CLIProxyAccount[]>([]);
-  const [confirmOut, setConfirmOut] = useState("");
   const [approval, setApproval] = useState<ApprovalInfo | null>(null);
   const [agentCLIs, setAgentCLIs] = useState<backend.ExternalAgentStatus[]>([]);
   const [probing, setProbing] = useState(false);
@@ -561,6 +483,71 @@ export default function SettingsView({ onSaved }: { onSaved: () => void }) {
   // milliseconds, this one asks every agent a question and takes seconds.
   const [reachable, setReachable] = useState<app.RemoteAgentStatus[]>([]);
   const [checking, setChecking] = useState(false);
+
+  // The nav goes on top when the page is too narrow for it beside the groups,
+  // whatever the page sits in: a window, the desk's panel, a phone.
+  useEffect(() => {
+    const el = pageRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setNarrow(el.clientWidth < 720));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [s === null]);
+
+  const patch = useMemo(() => (orig && s ? mergeDiff(orig, plain(s)) : {}), [orig, s]);
+  const dirty = Object.keys(patch).length > 0;
+
+  // The latest of both, for callbacks that land after an await.
+  const origRef = useRef<Json | null>(null);
+  const sRef = useRef<backend.Settings | null>(null);
+  origRef.current = orig;
+  sRef.current = s;
+
+  /** Takes settings saved elsewhere (a card, a direct patch) as the new
+   *  baseline, keeping whatever is still unsaved on the page on top. */
+  const absorb = (fresh: backend.Settings | Json) => {
+    const base = plain(fresh);
+    const o = origRef.current;
+    const cur = sRef.current;
+    const pending = o && cur ? mergeDiff(o, plain(cur)) : {};
+    const next = backend.Settings.createFrom(mergeApply(base, pending));
+    origRef.current = base;
+    sRef.current = next;
+    setOrig(base);
+    setS(next);
+  };
+  /** The same, for a few fields a card has just saved itself. */
+  const absorbFields = (p: Json) => absorb(mergeApply(origRef.current ?? {}, p));
+
+  /** Saves just these fields now, outside the page's Save. */
+  const patchNow = async (p: Json) => {
+    const fresh = await PatchSettings(p);
+    absorb(fresh);
+    return fresh;
+  };
+
+  /** Saves what is unsaved on the page, if anything: probes and tests run
+   *  against the settings in force, not the ones on screen. */
+  const flush = async () => {
+    if (!dirty) return;
+    const fresh = await PatchSettings(patch);
+    setOrig(plain(fresh));
+    setS(fresh);
+  };
+
+  async function testWebhook() {
+    setWebhookTesting(true);
+    setWebhookResult(null);
+    try {
+      await flush();
+      const res = await TestWebhook();
+      setWebhookResult(res === "ok" ? { ok: true, text: translate("Delivered") } : { ok: false, text: res });
+    } catch (e) {
+      setWebhookResult({ ok: false, text: String(e) });
+    } finally {
+      setWebhookTesting(false);
+    }
+  }
 
   const refreshAgentCLIs = () => {
     setProbing(true);
@@ -570,35 +557,22 @@ export default function SettingsView({ onSaved }: { onSaved: () => void }) {
       .finally(() => setProbing(false));
   };
 
-  /**
-   * The probe runs against the binary paths the backend has, which are the
-   * ones from the last save — so a path just typed in has to be saved before
-   * re-checking, or the button would report on the old value and look broken.
-   */
   async function recheckAgentCLIs() {
-    if (!s) return;
     setProbing(true);
     try {
-      await SaveSettings(s);
+      await flush();
     } catch (e: any) {
       toast.error(String(e?.message || e));
     }
     refreshAgentCLIs();
   }
 
-  /**
-   * Save, then actually ask every agent something.
-   *
-   * Saving first is the point: the check is only worth anything against the
-   * settings that will be in force, and a toggle flipped but not saved would
-   * have the button report on the old configuration.
-   */
+  /** Save, then actually ask every agent something. */
   async function checkReachable() {
-    if (!s) return;
     setChecking(true);
     setReachable([]);
     try {
-      await SaveSettings(s);
+      await flush();
       setReachable((await CheckRemoteAgents()) as app.RemoteAgentStatus[]);
     } catch (e: any) {
       toast.error(String(e?.message || e));
@@ -624,7 +598,10 @@ export default function SettingsView({ onSaved }: { onSaved: () => void }) {
 
   useEffect(() => {
     GetSettings()
-      .then((res) => setS(res))
+      .then((res) => {
+        setOrig(plain(res));
+        setS(res);
+      })
       .catch((e) => toast.error(String(e?.message || e)));
     CLIProxyProviders().then(setProviders).catch(() => setProviders([]));
     refreshProxy();
@@ -645,37 +622,19 @@ export default function SettingsView({ onSaved }: { onSaved: () => void }) {
   const set = <K extends keyof backend.Settings>(k: K, v: backend.Settings[K]) => {
     setS((prev) => (prev ? Object.assign(new backend.Settings(prev), { [k]: v }) : prev));
   };
-
-  // External agents is the one nested object in Settings, so it patches rather
-  // than replaces: the card edits one field at a time and must not drop the
-  // rest of the section on the way.
-  const setRA = (patch: Partial<backend.RemoteAgents>) => {
-    setS((prev) =>
-      prev
-        ? Object.assign(new backend.Settings(prev), {
-            remote_agents: Object.assign(new backend.RemoteAgents(prev.remote_agents), patch),
-          })
-        : prev,
-    );
-  };
-
-  const setEA = (patch: Partial<backend.ExternalAgents>) => {
-    setS((prev) =>
-      prev
-        ? Object.assign(new backend.Settings(prev), {
-            external_agents: Object.assign(new backend.ExternalAgents(prev.external_agents), patch),
-          })
-        : prev,
-    );
+  const setNested = <K extends "remote_agents" | "external_agents" | "hive">(k: K, p: Json) => {
+    setS((prev) => (prev ? backend.Settings.createFrom({ ...plain(prev), [k]: { ...plain(prev[k]), ...p } }) : prev));
   };
 
   const save = async () => {
-    if (!s) return;
+    if (!s || !dirty) return;
     setSaving(true);
     try {
-      await SaveSettings(s);
-      setQueenName(s.queen_name, s.queen_aliases);
-      toast.success("Saved. Backend rebuilt.");
+      const fresh = await PatchSettings(patch);
+      setOrig(plain(fresh));
+      setS(fresh);
+      setQueenName(fresh.queen_name, fresh.queen_aliases);
+      toast.success(translate("Saved"));
       refreshProxy();
       // The gate is rebuilt with the service, so what it reports is only true
       // after the save has been through.
@@ -688,487 +647,353 @@ export default function SettingsView({ onSaved }: { onSaved: () => void }) {
     }
   };
 
+  const signIn = (prov: backend.CLIProxyProvider, project = "") => {
+    setProjectFor(null);
+    setLogin({ status: "started", provider: prov.id, message: translate("Starting…") });
+    CLIProxyLogin(prov.id, project).then(() => refreshProxy()).catch((e) => setLogin({ status: "error", provider: prov.id, message: String(e?.message || e) }));
+  };
+  const providerLabel = (id: string) => providers.find((p) => p.id === id)?.label || id;
+
   if (!s) {
     return (
       <div className="view">
-        <div className="view-header">
-          <div className="view-title">{t("Settings")}</div>
-        </div>
-        <div className="loading-row"><span className="spinner" style={{ borderTopColor: "var(--accent)" }} /> Loading settings…</div>
+        <div className="loading-row"><span className="spinner" style={{ borderTopColor: "var(--accent)" }} /> {t("Loading settings…")}</div>
       </div>
     );
   }
 
+  const ra = s.remote_agents ?? new backend.RemoteAgents();
+  const loginBusy = login?.status === "started" || login?.status === "prompt";
+  const embedHost = (() => {
+    try {
+      return s.embed_base_url ? new URL(s.embed_base_url).host : "";
+    } catch {
+      return s.embed_base_url;
+    }
+  })();
+
   return (
-    <div className="view">
-      <div className="view-header with-action">
-        <div className="view-title">{t("Settings")}</div>
-        <div className="vh-actions"><LanguageSettings /></div>
-      </div>
-      <div className="settings-tabs" role="tablist">
-        {SECTIONS.map((t) => (
-          <button
-            key={t.id}
-            role="tab"
-            aria-selected={section === t.id}
-            className={`settings-tab${section === t.id ? " active" : ""}`}
-            onClick={() => setSection(t.id)}
-          >
-            {translate(t.label)}
+    <div className={`view st-page${narrow ? " narrow" : ""}`} ref={pageRef} data-testid="settings">
+      <nav className="st-nav" aria-label={t("Settings")} role="tablist">
+        <h2 className="st-nav-h">{t("Settings")}</h2>
+        {SECTIONS.map((x) => (
+          <button key={x.id} type="button" role="tab" aria-selected={section === x.id} data-testid={`st-nav-${x.id}`}
+            className={`st-nav-i${section === x.id ? " on" : ""}`} onClick={() => setSection(x.id)}>
+            <x.icon size={16} strokeWidth={1.8} aria-hidden />
+            {t(x.label)}
           </button>
         ))}
-      </div>
-      <div className="settings-scroll">
-        <div className="settings-grid">
-          {/* ── Model: what it thinks and remembers with ── */}
-          <div className="card" hidden={section !== "model"}>
-            <div className="card-title">{translate("Accounts")}</div>
-            <div className="field">
-              <label>{translate("Use my accounts")}</label>
-              <div
-                className="toggle"
-                onClick={() => set("cliproxy_enabled", !s.cliproxy_enabled)}
-                style={{ cursor: "pointer", marginTop: 2 }}
-              >
-                <div className={`switch${s.cliproxy_enabled ? " on" : ""}`}><div className="knob" /></div>
-                <span style={{ fontSize: 13, color: "var(--text-1)" }}>
-                  {translate(s.cliproxy_enabled ? "On — SuperLeo runs on your signed-in accounts" : "Off — SuperLeo uses the custom API")}
-                </span>
-              </div>
-            </div>
-            {s.cliproxy_enabled && (
-              <div className="field">
-                <label>Model</label>
-                {!proxy?.running && (
-                  <span className="hint">{proxy?.error ? proxy.error : "Sign in below to get started."}</span>
-                )}
-                {proxy?.running && !proxy.models?.length && (
-                  <span className="hint">No accounts yet — sign in below.</span>
-                )}
-                {proxy?.running && !!proxy.models?.length && (
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
-                    {proxy.models.map((m) => (
-                      <button
-                        key={m}
-                        type="button"
-                        className={`btn sm${s.llm_model === m ? "" : " ghost"}`}
-                        onClick={() => set("llm_model", m)}
-                      >
-                        {m}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+      </nav>
 
-            {s.cliproxy_enabled && !!accounts.length && (
-              <div className="field">
-                <label>Signed in</label>
-                <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
-                  {accounts.map((acc) => (
-                    <div
-                      key={acc.file}
-                      style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}
-                    >
-                      <span style={{ fontSize: 13, color: acc.disabled ? "var(--text-2)" : "var(--text-0)" }}>
-                        <b>{providers.find((p) => p.id === acc.provider)?.label || acc.provider}</b> · {acc.account}
-                        {acc.project ? ` · ${acc.project}` : ""}
-                        {acc.disabled ? " (paused)" : ""}
-                      </span>
-                      <button
-                        type="button"
-                        className="btn ghost sm"
-                        onClick={() =>
-                          CLIProxySetAccountEnabled(acc.file, acc.disabled).then(() => setTimeout(refreshProxy, 800))
-                        }
-                      >
-                        {acc.disabled ? "Resume" : "Pause"}
-                      </button>
-                      <button
-                        type="button"
-                        className="btn ghost sm"
-                        onClick={() => {
-                          if (confirmOut !== acc.file) {
-                            setConfirmOut(acc.file);
-                            return;
-                          }
-                          setConfirmOut("");
-                          CLIProxySignOut(acc.file).then(() => setTimeout(refreshProxy, 800));
-                        }}
-                      >
-                        {confirmOut === acc.file ? "Click again to delete" : "Sign out"}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+      <main className="st-main">
+        <div className="st">
+          {/* ── General ── */}
+          {section === "general" && (
+            <>
+              <Group icon={SunIcon} title="Appearance">
+                <AppearanceRows theme={theme} onTheme={onTheme} accent={accent} onAccent={onAccent} />
+              </Group>
 
-            {s.cliproxy_enabled && (
-              <div className="field">
-                <label>Add an account</label>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
-                  {providers.map((prov) => (
-                    <button
-                      key={prov.id}
-                      type="button"
-                      className="btn ghost sm"
-                      title={prov.note}
-                      disabled={login?.status === "started" || login?.status === "prompt"}
-                      onClick={() => {
-                        setLogin({ status: "started", provider: prov.id, message: "Starting…" });
-                        CLIProxyLogin(prov.id, prov.needs_project ? projectID : "").then(() => refreshProxy());
-                      }}
-                    >
-                      Sign in with {prov.label}
-                    </button>
-                  ))}
-                </div>
-                {providers.some((p) => p.needs_project) && (
-                  <input
-                    className="input"
-                    style={{ marginTop: 8 }}
-                    value={projectID}
-                    onChange={(e) => setProjectID(e.target.value)}
-                    placeholder="Google Cloud project ID (Gemini only)"
-                    autoComplete="off"
-                  />
-                )}
-                {login && (
-                  <span className={`hint${login.status === "error" ? " err" : ""}`} style={{ marginTop: 6 }}>
-                    {providers.find((p) => p.id === login.provider)?.label || login.provider}: {login.message}
-                  </span>
-                )}
-                {login?.status === "prompt" && (
-                  <div className="input-pw" style={{ marginTop: 6 }}>
-                    <input
-                      className="input"
-                      value={pasted}
-                      onChange={(e) => setPasted(e.target.value)}
-                      placeholder="Paste the callback URL from your browser"
-                      autoComplete="off"
-                    />
-                    <button
-                      type="button"
-                      className="pw-toggle"
-                      onClick={() => {
-                        CLIProxySubmitPrompt(pasted);
-                        setLogin({ ...login, status: "started", message: "Submitted, finishing sign-in…" });
-                      }}
-                    >
-                      submit
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+              <Group icon={HexagonIcon} title="Queen">
+                <Row label="Name">
+                  <Text label="Name" placeholder={DEFAULT_QUEEN} testId="queen-name"
+                    value={s.queen_name === DEFAULT_QUEEN ? "" : s.queen_name ?? ""} onChange={(v) => set("queen_name", v)} />
+                </Row>
+                <Row label="Also answers to">
+                  <Chips testId="queen-aliases" items={s.queen_aliases ?? []} removeLabel="Remove" addLabel="Add an alias" placeholder="bee"
+                    onRemove={(a) => set("queen_aliases", (s.queen_aliases ?? []).filter((x) => x !== a))}
+                    onAdd={(a) => {
+                      const next = a.split(/[,，\s]+/).filter(Boolean).filter((x) => !(s.queen_aliases ?? []).includes(x));
+                      if (next.length) set("queen_aliases", [...(s.queen_aliases ?? []), ...next]);
+                    }} />
+                </Row>
+              </Group>
 
-          <div className="card" hidden={section !== "model"}>
-            <div className="card-title">{translate("Custom API")}</div>
-            <TextField label="API Base URL" value={s.llm_base_url} onChange={(v) => set("llm_base_url", v)} placeholder="https://api.openai.com/v1" />
-            <PasswordField label="API Key" value={s.llm_key} onChange={(v) => set("llm_key", v)} />
-            <TextField label="Model" value={s.llm_model} onChange={(v) => set("llm_model", v)} placeholder="gpt-5.5" />
-          </div>
+              <Group icon={MonitorIcon} title="Runtime">
+                <Row label="Workspace directory">
+                  <Text mono label="Workspace directory" placeholder="~/.superleo/workspace" value={s.workspace_dir} onChange={(v) => set("workspace_dir", v)} />
+                </Row>
+                <ProxyCard proxy={s.proxy ?? new backend.ProxySettings()} saved={orig?.proxy} onChange={(p) => set("proxy", p)} />
+                <Row label="Rounds per task">
+                  <Num label="Rounds per task" min={1} value={s.max_rounds} onChange={(v) => set("max_rounds", v)} testId="max-rounds" />
+                </Row>
+                <Row label="Token budget per turn">
+                  <Num label="Token budget per turn" placeholder="No limit" value={s.turn_max_tokens} onChange={(v) => set("turn_max_tokens", v)} />
+                </Row>
+                <Row label="Token budget per long task">
+                  <Num label="Token budget per long task" placeholder="No limit" value={s.long_task_max_tokens} onChange={(v) => set("long_task_max_tokens", v)} />
+                </Row>
+                <Row label="PII redaction">
+                  <Toggle label="PII redaction" on={!!s.pii_redaction} onChange={(v) => set("pii_redaction", v)} testId="pii" />
+                </Row>
+                <Row label="PTC tool calling">
+                  <Toggle label="PTC tool calling" on={!s.disable_ptc} onChange={(v) => set("disable_ptc", !v)} />
+                </Row>
+              </Group>
 
-          {s.hive?.role !== "worker" && (
-            <QueenEngineCard
-              hidden={section !== "model"}
-              engine={s.hive?.queen_engine ?? ""}
-              fallback={s.hive?.queen_fallback !== false}
-              publicURL={s.hive?.public_url ?? ""}
-              onChange={(engine, fallback, publicURL) =>
-                setS((prev) =>
-                  prev
-                    ? Object.assign(new backend.Settings(prev), {
-                        hive: new backend.HiveSettings({ ...prev.hive, queen_engine: engine, queen_fallback: fallback, public_url: publicURL }),
-                      })
-                    : prev,
-                )
-              }
-            />
+              {!served && <OpenInBrowserGroup />}
+            </>
           )}
 
-          <div className="card" hidden={section !== "model"}>
-            <div className="card-title">{translate("Embeddings")}</div>
-            <TextField label="Base URL" value={s.embed_base_url} onChange={(v) => set("embed_base_url", v)} placeholder="https://api.openai.com/v1" />
-            <PasswordField label="API Key" value={s.embed_key} onChange={(v) => set("embed_key", v)} />
-            <TextField label="Model" value={s.embed_model} onChange={(v) => set("embed_model", v)} placeholder="text-embedding-3-small" />
-          </div>
+          {/* ── Model: what it thinks and remembers with ── */}
+          {section === "model" && (
+            <>
+              <Group icon={SparklesIcon} title="Model" testId="model-group"
+                action={s.cliproxy_enabled && providers.length > 0 ? (
+                  <Menu disabled={loginBusy}
+                    trigger={<Btn icon={PlusIcon} trail={ChevronDownIcon} disabled={loginBusy} data-testid="add-account">Add account</Btn>}
+                    items={providers.map((p) => ({
+                      key: p.id,
+                      hint: p.note,
+                      lead: <Avatar>{p.label.slice(0, 1).toUpperCase()}</Avatar>,
+                      label: p.label,
+                      onSelect: () => (p.needs_project ? setProjectFor(p) : signIn(p)),
+                    }))} />
+                ) : undefined}>
+                <Row label="Source">
+                  <Seg label="Source" testId="model-source" value={s.cliproxy_enabled ? "accounts" : "api"}
+                    options={[{ value: "accounts", label: "My accounts" }, { value: "api", label: "Custom API" }]}
+                    onChange={(v) => set("cliproxy_enabled", v === "accounts")} />
+                </Row>
 
-          <div className="card" hidden={section !== "model"}>
-            <div className="card-title">{translate("Memory")}</div>
-            <div className="field">
-              <label>Backend</label>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
-                {(["local", "shared"] as const).map((mode) => (
-                  <button
-                    key={mode}
-                    type="button"
-                    className={`btn sm${s.memory_backend === mode ? "" : " ghost"}`}
-                    onClick={() => set("memory_backend", mode)}
-                  >
-                    {mode === "local" ? "Local (this machine)" : "Shared brain (remote CortexDB)"}
-                  </button>
-                ))}
-              </div>
-            </div>
-            {s.memory_backend === "shared" && (
-              <>
-                <TextField
-                  label="Shared CortexDB Endpoint"
-                  value={s.shared_memory_endpoint}
-                  onChange={(v) => set("shared_memory_endpoint", v)}
-                  placeholder="192.168.1.10:47821"
+                {s.cliproxy_enabled ? (
+                  <>
+                    {accounts.map((acc) => {
+                      const label = providerLabel(acc.provider);
+                      return (
+                        <Row key={acc.file} dim={acc.disabled} testId="account"
+                          lead={<Avatar tone={acc.disabled ? "muted" : undefined}>{label.slice(0, 1).toUpperCase()}</Avatar>}
+                          label={label} sub={`${acc.account}${acc.project ? ` · ${acc.project}` : ""}`}>
+                          {acc.disabled ? <State tone="off">Paused</State> : <State tone="ok">Available</State>}
+                          <IconBtn icon={acc.disabled ? PlayIcon : PauseIcon} label={acc.disabled ? "Resume" : "Pause"}
+                            onClick={() => void CLIProxySetAccountEnabled(acc.file, acc.disabled).then(() => setTimeout(refreshProxy, 800))} />
+                          <ConfirmBtn icon={LogOutIcon} label="Sign out" testId="sign-out"
+                            title={translate("Sign out of {name}?", { name: label })} sub={acc.account}
+                            onConfirm={() => CLIProxySignOut(acc.file).then(() => { setTimeout(refreshProxy, 800); })} />
+                        </Row>
+                      );
+                    })}
+                    {projectFor && (
+                      <Row label={projectFor.label} sub={projectFor.note}>
+                        <Text mono label="Google Cloud project ID" placeholder="Google Cloud project ID" value={projectID} onChange={setProjectID}
+                          onEnter={() => projectID.trim() && signIn(projectFor, projectID.trim())} />
+                        <Btn pri disabled={!projectID.trim()} onClick={() => signIn(projectFor, projectID.trim())}>Sign in</Btn>
+                      </Row>
+                    )}
+                    {login && (
+                      <Row label={providerLabel(login.provider)}
+                        sub={login.status === "error" ? <span className="st-note bad">{login.message}</span> : login.message}>
+                        {login.status === "prompt" ? (
+                          <>
+                            <Text mono label="Callback URL" placeholder="Paste the callback URL from your browser" value={pasted} onChange={setPasted}
+                              onEnter={() => { void CLIProxySubmitPrompt(pasted); setLogin({ ...login, status: "started", message: translate("Finishing sign-in…") }); }} />
+                            <Btn pri disabled={!pasted.trim()} onClick={() => {
+                              void CLIProxySubmitPrompt(pasted);
+                              setLogin({ ...login, status: "started", message: translate("Finishing sign-in…") });
+                            }}>Submit</Btn>
+                          </>
+                        ) : login.status === "started" ? <State tone="busy">Signing in…</State>
+                          : login.status === "done" ? <State tone="ok">Signed in</State>
+                          : <State tone="bad">Failed</State>}
+                      </Row>
+                    )}
+                    {accounts.length === 0 && !login && !projectFor && <Row label="No accounts yet" dim />}
+                    <Row label="Model" sub={proxy && !proxy.running && proxy.error ? <span className="st-note bad">{proxy.error}</span> : undefined}>
+                      <Select mono label="Model" testId="account-model" value={s.llm_model} placeholder="Choose a model"
+                        options={(proxy?.models ?? []).map((m) => ({ value: m, label: m }))} onChange={(v) => set("llm_model", v)} />
+                    </Row>
+                  </>
+                ) : (
+                  <>
+                    <Row label="Base URL">
+                      <Text mono label="Base URL" placeholder="https://api.openai.com/v1" value={s.llm_base_url} onChange={(v) => set("llm_base_url", v)} />
+                    </Row>
+                    <Row label="API key">
+                      <Secret label="API key" value={s.llm_key} onChange={(v) => set("llm_key", v)} />
+                    </Row>
+                    <Row label="Model">
+                      <Text mono label="Model" placeholder="gpt-5.5" value={s.llm_model} onChange={(v) => set("llm_model", v)} />
+                    </Row>
+                  </>
+                )}
+              </Group>
+
+              {/* The queen's engine: its own card, owned and styled apart. */}
+              {s.hive?.role !== "worker" && (
+                <QueenEngineCard
+                  hidden={false}
+                  engine={s.hive?.queen_engine ?? ""}
+                  fallback={s.hive?.queen_fallback !== false}
+                  publicURL={s.hive?.public_url ?? ""}
+                  onChange={(engine, fallback, publicURL) =>
+                    setNested("hive", { queen_engine: engine, queen_fallback: fallback, public_url: publicURL })
+                  }
                 />
-                <PasswordField
-                  label="Shared CortexDB Token"
-                  value={s.shared_memory_token}
-                  onChange={(v) => set("shared_memory_token", v)}
-                />
-                <TextField
-                  label="Namespace"
-                  value={s.shared_memory_namespace}
-                  onChange={(v) => set("shared_memory_namespace", v)}
-                  placeholder="default"
-                />
-              </>
-            )}
-          </div>
+              )}
+
+              <Group icon={DatabaseIcon} title="Memory">
+                <Row label="Stored in">
+                  <Seg label="Stored in" testId="memory-backend" value={s.memory_backend === "shared" ? "shared" : "local"}
+                    options={[{ value: "local", label: "This machine" }, { value: "shared", label: "Shared CortexDB" }]}
+                    onChange={(v) => set("memory_backend", v)} />
+                </Row>
+                {s.memory_backend === "shared" && (
+                  <>
+                    <Row label="Address">
+                      <Text mono label="Address" placeholder="192.168.1.10:47821" value={s.shared_memory_endpoint} onChange={(v) => set("shared_memory_endpoint", v)} />
+                    </Row>
+                    <Row label="Token">
+                      <Secret label="Token" value={s.shared_memory_token} onChange={(v) => set("shared_memory_token", v)} />
+                    </Row>
+                    <Row label="Namespace">
+                      <Text mono label="Namespace" placeholder="default" value={s.shared_memory_namespace} onChange={(v) => set("shared_memory_namespace", v)} />
+                    </Row>
+                  </>
+                )}
+                <Row label="Embeddings" sub={[embedHost, s.embed_model].filter(Boolean).join(" · ") || translate("Not set")}>
+                  <IconBtn icon={PencilIcon} label={editEmbed ? "Done" : "Edit"} pressed={editEmbed} onClick={() => setEditEmbed((v) => !v)} data-testid="edit-embed" />
+                </Row>
+                {editEmbed && (
+                  <>
+                    <Row label="Base URL">
+                      <Text mono label="Base URL" placeholder="https://api.openai.com/v1" value={s.embed_base_url} onChange={(v) => set("embed_base_url", v)} />
+                    </Row>
+                    <Row label="API key">
+                      <Secret label="API key" value={s.embed_key} onChange={(v) => set("embed_key", v)} />
+                    </Row>
+                    <Row label="Model">
+                      <Text mono label="Model" placeholder="text-embedding-3-small" value={s.embed_model} onChange={(v) => set("embed_model", v)} />
+                    </Row>
+                  </>
+                )}
+              </Group>
+            </>
+          )}
 
           {/* ── Abilities: what it can reach, and who else it can hand work to ── */}
-          {/* Saved the moment it is picked, so the page's own copy of the
-              settings is told too: a later Save must not put the old mode back. */}
           {section === "abilities" && (
-            <BrowserModeCard onChanged={(mode) => setS((cur) => (cur ? backend.Settings.createFrom({ ...cur, browser_mode: mode }) : cur))} />
-          )}
-          {section === "abilities" && (
-            <DesktopControlCard
-              onChanged={(on) => setS((cur) => (cur ? backend.Settings.createFrom({ ...cur, desktop_control: on }) : cur))}
-              onBlockedChanged={(list) => setS((cur) => (cur ? backend.Settings.createFrom({ ...cur, desktop_blocked_apps: list as string[] }) : cur))}
-            />
-          )}
-          {section === "abilities" && (
-            <ExternalAgentsCard
-              ea={s.external_agents ?? new backend.ExternalAgents()}
-              onChange={setEA}
-              statuses={agentCLIs}
-              probing={probing}
-              reached={reachable}
-              onRecheck={recheckAgentCLIs}
-            />
-          )}
-          {section === "abilities" && (
-            <LocalHiveCard
-              onChanged={(fresh) => setS((cur) => (cur ? backend.Settings.createFrom({ ...cur, hive: fresh.hive }) : fresh))}
-            />
-          )}
-          {section === "abilities" && (
-            <LinkSuperLeoCard
-              onChanged={(fresh) => setS((cur) => (cur ? backend.Settings.createFrom({ ...cur, remote_agents: fresh.remote_agents }) : fresh))}
-            />
-          )}
-          {section === "abilities" && (
-            <AddAgentCard
-              queen={s.hive?.role === "queen"}
-              onQueen={
-                s.hive?.role === "worker"
-                  ? undefined
-                  : (on) =>
-                      setS((prev) =>
-                        prev
-                          ? Object.assign(new backend.Settings(prev), {
-                              hive: new backend.HiveSettings({ ...prev.hive, role: on ? "queen" : "", standalone: !on }),
-                            })
-                          : prev,
-                      )
-              }
-            />
-          )}
-          {section === "abilities" && (
-            <AddWorkerCard
-              ra={s.remote_agents ?? new backend.RemoteAgents()}
-              onSave={async (agents) => {
-                const next = Object.assign(new backend.Settings(s), {
-                  remote_agents: Object.assign(new backend.RemoteAgents(s.remote_agents), { agents, enabled: true }),
-                });
-                await SaveSettings(next);
-                setS(next);
-                onSaved();
-              }}
-            />
-          )}
-          {section === "abilities" && (
-            <RemoteAgentsCard
-              ra={s.remote_agents ?? new backend.RemoteAgents()}
-              onChange={setRA}
-              statuses={reachable}
-              checking={checking}
-              onCheck={checkReachable}
-            />
-          )}
-
-          <div className="card" hidden={section !== "abilities"}>
-            <div className="card-title">{translate("Safety")}</div>
-            <div className="field">
-              <label>Ask before running commands</label>
-              <div
-                className="toggle"
-                onClick={() => set("disable_tool_approval", !s.disable_tool_approval)}
-                style={{ cursor: "pointer", marginTop: 2 }}
-              >
-                {/* The switch reads "on = asking", so it tracks the inverse of
-                    the stored disable flag. The setting is stored as a disable
-                    so that a settings file which has never heard of it — every
-                    file written before this existed — still comes up gated. */}
-                <div className={`switch${s.disable_tool_approval ? "" : " on"}`}><div className="knob" /></div>
-                <span style={{ fontSize: 13, color: "var(--text-1)" }}>
-                  {s.disable_tool_approval
-                    ? "Off — shell commands, installs and deletions run without asking"
-                    : `On — unanswered after ${approval?.waitSeconds ?? 120}s counts as no`}
-                </span>
-              </div>
-            </div>
-            <AuditTail info={approval} />
-          </div>
-
-          {/* ── General ── */}
-          <QueenNameCard
-            hidden={section !== "general"}
-            name={s.queen_name === DEFAULT_QUEEN ? "" : s.queen_name ?? ""}
-            aliases={s.queen_aliases ?? []}
-            onChange={(name, aliases) => setS((prev) => (prev ? Object.assign(new backend.Settings(prev), { queen_name: name, queen_aliases: aliases }) : prev))}
-          />
-          {section === "general" && <PairPhoneCard />}
-          {!served && section === "general" && <OpenInBrowserCard />}
-
-          <div className="card" hidden={section !== "general"}>
-            <div className="card-title">{translate("Notifications")}</div>
-            <TextField
-              label="Webhook URL"
-              value={s.webhook_url}
-              onChange={(v) => set("webhook_url", v)}
-              placeholder="https://example.com/superleo-hook"
-            />
-            <PasswordField
-              label="Webhook Secret"
-              value={s.webhook_secret}
-              onChange={(v) => set("webhook_secret", v)}
-            />
-            <div className="row">
-              <button className="btn" onClick={testWebhook} disabled={webhookTesting || !s.webhook_url}>
-                {webhookTesting ? "Sending…" : "Send test"}
-              </button>
-              {webhookResult && <span className="hint">{webhookResult}</span>}
-            </div>
-          </div>
-
-          <div className="card" hidden={section !== "general"}>
-            <div className="card-title">Telegram</div>
-            <PasswordField
-              label="Bot Token"
-              value={s.telegram_bot_token}
-              onChange={(v) => set("telegram_bot_token", v)}
-            />
-            <TextField
-              label="Allowed Chat IDs"
-              value={(s.telegram_allowed_chats ?? []).join(", ")}
-              onChange={(v) =>
-                set(
-                  "telegram_allowed_chats",
-                  v
-                    .split(",")
-                    .map((x) => Number(x.trim()))
-                    .filter((n) => Number.isFinite(n) && n !== 0),
-                )
-              }
-              placeholder="1669479669"
-            />
-          </div>
-
-          <ProxyCard
-            hidden={section !== "general"}
-            proxy={s.proxy ?? new backend.ProxySettings()}
-            onChange={(p) => set("proxy", p)}
-          />
-
-          <div className="card" hidden={section !== "general"}>
-            <div className="card-title">{translate("Runtime")}</div>
-            <TextField label="Workspace Directory" value={s.workspace_dir} onChange={(v) => set("workspace_dir", v)} placeholder="~/.superleo/workspace" />
-            <div className="row2">
-              <div className="field">
-                <label>Max Rounds</label>
-                <input
-                  className="input"
-                  type="number"
-                  min={1}
-                  value={s.max_rounds}
-                  onChange={(e) => set("max_rounds", Number(e.target.value))}
+            <>
+              <Group icon={LaptopIcon} title="Computer">
+                {/* Both apply at once, so the page's own copy is told too: a
+                    later Save must not put the old value back. */}
+                <BrowserModeCard onChanged={(mode) => absorbFields({ browser_mode: mode })} />
+                <DesktopControlCard
+                  onChanged={(on) => absorbFields({ desktop_control: on })}
+                  onBlockedChanged={(list) => absorbFields({ desktop_blocked_apps: list })}
                 />
-              </div>
-              <div className="field">
-                <label>Token budget per turn</label>
-                <input
-                  className="input"
-                  type="number"
-                  min={0}
-                  value={s.turn_max_tokens || ""}
-                  placeholder="No limit"
-                  onChange={(e) => set("turn_max_tokens", Math.max(0, Number(e.target.value) || 0))}
-                />
-              </div>
-              <div className="field">
-                <label>Token budget per long task</label>
-                <input
-                  className="input"
-                  type="number"
-                  min={0}
-                  value={s.long_task_max_tokens || ""}
-                  placeholder="No limit"
-                  onChange={(e) => set("long_task_max_tokens", Math.max(0, Number(e.target.value) || 0))}
-                />
-              </div>
-            </div>
-            <div className="field">
-              <label>Disable PTC (programmatic tool calling)</label>
-              <div
-                className="toggle"
-                onClick={() => set("disable_ptc", !s.disable_ptc)}
-                style={{ cursor: "pointer", marginTop: 2 }}
-              >
-                <div className={`switch${s.disable_ptc ? " on" : ""}`}><div className="knob" /></div>
-                <span style={{ fontSize: 13, color: "var(--text-1)" }}>
-                  {s.disable_ptc
-                    ? "Direct one-tool-per-round calling (needed for DashScope qwen3.x)"
-                    : "PTC on — model writes JS that calls tools (best with gpt-5.x)"}
-                </span>
-              </div>
-            </div>
-            <div className="field">
-              <label>PII redaction (strip personal data before sending to the LLM)</label>
-              <div
-                className="toggle"
-                onClick={() => set("pii_redaction", !s.pii_redaction)}
-                style={{ cursor: "pointer", marginTop: 2 }}
-              >
-                <div className={`switch${s.pii_redaction ? " on" : ""}`}><div className="knob" /></div>
-                <span style={{ fontSize: 13, color: "var(--text-1)" }}>
-                  {s.pii_redaction
-                    ? "On — email / phone / 身份证 / 手机号 / 银行卡 masked before reaching the model"
-                    : "Off — the model sees your data as-is"}
-                </span>
-              </div>
-            </div>
-          </div>
+              </Group>
 
-          <div className="settings-actions">
-            <button className="btn" onClick={save} disabled={saving}>
-              {saving ? <><span className="spinner" /> Saving…</> : "Save settings"}
-            </button>
-          </div>
+              {/* CODING TOOLS: replaced by CodingToolsCard */}
+              <ExternalAgentsCard
+                ea={s.external_agents ?? new backend.ExternalAgents()}
+                onChange={(p) => setNested("external_agents", p as Json)}
+                statuses={agentCLIs}
+                probing={probing}
+                reached={reachable}
+                onRecheck={recheckAgentCLIs}
+              />
+              {/* /CODING TOOLS */}
+
+              <Group icon={NetworkIcon} title="Hive" testId="hive-group"
+                action={
+                  <>
+                    <IconBtn icon={RadarIcon} label="Ask every agent" spin={false} disabled={checking} onClick={() => void checkReachable()} data-testid="ask-all" />
+                    <Menu
+                      trigger={<Btn icon={PlusIcon} trail={ChevronDownIcon} data-testid="hive-add">Add</Btn>}
+                      items={[
+                        { key: "machine", label: translate("A machine"), onSelect: () => setAdding("machine") },
+                        { key: "link", label: translate("Another SuperLeo"), onSelect: () => setAdding("link") },
+                        { key: "worker", label: translate("A worker by its command"), onSelect: () => setAdding("worker") },
+                      ]} />
+                  </>
+                }>
+                <AddAgentCard
+                  queen={s.hive?.role === "queen"}
+                  onQueen={s.hive?.role === "worker" ? undefined : (on) => setNested("hive", { role: on ? "queen" : "", standalone: !on })}
+                  open={adding === "machine"}
+                  onClose={() => setAdding("")}
+                />
+                <LocalHiveCard onChanged={(fresh) => absorbFields({ hive: plain(fresh.hive) })} />
+                <Row label="Agents on other machines">
+                  <Toggle label="Agents on other machines" on={!!ra.enabled} onChange={(v) => setNested("remote_agents", { enabled: v })} />
+                </Row>
+                <LinkSuperLeoCard open={adding === "link"} onClose={() => setAdding("")}
+                  onChanged={(fresh) => absorbFields({ remote_agents: plain(fresh.remote_agents) })} />
+                <RemoteAgentRows ra={ra} statuses={reachable} checking={checking}
+                  onRemove={async (name) => {
+                    try {
+                      await patchNow({ remote_agents: { agents: { [name]: null } } });
+                    } catch (e: any) {
+                      toast.error(String(e?.message || e));
+                    }
+                  }} />
+                <AddWorkerCard ra={ra} open={adding === "worker"} onClose={() => setAdding("")}
+                  onSave={async (agents) => {
+                    const before = Object.keys(plain(origRef.current?.remote_agents?.agents));
+                    const p: Json = plain(agents);
+                    for (const k of before) if (!(k in p)) p[k] = null;
+                    await patchNow({ remote_agents: { agents: p, enabled: true } });
+                    onSaved();
+                  }} />
+              </Group>
+
+              <Group icon={ShieldCheckIcon} title="Ask before running">
+                {/* On = asking, the inverse of the stored disable flag, so a
+                    file that never heard of the setting still comes up gated. */}
+                <Row label="Ask before commands, installs and deletions">
+                  {!s.disable_tool_approval && (
+                    <span className="st-lab">{translate("{n}s unanswered counts as no", { n: approval?.waitSeconds ?? 120 })}</span>
+                  )}
+                  <Toggle label="Ask before running" on={!s.disable_tool_approval} onChange={(v) => set("disable_tool_approval", !v)} testId="ask-before" />
+                </Row>
+                <AuditRows info={approval} />
+              </Group>
+            </>
+          )}
+
+          {/* ── Notifications: where SuperLeo reaches you ── */}
+          {section === "notify" && (
+            <>
+              <PairPhoneCard />
+
+              {/* CHANNELS: replaced by ChannelsCard */}
+              <Group icon={WebhookIcon} title="Webhook">
+                <Row label="URL">
+                  <Text mono label="Webhook URL" placeholder="https://example.com/superleo-hook" value={s.webhook_url} onChange={(v) => set("webhook_url", v)} />
+                </Row>
+                <Row label="Secret">
+                  <Secret label="Webhook secret" value={s.webhook_secret} onChange={(v) => set("webhook_secret", v)} />
+                </Row>
+                <Row label="Send a test" sub={webhookResult ? <span className={`st-note ${webhookResult.ok ? "ok" : "bad"}`}>{webhookResult.text}</span> : undefined}>
+                  {webhookTesting && <State tone="busy">Sending…</State>}
+                  <IconBtn icon={SendIcon} label="Send a test" disabled={webhookTesting || !s.webhook_url} onClick={() => void testWebhook()} />
+                </Row>
+              </Group>
+              <Group icon={SendIcon} title="Telegram">
+                <Row label="Bot token">
+                  <Secret label="Bot token" value={s.telegram_bot_token} onChange={(v) => set("telegram_bot_token", v)} />
+                </Row>
+                <Row label="Allowed chats">
+                  <Chips mono items={(s.telegram_allowed_chats ?? []).map(String)} removeLabel="Remove" addLabel="Add a chat ID" placeholder="1669479669"
+                    onRemove={(c) => set("telegram_allowed_chats", (s.telegram_allowed_chats ?? []).filter((x) => String(x) !== c))}
+                    onAdd={(c) => {
+                      const ids = c.split(/[,\s]+/).map((x) => Number(x.trim())).filter((n) => Number.isFinite(n) && n !== 0);
+                      const cur = s.telegram_allowed_chats ?? [];
+                      set("telegram_allowed_chats", [...cur, ...ids.filter((n) => !cur.includes(n))]);
+                    }} />
+                </Row>
+              </Group>
+              {/* /CHANNELS */}
+            </>
+          )}
         </div>
-      </div>
+
+        <div className="st-save" data-testid="save-bar">
+          {dirty && <Note>{translate("Unsaved changes")}</Note>}
+          {dirty && <Btn onClick={() => orig && setS(backend.Settings.createFrom(orig))} disabled={saving}>Discard</Btn>}
+          <Btn pri disabled={!dirty || saving} onClick={() => void save()} data-testid="save">{saving ? "Saving…" : "Save"}</Btn>
+        </div>
+      </main>
     </div>
   );
 }
