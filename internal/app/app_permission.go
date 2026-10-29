@@ -68,6 +68,8 @@ func (a *App) askToolApproval(ctx context.Context, req backend.ApprovalRequest) 
 	}()
 
 	a.emit("tool:approval", approvalPayload(req))
+	// And to whoever is away from the window, on the channels that asked.
+	a.pushNeedsYou(req)
 	// A standing agent's card shows it is waiting on you.
 	a.emit("agent:update", map[string]any{"session": req.SessionID})
 

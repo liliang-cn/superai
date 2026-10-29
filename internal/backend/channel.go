@@ -5,6 +5,7 @@ import (
 	"encoding/base32"
 	"encoding/base64"
 	"encoding/json"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"slices"
@@ -365,13 +366,23 @@ func readChannelsFile() (channelsFile, bool) {
 // one, else what settings.json holds, with the legacy fields folded in.
 func (s *Settings) mergeChannels() {
 	var recorded channelLegacy
-	if f, ok := readChannelsFile(); ok {
+	f, haveFile := readChannelsFile()
+	if haveFile {
 		s.Channels = f.Channels
 		recorded = f.Legacy
 	} else if s.Channels != nil {
 		recorded = mirrorLegacy(s.Channels)
 	}
 	s.settleChannels(recorded)
+	// A migration happens on the first load, and what it made has to outlive
+	// the process before anything is saved: a webhook channel's id and token
+	// are its receive address, and one copied into a sender must not change
+	// with the next restart.
+	if !haveFile && len(s.Channels) > 0 {
+		if err := s.saveChannels(); err != nil {
+			slog.Warn("channels not written", "error", err)
+		}
+	}
 }
 
 // prepareChannels settles the list before a save. Channels nil means a client
@@ -389,7 +400,9 @@ func (s *Settings) prepareChannels() {
 	case haveFile:
 		recorded = f.Legacy
 	case s.Channels != nil:
-		recorded = mirrorLegacy(s.Channels)
+		// Channels built in code with nothing on disk yet: they are the
+		// truth, and the legacy fields are only to be mirrored from them.
+		recorded = legacyOf(s)
 	}
 	s.settleChannels(recorded)
 }

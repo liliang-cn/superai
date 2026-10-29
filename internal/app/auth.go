@@ -414,6 +414,11 @@ func gatedPath(p string) bool {
 	// A standing agent's webhook carries its own secret in the path.
 	case strings.HasPrefix(p, agentHookPrefix):
 		return false
+	// A webhook channel's receive path checks its own token, which opens
+	// that path and nothing else (channel_inbound.go). Outside /api already;
+	// said here so the line is drawn where the others are.
+	case strings.HasPrefix(p, backend.ChannelInboundPrefix):
+		return false
 	// The handoff is how a browser holding nothing gets a session; gating it on
 	// already having one would make it useless. It carries its own credential
 	// (see companion.go) and hands out nothing without one.

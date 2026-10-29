@@ -329,6 +329,8 @@ func newAPIMux(app *App, hub *eventHub, creds *credentials, handoff *handoffStor
 	pairRoutesLinking(mux, creds, func() int { _, l, _ := app.agentDoor.get(); return l })
 	registerPushRoute(mux, creds)
 	agentHookRoute(mux, app)
+	// A webhook channel's way in: its own token, its own door (channel_inbound.go).
+	channelInboundRoute(mux, app)
 	// The desktop app's "Open in Browser" hands the tab it opens a one-shot
 	// token here, so nobody is asked for a password they never chose. nil in
 	// serve mode: nothing there mints tokens, so every arrival is turned away.

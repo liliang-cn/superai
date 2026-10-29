@@ -2,6 +2,7 @@ package app
 
 import (
 	"log/slog"
+	"sync/atomic"
 
 	"github.com/liliang-cn/superleo/internal/backend"
 )
@@ -13,6 +14,10 @@ import (
 // kind of friction that makes a feature go unused. Stopped and rebuilt rather
 // than reconfigured: the poller holds a long-lived HTTP request and a lock, and
 // swapping a token underneath it is more moving parts than starting again.
+
+// telegramPolling says whether this process holds the poll, for the
+// Channels list: a bridge that exists may be idle behind another process.
+var telegramPolling atomic.Bool
 
 // startTelegram brings the bridge up if Telegram is configured. Any problem is
 // recorded and reported through GetStatus rather than failing the boot: an
@@ -50,6 +55,7 @@ func (a *App) startTelegram() {
 	a.telegramErr = ""
 	a.telegram = bridge
 	a.mu.Unlock()
+	telegramPolling.Store(started)
 
 	if started {
 		slog.Info("telegram bridge polling")
@@ -67,6 +73,7 @@ func (a *App) stopTelegram() {
 	bridge := a.telegram
 	a.telegram = nil
 	a.mu.Unlock()
+	telegramPolling.Store(false)
 
 	// Outside the lock: Stop waits for a turn in flight, and that turn runs
 	// against the service this lock also guards.

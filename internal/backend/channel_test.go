@@ -60,6 +60,12 @@ func TestChannelsMigrateFromLegacyFieldsOnLoad(t *testing.T) {
 		t.Errorf("legacy fields changed: %q %q", s.WebhookURL, s.TelegramBotToken)
 	}
 
+	// Loaded again before any save: the migration was kept, so the inbound
+	// address a sender was given still works after a restart.
+	if second, _ := LoadSettings(); second.Channels[0].ID != s.Channels[0].ID || second.Channels[0].InboundToken != s.Channels[0].InboundToken {
+		t.Fatalf("a restart changed the migrated channels: %+v vs %+v", second.Channels, s.Channels)
+	}
+
 	// Saved and loaded again: the same channels, same ids, not migrated twice.
 	if err := s.Save(); err != nil {
 		t.Fatal(err)
