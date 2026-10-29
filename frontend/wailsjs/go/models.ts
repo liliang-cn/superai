@@ -857,6 +857,76 @@ export namespace app {
 		}
 	}
 	
+	export class ChannelList {
+	    channels: backend.ChannelView[];
+	    public_url?: string;
+	    types: string[];
+	    events: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ChannelList(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.channels = this.convertValues(source["channels"], backend.ChannelView);
+	        this.public_url = source["public_url"];
+	        this.types = source["types"];
+	        this.events = source["events"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ChannelTestResult {
+	    ok: boolean;
+	    error?: string;
+	    channel: backend.ChannelView;
+	
+	    static createFrom(source: any = {}) {
+	        return new ChannelTestResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ok = source["ok"];
+	        this.error = source["error"];
+	        this.channel = this.convertValues(source["channel"], backend.ChannelView);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class CodingSession {
 	    machine?: string;
 	    cli: string;
@@ -890,6 +960,182 @@ export namespace app {
 	        this.at = this.convertValues(source["at"], null);
 	        this.readable = source["readable"];
 	        this.replyable = source["replyable"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class CodingToolEdit {
+	    kind: string;
+	    id: string;
+	    name?: string;
+	    command?: string;
+	    model?: string;
+	    path?: string;
+	    preset?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new CodingToolEdit(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.kind = source["kind"];
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.command = source["command"];
+	        this.model = source["model"];
+	        this.path = source["path"];
+	        this.preset = source["preset"];
+	    }
+	}
+	export class CodingToolOffer {
+	    id: string;
+	    label: string;
+	    binary: string;
+	    command?: string;
+	    found: boolean;
+	    path?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new CodingToolOffer(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.label = source["label"];
+	        this.binary = source["binary"];
+	        this.command = source["command"];
+	        this.found = source["found"];
+	        this.path = source["path"];
+	    }
+	}
+	export class CodingToolTry {
+	    ok: boolean;
+	    ms: number;
+	    text?: string;
+	    reason?: string;
+	    // Go type: time
+	    at: any;
+	
+	    static createFrom(source: any = {}) {
+	        return new CodingToolTry(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ok = source["ok"];
+	        this.ms = source["ms"];
+	        this.text = source["text"];
+	        this.reason = source["reason"];
+	        this.at = this.convertValues(source["at"], null);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class CodingToolRow {
+	    id: string;
+	    name: string;
+	    kind: string;
+	    command?: string;
+	    model?: string;
+	    path?: string;
+	    override?: string;
+	    version?: string;
+	    installed: boolean;
+	    off?: boolean;
+	    preset?: string;
+	    machine?: string;
+	    tried?: CodingToolTry;
+	
+	    static createFrom(source: any = {}) {
+	        return new CodingToolRow(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.kind = source["kind"];
+	        this.command = source["command"];
+	        this.model = source["model"];
+	        this.path = source["path"];
+	        this.override = source["override"];
+	        this.version = source["version"];
+	        this.installed = source["installed"];
+	        this.off = source["off"];
+	        this.preset = source["preset"];
+	        this.machine = source["machine"];
+	        this.tried = this.convertValues(source["tried"], CodingToolTry);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class CodingTools {
+	    enabled: boolean;
+	    tools: CodingToolRow[];
+	    offers: CodingToolOffer[];
+	    machines: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new CodingTools(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.enabled = source["enabled"];
+	        this.tools = this.convertValues(source["tools"], CodingToolRow);
+	        this.offers = this.convertValues(source["offers"], CodingToolOffer);
+	        this.machines = source["machines"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -2368,6 +2614,164 @@ export namespace backend {
 	        this.note = source["note"];
 	    }
 	}
+	export class Channel {
+	    id: string;
+	    type: string;
+	    name?: string;
+	    enabled: boolean;
+	    events: string[];
+	    url?: string;
+	    secret?: string;
+	    inbound_token?: string;
+	    reply_mode?: string;
+	    bot_token?: string;
+	    allowed_chats?: number[];
+	    server?: string;
+	    device_key?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Channel(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.type = source["type"];
+	        this.name = source["name"];
+	        this.enabled = source["enabled"];
+	        this.events = source["events"];
+	        this.url = source["url"];
+	        this.secret = source["secret"];
+	        this.inbound_token = source["inbound_token"];
+	        this.reply_mode = source["reply_mode"];
+	        this.bot_token = source["bot_token"];
+	        this.allowed_chats = source["allowed_chats"];
+	        this.server = source["server"];
+	        this.device_key = source["device_key"];
+	    }
+	}
+	export class ChannelInput {
+	    id?: string;
+	    type?: string;
+	    name?: string;
+	    enabled?: boolean;
+	    events?: string[];
+	    url?: string;
+	    secret?: string;
+	    reply_mode?: string;
+	    bot_token?: string;
+	    allowed_chats?: number[];
+	    server?: string;
+	    device_key?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ChannelInput(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.type = source["type"];
+	        this.name = source["name"];
+	        this.enabled = source["enabled"];
+	        this.events = source["events"];
+	        this.url = source["url"];
+	        this.secret = source["secret"];
+	        this.reply_mode = source["reply_mode"];
+	        this.bot_token = source["bot_token"];
+	        this.allowed_chats = source["allowed_chats"];
+	        this.server = source["server"];
+	        this.device_key = source["device_key"];
+	    }
+	}
+	export class ChannelStatus {
+	    last_ok_at?: string;
+	    last_error_at?: string;
+	    last_error?: string;
+	    last_inbound_at?: string;
+	    inbound_today: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ChannelStatus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.last_ok_at = source["last_ok_at"];
+	        this.last_error_at = source["last_error_at"];
+	        this.last_error = source["last_error"];
+	        this.last_inbound_at = source["last_inbound_at"];
+	        this.inbound_today = source["inbound_today"];
+	    }
+	}
+	export class ChannelView {
+	    id: string;
+	    type: string;
+	    name: string;
+	    enabled: boolean;
+	    events: string[];
+	    two_way: boolean;
+	    url?: string;
+	    secret_set: boolean;
+	    secret_mask?: string;
+	    inbound_path?: string;
+	    token_mask?: string;
+	    reply_mode?: string;
+	    bot_token_mask?: string;
+	    allowed_chats?: number[];
+	    server?: string;
+	    device_key_mask?: string;
+	    can_send: boolean;
+	    status: ChannelStatus;
+	    state?: string;
+	    state_error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ChannelView(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.type = source["type"];
+	        this.name = source["name"];
+	        this.enabled = source["enabled"];
+	        this.events = source["events"];
+	        this.two_way = source["two_way"];
+	        this.url = source["url"];
+	        this.secret_set = source["secret_set"];
+	        this.secret_mask = source["secret_mask"];
+	        this.inbound_path = source["inbound_path"];
+	        this.token_mask = source["token_mask"];
+	        this.reply_mode = source["reply_mode"];
+	        this.bot_token_mask = source["bot_token_mask"];
+	        this.allowed_chats = source["allowed_chats"];
+	        this.server = source["server"];
+	        this.device_key_mask = source["device_key_mask"];
+	        this.can_send = source["can_send"];
+	        this.status = this.convertValues(source["status"], ChannelStatus);
+	        this.state = source["state"];
+	        this.state_error = source["state_error"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class ChatSessionInfo {
 	    id: string;
 	    title: string;
@@ -2414,6 +2818,26 @@ export namespace backend {
 	        this.engine = source["engine"];
 	        this.cost_usd = source["cost_usd"];
 	        this.stand_in_for = source["stand_in_for"];
+	    }
+	}
+	export class CodingTool {
+	    id: string;
+	    name: string;
+	    command: string;
+	    model?: string;
+	    preset?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new CodingTool(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.command = source["command"];
+	        this.model = source["model"];
+	        this.preset = source["preset"];
 	    }
 	}
 	export class Dashboard {
@@ -2580,6 +3004,7 @@ export namespace backend {
 	    disabled?: string[];
 	    models?: Record<string, string>;
 	    timeout_seconds?: number;
+	    custom?: CodingTool[];
 	
 	    static createFrom(source: any = {}) {
 	        return new ExternalAgents(source);
@@ -2594,7 +3019,26 @@ export namespace backend {
 	        this.disabled = source["disabled"];
 	        this.models = source["models"];
 	        this.timeout_seconds = source["timeout_seconds"];
+	        this.custom = this.convertValues(source["custom"], CodingTool);
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class HAStandby {
 	    host: string;
@@ -3280,6 +3724,7 @@ export namespace backend {
 		}
 	}
 	
+	
 	export class RememberOption {
 	    scope: string;
 	    note?: string;
@@ -3507,6 +3952,7 @@ export namespace backend {
 	    webhook_secret: string;
 	    telegram_bot_token: string;
 	    telegram_allowed_chats: number[];
+	    channels: Channel[];
 	    external_agents: ExternalAgents;
 	    onboarded?: boolean;
 	    hive: HiveSettings;
@@ -3569,6 +4015,7 @@ export namespace backend {
 	        this.webhook_secret = source["webhook_secret"];
 	        this.telegram_bot_token = source["telegram_bot_token"];
 	        this.telegram_allowed_chats = source["telegram_allowed_chats"];
+	        this.channels = this.convertValues(source["channels"], Channel);
 	        this.external_agents = this.convertValues(source["external_agents"], ExternalAgents);
 	        this.onboarded = source["onboarded"];
 	        this.hive = this.convertValues(source["hive"], HiveSettings);

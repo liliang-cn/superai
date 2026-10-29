@@ -84,7 +84,11 @@ export function Dashboards():Promise<Array<backend.Dashboard>>;
 
 export function DeleteApprovalRule(arg1:string):Promise<Record<string, any>>;
 
+export function DeleteChannel(arg1:string):Promise<void>;
+
 export function DeleteChatSession(arg1:string):Promise<string>;
+
+export function DeleteCodingTool(arg1:string,arg2:string):Promise<app.CodingTools>;
 
 export function DeleteDashboard(arg1:string):Promise<Record<string, any>>;
 
@@ -188,7 +192,13 @@ export function LinkedSuperLeos():Promise<Array<app.LinkedSuperLeo>>;
 
 export function ListApprovalRules():Promise<Array<backend.ApprovalRule>>;
 
+export function ListChannels():Promise<app.ChannelList>;
+
+export function ListCodingTools():Promise<app.CodingTools>;
+
 export function ListIntegrationTokens():Promise<Array<app.IntegrationToken>>;
+
+export function LocalCodingTools():Promise<app.CodingTools>;
 
 export function LocalWorkerCandidates():Promise<Array<app.LocalWorkerCandidate>>;
 
@@ -292,6 +302,8 @@ export function ReadWorkspaceFileDataURL(arg1:string):Promise<string>;
 
 export function RefreshDashboard(arg1:string):Promise<Record<string, any>>;
 
+export function RegenerateChannelToken(arg1:string):Promise<backend.ChannelView>;
+
 export function Relays():Promise<Array<app.RelayAgent>>;
 
 export function Remote(arg1:string,arg2:Array<any>):Promise<any>;
@@ -316,11 +328,17 @@ export function ResolveToolApprovalRemember(arg1:string,arg2:boolean,arg3:backen
 
 export function ResumeStandingAgent(arg1:string):Promise<void>;
 
+export function RevealChannelToken(arg1:string):Promise<string>;
+
 export function RevokeIntegrationToken(arg1:string):Promise<void>;
 
 export function RunAgentLink(arg1:context.Context,arg2:app.AgentLinkOptions):Promise<void>;
 
 export function RunScheduledPromptNow(arg1:string):Promise<string>;
+
+export function SaveChannel(arg1:backend.ChannelInput):Promise<backend.ChannelView>;
+
+export function SaveCodingTool(arg1:string,arg2:app.CodingToolEdit):Promise<app.CodingTools>;
 
 export function SaveDashboard(arg1:string,arg2:string,arg3:string):Promise<Record<string, any>>;
 
@@ -345,6 +363,8 @@ export function SendChat(arg1:string,arg2:string,arg3:Array<string>):Promise<str
 export function SetAway(arg1:boolean):Promise<app.CCPresence>;
 
 export function SetBrowserMode(arg1:string):Promise<void>;
+
+export function SetCodingToolsEnabled(arg1:boolean):Promise<app.CodingTools>;
 
 export function SetDashboardCron(arg1:string,arg2:string):Promise<Record<string, any>>;
 
@@ -386,6 +406,8 @@ export function StopYoloMode():Promise<Record<string, any>>;
 
 export function TakeOver(arg1:string,arg2:string,arg3:string):Promise<void>;
 
+export function TestChannel(arg1:string):Promise<app.ChannelTestResult>;
+
 export function TestProxy(arg1:backend.ProxySettings):Promise<Record<string, any>>;
 
 export function TestWebhook():Promise<string>;
@@ -399,6 +421,8 @@ export function ToolStats(arg1:number):Promise<backend.ToolStatsReport>;
 export function TraceCall(arg1:string,arg2:string):Promise<string>;
 
 export function TraceLines(arg1:string,arg2:number):Promise<Array<string>>;
+
+export function TryCodingTool(arg1:string,arg2:app.CodingToolEdit):Promise<app.CodingToolTry>;
 
 export function TurnTrace(arg1:string):Promise<app.TurnTrace>;
 

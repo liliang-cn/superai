@@ -387,6 +387,8 @@ type ExternalAgents struct {
 	Models map[string]string `json:"models,omitempty"`
 	// TimeoutSeconds bounds one delegated run. Zero takes the default.
 	TimeoutSeconds int `json:"timeout_seconds,omitempty"`
+	// Custom are the coding tools a person added by command (codingtool.go).
+	Custom []CodingTool `json:"custom,omitempty"`
 }
 
 // DefaultExternalAgentTimeout bounds one delegated run when the settings do
@@ -469,6 +471,7 @@ func (e *ExternalAgents) normalize() {
 	}
 	e.Binaries = trimmedPairs(e.Binaries)
 	e.Models = trimmedPairs(e.Models)
+	e.Custom = normalizeCodingTools(e.Custom)
 	if e.TimeoutSeconds < 0 {
 		e.TimeoutSeconds = 0
 	}

@@ -287,6 +287,7 @@ func (a *App) startCLIRun(o cliStart) (CLIRun, error) {
 		}
 	}
 	registry := agentexec.RegistryFrom(installed)
+	registerCodingTools(registry, ext)
 	id := uuid.NewString()
 	provider, err := registry.Get(agent)
 	if err != nil {

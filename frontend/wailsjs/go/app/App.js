@@ -158,8 +158,16 @@ export function DeleteApprovalRule(arg1) {
   return window['go']['app']['App']['DeleteApprovalRule'](arg1);
 }
 
+export function DeleteChannel(arg1) {
+  return window['go']['app']['App']['DeleteChannel'](arg1);
+}
+
 export function DeleteChatSession(arg1) {
   return window['go']['app']['App']['DeleteChatSession'](arg1);
+}
+
+export function DeleteCodingTool(arg1, arg2) {
+  return window['go']['app']['App']['DeleteCodingTool'](arg1, arg2);
 }
 
 export function DeleteDashboard(arg1) {
@@ -366,8 +374,20 @@ export function ListApprovalRules() {
   return window['go']['app']['App']['ListApprovalRules']();
 }
 
+export function ListChannels() {
+  return window['go']['app']['App']['ListChannels']();
+}
+
+export function ListCodingTools() {
+  return window['go']['app']['App']['ListCodingTools']();
+}
+
 export function ListIntegrationTokens() {
   return window['go']['app']['App']['ListIntegrationTokens']();
+}
+
+export function LocalCodingTools() {
+  return window['go']['app']['App']['LocalCodingTools']();
 }
 
 export function LocalWorkerCandidates() {
@@ -574,6 +594,10 @@ export function RefreshDashboard(arg1) {
   return window['go']['app']['App']['RefreshDashboard'](arg1);
 }
 
+export function RegenerateChannelToken(arg1) {
+  return window['go']['app']['App']['RegenerateChannelToken'](arg1);
+}
+
 export function Relays() {
   return window['go']['app']['App']['Relays']();
 }
@@ -622,6 +646,10 @@ export function ResumeStandingAgent(arg1) {
   return window['go']['app']['App']['ResumeStandingAgent'](arg1);
 }
 
+export function RevealChannelToken(arg1) {
+  return window['go']['app']['App']['RevealChannelToken'](arg1);
+}
+
 export function RevokeIntegrationToken(arg1) {
   return window['go']['app']['App']['RevokeIntegrationToken'](arg1);
 }
@@ -632,6 +660,14 @@ export function RunAgentLink(arg1, arg2) {
 
 export function RunScheduledPromptNow(arg1) {
   return window['go']['app']['App']['RunScheduledPromptNow'](arg1);
+}
+
+export function SaveChannel(arg1) {
+  return window['go']['app']['App']['SaveChannel'](arg1);
+}
+
+export function SaveCodingTool(arg1, arg2) {
+  return window['go']['app']['App']['SaveCodingTool'](arg1, arg2);
 }
 
 export function SaveDashboard(arg1, arg2, arg3) {
@@ -680,6 +716,10 @@ export function SetAway(arg1) {
 
 export function SetBrowserMode(arg1) {
   return window['go']['app']['App']['SetBrowserMode'](arg1);
+}
+
+export function SetCodingToolsEnabled(arg1) {
+  return window['go']['app']['App']['SetCodingToolsEnabled'](arg1);
 }
 
 export function SetDashboardCron(arg1, arg2) {
@@ -762,6 +802,10 @@ export function TakeOver(arg1, arg2, arg3) {
   return window['go']['app']['App']['TakeOver'](arg1, arg2, arg3);
 }
 
+export function TestChannel(arg1) {
+  return window['go']['app']['App']['TestChannel'](arg1);
+}
+
 export function TestProxy(arg1) {
   return window['go']['app']['App']['TestProxy'](arg1);
 }
@@ -788,6 +832,10 @@ export function TraceCall(arg1, arg2) {
 
 export function TraceLines(arg1, arg2) {
   return window['go']['app']['App']['TraceLines'](arg1, arg2);
+}
+
+export function TryCodingTool(arg1, arg2) {
+  return window['go']['app']['App']['TryCodingTool'](arg1, arg2);
 }
 
 export function TurnTrace(arg1) {

@@ -154,7 +154,7 @@ func (a *App) localAgentNames() []agentexec.Installed {
 		off[strings.ToLower(strings.TrimSpace(n))] = true
 	}
 	var out []agentexec.Installed
-	for _, c := range installedCLIs(s.ExternalAgents.Binaries) {
+	for _, c := range withCustomCLIs(installedCLIs(s.ExternalAgents.Binaries), s.ExternalAgents) {
 		// Signed out, it cannot take work: not offered, not drawn, not a
 		// worker (workers.go). The first-start guide still lists it, from
 		// installedCLIs, so the person is told to sign in.

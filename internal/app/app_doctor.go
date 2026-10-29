@@ -25,10 +25,12 @@ func (a *App) Doctor() backend.DoctorReport {
 // report. Both go through the same probe, so they cannot disagree.
 func (a *App) ExternalAgentsStatus() []backend.ExternalAgentStatus {
 	a.mu.Lock()
-	var overrides map[string]string
+	var ext backend.ExternalAgents
 	if a.settings != nil {
-		overrides = a.settings.ExternalAgents.Binaries
+		ext = a.settings.ExternalAgents
 	}
 	a.mu.Unlock()
-	return backend.ExternalAgentStatuses(context.Background(), overrides)
+	// The user-added tools too, so a SuperLeo that reaches this one by URL
+	// can offer them as "tool.machine".
+	return append(backend.ExternalAgentStatuses(context.Background(), ext.Binaries), customAgentStatuses(ext)...)
 }
