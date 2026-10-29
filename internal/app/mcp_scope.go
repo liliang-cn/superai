@@ -48,7 +48,7 @@ var queenMCPTools = []string{
 	// the hive
 	"superleo_hive_members", "superleo_hive_spawn", "superleo_hive_retire", "superleo_hive_map",
 	"superleo_hive_command", "superleo_hive_send", "superleo_hive_inbox", "superleo_hive_delegate",
-	"superleo_hive_tasks", "superleo_hive_task_cancel",
+	"superleo_hive_tasks", "superleo_hive_task_cancel", "superleo_remote_agent_send",
 	// the machines, and how the cluster is doing
 	"superleo_machine_inspect", "superleo_machine_act", "superleo_linked_agents", "superleo_status", "superleo_attention",
 	// schedules
@@ -105,10 +105,11 @@ func (h scopedMCPHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // gate knows it by in the queen's own run, so a remembered rule and the audit
 // log read the same whichever way the call came.
 var mcpGated = map[string]string{
-	"superleo_machine_act":      "machine_act",
-	"superleo_hive_retire":      "hive_retire",
-	"superleo_hive_task_cancel": "hive_task_cancel",
-	"superleo_schedule_delete":  "schedule_remove",
+	"superleo_machine_act":       "machine_act",
+	"superleo_hive_retire":       "hive_retire",
+	"superleo_hive_task_cancel":  "hive_task_cancel",
+	"superleo_remote_agent_send": "remote_agent_send",
+	"superleo_schedule_delete":   "schedule_remove",
 }
 
 type approvalByKey struct{}

@@ -524,6 +524,7 @@ func (a *App) registerHiveTools(svc *backend.Service, cfg *backend.Settings) {
 	if a.hive != nil {
 		a.registerMailTools(inner)
 		a.registerDelegateTool(inner, h.DelegationMode())
+		a.registerQueenOrderTools(inner)
 		inner.AddToolWithMetadata("hive_spawn",
 			"Make more workers for this hive. Returns once they have joined and are live, and says who they are."+
 				" Use it when there is more to do than the workers you have can do at once, and check hive_members first:"+

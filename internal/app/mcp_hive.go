@@ -301,6 +301,11 @@ type hiveTasksIn struct {
 	RunningOnly bool   `json:"running_only,omitempty" jsonschema:"list only what is still running"`
 }
 
+type remoteAgentSendIn struct {
+	Agent   string `json:"agent" jsonschema:"who: a named agent (pi-mac, openclaw) or a coding agent on a machine (codex.mac); not a hive worker"`
+	Message string `json:"message" jsonschema:"the whole message, standing on its own"`
+}
+
 type hiveTaskCancelIn struct {
 	ID string `json:"id" jsonschema:"a delegation id (dlg-…) from superleo_hive_delegate, or a running task's id from superleo_hive_tasks"`
 }
@@ -544,6 +549,32 @@ func addHiveMCPTools(s *mcp.Server, app *App, caller string) {
 		}
 		return toolOK(map[string]any{"stopping": id, "kind": what,
 			"note": "stopped; it settles as cancelled once its worker has stopped, which superleo_hive_tasks shows"})
+	})
+
+	mcp.AddTool(s, &mcp.Tool{
+		Name:  "superleo_remote_agent_send",
+		Title: "Message an agent outside the hive",
+		Description: "Send a message to an agent that is not a hive worker — a named agent on a linked machine (pi-mac, " +
+			"openclaw) or a coding agent on a machine (codex.mac) — and wait for its answer. It has no memory of earlier " +
+			"messages, so the message must stand alone. The result names the task id, which superleo_hive_task_cancel stops. " +
+			"Passes SuperLeo's approval gate.",
+		Annotations: &mcp.ToolAnnotations{DestructiveHint: ptr(true)},
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in remoteAgentSendIn) (*mcp.CallToolResult, any, error) {
+		name, msg := strings.TrimSpace(in.Agent), strings.TrimSpace(in.Message)
+		if name == "" || msg == "" {
+			return toolErr("agent and message are both required")
+		}
+		if _, onRoster := app.remoteRunner().Workers()[name]; onRoster {
+			return toolErr(name + " is a hive worker: use superleo_hive_command or superleo_hive_send")
+		}
+		if refused := app.mcpGate(ctx, caller, "superleo_remote_agent_send", map[string]any{"agent": name, "message": msg}); refused != nil {
+			return refused, nil, nil
+		}
+		text, failed, handled, id := app.delegateOutsideID(ctx, name, msg)
+		if !handled {
+			return toolErr(fmt.Sprintf("no agent called %q here; superleo_linked_agents says who there is", name))
+		}
+		return toolOK(map[string]any{"agent": name, "task": id, "ok": !failed, "answer": text})
 	})
 
 	mcp.AddTool(s, &mcp.Tool{

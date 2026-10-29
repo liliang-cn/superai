@@ -116,6 +116,9 @@ func TestCoreRoutesThroughALinkedAgent(t *testing.T) {
 			}
 			var args []string
 			_ = json.Unmarshal([]byte(c.GetArgsJson()), &args)
+			if c.GetMethod() == "AskRemoteAgentAs" { // core's ask id first
+				args = args[1:]
+			}
 			out, _ := json.Marshal(map[string]any{"agent": args[0], "text": "pong to " + args[1]})
 			_ = stream.Send(&agentlinkpb.AgentFrame{Kind: &agentlinkpb.AgentFrame_Reply{Reply: &agentlinkpb.Reply{Id: c.GetId(), ResultJson: string(out)}}})
 		}

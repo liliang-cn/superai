@@ -50,6 +50,8 @@ var agentCallable = map[string]bool{
 	// A coding agent here thinking for core's queen (app_queen_engine.go).
 	"StartQueenCLIRun":     true,
 	"ExternalAgentsStatus": true, "RemoteAgentNames": true, "AskRemoteAgent": true,
+	// An ask core can stop: run under core's id, stopped by it (app_hive_stop.go).
+	"AskRemoteAgentAs": true, "CancelRemoteAsk": true,
 	"PendingToolApprovals": true, "ResolveToolApproval": true, "ToolApprovalInfo": true,
 	// An answer from the phone for one of this machine's terminal Claude Code
 	// sessions (cchook_local.go).

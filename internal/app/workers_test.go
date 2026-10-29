@@ -138,6 +138,11 @@ func TestEveryKindOfWorkerTakesAPiece(t *testing.T) {
 				continue
 			}
 			out := `{"ok":true}`
+			if c.GetMethod() == "AskRemoteAgentAs" { // an agent from before it: core asks the old way
+				_ = stream.Send(&agentlinkpb.AgentFrame{Kind: &agentlinkpb.AgentFrame_Reply{Reply: &agentlinkpb.Reply{Id: c.GetId(),
+					Error: "AskRemoteAgentAs is not something core can ask an agent to do"}}})
+				continue
+			}
 			if c.GetMethod() == "AskRemoteAgent" {
 				var args []string
 				_ = json.Unmarshal([]byte(c.GetArgsJson()), &args)

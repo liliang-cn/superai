@@ -174,27 +174,39 @@ func (a *App) finishDelegated(id string, ok bool, answer, errMsg string) {
 // name, so a job's parts for workers and for agents go out in one call and run
 // at the same time.
 func (a *App) delegateOutside(ctx context.Context, name, prompt string) (text string, failed bool, handled bool) {
+	text, failed, handled, _ = a.delegateOutsideID(ctx, name, prompt)
+	return text, failed, handled
+}
+
+// delegateOutsideID is delegateOutside, with the id of the board entry the
+// work went out under. hive_task_cancel on that id stops the work where it
+// runs: the coding run, on whichever machine, or the named agent's ask.
+func (a *App) delegateOutsideID(ctx context.Context, name, prompt string) (text string, failed, handled bool, id string) {
 	switch {
 	case a.isDrivenCLI(name):
-		id := a.tasks().Start(name, backend.TaskOut, prompt)
+		id = a.tasks().Start(name, backend.TaskOut, prompt)
 		a.tasks().InSession(id, backend.ChatSessionFrom(ctx))
+		ctx, release := a.stoppableTask(ctx, id)
+		defer release()
 		out := a.runCodingAgent(withBoardTask(ctx, id), name, prompt, "", "")
 		ok := out["ok"] == true
 		answer, errMsg := fmt.Sprint(orEmpty(out["answer"])), fmt.Sprint(orEmpty(out["error"]))
-		a.finishDelegated(id, ok, answer, errMsg)
+		a.finishOutside(ctx, id, ok, answer, errMsg)
 		if !ok {
-			return firstNonEmpty(errMsg, answer), true, true
+			return firstNonEmpty(errMsg, answer), true, true, id
 		}
-		return answer, false, true
+		return answer, false, true, id
 	case a.addressable(name):
-		id := a.tasks().Start(name, backend.TaskOut, prompt)
+		id = a.tasks().Start(name, backend.TaskOut, prompt)
 		a.tasks().InSession(id, backend.ChatSessionFrom(ctx))
+		ctx, release := a.stoppableTask(ctx, id)
+		defer release()
 		res := a.askAgent(ctx, name, prompt)
-		a.finishDelegated(id, !res.Failed, res.Text, res.Reason)
+		a.finishOutside(ctx, id, !res.Failed, res.Text, res.Reason)
 		if res.Failed {
-			return firstNonEmpty(res.Reason, res.Text), true, true
+			return firstNonEmpty(res.Reason, res.Text), true, true, id
 		}
-		return res.Text, false, true
+		return res.Text, false, true, id
 	}
-	return "", false, false
+	return "", false, false, ""
 }

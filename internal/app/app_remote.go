@@ -12,6 +12,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/google/uuid"
 	"github.com/liliang-cn/agent-go/v3/pkg/agent"
 	"github.com/liliang-cn/agent-go/v3/pkg/domain"
 	"github.com/liliang-cn/agentexec"
@@ -249,7 +250,16 @@ func (a *App) askAgent(ctx context.Context, name, prompt string) backend.RemoteR
 	hub := a.agents()
 	viaLink := func(c *agentConn, as string) backend.RemoteResult {
 		var res backend.RemoteResult
-		if err := c.call(ctx, "AskRemoteAgent", []any{as, prompt}, &res); err != nil {
+		// Under an id of ours, so a stop here stops it there too; an agent
+		// from before AskRemoteAgentAs is asked the old way.
+		askID := uuid.NewString()
+		stopFar := context.AfterFunc(ctx, func() { cancelFarAsk(ctx, c, askID) })
+		defer stopFar()
+		err := c.call(ctx, "AskRemoteAgentAs", []any{askID, as, prompt}, &res)
+		if err != nil && strings.Contains(err.Error(), "is not something core can ask") {
+			err = c.call(ctx, "AskRemoteAgent", []any{as, prompt}, &res)
+		}
+		if err != nil {
 			return backend.RemoteResult{Agent: name, Host: c.name(), Failed: true, Reason: err.Error()}
 		}
 		if res.Host == "" || backend.IsLocalHost(res.Host) || res.Host == "this machine" {
@@ -473,13 +483,16 @@ func (a *App) registerRemoteTools(svc *backend.Service, cfg backend.RemoteAgents
 			if _, onRoster := a.remoteRunner().Workers()[str(args["agent"])]; !onRoster {
 				id = a.tasks().Start(str(args["agent"]), backend.TaskOut, str(args["prompt"]))
 				a.tasks().InSession(id, backend.ChatSessionFrom(ctx))
+				var release context.CancelFunc
+				ctx, release = a.stoppableTask(ctx, id) // hive_task_cancel stops it
+				defer release()
 			}
 			// The same route @name takes in the conversation: an agent linked
 			// over the agent link that serves it first, then the configured
 			// hosts. Configured hosts alone go stale — an HA service moves.
 			res := a.askAgent(ctx, str(args["agent"]), str(args["prompt"]))
 			if id != "" {
-				a.finishDelegated(id, !res.Failed, res.Text, res.Reason)
+				a.finishOutside(ctx, id, !res.Failed, res.Text, res.Reason)
 			}
 			// The verdict comes first and in words, because the failure that
 			// matters here is the one that reads like an answer: a CLI sitting
