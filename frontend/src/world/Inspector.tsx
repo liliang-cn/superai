@@ -12,7 +12,6 @@ import { queenNamed, queenRef, useQueenName } from "../lib/queenName";
 import { toast } from "../lib/toasts";
 import { PATHS, attentionPath, taskPath } from "../lib/routes";
 import { focusInWorld } from "./bus";
-import { openSwitcher } from "../lib/hivelink";
 import Talk from "./Talk";
 import MachineHost from "./MachineHost";
 import type { Picked } from "./engine";
@@ -301,7 +300,6 @@ export default function Inspector({ picked, data, onClose, open, openDash }: {
         <div className="wi-acts">
           <button onClick={() => open(PATHS.settings, true)}>{t("Settings")}</button>
           <button onClick={() => window.dispatchEvent(new Event("superleo:theme"))}>{t("Theme")}</button>
-          <button onClick={() => openSwitcher()}>{t("Switch backend")}</button>
           <button onClick={() => open(PATHS.stats, true)}>{t("Stats")}</button>
         </div>
         </>

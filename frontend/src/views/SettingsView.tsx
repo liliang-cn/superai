@@ -17,6 +17,7 @@ import AddAgentCard from "../components/AddAgentCard";
 import AddWorkerCard from "../components/AddWorkerCard";
 import CodingToolsCard from "../components/settings/CodingToolsCard";
 import ChannelsCard from "../components/settings/ChannelsCard";
+import HiveMembershipCard from "../components/settings/HiveMembershipCard";
 import ResidentGroup from "../components/settings/ResidentGroup";
 import { ACCENTS } from "../components/ThemePicker";
 import {
@@ -677,6 +678,7 @@ export default function SettingsView({ onSaved, theme, onTheme, accent, onAccent
                       ]} />
                   </>
                 }>
+                <HiveMembershipCard onMakeCode={() => setAdding("machine")} />
                 <AddAgentCard
                   queen={s.hive?.role === "queen"}
                   onQueen={s.hive?.role === "worker" ? undefined : (on) => setNested("hive", { role: on ? "queen" : "", standalone: !on })}

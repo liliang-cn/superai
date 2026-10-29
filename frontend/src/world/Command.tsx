@@ -26,6 +26,7 @@ import { BubbleBrowser, useRequestBrowser } from "../components/BrowserCard";
 import { browserOp } from "../lib/browser";
 import { stepLabel, traceIdOf } from "../lib/trace";
 import TraceChip from "../components/TraceChip";
+import HiveBanner, { useHiveCutOff } from "../components/HiveBanner";
 
 
 /** A district's own actions: the things a person does there that are not
@@ -61,6 +62,7 @@ export default function Command({ view, onConversation, onTyping, hosts }: {
   const { t } = useI18n();
   const queen = useQueenName();
   const ime = useImeGuard();
+  const cutOff = useHiveCutOff();
   const [text, setText] = useState("");
   const ready = useReady();
   // Every turn still being answered. A new one can be sent at any time; each
@@ -255,6 +257,7 @@ export default function Command({ view, onConversation, onTyping, hosts }: {
           </div>
         </div>
       )}
+      <HiveBanner className="wc-hive" />
       <PodConfirm change={pod?.change ?? null} onAnswer={(yes) => { const p = pod; setPod(null); if (yes) p?.go(); }} />
       <div className="wc-bar">
         {(ACTIONS[district] ?? []).map((a, i) => (
@@ -269,7 +272,7 @@ export default function Command({ view, onConversation, onTyping, hosts }: {
           </button>
         ))}
         <button className={`wc-act${open ? " on" : ""}`} title={t("The conversation")} onClick={() => setOpen((v) => !v)}><MessageSquareIcon size={14} /></button>
-        <form className="wc-say" onSubmit={(e) => { e.preventDefault(); void send(); }}>
+        <form className="wc-say" onSubmit={(e) => { e.preventDefault(); if (!cutOff) void send(); }}>
           {attach.paths.length > 0 && <div className="wc-files"><AttachmentChips paths={attach.paths} onRemove={attach.remove} /></div>}
           <AgentMenu
             matches={mentions.matches}
@@ -280,18 +283,18 @@ export default function Command({ view, onConversation, onTyping, hosts }: {
             }}
           />
           <span className="wc-prompt">›</span>
-          <input ref={box} value={text} onChange={(e) => type(e.target.value, e.target.selectionStart ?? e.target.value.length)}
+          <input ref={box} value={text} disabled={cutOff} onChange={(e) => type(e.target.value, e.target.selectionStart ?? e.target.value.length)}
             onBlur={mentions.close}
             onPaste={attach.paste}
-            placeholder={t(lines.length ? "Reply to {name}… @ for a worker or an agent" : "Tell {name}, from anywhere. @ for a worker or an agent", { name: queenRef(queen) })}
+            placeholder={cutOff ? t("Waiting for the hive…") : t(lines.length ? "Reply to {name}… @ for a worker or an agent" : "Tell {name}, from anywhere. @ for a worker or an agent", { name: queenRef(queen) })}
             onCompositionStart={ime.handlers.onCompositionStart} onCompositionEnd={ime.handlers.onCompositionEnd}
             onKeyDown={(e) => {
               if (ime.composing(e)) { if (e.key === "Enter") e.preventDefault(); return; }
               // Picking a name with Enter must never also send.
               mentions.onKeyDown(e);
             }} />
-          <button type="button" className="wc-clip" onClick={attach.pick} disabled={attach.importing} title={t("Attach")} data-testid="wc-attach"><PaperclipIcon size={15} /></button>
-          <button type="submit" disabled={!text.trim() && attach.paths.length === 0} title={t("Send")}><ArrowUpIcon size={16} /></button>
+          <button type="button" className="wc-clip" onClick={attach.pick} disabled={attach.importing || cutOff} title={t("Attach")} data-testid="wc-attach"><PaperclipIcon size={15} /></button>
+          <button type="submit" disabled={cutOff || !text.trim() && attach.paths.length === 0} title={t("Send")}><ArrowUpIcon size={16} /></button>
         </form>
       </div>
     </div>

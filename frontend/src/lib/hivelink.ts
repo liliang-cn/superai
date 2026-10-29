@@ -96,18 +96,6 @@ export interface HiveLinkEntry {
   active: boolean;
 }
 
-/** Asks anything on screen that shows the backend switcher to open it. */
-export const openSwitcher = () => window.dispatchEvent(new Event("superleo:switcher"));
-
-/** "Use this Mac on its own" — remembered so the question is asked once. */
-const ALONE_KEY = "superleo-desktop-alone";
-export const wantsAlone = () => {
-  try { return localStorage.getItem(ALONE_KEY) === "1"; } catch { return false; }
-};
-export const setAlone = (on: boolean) => {
-  try { on ? localStorage.setItem(ALONE_KEY, "1") : localStorage.removeItem(ALONE_KEY); } catch { /* fine */ }
-};
-
 /** A double-click on any strip the window is dragged by acts as the title
  *  bar's would (zoom, minimize or nothing, as System Settings says). The
  *  strips are marked with --wails-draggable: drag, set inline or in CSS. */

@@ -28,7 +28,8 @@ function initial(): Language {
 }
 let language = initial();
 const listeners = new Set<() => void>();
-const zh: Record<string,string> = { "Sign in with your AI account":"用你的 AI 账号登录", "Sign in":"登录", "Use an API key":"用 API Key",
+const zh: Record<string,string> = { "The hive is out of reach · retrying in {n}s":"蜂群连不上 · {n} 秒后重试", "The hive is out of reach":"蜂群连不上", "Waiting for the hive…":"等蜂群回来…", "{count} machines online":"{count} 台机器在线", "{n} machines online":"{n} 台机器在线", "Queen · {n} machines":"蜂后 · {n} 台机器", "Leave {hive}?":"退出 {hive}？", "This Mac goes back to a hive of its own":"这台 Mac 变回只有自己的蜂群", "Leave the hive":"退出蜂群", "This Mac":"这台 Mac", "Leave":"退出", "In the hive":"在蜂群里", "Join a hive":"加入一个蜂群", "Hive address":"蜂群地址", "Pairing code":"配对码", "Join":"加入", "Let another machine join":"让别的机器加入", "Make a pairing code":"生成配对码", "The old node program is still running":"旧的节点程序还在运行", "Stop the old node program":"停止旧的节点程序", "Stop the old node program?":"停止旧的节点程序？", "Unreachable":"连不上",
+  "Sign in with your AI account":"用你的 AI 账号登录", "Sign in":"登录", "Use an API key":"用 API Key",
   "Find agents":"查找智能体",
   "No AI agents found on {where}.":"{where}上没有找到 AI 智能体。", "Use my own model":"用我自己的模型", "Connect your phone":"连接手机", "Scan with your phone's camera":"用手机相机扫码", "Expires in {time}":"{time} 后过期", "Show a new code":"换一个新码", "{name} is connected":"{name} 已连接", "Your phone":"你的手机", "Also here: {names}":"这里还有：{names}", "Back to the agents":"回到智能体", "Your own model":"自己的模型",
   "the machine SuperLeo runs on":"运行 SuperLeo 的那台机器", "this {machine}":"这台{machine}", "SuperLeo can work with Claude Code, Codex and the other AI agents you already use. May it look for them on {where}? It only checks what is installed there.":"SuperLeo 可以和你已经在用的 Claude Code、Codex 等 AI 智能体一起工作。要在{where}上找找它们吗？只检查那里装了什么。", "Look for AI agents on {where} instead":"改为在{where}上查找 AI 智能体",

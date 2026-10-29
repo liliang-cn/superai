@@ -11,7 +11,7 @@ import '@fontsource-variable/geist-mono'
 import './styles.css'
 import App from './App'
 import Gate from './components/Gate'
-import {HiveLinkStatus, OnboardingNeeded, TitleBarDoubleClick} from '../wailsjs/go/app/App'
+import {HiveMembership, OnboardingNeeded, TitleBarDoubleClick} from '../wailsjs/go/app/App'
 import {installHiveBridge, installTitleBarDoubleClick} from './lib/hivelink'
 import Onboarding from './components/Onboarding'
 import {SETUP_EVENT} from './lib/ready'
@@ -53,10 +53,9 @@ function Root() {
             .catch(() => setAuthed(false))
     }, [served])
 
-    // The desktop window: onto the hive it is linked to, else this Mac on its
-    // own — a first start opens straight onto the app, and a hive is linked
-    // from the backend switcher. null = still finding out.
-    const [link, setLink] = useState<'linked' | 'alone' | null>(served ? 'alone' : null)
+    // The desktop window: onto the hive this Mac has joined, else onto this
+    // Mac's own queen. false = still finding out.
+    const [placed, setPlaced] = useState<boolean>(served)
     // The first start's questions not asked yet: those first, the same in a
     // browser (the agents are those on the machine SuperLeo runs on).
     const [onboard, setOnboard] = useState(false)
@@ -73,20 +72,16 @@ function Root() {
     }, [])
     useEffect(() => {
         if (served) return
-        HiveLinkStatus()
-            .then(async (s) => {
-                if (s?.linked) {
-                    installHiveBridge()
-                    setLink('linked')
-                    return
-                }
-                setOnboard(await OnboardingNeeded().catch(() => false))
-                setLink('alone')
+        HiveMembership()
+            .then(async (m) => {
+                if (m?.joined) installHiveBridge()
+                else setOnboard(await OnboardingNeeded().catch(() => false))
             })
-            .catch(() => setLink('alone'))
+            .catch(() => {})
+            .finally(() => setPlaced(true))
     }, [served])
 
-    if (authed === null || link === null) return null
+    if (authed === null || !placed) return null
     if (!authed) return <Gate onEnter={() => setAuthed(true)}/>
     if (onboard) return <Onboarding web={served} start={onboardAt} onDone={() => setOnboard(false)}/>
     return (

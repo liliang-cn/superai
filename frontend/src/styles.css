@@ -4203,3 +4203,12 @@ code, kbd, pre, .mono { font-family: var(--font-mono); }
 .dc-app button:hover:not(:disabled) { background: var(--bg-hover); color: var(--text-0); }
 .dc-add { display: flex; gap: 6px; align-items: center; margin-top: 8px; max-width: 520px; }
 .dc-add .input { flex: 1; min-width: 0; }
+
+/* The line over a conversation while the hive does not answer. */
+.hive-banner { display: flex; align-items: center; gap: 10px; margin: 10px 14px 0; padding: 9px 12px; border-radius: 10px; font-size: 13px; background: rgba(217, 140, 30, .14); border: 1px solid rgba(217, 140, 30, .38); color: #8a4f0c; }
+.hive-banner span { flex: 1; min-width: 0; }
+.hive-banner button { height: 28px; padding: 0 12px; border-radius: 8px; border: 1px solid rgba(217, 140, 30, .45); background: rgba(255, 255, 255, .6); color: inherit; font: 500 13px inherit; cursor: pointer; }
+.hive-banner.wc-hive { margin: 0 0 8px; }
+:root[data-theme="dark"] .hive-banner { color: #f0c27a; }
+:root[data-theme="dark"] .hive-banner.dk-hive { background: #3a2a12; }
+.hive-banner.dk-hive { margin: 0; position: sticky; top: -10px; z-index: 2; background: #fbeed8; }

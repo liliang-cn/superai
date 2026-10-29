@@ -32,7 +32,7 @@ import {
   CancelAllChats, CancelCLIRun, ChatSessions, HiveLinkStatus, TakeOver,
 } from "../../wailsjs/go/app/App";
 import { EventsOn } from "../../wailsjs/runtime";
-import { openSwitcher } from "../lib/hivelink";
+import HiveBanner, { useHiveCutOff } from "../components/HiveBanner";
 import LiveHive from "./LiveHive";
 import LiveRun, { useRun } from "./LiveRun";
 import LiveStatus from "./LiveStatus";
@@ -123,20 +123,6 @@ function nextLabel(items: UpcomingItem[]): string {
   return d.toDateString() === new Date().toDateString() ? t : `${d.toLocaleDateString([], { weekday: "short" })} ${t}`;
 }
 
-/** Where this window is looking: the hive it is linked to, or this Mac. */
-function useLink() {
-  const [link, setLink] = useState<{ linked: boolean; url?: string; live: boolean }>({ linked: served, url: served ? location.host : undefined, live: served });
-  useEffect(() => {
-    if (served) return;
-    const load = () => HiveLinkStatus().then((s) => setLink(s as any)).catch(() => {});
-    load();
-    const off = EventsOn("hivelink:state", load);
-    return () => { if (typeof off === "function") off(); };
-  }, []);
-  return link;
-}
-
-
 /** The tabs the right pane always has. */
 const FIXED: TabKey[] = ["hive", "status", "stats"];
 /** Which of the fixed tabs was last in front, so a home left on its figures
@@ -194,7 +180,7 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
   const queenId = useQueenSession();
   const pulse = usePulse();
   const recents = useRecents(chat.sending);
-  const link = useLink();
+  const cutOff = useHiveCutOff();
   const attention = attentionItems;
   const [draft, setDraft] = useState("");
   const composerRef = useRef<HTMLTextAreaElement>(null);
@@ -443,15 +429,6 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
             );
           })}
         </div>
-        <div className="dk-foot">
-          <button className="dk-link" onClick={() => openSwitcher()} title={t("Switch backend")}>
-            <span className="dk-qhex small">{link.linked ? "Q" : "M"}</span>
-            <span>
-              {link.linked ? (link.url || "").replace(/^https?:\/\//, "") : t("This {machine}", { machine: t(machine) })}
-              {link.linked && <small><i className={link.live ? "dk-ok" : "dk-off"} />{link.live ? t("Linked") : t("Reconnecting")}</small>}
-            </span>
-          </button>
-        </div>
       </aside>
 
       {!sideFolded && <div className="dk-side-resizer" role="separator" tabIndex={0}
@@ -487,6 +464,7 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
         </header>
         {traceOpen && <RunTracePanel taskId={chat.sessionId} live={chat.sending} onClose={() => setTraceOpen(false)} />}
         <div className="dk-msgs" ref={msgsRef}>
+          <HiveBanner className="dk-hive" />
           {msgs.length === 0 && (
             <div className="dk-empty">{t("Ask {name} anything, or give the hive an order: “check disk on every worker and tell me the fullest”.", { name: queenRef(queen) })}</div>
           )}
@@ -532,7 +510,7 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
           </div>
           <div ref={endRef} />
         </div>
-        <form className="dk-comp" onSubmit={(e) => { e.preventDefault(); send(); }}>
+        <form className="dk-comp" onSubmit={(e) => { e.preventDefault(); if (!cutOff) send(); }}>
           <AgentMenu
             matches={mentions.matches}
             active={mentions.active}
@@ -543,7 +521,7 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
           />
           <textarea
             ref={composerRef}
-            name="message" rows={1} value={draft} placeholder={t("Ask {name}, or give the hive an order. @ for an agent or a worker", { name: queenRef(queen) })}
+            name="message" rows={1} value={draft} disabled={cutOff} placeholder={cutOff ? t("Waiting for the hive…") : t("Ask {name}, or give the hive an order. @ for an agent or a worker", { name: queenRef(queen) })}
             onChange={(e) => { setDraft(e.target.value); mentions.update(e.target.value, e.target.selectionStart ?? e.target.value.length); }}
             onKeyDown={(e) => {
               if (mentions.onKeyDown(e)) return;
@@ -553,11 +531,11 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
             onPaste={attach.paste}
           />
           {attach.paths.length > 0 && <div className="dk-files"><AttachmentChips paths={attach.paths} onRemove={attach.remove} /></div>}
-          <button type="button" className="dk-clip" onClick={attach.pick} disabled={attach.importing} title={t("Attach")} data-testid="dk-attach"><PaperclipIcon size={17} /></button>
+          <button type="button" className="dk-clip" onClick={attach.pick} disabled={attach.importing || cutOff} title={t("Attach")} data-testid="dk-attach"><PaperclipIcon size={17} /></button>
           {chat.sending && !draft.trim() && attach.paths.length === 0 ? (
             <button type="button" className="dk-send stop" title={t("Stop")} onClick={() => chat.cancel()}><SquareIcon size={14} fill="currentColor" /></button>
           ) : (
-            <button type="submit" className="dk-send" title={t("Send")} disabled={!draft.trim() && attach.paths.length === 0}><ArrowUpIcon size={18} /></button>
+            <button type="submit" className="dk-send" title={t("Send")} disabled={cutOff || !draft.trim() && attach.paths.length === 0}><ArrowUpIcon size={18} /></button>
           )}
         </form>
       </section>

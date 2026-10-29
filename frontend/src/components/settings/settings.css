@@ -305,3 +305,7 @@
 /* On a phone the chat button sits bottom right; Save keeps clear of it. */
 .st-page.narrow .st-save { justify-content: flex-start; padding-right: 72px; }
 .st-page.narrow .st-save .st-note { margin-right: 0; order: 3; }
+
+.hive-join { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.hive-join-addr { flex: 1 1 200px; min-width: 0; }
+.hive-join-addr .st-in { width: 100%; }

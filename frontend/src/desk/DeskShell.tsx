@@ -15,7 +15,6 @@ import { SetWindowTheme } from "../../wailsjs/go/app/App";
 import { useI18n } from "../lib/i18n";
 import { queenTitle, useQueenName } from "../lib/queenName";
 import NotificationCenter from "../components/NotificationCenter";
-import BackendSwitcher from "./BackendSwitcher";
 import ThemePanel from "../canvas/ThemePanel";
 import { ChatFab, FabStack, ModeFab, SettingsFab } from "../components/Fabs";
 import { askToCompose } from "../lib/compose";
@@ -241,7 +240,6 @@ export default function DeskShell({ view, badges, children, onOpenConversation, 
             <GlobeIcon size={20} strokeWidth={2} />
           </button>
           <span className="dk-sp" />
-          <BackendSwitcher />
           <button title={t("Theme")} style={noDrag} className={`dk-app dk-a-mode${theming ? " on" : ""}`} onClick={() => setTheming((v) => !v)}>
             <PaletteIcon size={19} />
           </button>
