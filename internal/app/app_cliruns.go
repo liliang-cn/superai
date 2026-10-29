@@ -321,7 +321,9 @@ func (a *App) startCLIRun(o cliStart) (CLIRun, error) {
 	}
 	// The CLI goes out the way this machine's own requests do (Settings →
 	// Runtime → Proxy); its own servers here stay direct through NO_PROXY.
-	for k, v := range backend.ProxyEnv() {
+	// Detached, it may outlive SuperLeo and with it the Mac's Local Network
+	// grant, so a LAN proxy is swapped for one on loopback (proxy_detached.go).
+	for k, v := range backend.DetachedProxyEnv() {
 		req.Env[k] = v
 	}
 	if req.Env["HTTPS_PROXY"] != "" {

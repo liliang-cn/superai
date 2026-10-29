@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 // The hive's own addresses never go through a proxy: an agent link to
@@ -106,6 +107,58 @@ func TestStartedProgramsTakeTheSameWayOut(t *testing.T) {
 	ApplyProxy(ProxySettings{Mode: ProxyModeOff})
 	if env := ProxyEnv(); env["HTTPS_PROXY"] != "" || env["ALL_PROXY"] != "" {
 		t.Fatalf("off left a proxy: %v", env)
+	}
+}
+
+// A CLI that may outlive SuperLeo is never handed a LAN proxy when this
+// machine runs one on loopback: once the app quits, macOS bars the orphan
+// from the LAN. A loopback proxy set is kept, and no proxy stays no proxy.
+func TestADetachedCLIGoesOutThroughLoopback(t *testing.T) {
+	defer ApplyProxy(currentProxy())
+	listening := map[string]bool{}
+	old := localProxyListening
+	localProxyListening = func(hp string) bool { return listening[hp] }
+	defer func() { localProxyListening = old }()
+	sysCache.mu.Lock()
+	sysCache.val, sysCache.at = sysProxy{}, time.Now().Add(time.Hour)
+	sysCache.mu.Unlock()
+	defer systemCacheReset()
+
+	lan := ProxySettings{Mode: ProxyModeManual, URL: "http://192.168.123.61:43127"}
+	ApplyProxy(lan)
+	if env := DetachedProxyEnv(); env["HTTPS_PROXY"] != "http://192.168.123.61:43127" {
+		t.Fatalf("nothing local answers, so the LAN proxy should stay: %v", env)
+	}
+	listening["127.0.0.1:7890"] = true
+	env := DetachedProxyEnv()
+	for _, k := range []string{"HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "ALL_PROXY", "all_proxy"} {
+		if env[k] != "http://127.0.0.1:7890" {
+			t.Fatalf("%s = %q, want the local Clash", k, env[k])
+		}
+	}
+	if !strings.Contains(env["NO_PROXY"], "127.0.0.1") {
+		t.Fatalf("SuperLeo's own servers must stay direct: %v", env)
+	}
+	if ProxyEnv()["HTTPS_PROXY"] != "http://192.168.123.61:43127" {
+		t.Fatal("programs SuperLeo keeps an eye on should still take the proxy set")
+	}
+
+	// A system proxy on loopback wins over guessing ports.
+	listening["127.0.0.1:7897"] = true
+	sysCache.mu.Lock()
+	sysCache.val = parseScutil(scutilClash)
+	sysCache.mu.Unlock()
+	if got := DetachedProxyEnv()["HTTPS_PROXY"]; got != "http://127.0.0.1:7897" {
+		t.Fatalf("got %q, want the system proxy", got)
+	}
+
+	ApplyProxy(ProxySettings{Mode: ProxyModeManual, URL: "http://127.0.0.1:1087"})
+	if got := DetachedProxyEnv()["HTTPS_PROXY"]; got != "http://127.0.0.1:1087" {
+		t.Fatalf("a loopback proxy set should be kept, got %q", got)
+	}
+	ApplyProxy(ProxySettings{Mode: ProxyModeOff})
+	if env := DetachedProxyEnv(); env["HTTPS_PROXY"] != "" || env["ALL_PROXY"] != "" {
+		t.Fatalf("no proxy set should stay direct: %v", env)
 	}
 }
 
