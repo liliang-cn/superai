@@ -26,7 +26,8 @@ func (a *App) routeToCLI(requestID, sessionID, name, prompt string) {
 	unattended := a.settings != nil && a.settings.ExternalAgents.Unattended
 	a.mu.Unlock()
 
-	o := cliStart{Agent: name, Prompt: prompt, Ask: !unattended, Chat: sessionID}
+	o := cliStart{Agent: name, Prompt: prompt, Ask: !unattended, Chat: sessionID,
+		Origin: fmt.Sprintf("@%s in conversation %s (request %s)", name, sessionID, requestID)}
 	if prev := a.lastChatRun(sessionID, name, false); prev != nil {
 		o.Thread, o.Session, o.Cwd, o.Model, o.Ask, o.Prev = prev.Thread, prev.Session, prev.Cwd, prev.Model, prev.Ask, prev
 	}

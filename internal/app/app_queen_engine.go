@@ -130,7 +130,7 @@ func (a *App) StartQueenCLIRun(r QueenRunRequest) (CLIRun, error) {
 	}
 	kit := r.Kit
 	return a.startCLIRun(cliStart{Agent: r.Agent, Prompt: r.Prompt, Cwd: r.Cwd, Model: r.Model, Ask: r.Ask,
-		Session: r.Session, Queen: &kit})
+		Session: r.Session, Queen: &kit, Origin: "the queen, thinking in a coding agent"})
 }
 
 // queenEngineFor is the engine a turn goes to, or "" for this app's model.

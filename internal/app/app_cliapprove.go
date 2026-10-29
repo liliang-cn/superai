@@ -15,6 +15,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"strings"
@@ -45,11 +46,60 @@ type cliApproveIn struct {
 // cliApproveURL starts the loopback server on first use and returns the
 // MCP URL for one run.
 func (a *App) cliApproveURL(runID string) (string, error) {
+	ap := a.cliApproveStart("")
+	if ap == nil {
+		return "", fmt.Errorf("could not listen on loopback")
+	}
+	b := make([]byte, 16)
+	_, _ = rand.Read(b)
+	secret := hex.EncodeToString(b)
+	ap.mu.Lock()
+	ap.secrets[runID] = secret
+	ap.mu.Unlock()
+	return fmt.Sprintf("%s/approve/%s/%s", ap.base, runID, secret), nil
+}
+
+// cliApproveRestore serves a run's approval URL from before a restart
+// again: a CLI that kept running holds it, and asks there. The server
+// listens where it did if it is the first thing to start it and the port is
+// free; elsewhere, that CLI's prompts go unanswered and are refused.
+func (a *App) cliApproveRestore(runID, url string) {
+	rest, ok := strings.CutPrefix(url, "http://")
+	if !ok {
+		return
+	}
+	host, path, _ := strings.Cut(rest, "/")
+	parts := strings.Split(strings.TrimPrefix(path, "approve/"), "/")
+	if len(parts) < 2 || parts[0] != runID {
+		return
+	}
+	ap := a.cliApproveStart(host)
+	if ap == nil {
+		return
+	}
+	ap.mu.Lock()
+	ap.secrets[runID] = parts[1]
+	base := ap.base
+	ap.mu.Unlock()
+	if base != "http://"+host {
+		slog.Warn("cli run: the approval channel moved with the restart; this run's prompts will be refused", "run", runID, "was", host, "now", base)
+	}
+}
+
+// cliApproveStart starts the loopback server once, at prefer when that is
+// free, and returns it.
+func (a *App) cliApproveStart(prefer string) *cliApprover {
 	a.cliApproveOnce.Do(func() {
 		ap := &cliApprover{secrets: map[string]string{}}
-		ln, err := net.Listen("tcp", "127.0.0.1:0")
-		if err != nil {
-			return
+		var ln net.Listener
+		var err error
+		if prefer != "" {
+			ln, err = net.Listen("tcp", prefer)
+		}
+		if ln == nil {
+			if ln, err = net.Listen("tcp", "127.0.0.1:0"); err != nil {
+				return
+			}
 		}
 		ap.base = "http://" + ln.Addr().String()
 		mux := http.NewServeMux()
@@ -76,17 +126,7 @@ func (a *App) cliApproveURL(runID string) (string, error) {
 		go func() { _ = http.Serve(ln, mux) }()
 		a.cliApprove = ap
 	})
-	ap := a.cliApprove
-	if ap == nil {
-		return "", fmt.Errorf("could not listen on loopback")
-	}
-	b := make([]byte, 16)
-	_, _ = rand.Read(b)
-	secret := hex.EncodeToString(b)
-	ap.mu.Lock()
-	ap.secrets[runID] = secret
-	ap.mu.Unlock()
-	return fmt.Sprintf("%s/approve/%s/%s", ap.base, runID, secret), nil
+	return a.cliApprove
 }
 
 func (a *App) cliApproveHandler(runID string) http.Handler {

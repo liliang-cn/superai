@@ -17,6 +17,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"sort"
 	"strings"
@@ -220,15 +221,12 @@ func (a *App) startRemoteCLIRun(o cliStart, host string) (CLIRun, error) {
 	}
 	run := &CLIRun{ID: id, Thread: thread, Agent: o.Agent + "." + host, Prompt: o.Prompt, Cwd: there.Cwd,
 		Model: there.Model, Session: there.Session, Ask: there.Ask, Chat: o.Chat, Queen: o.Queen != nil, State: "running",
-		Started: time.Now(), Remote: host, RemoteRun: there.ID}
+		Started: time.Now(), Remote: host, RemoteRun: there.ID, Origin: o.Origin}
+	m := &remoteMirror{a: a, host: host, run: run, there: there, r: r, stop: stop}
 	s := a.cliStore()
 	s.mu.Lock()
 	s.runs[id] = run
-	s.cancels[id] = func() {
-		cctx, ccancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer ccancel()
-		_ = r.rpc(cctx, "CancelCLIRun", []any{there.ID}, nil)
-	}
+	s.cancels[id] = m.cancel
 	if o.Watch != nil {
 		s.watch[id] = o.Watch
 	}
@@ -241,10 +239,169 @@ func (a *App) startRemoteCLIRun(o cliStart, host string) (CLIRun, error) {
 	out := summaryOf(run) // before the mirror starts changing it
 	go func() {
 		defer stop()
-		defer resp.Body.Close()
-		a.mirrorRemoteRun(ctx, r, run, there, resp.Body)
+		m.follow(ctx, resp.Body)
 	}()
 	return out, nil
+}
+
+// How long a run on another machine waits for the line to it to come back
+// when it drops — the machine restarting, its SuperLeo updating — and how
+// often it looks. The run goes on there meanwhile (cli_live.go).
+var (
+	cliRemoteBack  = 20 * time.Minute
+	cliRemoteRetry = 2 * time.Second
+)
+
+// remoteMirror is one run on another machine, followed here.
+type remoteMirror struct {
+	a     *App
+	host  string
+	run   *CLIRun
+	there CLIRun
+	stop  context.CancelFunc
+
+	mu      sync.Mutex
+	r       cliRemote // the line to it now: a new one after a reconnect
+	lastSeq int       // the newest of its events copied here
+}
+
+func (m *remoteMirror) remote() cliRemote {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.r
+}
+
+// cancel stops the run there. When there is nobody to tell — the line is
+// down — it stops here and is not waited for any more.
+func (m *remoteMirror) cancel() {
+	cctx, ccancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer ccancel()
+	if err := m.remote().rpc(cctx, "CancelCLIRun", []any{m.there.ID}, nil); err != nil {
+		m.stop()
+	}
+}
+
+// follow mirrors the run until it ends there, riding out the line dropping.
+func (m *remoteMirror) follow(ctx context.Context, body io.ReadCloser) {
+	a, run := m.a, m.run
+	for {
+		ended := a.mirrorRemoteRun(ctx, m.remote(), run, m.there, body, &m.lastSeq)
+		body.Close()
+		if ended {
+			return
+		}
+		if ctx.Err() != nil {
+			a.finishCLIRun(run, func(run *CLIRun) { run.State, run.Error = "cancelled", "stopped" })
+			return
+		}
+		lost := time.Now()
+		slog.Warn("cli run: the line to the machine running it dropped; waiting for it to come back",
+			"run", run.ID, "remote", m.host, "remote_run", m.there.ID, "origin", run.Origin, "wait", cliRemoteBack)
+		a.pauseCLIRun(run, "lost the connection to "+m.host+"; waiting for it to come back")
+		r, next, detail, err := m.reconnect(ctx)
+		if err != nil {
+			if ctx.Err() != nil {
+				a.finishCLIRun(run, func(run *CLIRun) { run.State, run.Error = "cancelled", "stopped" })
+				return
+			}
+			slog.Warn("cli run: the machine running it did not come back", "run", run.ID, "remote", m.host, "error", err)
+			a.finishCLIRun(run, func(run *CLIRun) {
+				run.State, run.Error, run.Paused = "failed", "lost the connection to "+m.host+": "+err.Error(), ""
+			})
+			return
+		}
+		m.mu.Lock()
+		m.r = r
+		m.mu.Unlock()
+		slog.Info("cli run: back in touch with the machine running it; the run goes on",
+			"run", run.ID, "remote", m.host, "remote_run", m.there.ID, "away", time.Since(lost).Round(time.Second), "state", detail.State)
+		a.resumeCLIRun(run, fmt.Sprintf("back in touch with %s after %s", m.host, time.Since(lost).Round(time.Second)))
+		// What it did while the line was down.
+		for _, e := range detail.Events {
+			if e.Seq <= m.lastSeq {
+				continue
+			}
+			m.lastSeq = e.Seq
+			if !isApprovalNote(e) {
+				a.addCLIEvent(run, e)
+			}
+		}
+		if detail.State != "running" {
+			next.Close()
+			a.finishCLIRun(run, func(run *CLIRun) {
+				run.State, run.Summary, run.Error = detail.State, detail.Summary, detail.Error
+				run.Session = detail.Session
+				run.In, run.Out, run.Cache, run.CostUSD = detail.In, detail.Out, detail.Cache, detail.CostUSD
+			})
+			return
+		}
+		if detail.Session != "" {
+			a.setCLISession(run, detail.Session)
+		}
+		body = next
+	}
+}
+
+// reconnect waits for the machine to be back, opens its event stream again,
+// and reads where the run is there.
+func (m *remoteMirror) reconnect(ctx context.Context) (cliRemote, io.ReadCloser, CLIRun, error) {
+	deadline := time.Now().Add(cliRemoteBack)
+	for {
+		if r, ok := m.a.cliRemotes()[m.host]; ok && (r.link == nil || r.link.alive()) {
+			// The stream before the look, so nothing between the two is missed;
+			// what both carry is told apart by its sequence number.
+			resp, err := r.events(ctx)
+			if err == nil {
+				var detail CLIRun
+				cctx, ccancel := context.WithTimeout(ctx, 30*time.Second)
+				err = r.rpc(cctx, "CLIRunDetail", []any{m.there.ID}, &detail)
+				ccancel()
+				if err == nil {
+					return r, resp.Body, detail, nil
+				}
+				resp.Body.Close()
+				if strings.Contains(err.Error(), "no run "+m.there.ID) {
+					return cliRemote{}, nil, CLIRun{}, fmt.Errorf("%s no longer has the run", m.host)
+				}
+			}
+		}
+		if time.Now().After(deadline) {
+			return cliRemote{}, nil, CLIRun{}, fmt.Errorf("it did not come back within %s", cliRemoteBack)
+		}
+		select {
+		case <-ctx.Done():
+			return cliRemote{}, nil, CLIRun{}, ctx.Err()
+		case <-time.After(cliRemoteRetry):
+		}
+	}
+}
+
+// pauseCLIRun marks a run as waiting on its machine, and says so.
+func (a *App) pauseCLIRun(run *CLIRun, why string) {
+	s := a.cliStore()
+	s.mu.Lock()
+	run.Paused = why
+	payload := runPayload(run)
+	s.mu.Unlock()
+	a.addCLIEvent(run, CLIRunEvent{Kind: "note", Text: why})
+	a.emit("cli:run", payload)
+}
+
+// resumeCLIRun marks a paused run as going again.
+func (a *App) resumeCLIRun(run *CLIRun, note string) {
+	s := a.cliStore()
+	s.mu.Lock()
+	run.Paused = ""
+	payload := runPayload(run)
+	s.mu.Unlock()
+	a.addCLIEvent(run, CLIRunEvent{Kind: "note", Text: note})
+	a.emit("cli:run", payload)
+}
+
+// isApprovalNote is a note about an approval: this side writes its own,
+// the card being here.
+func isApprovalNote(e CLIRunEvent) bool {
+	return e.Kind == "note" && (e.Text == "waiting for approval" || e.Text == "approved" || strings.HasPrefix(e.Text, "denied"))
 }
 
 // events opens the remote's event stream: SSE over HTTP, or the agent link's
@@ -269,8 +426,10 @@ func (r cliRemote) events(ctx context.Context) (*http.Response, error) {
 	return resp, nil
 }
 
-// mirrorRemoteRun copies one remote run's events here until it ends.
-func (a *App) mirrorRemoteRun(ctx context.Context, r cliRemote, run *CLIRun, there CLIRun, body io.Reader) {
+// mirrorRemoteRun copies one remote run's events here until it ends there,
+// which it reports true, or the stream ends, false. lastSeq is the newest of
+// the run's events copied, kept across streams.
+func (a *App) mirrorRemoteRun(ctx context.Context, r cliRemote, run *CLIRun, there CLIRun, body io.Reader, lastSeq *int) bool {
 	asking := map[string]context.CancelFunc{} // remote approval id → the card here
 	var askMu sync.Mutex
 	sc := bufio.NewScanner(body)
@@ -294,8 +453,15 @@ func (a *App) mirrorRemoteRun(ctx context.Context, r cliRemote, run *CLIRun, the
 				Event CLIRunEvent `json:"event"`
 			}
 			if json.Unmarshal(ev.Payload, &p) == nil && p.Run == there.ID {
+				// Already copied, from the run's detail after a reconnect.
+				if p.Event.Seq > 0 {
+					if p.Event.Seq <= *lastSeq {
+						continue
+					}
+					*lastSeq = p.Event.Seq
+				}
 				// The approval notes are this side's to write: the card is here.
-				if p.Event.Kind == "note" && (p.Event.Text == "waiting for approval" || p.Event.Text == "approved" || strings.HasPrefix(p.Event.Text, "denied")) {
+				if isApprovalNote(p.Event) {
 					continue
 				}
 				a.addCLIEvent(run, p.Event)
@@ -316,7 +482,7 @@ func (a *App) mirrorRemoteRun(ctx context.Context, r cliRemote, run *CLIRun, the
 				run.Session = p.Session
 				run.In, run.Out, run.Cache, run.CostUSD = p.In, p.Out, p.Cache, p.CostUSD
 			})
-			return
+			return true
 		case "tool:approval":
 			var p struct {
 				ID      string         `json:"id"`
@@ -348,9 +514,7 @@ func (a *App) mirrorRemoteRun(ctx context.Context, r cliRemote, run *CLIRun, the
 			}
 		}
 	}
-	a.finishCLIRun(run, func(run *CLIRun) {
-		run.State, run.Error = "failed", "lost the connection to "+r.name
-	})
+	return false
 }
 
 // relayRemoteApproval asks here and answers there.

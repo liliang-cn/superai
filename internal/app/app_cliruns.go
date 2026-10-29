@@ -30,7 +30,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/liliang-cn/agentexec"
-	agentexecpty "github.com/liliang-cn/agentexec/pty"
 	"github.com/liliang-cn/superleo/internal/backend"
 )
 
@@ -72,19 +71,31 @@ type CLIRun struct {
 	Queen bool `json:"queen,omitempty"`
 	// Remote is the SuperLeo this run is happening on, by its name in Remote
 	// agents; RemoteRun is the run's id there. Empty for a run on this machine.
-	Remote    string        `json:"remote,omitempty"`
-	RemoteRun string        `json:"remoteRun,omitempty"`
-	State     string        `json:"state"`
-	Started   time.Time     `json:"started"`
-	Ended     *time.Time    `json:"ended,omitempty"`
-	Summary   string        `json:"summary,omitempty"`
-	Error     string        `json:"error,omitempty"`
-	In        int           `json:"in"`
-	Out       int           `json:"out"`
-	Cache     int           `json:"cache"`
-	CostUSD   float64       `json:"costUsd"`
-	Tools     int           `json:"tools"`
-	Events    []CLIRunEvent `json:"events,omitempty"`
+	Remote    string `json:"remote,omitempty"`
+	RemoteRun string `json:"remoteRun,omitempty"`
+	// Origin is who handed the run out: a chat turn, a hive task, core over
+	// the agent link, a page.
+	Origin string `json:"origin,omitempty"`
+	// PID is the CLI's process while it runs on this machine, outside
+	// SuperLeo's own (cli_live.go).
+	PID int `json:"pid,omitempty"`
+	// Resumed counts the times the CLI's session was resumed because
+	// SuperLeo came back to find it gone.
+	Resumed int `json:"resumed,omitempty"`
+	// Paused says why a run on another machine is waiting: the line to it
+	// dropped and this side is waiting for it to come back.
+	Paused  string        `json:"paused,omitempty"`
+	State   string        `json:"state"`
+	Started time.Time     `json:"started"`
+	Ended   *time.Time    `json:"ended,omitempty"`
+	Summary string        `json:"summary,omitempty"`
+	Error   string        `json:"error,omitempty"`
+	In      int           `json:"in"`
+	Out     int           `json:"out"`
+	Cache   int           `json:"cache"`
+	CostUSD float64       `json:"costUsd"`
+	Tools   int           `json:"tools"`
+	Events  []CLIRunEvent `json:"events,omitempty"`
 }
 
 const (
@@ -100,6 +111,8 @@ type cliRunStore struct {
 	// watch and done are the hooks of a run started for a chat turn.
 	watch map[string]func(CLIRunEvent)
 	done  map[string]func(CLIRun)
+	// live is the journal of each run going on this machine (cli_live.go).
+	live map[string]*cliDriver
 }
 
 // cliStart is everything a run is started with.
@@ -107,6 +120,8 @@ type cliStart struct {
 	Agent, Prompt, Cwd, Model string
 	Ask                       bool
 	Thread, Session, Chat     string
+	// Origin is who handed the run out, kept with it.
+	Origin string
 	// Prev is the run this one continues, if any.
 	Prev *CLIRun
 	// Queen, when set, makes the run one thinking for the queen.
@@ -118,7 +133,7 @@ type cliStart struct {
 func (a *App) cliStore() *cliRunStore {
 	a.cliOnce.Do(func() {
 		a.cli = &cliRunStore{runs: map[string]*CLIRun{}, cancels: map[string]context.CancelFunc{},
-			watch: map[string]func(CLIRunEvent){}, done: map[string]func(CLIRun){}}
+			watch: map[string]func(CLIRunEvent){}, done: map[string]func(CLIRun){}, live: map[string]*cliDriver{}}
 		a.cli.load()
 	})
 	return a.cli
@@ -136,8 +151,9 @@ func (s *cliRunStore) load() {
 		return
 	}
 	for _, r := range runs {
-		// A run that was going when the process died is not going now.
-		if r.State == "running" {
+		// A run that was going when the process died is not going now,
+		// unless its journal says where to pick it up (recoverCLIRuns).
+		if r.State == "running" && !cliLiveExists(r.ID) {
 			r.State = "cancelled"
 			r.Error = "SuperLeo stopped while this was running"
 		}
@@ -208,7 +224,7 @@ func (a *App) CLIRunDetail(id string) (CLIRun, error) {
 
 // StartCLIRun starts an agent CLI on a task in the background.
 func (a *App) StartCLIRun(agent, prompt, cwd, model string, ask bool) (CLIRun, error) {
-	r, err := a.startCLIRun(cliStart{Agent: agent, Prompt: prompt, Cwd: cwd, Model: model, Ask: ask})
+	r, err := a.startCLIRun(cliStart{Agent: agent, Prompt: prompt, Cwd: cwd, Model: model, Ask: ask, Origin: "a page"})
 	if err != nil {
 		return CLIRun{}, err
 	}
@@ -241,7 +257,7 @@ func (a *App) FollowUpCLIRun(id, prompt string) (CLIRun, error) {
 		return CLIRun{}, fmt.Errorf("%s did not report a session to continue", p.Agent)
 	}
 	return a.startCLIRun(cliStart{Agent: p.Agent, Prompt: prompt, Cwd: p.Cwd, Model: p.Model, Ask: p.Ask,
-		Thread: p.Thread, Session: p.Session, Chat: p.Chat, Prev: &p})
+		Thread: p.Thread, Session: p.Session, Chat: p.Chat, Origin: p.Origin, Prev: &p})
 }
 
 // CancelCLIRun stops a running CLI.
@@ -252,6 +268,12 @@ func (a *App) CancelCLIRun(id string) string {
 	s.mu.Unlock()
 	if cancel == nil {
 		return "that run is not running"
+	}
+	// SuperLeo stopping ends the turns that wait on runs, and they stop
+	// their runs as they go: the runs carry on instead, and are picked up
+	// when it is back (cli_live.go).
+	if a.cliDetached.Load() {
+		return "SuperLeo is stopping; the run carries on and is picked up when it is back"
 	}
 	cancel()
 	return "ok"
@@ -271,28 +293,11 @@ func (a *App) startCLIRun(o cliStart) (CLIRun, error) {
 		o.Agent, o.Prompt = name, prompt
 		return a.startRemoteCLIRun(o, host)
 	}
-	a.mu.Lock()
-	var ext backend.ExternalAgents
-	if a.settings != nil {
-		ext = a.settings.ExternalAgents
-	}
-	a.mu.Unlock()
-	if !ext.Enabled {
-		return CLIRun{}, errors.New("agent CLIs are switched off in Settings (External agents)")
-	}
-	installed := installedCLIs(ext.Binaries)
-	for _, d := range ext.Disabled {
-		if strings.EqualFold(strings.TrimSpace(d), agent) {
-			return CLIRun{}, fmt.Errorf("%s is switched off here (external_agents.disabled)", agent)
-		}
-	}
-	registry := agentexec.RegistryFrom(installed)
-	registerCodingTools(registry, ext)
-	id := uuid.NewString()
-	provider, err := registry.Get(agent)
+	provider, ext, err := a.cliProvider(agent)
 	if err != nil {
-		return CLIRun{}, fmt.Errorf("%s is not installed here", agent)
+		return CLIRun{}, err
 	}
+	id := uuid.NewString()
 	dir, err := a.cliCwd(cwd, ext.Roots)
 	if err != nil {
 		return CLIRun{}, err
@@ -305,7 +310,7 @@ func (a *App) startCLIRun(o cliStart) (CLIRun, error) {
 		thread = id
 	}
 	run := &CLIRun{ID: id, Thread: thread, Agent: agent, Prompt: prompt, Cwd: dir, Model: model,
-		Session: session, Ask: ask, Chat: o.Chat, Queen: o.Queen != nil, State: "running", Started: time.Now()}
+		Session: session, Ask: ask, Chat: o.Chat, Queen: o.Queen != nil, Origin: o.Origin, State: "running", Started: time.Now()}
 
 	req := agentexec.Request{
 		RunID: id, Prompt: prompt, WorkspacePath: dir, Model: model,
@@ -376,10 +381,16 @@ func (a *App) startCLIRun(o cliStart) (CLIRun, error) {
 	}
 
 	ctx, cancel := backend.WithLimit(context.Background(), ext.Timeout())
+	live := &cliLive{Req: req, Approve: approve}
+	if dl, ok := ctx.Deadline(); ok {
+		live.Deadline = dl
+	}
+	d := newCLIDriver(a, run, live, provider, sess)
 	s := a.cliStore()
 	s.mu.Lock()
 	s.runs[id] = run
 	s.cancels[id] = cancel
+	s.live[id] = d
 	if o.Watch != nil {
 		s.watch[id] = o.Watch
 	}
@@ -387,62 +398,54 @@ func (a *App) startCLIRun(o cliStart) (CLIRun, error) {
 		s.done[id] = o.Done
 	}
 	s.mu.Unlock()
+	// The CLI runs in a session of its own, writing to a file, so SuperLeo
+	// can stop and start again around it (cli_live.go).
+	wait, err := d.launch(spec)
+	if err != nil {
+		cancel()
+		// The caller hears it as the error returned, not from its hook too.
+		s.mu.Lock()
+		delete(s.watch, id)
+		delete(s.done, id)
+		s.mu.Unlock()
+		a.finishCLIRun(run, func(run *CLIRun) { run.State, run.Error = "failed", err.Error() })
+		return CLIRun{}, fmt.Errorf("could not start %s: %w", agent, err)
+	}
 	a.emit("cli:run", runPayload(run))
 
 	// Read before the run is under way: from then on it changes under the
 	// store's lock, which this does not hold.
+	s.mu.Lock()
 	out := summaryOf(run)
-	go a.driveCLIRun(ctx, cancel, run, sess, spec)
+	s.mu.Unlock()
+	go d.drive(ctx, cancel, wait, 0)
 	return out, nil
 }
 
-func (a *App) driveCLIRun(ctx context.Context, cancel context.CancelFunc, run *CLIRun, sess agentexec.Session, spec agentexec.CommandSpec) {
-	defer cancel()
-	calls := map[string]string{} // call id → tool name, to label results
-	push := func(evs []agentexec.Event) {
-		for _, e := range evs {
-			for _, ce := range normaliseCLIEvent(e, calls) {
-				a.addCLIEvent(run, ce)
-			}
+// cliProvider is the agentexec provider that runs agent here, with the
+// settings it runs under.
+func (a *App) cliProvider(agent string) (agentexec.Provider, backend.ExternalAgents, error) {
+	a.mu.Lock()
+	var ext backend.ExternalAgents
+	if a.settings != nil {
+		ext = a.settings.ExternalAgents
+	}
+	a.mu.Unlock()
+	if !ext.Enabled {
+		return nil, ext, errors.New("agent CLIs are switched off in Settings (External agents)")
+	}
+	for _, d := range ext.Disabled {
+		if strings.EqualFold(strings.TrimSpace(d), agent) {
+			return nil, ext, fmt.Errorf("%s is switched off here (external_agents.disabled)", agent)
 		}
 	}
-	res, runErr := agentexecpty.Run(ctx, agentexecpty.Command{Argv: spec.Argv, Env: spec.Env, WorkDir: spec.WorkDir},
-		func(chunk []byte) {
-			evs, _ := sess.ParseChunk(chunk)
-			push(evs)
-			if id := sess.SessionID(); id != "" {
-				a.setCLISession(run, id)
-			}
-		})
-	result, tail, finErr := sess.Finalize(context.Background(), res.Output, res.ExitCode)
-	push(tail)
-
-	a.finishCLIRun(run, func(run *CLIRun) {
-		if id := sess.SessionID(); id != "" {
-			run.Session = id
-		}
-		run.Summary = strings.TrimSpace(result.Summary)
-		run.In, run.Out, run.Cache = int(result.Usage.InputTokens), int(result.Usage.OutputTokens), int(result.Usage.CacheTokens)
-		run.CostUSD = result.Usage.EstimatedCostUSD
-		switch {
-		case errors.Is(ctx.Err(), context.Canceled):
-			run.State, run.Error = "cancelled", "stopped"
-		case errors.Is(runErr, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded):
-			run.State, run.Error = "failed", "did not finish in time and was stopped"
-		case runErr != nil:
-			run.State, run.Error = "failed", runErr.Error()
-		case finErr != nil:
-			run.State, run.Error = "failed", finErr.Error()
-		case result.Failed || res.ExitCode != 0:
-			run.State = "failed"
-			run.Error = run.Summary
-			if run.Error == "" {
-				run.Error = cliLastLine(string(res.Output))
-			}
-		default:
-			run.State = "done"
-		}
-	})
+	registry := agentexec.RegistryFrom(installedCLIs(ext.Binaries))
+	registerCodingTools(registry, ext)
+	provider, err := registry.Get(agent)
+	if err != nil {
+		return nil, ext, fmt.Errorf("%s is not installed here", agent)
+	}
+	return provider, ext, nil
 }
 
 // finishCLIRun records how a run ended, saves, tells the UI, and calls the
@@ -456,15 +459,23 @@ func (a *App) finishCLIRun(run *CLIRun, set func(*CLIRun)) {
 	}
 	now := time.Now()
 	run.Ended = &now
+	run.Paused = ""
 	set(run)
 	delete(s.cancels, run.ID)
 	delete(s.watch, run.ID)
 	done := s.done[run.ID]
 	delete(s.done, run.ID)
+	live := s.live[run.ID]
+	delete(s.live, run.ID)
+	run.PID = 0
 	s.saveLocked()
 	payload := runPayload(run)
 	final := summaryOf(run)
 	s.mu.Unlock()
+	// Saved with the rest now: the journal it was picked up by goes.
+	if live != nil {
+		live.forget()
+	}
 	a.emit("cli:run", payload)
 	if done != nil {
 		done(final)
@@ -501,7 +512,11 @@ func (a *App) addCLIEvent(run *CLIRun, e CLIRunEvent) {
 		run.Tools++
 	}
 	watch := s.watch[run.ID]
+	live := s.live[run.ID]
 	s.mu.Unlock()
+	if live != nil {
+		live.record(e)
+	}
 	if watch != nil {
 		watch(e)
 	}
@@ -514,8 +529,12 @@ func (a *App) setCLISession(run *CLIRun, id string) {
 	changed := run.Session != id
 	run.Session = id
 	payload := runPayload(run)
+	live := s.live[run.ID]
 	s.mu.Unlock()
 	if changed {
+		if live != nil {
+			live.save()
+		}
 		a.emit("cli:run", payload)
 	}
 }

@@ -248,8 +248,13 @@ type App struct {
 	approvalMu sync.Mutex
 	// Agent CLI runs started from the Agents page or the phone, and the
 	// loopback MCP server their permission prompts come through.
-	cli            *cliRunStore
-	cliOnce        sync.Once
+	cli     *cliRunStore
+	cliOnce sync.Once
+	// cliDetached is set while SuperLeo stops: its coding runs carry on
+	// without it (cli_live.go).
+	cliDetached atomic.Bool
+	// linkCore is the core this agent last linked to (agentlink_agent.go).
+	linkCore       atomic.Value
 	cliApprove     *cliApprover
 	cliApproveOnce sync.Once
 	remoteCLI      remoteCLICache
@@ -345,6 +350,8 @@ func (a *App) boot() {
 
 	a.syncProxy()
 	a.rebuild()
+	// The coding runs that were going when SuperLeo last stopped.
+	a.recoverCLIRuns()
 
 	// Permission is requested at startup, not when a timer fires: by then the
 	// user is typically not at the machine, which is the whole point of a
@@ -398,6 +405,9 @@ func (a *App) syncProxy() {
 
 // shutdown releases backend resources.
 func (a *App) Shutdown(ctx context.Context) {
+	// Before the turns: a turn ending stops the coding run it waits on, and
+	// those runs are to carry on and be picked up when SuperLeo is back.
+	a.detachCLIRuns()
 	// The turns first: what they started — shell commands above all — is
 	// bound to their contexts, and the process going away does not end a
 	// child that has a process group of its own.

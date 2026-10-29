@@ -185,7 +185,7 @@ func (a *App) runOnAgent(ctx context.Context, w HiveWorker, prompt string) backe
 	board.InSession(id, backend.ChatSessionFrom(ctx))
 	var res backend.RemoteResult
 	if w.Kind == hostAgentCLI {
-		res = a.runCLIPiece(ctx, w, prompt, id)
+		res = a.runCLIPiece(ctx, w, prompt, "hive task "+id, id)
 	} else {
 		res = a.askAgent(ctx, w.Name, prompt)
 	}
@@ -202,7 +202,7 @@ func (a *App) runOnAgent(ctx context.Context, w HiveWorker, prompt string) backe
 }
 
 // runCLIPiece runs prompt as a coding run of the CLI worker w and waits for it.
-func (a *App) runCLIPiece(ctx context.Context, w HiveWorker, prompt, taskID string) backend.RemoteResult {
+func (a *App) runCLIPiece(ctx context.Context, w HiveWorker, prompt, origin, taskID string) backend.RemoteResult {
 	started := time.Now()
 	res := backend.RemoteResult{Agent: w.Name, Host: w.Host}
 	agent := w.Name
@@ -210,7 +210,7 @@ func (a *App) runCLIPiece(ctx context.Context, w HiveWorker, prompt, taskID stri
 		agent = agentCLIName(HostAgent{Name: w.Name, Via: w.Via}) // one of this machine's own
 	}
 	done := make(chan CLIRun, 1)
-	run, err := a.startCLIRun(cliStart{Agent: agent, Prompt: prompt, Ask: true, Watch: a.cliTaskFeed(taskID), Done: func(r CLIRun) {
+	run, err := a.startCLIRun(cliStart{Agent: agent, Prompt: prompt, Ask: true, Origin: origin, Watch: a.cliTaskFeed(taskID), Done: func(r CLIRun) {
 		select {
 		case done <- r:
 		default:

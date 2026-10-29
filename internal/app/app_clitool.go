@@ -110,7 +110,11 @@ func (a *App) runCodingAgent(ctx context.Context, name, prompt, cwd, cont string
 	// the tool call that handed it out, with how it came out.
 	_, span := backend.StartSpan(ctx, "coding."+name, prompt)
 	done := make(chan CLIRun, 1)
-	o := cliStart{Agent: name, Prompt: prompt, Cwd: cwd, Ask: !unattended,
+	origin := "a turn"
+	if chat := backend.ChatSessionFrom(ctx); chat != "" {
+		origin = "a turn in conversation " + chat
+	}
+	o := cliStart{Agent: name, Prompt: prompt, Cwd: cwd, Ask: !unattended, Origin: origin,
 		Watch: a.cliTaskFeed(boardTaskFrom(ctx)),
 		Done:  func(r CLIRun) { done <- r }}
 	if cont != "" {

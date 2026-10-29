@@ -61,6 +61,16 @@ type agentConn struct {
 
 func (c *agentConn) name() string { return c.hello.GetName() }
 
+// alive says whether the connection is still the agent's.
+func (c *agentConn) alive() bool {
+	select {
+	case <-c.done:
+		return false
+	default:
+		return true
+	}
+}
+
 // call runs a method on the agent and decodes its result into out (which may
 // be nil). It gives up with ctx, or when the agent goes away.
 func (c *agentConn) call(ctx context.Context, method string, args []any, out any) error {

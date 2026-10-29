@@ -259,6 +259,7 @@ func (a *App) agentLinkOnce(ctx context.Context, o AgentLinkOptions) error {
 	}
 	slog.InfoContext(ctx, "agent link connected", "core", o.Core, "name", hello.GetName(), "clis", hello.GetClis())
 	a.noteAgentLink(true, nil)
+	a.linkCore.Store(o.Core)
 
 	// What this machine's event bus says goes up the line.
 	tap := func(name string, payload map[string]any) {
@@ -359,6 +360,12 @@ func (a *App) answerCall(c *agentlinkpb.Call) *agentlinkpb.Reply {
 	if err != nil {
 		r.Error = err.Error()
 		return r
+	}
+	// A coding run core handed out is core's: said so in its journal, so a
+	// restart here knows whom it is finishing it for.
+	if run, ok := result.(CLIRun); ok {
+		core, _ := a.linkCore.Load().(string)
+		a.tagCLIOrigin(run.ID, "core "+core+" over the agent link ("+c.GetMethod()+")")
 	}
 	b, err := json.Marshal(result)
 	if err != nil {
