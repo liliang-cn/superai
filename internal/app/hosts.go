@@ -145,12 +145,26 @@ func withoutHA(t HiveTopology) HiveTopology {
 			parents[h.Parent] = true
 		}
 	}
+	// The agents an HA service keeps up, by name. Another host that lists
+	// one of them only reaches it (a Mac's settings name hermes on the
+	// openclaw cluster): it runs on the service's cloud and is drawn there.
+	inHA := map[string]bool{}
+	for _, h := range t.Hosts {
+		for _, ag := range h.Agents {
+			if ag.Kind == hostAgentNamed && ag.Service != "" {
+				inHA[ag.Name] = true
+			}
+		}
+	}
 	clouds := map[string]*Host{}
 	var order []string
 	hosts := make([]Host, 0, len(t.Hosts))
 	for _, h := range t.Hosts {
 		kept := make([]HostAgent, 0, len(h.Agents))
 		for _, ag := range h.Agents {
+			if ag.Kind == hostAgentNamed && ag.Service == "" && inHA[ag.Name] {
+				continue
+			}
 			if ag.Kind == hostAgentNamed && ag.Service != "" {
 				c := clouds[ag.Service]
 				if c == nil {

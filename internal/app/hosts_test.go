@@ -445,3 +445,31 @@ func TestTheHAServiceSaysWhereItsClusterRuns(t *testing.T) {
 		t.Fatalf("the worker keeps its SuperLeo and loses the copy: %+v", w)
 	}
 }
+
+// A Mac whose settings name hermes and pi on the openclaw cluster reaches
+// them; they run on the cluster's cloud and are drawn there only. Its own pi
+// (pi-mac) stays on the Mac.
+func TestAnAgentTheHAClusterRunsIsNotDrawnAgainOnAMacThatReachesIt(t *testing.T) {
+	top := withoutHA(HiveTopology{
+		Hosts: []Host{
+			{ID: "pro.local", Name: "mac", State: "live", Agents: []HostAgent{
+				{Name: "mac", Kind: hostAgentSuperLeo, Role: "worker", State: "live"},
+				{Name: "hermes", Kind: hostAgentNamed, State: "live", Via: "mac"},
+				{Name: "pi", Kind: hostAgentNamed, State: "live", Via: "mac"},
+				{Name: "pi-mac", Kind: hostAgentNamed, State: "live", Via: "mac"},
+			}},
+			{ID: "sds-e", Name: "sds-e", State: "live", Agents: []HostAgent{
+				{Name: "hermes", Kind: hostAgentNamed, State: "live", Service: "openclaw"},
+				{Name: "pi", Kind: hostAgentNamed, State: "live", Service: "openclaw"},
+			}},
+		},
+		Services: []backend.HAService{{Name: "openclaw", Active: "sds-e", State: "active"}},
+	})
+	mac := hostByName(top.Hosts, "mac")
+	if mac == nil || agentNamed(mac, "hermes") != nil || agentNamed(mac, "pi") != nil || agentNamed(mac, "pi-mac") == nil {
+		t.Fatalf("the Mac: %+v", mac)
+	}
+	if c := hostByName(top.Hosts, "openclaw"); c == nil || agentNamed(c, "hermes") == nil || agentNamed(c, "pi") == nil {
+		t.Fatalf("the cloud: %+v", c)
+	}
+}
