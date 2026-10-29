@@ -77,6 +77,8 @@
 .bw-screen { position: relative; flex: 1; min-height: 0; display: grid; place-items: center; background: var(--cr-bg); outline: none; cursor: default; overflow: hidden; }
 .bw-screen img { width: 100%; height: 100%; object-fit: contain; display: block; user-select: none; -webkit-user-drag: none; }
 .bw-screen.taken { box-shadow: inset 0 0 0 2px var(--cr-cyan); }
+/* Takes the keys while the page is taken over; never seen, and grid-placed out of the picture's way. */
+.bw-sink { position: absolute; left: 0; top: 0; width: 1px; height: 1px; padding: 0; border: 0; opacity: 0; resize: none; pointer-events: none; caret-color: transparent; }
 .bw-screen .bw-flag { left: 50%; right: auto; bottom: 12px; transform: translateX(-50%); padding: 3px 10px; border-radius: 999px; background: var(--cr-panel); box-shadow: 0 0 0 1px var(--cr-line-2); }
 .bw-blank { color: var(--cr-mute); }
 .bw-empty { cursor: default; }

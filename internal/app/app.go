@@ -151,10 +151,19 @@ type App struct {
 	// pulse is the live meter: every run this process makes, chat turns
 	// included, folded into a per-second histogram. Like the wall it outlives
 	// a rebuild, so a settings save does not reset the counters.
-	pulseOnce sync.Once
-	pulse     *backend.Pulse
-	pulseMu   sync.Mutex
-	pulseStop func() // ends the push loop after its last write; nil when not running
+	// phoneBrowserState routes the phone_browser_* tools to the iPhone that
+	// lends its browser (phone_browser.go).
+	// browserRelay* is the desktop window's loopback relay to the browser's
+	// stream (app_browser.go).
+	browserRelayOnce  sync.Once
+	browserRelayURL   string
+	browserRelayErr   error
+	phoneBrowserOnce  sync.Once
+	phoneBrowserState *phoneBrowser
+	pulseOnce         sync.Once
+	pulse             *backend.Pulse
+	pulseMu           sync.Mutex
+	pulseStop         func() // ends the push loop after its last write; nil when not running
 	// longRuns holds the segmented tasks in flight, by task id, so a stop
 	// button has something to press.
 	longMu   sync.Mutex

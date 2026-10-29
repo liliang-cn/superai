@@ -2,6 +2,7 @@ package backend
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 	"testing"
 
@@ -32,5 +33,31 @@ func TestAForbiddenToolIsRefusedWhateverTheSwitches(t *testing.T) {
 	other := agent.PermissionRequest{ToolName: "mcp_browser_agent_browser_open", SessionID: "s"}
 	if g.Policy()(other) {
 		t.Fatal("an ordinary browser tool was sent to the gate")
+	}
+}
+
+// A guard refuses the call when it fails, and when it passes the call goes on
+// as it would have: an ordinary browser call is not turned into a question.
+func TestAGuardRefusesOnFailureAndAsksNothingOnSuccess(t *testing.T) {
+	g := NewToolGate(true, filepath.Join(t.TempDir(), "audit.jsonl"))
+	fail := true
+	g.Guard("mcp_browser_", func(context.Context) error {
+		if fail {
+			return errors.New("not in its own tab")
+		}
+		return nil
+	})
+	req := agent.PermissionRequest{ToolName: "mcp_browser_agent_browser_open", SessionID: "s"}
+	if !g.Policy()(req) {
+		t.Fatal("a guarded tool did not reach the gate")
+	}
+	res, err := g.Handler()(context.Background(), req)
+	if err != nil || res.Allowed {
+		t.Fatalf("a failed guard let the call through: %+v %v", res, err)
+	}
+	fail = false
+	res, err = g.Handler()(context.Background(), req)
+	if err != nil || !res.Allowed {
+		t.Fatalf("a passed guard did not allow an ordinary call: %+v %v", res, err)
 	}
 }

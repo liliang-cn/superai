@@ -128,6 +128,9 @@ type ToolGate struct {
 	// back to the model. Not an ask: the gate being off or YOLO being on
 	// relaxes asking, and these are never to run here at all (Forbid).
 	forbidden map[string]string
+	// guards run before every call whose name starts with their prefix; one
+	// that fails refuses the call (Guard).
+	guards map[string]func(context.Context) error
 
 	// yolo is YOLO mode: every gated call approved without asking, until it is
 	// switched off. yoloSince is when it was turned on, which is what the
@@ -278,7 +281,7 @@ func (g *ToolGate) Policy() agent.PermissionPolicy {
 	g.mu.RUnlock()
 	base := policyWith(d)
 	return func(req agent.PermissionRequest) bool {
-		if g.forbiddenReason(req.ToolName) != "" {
+		if g.forbiddenReason(req.ToolName) != "" || g.guardFor(req.ToolName) != nil {
 			return true
 		}
 		// A call a session rule has an opinion on reaches the handler, read
@@ -301,6 +304,30 @@ func (g *ToolGate) Forbid(tool, reason string) {
 		g.forbidden = map[string]string{}
 	}
 	g.forbidden[tool] = reason
+}
+
+// Guard runs check before every call to a tool whose name starts with prefix,
+// and refuses the call when it fails. For a precondition the call depends on
+// rather than a question to ask: the browser in the person's own Chrome makes
+// sure, before each call, that it is in a tab of its own.
+func (g *ToolGate) Guard(prefix string, check func(context.Context) error) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.guards == nil {
+		g.guards = map[string]func(context.Context) error{}
+	}
+	g.guards[prefix] = check
+}
+
+func (g *ToolGate) guardFor(tool string) func(context.Context) error {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	for prefix, check := range g.guards {
+		if strings.HasPrefix(tool, prefix) {
+			return check
+		}
+	}
+	return nil
 }
 
 func (g *ToolGate) forbiddenReason(tool string) string {
@@ -399,6 +426,19 @@ func (g *ToolGate) decide(ctx context.Context, req agent.PermissionRequest) (*ag
 
 	if why := g.forbiddenReason(req.ToolName); why != "" {
 		return g.answer(ask, ApprovalDecision{By: DecidedByRule, Reason: why})
+	}
+	if guard := g.guardFor(req.ToolName); guard != nil {
+		if err := guard(ctx); err != nil {
+			return g.answer(ask, ApprovalDecision{By: DecidedByRule, Reason: err.Error()})
+		}
+		// Passing the guard is not a reason to ask: a call the rest of the
+		// gate would not have stopped goes ahead as it would have.
+		g.mu.RLock()
+		d := g.decider
+		g.mu.RUnlock()
+		if v, _ := g.sessionVerdict(req); v == VerdictNone && !confirmedEvenInYolo(strings.ToLower(strings.TrimSpace(req.ToolName))) && !policyWith(d)(req) {
+			return &agent.PermissionResponse{Allowed: true, Reason: "guard passed", DecidedBy: string(DecidedByRule)}, nil
+		}
 	}
 	// The session's own rule first. A refusal holds even with the gate
 	// switched off or YOLO on: those relax asking, and "never" is not an ask.

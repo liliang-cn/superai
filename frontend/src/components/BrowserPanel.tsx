@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { GlobeIcon, RotateCwIcon, XIcon } from "lucide-react";
 import { EventsOn } from "../../wailsjs/runtime";
 import {
-  BrowserStream, closeBrowserPanel, noteBrowserEvent, refreshBrowserStatus, setBrowserMode, settleBrowserTurn, useBrowserPanelOpen, useBrowserStream,
+  BrowserStream, closeBrowserPanel, connectBrowser, noteBrowserEvent, refreshBrowserStatus, setBrowserMode, settleBrowserTurn, useBrowserPanelOpen, useBrowserStream,
 } from "../lib/browser";
 import { PATHS } from "../lib/routes";
 import { useI18n } from "../lib/i18n";
@@ -22,7 +22,7 @@ export function browserBlocker(s: BrowserStream): { label: string; kind: "off" |
   if (!st.enabled) return { label: "Browser off", kind: "off" };
   if (st.error) return { label: "Browser failed", kind: "bad", error: st.error };
   if (!st.ready) return { label: "Installing browser…", kind: "wait" };
-  if (st.mode === "chrome" && (s.connected === false || s.socket === "retrying")) return { label: "Chrome not connected", kind: "off" };
+  if (st.mode === "chrome" && (st.connected === false || s.connected === false || s.socket === "retrying")) return { label: "Chrome not connected", kind: "off" };
   if (s.connected === false) return { label: "Not connected", kind: "off" };
   if (s.socket === "retrying") return { label: "Reconnecting…", kind: "wait" };
   if (s.socket !== "open" && !s.frame) return { label: "Connecting…", kind: "wait" };
@@ -42,6 +42,26 @@ const modifiers = (e: { altKey: boolean; ctrlKey: boolean; metaKey: boolean; shi
 const buttonName = (b: number) => (b === 0 ? "left" : b === 1 ? "middle" : b === 2 ? "right" : "none");
 
 /**
+ * Text cut to what one key event carries. Chromium keeps at most three
+ * UTF-16 units of a key's text and drops a longer one whole: "Tokyo " typed
+ * as one key never arrived. A character is never split, so an emoji's two
+ * halves stay together.
+ */
+export function keyPieces(text: string): string[] {
+  const out: string[] = [];
+  let cur = "";
+  for (const ch of text) {
+    if (cur.length + ch.length > 3) {
+      out.push(cur);
+      cur = "";
+    }
+    cur += ch;
+  }
+  if (cur) out.push(cur);
+  return out;
+}
+
+/**
  * The page, live, and taken over by whoever clicks into it: while the view
  * has focus, pointer, wheel and keys go to the page through the socket. Out
  * of focus it is only a picture, and every key belongs to the app again.
@@ -50,6 +70,13 @@ function BrowserScreen({ s }: { s: BrowserStream }) {
   const { t } = useI18n();
   const box = useRef<HTMLDivElement>(null);
   const img = useRef<HTMLImageElement>(null);
+  // Where the keyboard goes while the view is taken over. An input method
+  // only starts in a field that takes text, never in a bare focusable box,
+  // and a paste only lands in one; what it is given goes to the page whole.
+  const sink = useRef<HTMLTextAreaElement>(null);
+  // The text of the last key sent to the page as a key. Some engines still
+  // put it in the sink after the keydown was cancelled; there it is dropped.
+  const keyed = useRef<string | null>(null);
   const [focused, setFocused] = useState(false);
   const down = useRef<number | null>(null);
   const lastClick = useRef({ at: 0, x: 0, y: 0, n: 0 });
@@ -77,19 +104,39 @@ function BrowserScreen({ s }: { s: BrowserStream }) {
     return { x: Math.round(fx * p.deviceWidth), y: Math.round(fy * p.deviceHeight) };
   };
 
+  /** Text typed as a whole: an input method's word, or a paste. */
+  const flush = () => {
+    const el = sink.current;
+    if (!el || !el.value) return;
+    const text = el.value;
+    el.value = "";
+    for (const piece of keyPieces(text)) {
+      sendRef.current({ type: "input_keyboard", eventType: "keyDown", key: "", code: "", text: piece, windowsVirtualKeyCode: 0, modifiers: 0 });
+      sendRef.current({ type: "input_keyboard", eventType: "keyUp", key: "", code: "", windowsVirtualKeyCode: 0, modifiers: 0 });
+    }
+  };
+
   // Keys go to the page only while the view has focus, caught before the
   // app's own shortcuts see them; with the focus elsewhere nothing changes.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (document.activeElement !== box.current || e.isComposing) return;
-      e.preventDefault();
+      if (document.activeElement !== sink.current) return;
       e.stopPropagation();
+      // A key the input method is holding (229 in WebKit, which does not
+      // always say isComposing on the first one) stays here until it lets
+      // go of a word; the word goes over in flush.
+      if (e.isComposing || e.keyCode === 229 || e.key === "Process") return;
+      // The page's clipboard is not this machine's: ⌘V is left to paste
+      // into the sink, and the pasted text goes over as typing.
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "v") return;
       const type = e.type === "keydown" ? "keyDown" : "keyUp";
       const k = KEYS[e.key];
       const printable = e.key.length === 1;
+      const text = type === "keyDown" ? k?.text ?? (printable && !e.metaKey && !e.ctrlKey ? e.key : undefined) : undefined;
+      if (text) keyed.current = text;
       sendRef.current({
         type: "input_keyboard", eventType: type, key: e.key, code: e.code,
-        text: type === "keyDown" ? k?.text ?? (printable && !e.metaKey && !e.ctrlKey ? e.key : undefined) : undefined,
+        text,
         windowsVirtualKeyCode: k?.code ?? (printable ? e.key.toUpperCase().charCodeAt(0) : 0),
         modifiers: modifiers(e),
       });
@@ -119,7 +166,7 @@ function BrowserScreen({ s }: { s: BrowserStream }) {
   useEffect(() => () => cancelAnimationFrame(raf.current), []);
 
   const onPointerDown = (e: React.PointerEvent) => {
-    box.current?.focus();
+    sink.current?.focus({ preventScroll: true });
     const p = toPage(e.clientX, e.clientY);
     if (!p) return;
     e.preventDefault();
@@ -157,12 +204,51 @@ function BrowserScreen({ s }: { s: BrowserStream }) {
 
   const block = browserBlocker(s);
   return (
-    <div ref={box} className={`bw-screen${focused ? " taken" : ""}`} tabIndex={0} data-testid="browser-screen"
-      onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
+    <div ref={box} className={`bw-screen${focused ? " taken" : ""}`} data-testid="browser-screen"
       onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp}
       onContextMenu={(e) => e.preventDefault()}>
+      <textarea ref={sink} className="bw-sink" aria-label={t("Type into the page")} data-testid="browser-keys"
+        autoCapitalize="off" autoCorrect="off" spellCheck={false}
+        onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
+        onCompositionEnd={flush}
+        onInput={(e) => {
+          const ev = e.nativeEvent as InputEvent;
+          if (ev.isComposing) return;
+          if (ev.inputType === "insertText" && ev.data !== null && ev.data === keyed.current) {
+            keyed.current = null;
+            e.currentTarget.value = "";
+            return;
+          }
+          flush();
+        }} />
       {s.frame ? <img ref={img} src={s.frame} alt="" draggable={false} /> : <div className="bw-blank"><GlobeIcon size={28} strokeWidth={1.4} /></div>}
-      {block.label && <span className={`bw-flag ${block.kind}`}>{t(block.label)}</span>}
+      {block.label === "Chrome not connected" ? <ConnectChrome /> : block.label && <span className={`bw-flag ${block.kind}`}>{t(block.label)}</span>}
+    </div>
+  );
+}
+
+/** The person's Chrome is attached on demand; this is the demand. */
+function ConnectChrome() {
+  const { t } = useI18n();
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const go = async () => {
+    setBusy(true);
+    setErr("");
+    try {
+      await connectBrowser();
+    } catch (e) {
+      setErr(String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="bw-flag off bw-connect" onPointerDown={(e) => e.stopPropagation()}>
+      <button className="cr-btn primary tiny" disabled={busy} onClick={go} data-testid="browser-connect">
+        {busy ? t("Connecting…") : t("Connect Chrome")}
+      </button>
+      {err && <code>{err}</code>}
     </div>
   );
 }
@@ -179,6 +265,15 @@ export function BrowserPanel({ onClose }: { onClose: () => void }) {
   const off = !s.switching && !!s.status && !s.status.enabled;
   const [err, setErr] = useState("");
   const turnOn = (mode: "chrome" | "own") => { setErr(""); setBrowserMode(mode).catch((e) => setErr(String(e instanceof Error ? e.message : e))); };
+  const chrome = s.status?.mode === "chrome";
+
+  // In the person's own Chrome the session can end up in whichever tab was in
+  // front when it attached (the daemon re-attaches after a restart), and the
+  // panel would then show, and take keys into, the person's own page. Opening
+  // the panel first puts the session back in a tab of its own.
+  useEffect(() => {
+    if (chrome && ready) connectBrowser().catch((e) => setErr(String(e instanceof Error ? e.message : e)));
+  }, [chrome, ready]);
 
   // Escape closes the panel unless the page has the keys.
   useEffect(() => {
@@ -195,7 +290,9 @@ export function BrowserPanel({ onClose }: { onClose: () => void }) {
       <div className="bw-panel" role="dialog" aria-label={t("Browser")} onClick={(e) => e.stopPropagation()} data-testid="browser-panel">
         <div className="bw-tabs">
           <GlobeIcon size={15} className="bw-tabs-ic" />
-          {s.tabs.length > 0 ? s.tabs.map((tab) => (
+          {/* In the person's Chrome only the session's own tab is shown: the
+              others are theirs, and listing them shows their browsing here. */}
+          {s.tabs.length > 0 ? s.tabs.filter((tab) => !chrome || tab.active).map((tab) => (
             <span key={tab.tabId} className={`bw-tab${tab.active ? " on" : ""}`} title={tab.url}>{tab.title || tab.url || t("New tab")}</span>
           )) : <span className="bw-tab on">{s.title || t("Browser")}</span>}
           <button className="cr-trace-x bw-x" onClick={onClose} aria-label={t("Close")}><XIcon size={16} /></button>

@@ -1,8 +1,13 @@
 package app
 
 import (
+	"context"
+	"crypto/rand"
+	"crypto/subtle"
+	"encoding/hex"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"sync"
@@ -29,7 +34,69 @@ func (a *App) BrowserStatus() backend.BrowserStatus {
 	a.mu.Lock()
 	svc := a.svc
 	a.mu.Unlock()
-	return svc.BrowserStatus()
+	st := svc.BrowserStatus()
+	// The desktop window cannot use agent-browser's stream as it is: the
+	// stream answers 403 to any page not served over http from loopback, and
+	// the window's origin is wails://. It goes through a relay of its own on
+	// loopback instead (browserLocalRelay). A page elsewhere ignores this URL
+	// and uses /api/browser/stream.
+	if st.Ready && st.StreamURL != "" {
+		if u, err := a.browserLocalRelay(); err == nil {
+			st.StreamURL = u
+		} else {
+			log.Printf("superleo: browser: local relay: %v", err)
+		}
+	}
+	return st
+}
+
+// browserLocalRelay serves the stream to the desktop window: loopback only,
+// behind a token minted per process, and only to the window's own origin, so
+// a web page open in some browser on this machine cannot reach it.
+func (a *App) browserLocalRelay() (string, error) {
+	a.browserRelayOnce.Do(func() {
+		var b [16]byte
+		if _, err := rand.Read(b[:]); err != nil {
+			a.browserRelayErr = err
+			return
+		}
+		token := hex.EncodeToString(b[:])
+		ln, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			a.browserRelayErr = err
+			return
+		}
+		up := websocket.Upgrader{
+			ReadBufferSize: 4 << 10, WriteBufferSize: 64 << 10,
+			CheckOrigin: func(r *http.Request) bool {
+				o, err := url.Parse(r.Header.Get("Origin"))
+				return r.Header.Get("Origin") == "" || (err == nil && (o.Scheme == "wails" || o.Hostname() == "wails.localhost"))
+			},
+		}
+		srv := &http.Server{ReadHeaderTimeout: 10 * time.Second, Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if subtle.ConstantTimeCompare([]byte(r.URL.Query().Get("t")), []byte(token)) != 1 {
+				http.Error(w, "forbidden", http.StatusForbidden)
+				return
+			}
+			q := r.URL.Query()
+			q.Del("t")
+			r.URL.RawQuery = q.Encode()
+			a.relayBrowserStream(w, r, &up)
+		})}
+		go func() { _ = srv.Serve(ln) }()
+		a.browserRelayURL = fmt.Sprintf("ws://%s/?t=%s", ln.Addr(), token)
+	})
+	return a.browserRelayURL, a.browserRelayErr
+}
+
+// BrowserConnect attaches the browser now, for the panel's connect button:
+// in the person's own Chrome it is otherwise attached by the model's first
+// call, and a panel opened before that had nothing to show.
+func (a *App) BrowserConnect() error {
+	a.mu.Lock()
+	svc := a.svc
+	a.mu.Unlock()
+	return svc.BrowserConnect(context.Background())
 }
 
 // SetBrowserMode turns the browser on — in the person's own Chrome
@@ -68,6 +135,13 @@ var browserUpgrader = websocket.Upgrader{
 // frames, URL and tab updates one way, mouse and keyboard the other, each
 // message passed through unchanged.
 func (a *App) handleBrowserStream(w http.ResponseWriter, r *http.Request) {
+	a.relayBrowserStream(w, r, &browserUpgrader)
+}
+
+// relayBrowserStream passes one page's socket through to the stream. The
+// upstream dial carries no Origin: agent-browser refuses every one but a
+// loopback http page, and the page is checked here, by upgrader, instead.
+func (a *App) relayBrowserStream(w http.ResponseWriter, r *http.Request, upgrader *websocket.Upgrader) {
 	a.mu.Lock()
 	svc := a.svc
 	a.mu.Unlock()
@@ -88,7 +162,7 @@ func (a *App) handleBrowserStream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer up.Close()
-	down, err := browserUpgrader.Upgrade(w, r, nil)
+	down, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		return // Upgrade has answered the request
 	}

@@ -30,6 +30,10 @@ export function Attention() {
   return window['go']['app']['App']['Attention']();
 }
 
+export function BrowserConnect() {
+  return window['go']['app']['App']['BrowserConnect']();
+}
+
 export function BrowserStatus() {
   return window['go']['app']['App']['BrowserStatus']();
 }
@@ -480,6 +484,14 @@ export function PendingToolApprovals() {
 
 export function PetStage(arg1, arg2) {
   return window['go']['app']['App']['PetStage'](arg1, arg2);
+}
+
+export function PhoneBrowserOnline(arg1) {
+  return window['go']['app']['App']['PhoneBrowserOnline'](arg1);
+}
+
+export function PhoneBrowserResult(arg1, arg2, arg3, arg4) {
+  return window['go']['app']['App']['PhoneBrowserResult'](arg1, arg2, arg3, arg4);
 }
 
 export function PhoneLinks() {

@@ -90,6 +90,10 @@ type BrowserStatus struct {
 	// running here (the desktop window). A page elsewhere uses the relay at
 	// /api/browser/stream, which forwards to the same place.
 	StreamURL string `json:"streamUrl"`
+	// Connected is whether the session is attached to its browser. In the
+	// person's own Chrome nothing attaches it but a deliberate connect, so a
+	// page shows a connect button instead of dialling the stream in a loop.
+	Connected bool   `json:"connected"`
 	Error     string `json:"error,omitempty"`
 }
 
@@ -106,9 +110,19 @@ type browserRuntime struct {
 	err    string
 	cancel context.CancelFunc
 
-	addrMu sync.Mutex
-	addr   string
-	addrAt time.Time
+	addrMu    sync.Mutex
+	addr      string
+	connected bool
+	addrAt    time.Time
+
+	// lastAttach is the last time a connect reached for the person's Chrome;
+	// attempts are spaced (BrowserConnect), since each one can stop Chrome
+	// for a permission prompt.
+	attachMu   sync.Mutex
+	lastAttach time.Time
+
+	tabMu        sync.Mutex // one ensureOwnTab at a time
+	attachFailed time.Time  // when reaching Chrome last failed, under tabMu
 }
 
 func (b *browserRuntime) setErr(err error) {
@@ -131,8 +145,9 @@ func (s *Service) BrowserStatus() BrowserStatus {
 	st.Enabled, st.Mode = true, b.mode
 	st.Ready = b.ready.Load()
 	if st.Ready {
-		if addr, err := b.streamAddr(); err == nil {
+		if addr, connected, err := b.streamInfo(); err == nil {
 			st.StreamURL = "ws://" + addr + "/"
+			st.Connected = connected
 			// A miss while the daemon was still starting is over.
 			b.setErr(nil)
 		} else {
@@ -152,49 +167,198 @@ func (s *Service) BrowserStreamAddr() string {
 	if s == nil || s.browser == nil || !s.browser.ready.Load() {
 		return ""
 	}
-	addr, err := s.browser.streamAddr()
+	addr, connected, err := s.browser.streamInfo()
 	if err != nil {
 		log.Printf("superleo: browser stream: %v", err)
+		return ""
+	}
+	// A page opening the stream makes agent-browser reach for the browser
+	// when it is not attached. In the person's own Chrome every such reach is
+	// one more thing laid on Chrome — retried by every page and phone in a
+	// loop, it hung Chrome and the machine with it. Only a deliberate connect
+	// attaches there; until then the stream is closed to everyone.
+	if s.browser.mode == BrowserModeChrome && !connected {
 		return ""
 	}
 	return addr
 }
 
+// BrowserConnect attaches the session to the browser now rather than at the
+// model's first call: agent-browser connects to the person's Chrome only when
+// a command needs it, so a panel opened first showed "not connected" with
+// nothing to do about it. The command is a read; in the person's Chrome it
+// opens the session's own tab (pin-tab) and nothing else.
+func (s *Service) BrowserConnect(ctx context.Context) error {
+	if s == nil || s.browser == nil || !s.browser.ready.Load() {
+		return fmt.Errorf("the browser is not on")
+	}
+	b := s.browser
+	defer b.forgetStream()
+	if b.mode != BrowserModeChrome {
+		_, err := b.run(ctx, "get", "url")
+		return err
+	}
+	b.attachMu.Lock()
+	if wait := browserAttachGap - time.Since(b.lastAttach); wait > 0 {
+		b.attachMu.Unlock()
+		return fmt.Errorf("tried a moment ago; try again in %ds", int(wait.Seconds())+1)
+	}
+	b.lastAttach = time.Now()
+	b.attachMu.Unlock()
+	return b.ensureOwnTab(ctx)
+}
+
+// browserAttachGap is the least time between two connects to the person's
+// Chrome: each can stop Chrome on a permission prompt.
+const browserAttachGap = 20 * time.Second
+
+// ensureOwnTab makes sure the session works in a tab it opened itself. In the
+// person's Chrome, pin-tab binds the session to whichever tab was in front
+// when it attached — measured: the person's Gemini tab, after the daemon had
+// restarted — and the model's next open would have navigated it away. So the
+// tab is checked before every browser call (the gate's guard) and, unless it
+// is the one recorded as the session's own, a new one is opened and recorded.
+func (b *browserRuntime) ensureOwnTab(ctx context.Context) error {
+	b.tabMu.Lock()
+	defer b.tabMu.Unlock()
+	// After Chrome failed to answer, nothing reaches for it again for a while:
+	// a model retrying its call would otherwise knock on Chrome once a round.
+	if since := time.Since(b.attachFailed); since < browserAttachGap {
+		return fmt.Errorf("the person's Chrome did not answer a moment ago; try again in %ds, or ask them to check Chrome", int((browserAttachGap-since).Seconds())+1)
+	}
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	own := b.ownTab()
+	cur, err := b.boundTab(ctx)
+	if err != nil {
+		b.attachFailed = time.Now()
+		return fmt.Errorf("reach the person's Chrome: %v", err)
+	}
+	if cur != "" && cur == own {
+		return nil
+	}
+	if out, err := b.run(ctx, "tab", "new"); err != nil {
+		return fmt.Errorf("open a tab of its own in Chrome: %s", out)
+	}
+	cur, err = b.boundTab(ctx)
+	if err != nil || cur == "" {
+		return fmt.Errorf("could not tell which tab the browser is in: %v", err)
+	}
+	if err := os.WriteFile(b.ownTabPath(), []byte(cur), 0o600); err != nil {
+		return err
+	}
+	return nil
+}
+
+// boundTab is the target id of the tab the session is in, "" when none.
+func (b *browserRuntime) boundTab(ctx context.Context) (string, error) {
+	out, err := b.run(ctx, "--json", "tab", "list")
+	if err != nil {
+		return "", err
+	}
+	var r struct {
+		Data struct {
+			Tabs []struct {
+				TargetID string `json:"targetId"`
+				Active   bool   `json:"active"`
+			} `json:"tabs"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(out), &r); err != nil {
+		return "", err
+	}
+	for _, t := range r.Data.Tabs {
+		if t.Active {
+			return t.TargetID, nil
+		}
+	}
+	return "", nil
+}
+
+func (b *browserRuntime) ownTabPath() string {
+	return filepath.Join(DataDir(), "browser-tab-"+b.env["AGENT_BROWSER_SESSION"])
+}
+
+func (b *browserRuntime) ownTab() string {
+	raw, _ := os.ReadFile(b.ownTabPath())
+	return strings.TrimSpace(string(raw))
+}
+
+// run runs one agent-browser command in this session and returns what it
+// printed. A command that reports failure in its JSON is an error too.
+func (b *browserRuntime) run(ctx context.Context, args ...string) (string, error) {
+	cmd := exec.CommandContext(ctx, b.bin, args...)
+	cmd.Env = os.Environ()
+	for k, v := range b.env {
+		cmd.Env = append(cmd.Env, k+"="+v)
+	}
+	raw, err := cmd.CombinedOutput()
+	out := strings.TrimSpace(string(raw))
+	if err == nil && strings.Contains(out, `"success":false`) {
+		err = fmt.Errorf("agent-browser: %s", out)
+	}
+	if err != nil && out == "" {
+		out = err.Error()
+	}
+	return out, err
+}
+
 // streamAddr asks agent-browser where this session's stream is. The answer
 // is kept for a moment, since a page opening a card and its modal asks twice.
 func (b *browserRuntime) streamAddr() (string, error) {
+	addr, _, err := b.streamInfo()
+	return addr, err
+}
+
+// streamInfo is where the stream is and whether the session is attached to a
+// browser. It is asked without the attach settings (auto-connect, pin-tab),
+// so asking can never be what reaches into the person's Chrome: a status
+// query must not become one more attempt on it.
+func (b *browserRuntime) streamInfo() (string, bool, error) {
 	b.addrMu.Lock()
 	defer b.addrMu.Unlock()
 	if b.addr != "" && time.Since(b.addrAt) < 2*time.Second {
-		return b.addr, nil
+		return b.addr, b.connected, nil
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, b.bin, "stream", "status", "--json")
 	cmd.Env = os.Environ()
 	for k, v := range b.env {
+		if k == "AGENT_BROWSER_AUTO_CONNECT" || k == "AGENT_BROWSER_PIN_TAB" {
+			continue
+		}
 		cmd.Env = append(cmd.Env, k+"="+v)
 	}
 	out, err := cmd.Output()
 	if err != nil {
-		return "", fmt.Errorf("agent-browser stream status: %w", err)
+		return "", false, fmt.Errorf("agent-browser stream status: %w", err)
 	}
 	var st struct {
 		Success bool `json:"success"`
 		Data    struct {
-			Enabled bool `json:"enabled"`
-			Port    int  `json:"port"`
+			Enabled   bool `json:"enabled"`
+			Connected bool `json:"connected"`
+			Port      int  `json:"port"`
 		} `json:"data"`
 		Error any `json:"error"`
 	}
 	if err := json.Unmarshal(out, &st); err != nil {
-		return "", fmt.Errorf("agent-browser stream status: %w", err)
+		return "", false, fmt.Errorf("agent-browser stream status: %w", err)
 	}
 	if !st.Success || !st.Data.Enabled || st.Data.Port <= 0 {
-		return "", fmt.Errorf("agent-browser has no stream for this session (%v)", st.Error)
+		return "", false, fmt.Errorf("agent-browser has no stream for this session (%v)", st.Error)
 	}
-	b.addr, b.addrAt = fmt.Sprintf("127.0.0.1:%d", st.Data.Port), time.Now()
-	return b.addr, nil
+	b.addr, b.connected, b.addrAt = fmt.Sprintf("127.0.0.1:%d", st.Data.Port), st.Data.Connected, time.Now()
+	return b.addr, b.connected, nil
+}
+
+// forgetStream drops the kept answer, so the next one is asked afresh: after
+// a connect, the page must see it at once.
+func (b *browserRuntime) forgetStream() {
+	b.addrMu.Lock()
+	b.addrAt = time.Time{}
+	b.addrMu.Unlock()
 }
 
 // startBrowser gets the binary and mounts it, off the caller's path: Build
@@ -258,6 +422,9 @@ func (s *Service) guardPersonsChrome(b *browserRuntime) {
 	if s.gate != nil {
 		s.gate.Forbid(BrowserTool("close"), why)
 		s.gate.Forbid(BrowserTool("tab_close"), why)
+		// Every browser call first makes sure the session is in its own tab
+		// and not in the one the person has in front (ensureOwnTab).
+		s.gate.Guard(BrowserTool(""), b.ensureOwnTab)
 	}
 	b.env["AGENT_BROWSER_PIN_TAB"] = "1"
 	policy := filepath.Join(DataDir(), "browser-policy.json")
@@ -281,8 +448,8 @@ func browserEnv(mode string) map[string]string {
 	sum := sha256.Sum256([]byte(DataDir()))
 	env := map[string]string{
 		"AGENT_BROWSER_SESSION":          "superleo-" + hex.EncodeToString(sum[:4]),
-		"AGENT_BROWSER_STREAM_QUALITY":   "70",
-		"AGENT_BROWSER_STREAM_MAX_WIDTH": "1440",
+		"AGENT_BROWSER_STREAM_QUALITY":   "60",
+		"AGENT_BROWSER_STREAM_MAX_WIDTH": "1280",
 	}
 	if mode == BrowserModeChrome {
 		env["AGENT_BROWSER_AUTO_CONNECT"] = "1"
@@ -437,6 +604,8 @@ var browserEagerTools = []string{
 	"mcp_browser_agent_browser_back",
 	"mcp_browser_agent_browser_wait_for_load",
 	"mcp_browser_agent_browser_tab_list",
+	// A tab closed under the session (tab_gone) is replaced with this.
+	"mcp_browser_agent_browser_tab_new",
 	"mcp_browser_agent_browser_tab_switch",
 }
 

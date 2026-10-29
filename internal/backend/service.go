@@ -593,6 +593,13 @@ func (s *Service) Close() error {
 	}
 	if s.svc != nil {
 		_ = s.svc.Close()
+		// agent-go's Close leaves the MCP servers it started running. A
+		// settings change rebuilds this service, and every rebuild left one
+		// more set of server processes behind (two noted mcp-remotes, two
+		// browser servers) talking to nobody.
+		if s.svc.MCP != nil {
+			_ = s.svc.MCP.Close()
+		}
 	}
 	if s.traces != nil {
 		_ = s.traces.Close()

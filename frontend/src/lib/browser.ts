@@ -1,5 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { BrowserStatus as fetchBrowserStatus, SetBrowserMode } from "../../wailsjs/go/app/App";
+import { BrowserConnect, BrowserStatus as fetchBrowserStatus, SetBrowserMode } from "../../wailsjs/go/app/App";
 
 /**
  * The built-in browser, as every screen sees it: whether there is one, the
@@ -17,6 +17,8 @@ export interface BrowserStatus {
   version: string;
   mode: "chrome" | "own" | "off" | string;
   streamUrl: string;
+  /** Attached to its browser. False in the person's Chrome until a connect. */
+  connected?: boolean;
   error?: string;
 }
 
@@ -52,6 +54,9 @@ async function pollStatus() {
   if (landed || JSON.stringify(next) !== JSON.stringify(status)) {
     status = next;
     statusSubs.forEach((f) => f());
+    // A stream held back while the person's Chrome was unattached goes up
+    // the moment it is attached.
+    hubs.forEach((h) => h.resume());
   }
   if (statusSubs.size > 0 || target) {
     const settling = next.enabled && (!next.ready || !!next.error);
@@ -95,6 +100,28 @@ export async function setBrowserMode(mode: "chrome" | "own" | "off") {
   }
   void pollStatus();
 }
+
+/**
+ * Attach the browser now. In the person's own Chrome agent-browser attaches
+ * only when a command needs it, so a panel opened before the model's first
+ * call would otherwise sit at "not connected"; once attached, the stream
+ * says so itself.
+ */
+export const connectBrowser = async () => {
+  try {
+    await BrowserConnect();
+  } finally {
+    void pollStatus();
+  }
+};
+
+/**
+ * Whether the stream must stay shut: the person's own Chrome, not attached.
+ * Opening the stream then makes agent-browser reach for Chrome, and pages
+ * and phones redialling in a loop did that every few seconds until Chrome,
+ * and the machine, hung. Only a connect the person presses attaches it.
+ */
+const heldBack = () => status?.mode === "chrome" && status.ready && status.connected === false;
 
 /** Ask for the status again now, for a retry button. */
 export const refreshBrowserStatus = () => void pollStatus();
@@ -279,9 +306,19 @@ class Hub {
     this.subs.forEach((f) => f());
   }
 
+  /** Dial now if wanted and not up: the status changed under a held stream. */
+  resume() {
+    if (this.base && !this.ws && !this.timer) this.dial();
+  }
+
   private dial() {
     window.clearTimeout(this.timer);
     this.timer = 0;
+    if (heldBack()) {
+      this.retry = 0;
+      this.set({ socket: "idle", connected: false });
+      return;
+    }
     const sep = this.base.includes("?") ? "&" : "?";
     let ws: WebSocket;
     try {
@@ -310,6 +347,11 @@ class Hub {
   /** Dial again later, waiting longer each time, up to fifteen seconds. */
   private again() {
     if (!this.base) return;
+    if (heldBack()) {
+      this.retry = 0;
+      this.set({ socket: "idle", connected: false });
+      return;
+    }
     const wait = Math.min(15000, 1000 * 2 ** this.retry);
     this.retry++;
     this.set({ socket: "retrying", connected: this.state.connected === true ? null : this.state.connected });

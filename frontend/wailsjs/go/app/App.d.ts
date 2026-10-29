@@ -20,6 +20,8 @@ export function AskRemoteAgent(arg1:string,arg2:string):Promise<backend.RemoteRe
 
 export function Attention():Promise<Array<app.AttentionItem>>;
 
+export function BrowserConnect():Promise<void>;
+
 export function BrowserStatus():Promise<backend.BrowserStatus>;
 
 export function CCActivityAll():Promise<Record<string, app.CCActivity>>;
@@ -245,6 +247,10 @@ export function PauseStandingAgent(arg1:string):Promise<void>;
 export function PendingToolApprovals():Promise<Array<Record<string, any>>>;
 
 export function PetStage(arg1:string,arg2:Array<Record<string, string>>):Promise<void>;
+
+export function PhoneBrowserOnline(arg1:string):Promise<void>;
+
+export function PhoneBrowserResult(arg1:string,arg2:boolean,arg3:string,arg4:string):Promise<void>;
 
 export function PhoneLinks():Promise<app.PhoneLinkInfo>;
 
