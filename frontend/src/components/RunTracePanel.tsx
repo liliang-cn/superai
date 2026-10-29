@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { TraceCall, TraceLines, TurnTrace, TurnTraces } from "../../wailsjs/go/app/App";
 import { EventsOn } from "../../wailsjs/runtime";
 import { useImeGuard } from "@/lib/ime";
@@ -279,7 +280,10 @@ export default function RunTracePanel({
     return out;
   }, [lines, filter]);
 
-  return (
+  // On the body: opened from inside a window (the chat in 3D mode), the
+  // overlay was held in that window's stacking order and the window's own
+  // close button sat on top of it.
+  return createPortal(
     <div className="cr-trace-overlay cr-scope" onClick={onClose}>
       <div className="cr-trace" onClick={(e) => e.stopPropagation()}>
         <div className="cr-panel-h">
@@ -391,7 +395,8 @@ export default function RunTracePanel({
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

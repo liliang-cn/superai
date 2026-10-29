@@ -1685,7 +1685,7 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
 .cr-trace-x:hover { color: var(--cr-text); background: var(--cr-line); }
 /* The conversation's turns above the JSONL: who answered each, in what order
    engines were tried, first words / total time, and the steps on a click. */
-.cr-turns { display: flex; flex-direction: column; gap: 2px; max-height: 34vh; overflow: auto; border: 1px solid var(--cr-line); border-radius: 8px; padding: 4px; background: var(--cr-panel-2); }
+.cr-turns { flex-shrink: 0; display: flex; flex-direction: column; gap: 2px; max-height: 26vh; overflow: auto; border: 1px solid var(--cr-line); border-radius: 8px; padding: 4px; background: var(--cr-panel-2); }
 .cr-turn-row { display: grid; grid-template-columns: 12px 8px 62px minmax(0,1fr) auto auto; gap: 8px; align-items: center; width: 100%; background: none; border: 0; padding: 4px 6px; color: var(--cr-text); font: 12px var(--cr-mono); text-align: left; cursor: pointer; border-radius: 5px; }
 .cr-turn-row:hover { background: var(--cr-bg); }
 .cr-turn-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--cr-mute); }
@@ -1699,7 +1699,10 @@ textarea.input { resize: vertical; min-height: 74px; line-height: 1.5; }
 .cr-turn-steps { font: 11px var(--cr-mono); color: var(--cr-dim); padding: 2px 6px 6px 34px; }
 .cr-turn-steps > div { display: grid; grid-template-columns: 52px 110px 90px minmax(0,1fr); gap: 8px; padding: 1px 0; }
 .cr-turn-steps > div > span:last-child { color: var(--cr-text); overflow-wrap: anywhere; }
-.cr-trace-bar { display: flex; align-items: center; gap: 6px; }
+.cr-trace-bar { flex-shrink: 0; display: flex; align-items: center; gap: 6px; }
+/* The panel's height is shared out from the bottom: the event list scrolls,
+   and the turns, the bar and the header above it keep their own height. */
+.cr-trace > .cr-panel-h { flex-shrink: 0; }
 .cr-trace-bar .input { flex: 1; min-width: 0; font-family: var(--cr-mono); font-size: 12px; background: var(--cr-bg); color: var(--cr-text); border: 1px solid var(--cr-line-2); border-radius: 7px; padding: 6px 10px; }
 .cr-trace-rows { flex: 1; min-height: 0; overflow: auto; border: 1px solid var(--cr-line); border-radius: 8px; background: var(--cr-bg); padding: 4px 0; }
 .cr-trace-row { display: grid; grid-template-columns: 64px 92px 30px minmax(90px, 180px) 56px 76px minmax(0, 1fr); gap: 8px; align-items: baseline; padding: 2px 10px; font-family: var(--cr-mono); font-size: 10.5px; line-height: 1.6; color: var(--cr-dim); font-variant-numeric: tabular-nums; }
