@@ -2409,6 +2409,7 @@ export namespace backend {
 	    ready: boolean;
 	    version: string;
 	    accessibility?: string;
+	    tools: number;
 	    blocked: string[];
 	    blockedIsDefault: boolean;
 	    error?: string;
@@ -2423,6 +2424,7 @@ export namespace backend {
 	        this.ready = source["ready"];
 	        this.version = source["version"];
 	        this.accessibility = source["accessibility"];
+	        this.tools = source["tools"];
 	        this.blocked = source["blocked"];
 	        this.blockedIsDefault = source["blockedIsDefault"];
 	        this.error = source["error"];
@@ -3414,7 +3416,7 @@ export namespace backend {
 	    disable_browser: boolean;
 	    browser_mode?: string;
 	    desktop_control?: boolean;
-	    desktop_blocked_apps?: string[];
+	    desktop_blocked_apps: string[];
 	    disable_ptc: boolean;
 	    pii_redaction: boolean;
 	    avatar_port: number;

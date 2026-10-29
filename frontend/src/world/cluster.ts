@@ -33,6 +33,9 @@ export interface WorldData {
   dashboards: { id: string; name: string; refreshed_at?: string }[];
   skills: string[];
   mcp: { name: string; ok: boolean; tools: number }[];
+  /** Desktop control, when it is on: not an MCP server, but tools the queen
+   *  reaches the person's apps with, so it stands among them. */
+  desktop?: { ok: boolean; tools: number; note: string } | null;
   knowledge: number;
   meter: { total: Member; members: Member[] };
   busy: boolean;
@@ -1553,7 +1556,7 @@ export const cluster: District<WorldData> = {
         rackLab.set(translate("Skills"), d.skills.length ? translate("{count} installed", { count: d.skills.length }) : translate("none yet — click to add"), "idle");
 
         // MCP servers: a box each, on an arc beyond the hub, cabled to it.
-        const ms = JSON.stringify(d.mcp);
+        const ms = JSON.stringify([d.mcp, d.desktop ?? null]);
         if (ms !== mcpSig) {
           mcpSig = ms;
           services.traverse((o) => o.userData.dispose?.());
@@ -1577,6 +1580,24 @@ export const cluster: District<WorldData> = {
             ctx.pickable(boxNode, { kind: "mcp", id: m.name, title: m.name });
             mcpLabels.push(ctx.label(boxNode, m.name, m.ok ? translate("{count} tools", { count: m.tools }) : translate("not connected"), 3.6));
           });
+          // Desktop control at the end of the same arc, off the MCP count.
+          if (d.desktop) {
+            const i = Math.min(d.mcp.length, 6);
+            const a = THREE.MathUtils.degToRad(25 + i * 16);
+            const at = new THREE.Vector3(Math.cos(a) * 26, 0, Math.sin(a) * 26);
+            const boxNode = new THREE.Group();
+            const icon = plug(d.desktop.ok ? 0x5b7cfa : 0xc3c9d1, 0.7);
+            icon.position.y = 2.3;
+            boxNode.add(pedestal(0.9), icon);
+            boxNode.userData.icon = icon;
+            boxNode.position.copy(at);
+            services.add(boxNode);
+            const c = cable(new THREE.Vector3(10, 0, 10), at, hash01("desktop"));
+            c.setOk(d.desktop.ok);
+            services.add(c.tube);
+            ctx.pickable(boxNode, { kind: "desktop", id: "desktop", title: translate("Desktop apps") });
+            mcpLabels.push(ctx.label(boxNode, translate("Desktop apps"), d.desktop.ok ? translate("{count} tools", { count: d.desktop.tools }) : d.desktop.note, 3.6));
+          }
         }
         hubLab.set("MCP", translate("{ok}/{all} connected", { ok: d.mcp.filter((m) => m.ok).length, all: d.mcp.length }), "idle");
 

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ChevronDownIcon, GaugeIcon, HomeIcon, LocateFixedIcon, MinusIcon, MoonIcon, PlusIcon, RotateCcwIcon, RotateCwIcon, SunIcon } from "lucide-react";
-import { Dashboards, MCP, NotedToday, Skills } from "../../wailsjs/go/app/App";
+import { Dashboards, DesktopStatus, MCP, NotedToday, Skills } from "../../wailsjs/go/app/App";
+import { translate } from "../lib/i18n";
 import { EventsOn } from "../../wailsjs/runtime";
 import { useBees, useCodingRuns, useHive, useHosts, useLinkedAgents, useWorkers } from "../canvas/data";
 import { useAttentionState } from "../canvas/attention";
@@ -29,6 +30,7 @@ function useSlow() {
   const [dashboards, setDashboards] = useState<WorldData["dashboards"]>([]);
   const [skills, setSkills] = useState<string[]>([]);
   const [mcp, setMcp] = useState<WorldData["mcp"]>([]);
+  const [desktop, setDesktop] = useState<WorldData["desktop"]>(null);
   const [agenda, setAgenda] = useState<AgendaEntry[]>([]);
   const [agendaTick, setAgendaTick] = useState(0);
   // noted's day: a minute old at most, and read again after a noted call.
@@ -45,13 +47,32 @@ function useSlow() {
       Dashboards().then((l: any) => { if (alive) setDashboards(((l ?? []) as any[]).map((d) => ({ id: String(d.id), name: String(d.name ?? d.title ?? "Dashboard"), refreshed_at: d.refreshed_at }))); }).catch(() => {});
       Skills().then((l: any) => { if (alive) setSkills(((l ?? []) as any[]).map((s) => String(s.name))); }).catch(() => {});
       MCP().then((l: any) => { if (alive) setMcp(((l ?? []) as any[]).map((s) => ({ name: String(s.name), ok: !!s.running, tools: Number(s.tool_count ?? 0) }))); }).catch(() => {});
+      loadDesktop();
+    };
+    // Desktop control comes up a while after it is switched on (a download,
+    // then the permission), so it is asked again until it has settled.
+    let again = 0;
+    const loadDesktop = () => {
+      window.clearTimeout(again);
+      DesktopStatus().then((st) => {
+        if (!alive) return;
+        if (!st?.enabled) { setDesktop(null); return; }
+        const granted = !st.accessibility || st.accessibility === "granted";
+        const ok = st.ready && granted && !st.error;
+        const note = st.error ? translate("Failed to start") : !st.ready ? translate("Installing…") : translate("Needs Accessibility permission");
+        setDesktop((cur) => {
+          const next = { ok, tools: st.tools ?? 0, note };
+          return cur && cur.ok === next.ok && cur.tools === next.tools && cur.note === next.note ? cur : next;
+        });
+        if (!ok && !st.error) again = window.setTimeout(loadDesktop, 3000);
+      }).catch(() => {});
     };
     load();
     const t = window.setInterval(load, 60000);
-    const offs = ["dashboard:changed", "skills:changed", "mcp:changed"].map((e) => EventsOn(e, load));
-    return () => { alive = false; window.clearInterval(t); offs.forEach((o) => typeof o === "function" && o()); };
+    const offs = ["dashboard:changed", "skills:changed", "mcp:changed", "settings:changed"].map((e) => EventsOn(e, load));
+    return () => { alive = false; window.clearInterval(t); window.clearTimeout(again); offs.forEach((o) => typeof o === "function" && o()); };
   }, []);
-  return { dashboards, skills, mcp, agenda, reloadAgenda: () => setAgendaTick((n) => n + 1) };
+  return { dashboards, skills, mcp, desktop, agenda, reloadAgenda: () => setAgendaTick((n) => n + 1) };
 }
 
 /** Whether a conversation turn is going, anywhere in the app. */
@@ -138,7 +159,7 @@ export default function World({ view, onFlipTheme }: { view: ViewKey; onFlipThem
 
   const data: WorldData = useMemo(() => ({
     hive, runs, bees, linked, attention, agenda: slow.agenda,
-    dashboards: slow.dashboards, skills: slow.skills, mcp: slow.mcp,
+    dashboards: slow.dashboards, skills: slow.skills, mcp: slow.mcp, desktop: slow.desktop,
     knowledge: 0, meter: { total: meter.total, members: meter.members }, busy,
     hosts: topo.hosts, services: topo.services,
   }), [hive, runs, bees, linked, topo, attention, slow, meter, busy]);

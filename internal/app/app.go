@@ -565,6 +565,9 @@ func (a *App) SaveSettings(s backend.Settings) error {
 	a.startHive()
 	// agent_link.relay_only may have moved an agent in or out of the machines.
 	a.agentsChanged()
+	// What the settings switch on or off shows elsewhere (the 3D world's
+	// desktop control), and those views have nothing else to listen to.
+	a.emit("settings:changed", nil)
 	return nil
 }
 

@@ -103,8 +103,10 @@ type DesktopStatus struct {
 	Version string `json:"version"`
 	// Accessibility is the OS permission as agent-desktop reads it:
 	// "granted", "denied", "unknown", or "" before it has been asked.
-	Accessibility string   `json:"accessibility,omitempty"`
-	Blocked       []string `json:"blocked"`
+	Accessibility string `json:"accessibility,omitempty"`
+	// Tools is how many desktop_* tools the agent has, once ready.
+	Tools   int      `json:"tools"`
+	Blocked []string `json:"blocked"`
 	// BlockedIsDefault is whether Blocked is the default list, not the
 	// person's own.
 	BlockedIsDefault bool   `json:"blockedIsDefault"`
@@ -116,6 +118,7 @@ type desktopRuntime struct {
 	home    string
 	blocked []string
 	ready   atomic.Bool
+	tools   atomic.Int32
 	cancel  context.CancelFunc
 
 	mu       sync.Mutex
@@ -154,6 +157,7 @@ func (s *Service) DesktopStatus() DesktopStatus {
 	}
 	st.Enabled = true
 	st.Ready = d.ready.Load()
+	st.Tools = int(d.tools.Load())
 	// Until it is granted the person is on their way to System Settings to
 	// grant it, and the page should see the moment they have.
 	if st.Ready {
@@ -533,7 +537,10 @@ func desktopAnswer(out []byte) any {
 }
 
 func (s *Service) registerDesktopTools(d *desktopRuntime) {
-	svc := s.svc
+	add := func(name, desc string, params map[string]any, h func(context.Context, map[string]any) (any, error), meta agent.ToolMetadata) {
+		s.svc.AddToolWithMetadata(name, desc, params, h, meta)
+		d.tools.Add(1)
+	}
 	read := agent.ToolMetadata{ReadOnly: true, ConcurrencySafe: true}
 	act := agent.ToolMetadata{InterruptBehavior: agent.InterruptBehaviorBlock}
 	str := func(desc string) map[string]any { return map[string]any{"type": "string", "description": desc} }
@@ -564,7 +571,7 @@ func (s *Service) registerDesktopTools(d *desktopRuntime) {
 		return desktopAnswer(out), nil
 	}
 
-	svc.AddToolWithMetadata("desktop_windows",
+	add("desktop_windows",
 		"List the open windows of the desktop apps on this machine (app, title, window id). Start here to find the app to work in.",
 		obj(map[string]any{"app": str("Only this app's windows (optional)")}),
 		func(ctx context.Context, a map[string]any) (any, error) {
@@ -598,7 +605,7 @@ func (s *Service) registerDesktopTools(d *desktopRuntime) {
 			return okData(map[string]any{"windows": list}), nil
 		}, read)
 
-	svc.AddToolWithMetadata("desktop_snapshot",
+	add("desktop_snapshot",
 		"Read a desktop app's window as its accessibility tree: every element you can act on has a ref like @s8f3k2p9:e5. Use the app name as desktop_windows shows it (a Chinese system names apps in Chinese). For a big app take skeleton first, then root on one region. Refs go stale when the window changes: snapshot again after acting to check what happened.",
 		obj(map[string]any{
 			"app":       str("App name, as desktop_windows shows it"),
@@ -640,7 +647,7 @@ func (s *Service) registerDesktopTools(d *desktopRuntime) {
 			return desktopAnswer(out), nil
 		}, read)
 
-	svc.AddToolWithMetadata("desktop_find",
+	add("desktop_find",
 		"Find elements in a desktop app by role, name or text, when you know what you are looking for; returns refs like desktop_snapshot.",
 		obj(map[string]any{
 			"app":   str("App name"),
@@ -674,7 +681,7 @@ func (s *Service) registerDesktopTools(d *desktopRuntime) {
 			return desktopAnswer(out), nil
 		}, read)
 
-	svc.AddToolWithMetadata("desktop_get",
+	add("desktop_get",
 		"Read one element: text (what a person reads), value, title, role, states or bounds.",
 		obj(map[string]any{"ref": str("Ref from desktop_snapshot"), "property": str("text (default), value, title, role, states or bounds")}, "ref"),
 		func(ctx context.Context, a map[string]any) (any, error) {
@@ -685,42 +692,42 @@ func (s *Service) registerDesktopTools(d *desktopRuntime) {
 			return onRef(ctx, argStr(a, "ref"), args...)
 		}, read)
 
-	svc.AddToolWithMetadata("desktop_click",
+	add("desktop_click",
 		"Press an element (a button, a link, a menu item) through the accessibility API. The pointer does not move and the app does not come to the front.",
 		obj(map[string]any{"ref": str("Ref from desktop_snapshot")}, "ref"),
 		func(ctx context.Context, a map[string]any) (any, error) {
 			return onRef(ctx, argStr(a, "ref"), "click", argStr(a, "ref"))
 		}, act)
 
-	svc.AddToolWithMetadata("desktop_type",
+	add("desktop_type",
 		"Insert text into a text field or text area at its ref.",
 		obj(map[string]any{"ref": str("Ref of the text field"), "text": str("Text to insert")}, "ref", "text"),
 		func(ctx context.Context, a map[string]any) (any, error) {
 			return onRef(ctx, argStr(a, "ref"), "type", argStr(a, "ref"), argStr(a, "text"))
 		}, act)
 
-	svc.AddToolWithMetadata("desktop_set_value",
+	add("desktop_set_value",
 		"Replace an element's value outright (a text field's whole text, a slider's position).",
 		obj(map[string]any{"ref": str("Ref of the element"), "value": str("The new value")}, "ref", "value"),
 		func(ctx context.Context, a map[string]any) (any, error) {
 			return onRef(ctx, argStr(a, "ref"), "set-value", argStr(a, "ref"), argStr(a, "value"))
 		}, act)
 
-	svc.AddToolWithMetadata("desktop_select",
+	add("desktop_select",
 		"Choose an option in a list or a pop-up menu.",
 		obj(map[string]any{"ref": str("Ref of the list or pop-up"), "value": str("The option")}, "ref", "value"),
 		func(ctx context.Context, a map[string]any) (any, error) {
 			return onRef(ctx, argStr(a, "ref"), "select", argStr(a, "ref"), argStr(a, "value"))
 		}, act)
 
-	svc.AddToolWithMetadata("desktop_toggle",
+	add("desktop_toggle",
 		"Flip a checkbox or a switch. Read its state with desktop_get first: toggling twice undoes it.",
 		obj(map[string]any{"ref": str("Ref of the checkbox or switch")}, "ref"),
 		func(ctx context.Context, a map[string]any) (any, error) {
 			return onRef(ctx, argStr(a, "ref"), "toggle", argStr(a, "ref"))
 		}, act)
 
-	svc.AddToolWithMetadata("desktop_scroll",
+	add("desktop_scroll",
 		"Scroll an element (a list, a scroll area).",
 		obj(map[string]any{"ref": str("Ref of the element"), "direction": str("up, down (default), left or right"), "amount": map[string]any{"type": "integer", "description": "Scroll units, default 3"}}, "ref"),
 		func(ctx context.Context, a map[string]any) (any, error) {
@@ -734,7 +741,7 @@ func (s *Service) registerDesktopTools(d *desktopRuntime) {
 			return onRef(ctx, argStr(a, "ref"), args...)
 		}, act)
 
-	svc.AddToolWithMetadata("desktop_press",
+	add("desktop_press",
 		"Send a key combo to an app without bringing it forward: return, escape, tab, cmd+f, shift+tab… Combos that quit an app or close a window are refused.",
 		obj(map[string]any{"app": str("App name"), "combo": str("Key combo")}, "app", "combo"),
 		func(ctx context.Context, a map[string]any) (any, error) {
@@ -755,7 +762,7 @@ func (s *Service) registerDesktopTools(d *desktopRuntime) {
 			return desktopAnswer(out), nil
 		}, act)
 
-	svc.AddToolWithMetadata("desktop_launch",
+	add("desktop_launch",
 		"Start a desktop app, or attach to it if it is running, without bringing it to the front.",
 		obj(map[string]any{"app": str("App name or bundle id, e.g. Calculator")}, "app"),
 		func(ctx context.Context, a map[string]any) (any, error) {

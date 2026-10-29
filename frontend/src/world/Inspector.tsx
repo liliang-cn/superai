@@ -244,6 +244,12 @@ export default function Inspector({ picked, data, onClose, open, openDash }: {
         </div>
       );
       break;
+    case "desktop": {
+      const dk = data.desktop;
+      kind = "Desktop apps";
+      if (dk) rows.push(["State", dk.ok ? "Ready" : dk.note], ["Tools", String(dk.tools)]);
+      break;
+    }
     case "mcp": {
       const m = data.mcp.find((x) => x.name === picked.id);
       kind = "MCP server";
