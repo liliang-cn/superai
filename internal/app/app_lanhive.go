@@ -309,7 +309,7 @@ func (a *App) lanRoster() LanRoster {
 func (a *App) lanElect(name string, skip map[string]bool) (next LanMember, self, ok bool) {
 	// A member of a hive never promotes itself: two queens are two sets of
 	// conversations. The queen being away is said, not covered for.
-	if a.isHiveMember() {
+	if !a.queenHere() {
 		return LanMember{}, false, false
 	}
 	r := a.lanRoster()

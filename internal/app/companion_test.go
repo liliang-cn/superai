@@ -40,11 +40,10 @@ func TestEmitReachesWindowAndCompanionTogether(t *testing.T) {
 	window := make(chan string, 4)
 	windowEmit = func(_ context.Context, name string, _ map[string]any) { window <- name }
 	t.Cleanup(func() { windowEmit = prev })
-	app.ctx = context.Background() // stands in for a live Wails window
-
 	if _, err := app.OpenInBrowser(); err != nil {
 		t.Fatalf("OpenInBrowser: %v", err)
 	}
+	app.ctx = context.Background() // stands in for a live Wails window
 	hub := app.companionHub.Load()
 	if hub == nil {
 		t.Fatal("the companion server is running but its hub is not in the emit path")

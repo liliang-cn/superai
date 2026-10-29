@@ -66,9 +66,9 @@ export default function DeskStatusBar({ status, loading, codingRuns }: { status:
   const disconnected = runtime.error || cut;
   const state = loading ? "Connecting…" : disconnected ? "Disconnected" : status?.ready ? "Ready" : "Not ready";
   const error = cut ? (m?.error || t("The hive is out of reach")) : runtime.error ? t("Backend connection is unavailable.") : status?.error;
-  // Which hive this window is on: the one this Mac joined, the address a
-  // browser tab is served from, else this Mac's own.
-  const hiveName = m?.joined ? hiveHost(m.hive) : served ? location.host : t("This {machine}", { machine: t(machine) });
+  // Which hive this window is on: the one this Mac joined, or the address a
+  // browser tab is served from.
+  const hiveName = m?.joined ? hiveHost(m.hive) : location.host;
   const workers = useWorkers();
   const machines = hosts ? hosts.filter((h) => h.state === "live").length : 0;
   return <footer className="dk-statusbar" aria-label={t("Status bar")}>

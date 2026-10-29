@@ -678,10 +678,9 @@ export default function SettingsView({ onSaved, theme, onTheme, accent, onAccent
                       ]} />
                   </>
                 }>
-                <HiveMembershipCard onMakeCode={() => setAdding("machine")} />
+                <HiveMembershipCard />
                 <AddAgentCard
                   queen={s.hive?.role === "queen"}
-                  onQueen={s.hive?.role === "worker" ? undefined : (on) => setNested("hive", { role: on ? "queen" : "", standalone: !on })}
                   open={adding === "machine"}
                   onClose={() => setAdding("")}
                 />

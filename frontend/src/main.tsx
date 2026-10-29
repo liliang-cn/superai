@@ -14,6 +14,7 @@ import Gate from './components/Gate'
 import {HiveMembership, OnboardingNeeded, TitleBarDoubleClick} from '../wailsjs/go/app/App'
 import {installHiveBridge, installTitleBarDoubleClick} from './lib/hivelink'
 import Onboarding from './components/Onboarding'
+import JoinGate from './components/JoinGate'
 import {SETUP_EVENT} from './lib/ready'
 import {installImeEnterGuard} from './lib/ime'
 
@@ -53,9 +54,10 @@ function Root() {
             .catch(() => setAuthed(false))
     }, [served])
 
-    // The desktop window: onto the hive this Mac has joined, else onto this
-    // Mac's own queen. false = still finding out.
+    // The desktop window is a client of the one hive: onto it once joined,
+    // else the join form. false = still finding out.
     const [placed, setPlaced] = useState<boolean>(served)
+    const [joined, setJoined] = useState<boolean>(served)
     // The first start's questions not asked yet: those first, the same in a
     // browser (the agents are those on the machine SuperLeo runs on).
     const [onboard, setOnboard] = useState(false)
@@ -73,9 +75,10 @@ function Root() {
     useEffect(() => {
         if (served) return
         HiveMembership()
-            .then(async (m) => {
-                if (m?.joined) installHiveBridge()
-                else setOnboard(await OnboardingNeeded().catch(() => false))
+            .then((m) => {
+                if (!m?.joined) return
+                installHiveBridge()
+                setJoined(true)
             })
             .catch(() => {})
             .finally(() => setPlaced(true))
@@ -83,6 +86,7 @@ function Root() {
 
     if (authed === null || !placed) return null
     if (!authed) return <Gate onEnter={() => setAuthed(true)}/>
+    if (!joined) return <JoinGate/>
     if (onboard) return <Onboarding web={served} start={onboardAt} onDone={() => setOnboard(false)}/>
     return (
         <HashRouter>

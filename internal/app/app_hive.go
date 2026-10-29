@@ -372,7 +372,7 @@ func (a *App) startHive() {
 	a.stopHive()
 	// A member of a hive is a worker over its agent link (hive_member.go),
 	// neither a roster nor an announcing loop of its own.
-	if a.isHiveMember() {
+	if !a.queenHere() {
 		a.stopLocalHive()
 		return
 	}

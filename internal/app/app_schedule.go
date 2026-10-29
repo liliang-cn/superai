@@ -32,7 +32,7 @@ const scheduleNotifyTitle = "SuperLeo"
 // timers, which GetStatus reports.
 func (a *App) startScheduler() {
 	// A member of a hive: the queen fires the schedules.
-	if a.isHiveMember() {
+	if !a.queenHere() {
 		a.stopScheduler()
 		return
 	}

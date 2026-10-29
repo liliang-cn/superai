@@ -10,12 +10,9 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"net/url"
-	"strings"
 	"testing"
 	"time"
 
-	"github.com/liliang-cn/superleo/internal/relay"
 )
 
 // phoneOver is a phone's HTTP client: it dials addr whatever the URL says, and
@@ -50,80 +47,14 @@ func claimOver(t *testing.T, c *http.Client, base, code string) int {
 	return resp.StatusCode
 }
 
-// The desktop app's pairing link names the local network and the relay, and a
-// phone holding it can pair over either, trusting only this computer.
-func TestTheDesktopPairsAPhoneOverTheLANAndTheRelay(t *testing.T) {
+// Phones pair with the hive's queen. The desktop window is a client of the
+// hive and opens no phone link of its own.
+func TestTheDesktopPairsNoPhone(t *testing.T) {
 	app := companionTestApp(t)
 	app.ctx = context.Background() // the desktop app
-	prev := phoneLinkPort
-	phoneLinkPort = 0
-	t.Cleanup(func() { phoneLinkPort = prev })
 	t.Cleanup(app.stopPhoneLink)
-
-	rl, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer rl.Close()
-	rs := &relay.Server{Domain: "localhost", Logf: func(string, ...any) {}}
-	go rs.Serve(rl)
-	t.Setenv("SUPERLEO_RELAY", "localhost:"+portOf(rl.Addr()))
-
-	first, err := app.PairPhone()
-	if err != nil {
-		t.Fatal(err)
-	}
-	u, err := url.Parse(first.Link)
-	if err != nil || u.Scheme != "superleo" || u.Host != "pair" {
-		t.Fatalf("link %q", first.Link)
-	}
-	q := u.Query()
-	fp := q.Get("fp")
-	urls := append([]string{q.Get("server")}, q["alt"]...)
-	relayed := urls[len(urls)-1]
-	if fp == "" || q.Get("code") != first.Code || !strings.HasSuffix(relayed, ".localhost:"+portOf(rl.Addr())) {
-		t.Fatalf("link %q", first.Link)
-	}
-
-	// Straight to the listener, as on the same network.
-	lan := "127.0.0.1:" + portOf(app.phones.ln.Addr())
-	if got := claimOver(t, phoneOver(lan, fp), "https://"+lan, first.Code); got != http.StatusOK {
-		t.Fatalf("LAN claim: %d", got)
-	}
-
-	// Through the relay, as from anywhere else.
-	id := strings.TrimPrefix(strings.SplitN(relayed, ".", 2)[0], "https://")
-	for range 200 {
-		if rs.Linked(id) {
-			break
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	second, err := app.PairPhone()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := claimOver(t, phoneOver(rl.Addr().String(), fp), relayed, second.Code); got != http.StatusOK {
-		t.Fatalf("relay claim: %d", got)
-	}
-
-	// A phone pinned to another certificate does not get as far as a request.
-	body, _ := json.Marshal(map[string]string{"code": "000000", "device": "x"})
-	if _, err := phoneOver(lan, "not-it").Post("https://"+lan+pairClaimPath, "application/json", bytes.NewReader(body)); err == nil {
-		t.Fatal("a phone trusted a certificate it was not given")
-	}
-
-	// The certificate, and so the fingerprint, survives a restart.
-	app.stopPhoneLink()
-	again, err := app.PairPhone()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if u, _ := url.Parse(again.Link); u.Query().Get("fp") != fp {
-		t.Fatal("the fingerprint changed across a restart")
-	}
-	if got := app.PhoneLinks(); got.Fingerprint != fp || len(got.URLs) == 0 {
-		t.Fatalf("PhoneLinks = %+v", got)
+	if _, err := app.PairPhone(); err == nil {
+		t.Fatal("the desktop paired a phone")
 	}
 }
 

@@ -353,7 +353,7 @@ func (a *App) boot() {
 	// The queen's duties, unless this process is a member of a hive: its
 	// queen is elsewhere, and a second set would fork the conversations.
 	// The phone link and the agent door are the desktop's, started in Startup.
-	if !a.isHiveMember() {
+	if a.queenHere() {
 		a.startScheduler()
 		a.startTelegram()
 		a.startHive()
