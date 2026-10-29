@@ -99,8 +99,7 @@ type HiveSettings struct {
 	// come from a Secret, and turning delegation down should not need one.
 	Delegation string `json:"delegation,omitempty"`
 	// DelegateTimeoutSeconds bounds one delegated piece of work on one worker
-	// before it is given to another (or done by the queen). Zero takes
-	// DefaultDelegateTimeout.
+	// before it is given to another (or done by the queen). Zero: no limit.
 	DelegateTimeoutSeconds int `json:"delegate_timeout_seconds,omitempty"`
 	// QueenEngine is who thinks for the queen when a person talks to her: ""
 	// is SuperLeo's own agent, a driven agent CLI's name ("claude", or

@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -87,11 +88,14 @@ func TestExternalAgentsRoundTrip(t *testing.T) {
 	if ea.Timeout() != 15*time.Minute {
 		t.Fatalf("Timeout() = %v, want the configured 900s", ea.Timeout())
 	}
-	if (ExternalAgents{}).Timeout() != DefaultExternalAgentTimeout {
-		t.Error("an unset timeout must take the default, not zero — zero means already expired")
+	// Unset is no limit: a run ends when its task is done or it is stopped.
+	if (ExternalAgents{}).Timeout() != 0 || (ExternalAgents{TimeoutSeconds: -1}).Timeout() != 0 {
+		t.Error("an unset timeout must be no limit")
 	}
-	if (ExternalAgents{TimeoutSeconds: -1}).Timeout() != DefaultExternalAgentTimeout {
-		t.Error("a negative timeout must take the default too")
+	ctx, cancel := WithLimit(context.Background(), 0)
+	defer cancel()
+	if _, ok := ctx.Deadline(); ok || ctx.Err() != nil {
+		t.Error("no limit must give a context with no deadline, not one already expired")
 	}
 }
 

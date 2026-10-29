@@ -38,12 +38,6 @@ import (
 // answer is cached briefly, because a failover is rare and a probe per call
 // would double the latency of every delegated question.
 
-// DefaultRemoteAgentTimeout bounds one remote run when the settings do not.
-//
-// Shorter than a local delegation's twenty minutes: these are asked questions
-// rather than handed tasks, and an SSH command that has produced nothing in
-// five minutes is usually a login prompt or a wedged model, not slow thinking.
-const DefaultRemoteAgentTimeout = 5 * time.Minute
 
 // remoteProbeTimeout bounds one host probe. Long enough for an SSH handshake
 // on the LAN, short enough that walking three dead hosts still leaves time to
@@ -118,7 +112,7 @@ type RemoteAgent struct {
 // Timeout is how long one remote run may take.
 func (r RemoteAgents) Timeout() time.Duration {
 	if r.TimeoutSeconds <= 0 {
-		return DefaultRemoteAgentTimeout
+		return 0 // no limit unless one is set
 	}
 	return time.Duration(r.TimeoutSeconds) * time.Second
 }

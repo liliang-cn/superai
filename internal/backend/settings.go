@@ -3,6 +3,7 @@
 package backend
 
 import (
+	"context"
 	"encoding/json"
 	_ "github.com/liliang-cn/superleo/internal/brand" // the old SuperLeo names keep working
 	"net/url"
@@ -399,19 +400,23 @@ type ExternalAgents struct {
 	Custom []CodingTool `json:"custom,omitempty"`
 }
 
-// DefaultExternalAgentTimeout bounds one delegated run when the settings do
-// not. Generous on purpose: the whole point of handing a task to Claude Code
-// is that it is a task, and a five-minute ceiling would kill the runs worth
-// delegating. It exists so a CLI sitting on a login prompt nobody can answer
-// eventually gives the turn back instead of holding it forever.
-const DefaultExternalAgentTimeout = 20 * time.Minute
-
-// Timeout is how long one delegated run may take.
+// Timeout is how long one delegated run may take: TimeoutSeconds, or zero —
+// no limit — when it is not set. A run handed to Claude Code is a task, and it
+// ends when the task is done or someone stops it; a twenty-minute default
+// killed the hive's development runs half way through.
 func (e ExternalAgents) Timeout() time.Duration {
 	if e.TimeoutSeconds <= 0 {
-		return DefaultExternalAgentTimeout
+		return 0
 	}
 	return time.Duration(e.TimeoutSeconds) * time.Second
+}
+
+// WithLimit is ctx bounded by d, or only cancellable when d is zero: no limit.
+func WithLimit(ctx context.Context, d time.Duration) (context.Context, context.CancelFunc) {
+	if d <= 0 {
+		return context.WithCancel(ctx)
+	}
+	return context.WithTimeout(ctx, d)
 }
 
 // Binary returns the configured path to an agent's CLI, or the bare name for

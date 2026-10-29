@@ -348,7 +348,7 @@ func (a *App) delegate(ctx context.Context, tasks []backend.DelegateTask, onAssi
 	a.mu.Lock()
 	svc, s := a.svc, a.settings
 	a.mu.Unlock()
-	timeout := backend.DefaultDelegateTimeout
+	var timeout time.Duration
 	if s != nil {
 		timeout = s.Hive.DelegateTimeout()
 	}

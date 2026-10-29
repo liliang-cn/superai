@@ -3,8 +3,9 @@ package app
 // The hive tools /mcp adds to the ones in mcp.go: delegation, the task board
 // and its stop button, and the approvals waiting for the person.
 //
-// Delegation is asynchronous. A piece can take minutes (DefaultDelegateTimeout
-// is five, and a failure moves it to another worker or the queen), and an MCP
+// Delegation is asynchronous. A piece can take minutes or hours (it has no
+// limit unless one is set, and a failure moves it to another worker or the
+// queen), and an MCP
 // client such as Claude Code gives up on a call long before that. So
 // superleo_hive_delegate starts the delegation, waits a little in case it is
 // quick, and otherwise answers with its id; superleo_hive_tasks with that id

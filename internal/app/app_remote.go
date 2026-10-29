@@ -513,7 +513,7 @@ func (a *App) registerRemoteTools(svc *backend.Service, cfg backend.RemoteAgents
 // where the question had been. Being addressed to someone else is not the same
 // as not having happened.
 func (a *App) routeToRemote(requestID, sessionID, name, prompt string) {
-	ctx, cancel := context.WithTimeout(context.Background(), a.routedTimeout(name))
+	ctx, cancel := backend.WithLimit(context.Background(), a.routedTimeout(name))
 	a.trackRun(requestID, cancel)
 
 	go func() {
@@ -615,7 +615,7 @@ func (a *App) routedTimeout(name string) time.Duration {
 	s := a.settings
 	a.mu.Unlock()
 	if s == nil {
-		return backend.DefaultExternalAgentTimeout
+		return 0
 	}
 	return s.ExternalAgents.Timeout()
 }

@@ -47,10 +47,6 @@ const (
 // DelegateToolName is the queen's one route to tool work in max mode.
 const DelegateToolName = "hive_delegate"
 
-// DefaultDelegateTimeout bounds one piece on one worker. Long enough for a
-// research piece with a few searches; short enough that a worker that has
-// gone quiet is replaced while the person is still waiting.
-const DefaultDelegateTimeout = 5 * time.Minute
 
 // MaxDelegateTasks is how many pieces one call takes.
 const MaxDelegateTasks = 20
@@ -76,7 +72,7 @@ func (h HiveSettings) DelegationMode() string {
 // DelegateTimeout is DelegateTimeoutSeconds as a duration, or the default.
 func (h HiveSettings) DelegateTimeout() time.Duration {
 	if h.DelegateTimeoutSeconds <= 0 {
-		return DefaultDelegateTimeout
+		return 0 // no limit unless one is set: a piece ends when it is done
 	}
 	return time.Duration(h.DelegateTimeoutSeconds) * time.Second
 }

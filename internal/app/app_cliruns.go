@@ -375,7 +375,7 @@ func (a *App) startCLIRun(o cliStart) (CLIRun, error) {
 		return CLIRun{}, fmt.Errorf("could not build the %s command: %w", agent, err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), ext.Timeout())
+	ctx, cancel := backend.WithLimit(context.Background(), ext.Timeout())
 	s := a.cliStore()
 	s.mu.Lock()
 	s.runs[id] = run
