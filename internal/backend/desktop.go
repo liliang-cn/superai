@@ -198,6 +198,12 @@ func (s *Service) startDesktop(blocked []string) {
 // checkAccess reads the Accessibility permission as agent-desktop sees it.
 // On macOS that is the grant of the app that started it: SuperLeo.
 func (d *desktopRuntime) checkAccess(ctx context.Context) {
+	d.mu.Lock()
+	granted := d.access == "granted"
+	d.mu.Unlock()
+	if !granted {
+		d.dropHosts()
+	}
 	out, err := d.run(ctx, "permissions")
 	if err != nil {
 		return
@@ -214,6 +220,18 @@ func (d *desktopRuntime) checkAccess(ctx context.Context) {
 		d.access, d.accessAt = env.Data.Accessibility.State, time.Now()
 		d.mu.Unlock()
 	}
+}
+
+// dropHosts stops agent-desktop's resident command hosts. On macOS it keeps
+// one running for up to 15 idle minutes, and one started before the person
+// granted Accessibility stays refused after they have: the card kept saying
+// the permission was missing with the grant already in System Settings. A
+// host carries no arguments, which is what tells it from a command running.
+func (d *desktopRuntime) dropHosts() {
+	if runtime.GOOS != "darwin" || d.bin == "" {
+		return
+	}
+	_ = exec.Command("pkill", "-x", "-f", d.bin).Run()
 }
 
 // DesktopRequestAccess asks the OS for the Accessibility permission desktop
