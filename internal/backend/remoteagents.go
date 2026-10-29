@@ -467,7 +467,14 @@ func (r *RemoteRunner) Run(ctx context.Context, name, prompt string) (res Remote
 		return res, nil
 	}
 
-	runCtx, cancel := context.WithTimeout(ctx, r.cfg.Timeout())
+	// Only an explicit TimeoutSeconds bounds a run, as it does a worker: an
+	// agent handed a piece of work (pi building a feature for the hive) ends
+	// when it is done, and five minutes in it was killed with the work half
+	// made. A stopped turn or order still stops it.
+	runCtx, cancel := context.WithCancel(ctx)
+	if r.cfg.TimeoutSeconds > 0 {
+		runCtx, cancel = context.WithTimeout(ctx, r.cfg.Timeout())
+	}
 	defer cancel()
 	out, runErr := sshRun(runCtx, host, script, r.cfg.Timeout())
 	// A rate limit that names its own delay is worth waiting out once. These

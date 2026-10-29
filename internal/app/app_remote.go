@@ -415,8 +415,19 @@ func (a *App) registerRemoteTools(svc *backend.Service, cfg backend.RemoteAgents
 		map[string]any{"type": "object", "properties": map[string]any{}},
 		func(ctx context.Context, _ map[string]any) (any, error) {
 			out := []map[string]string{}
+			seen := map[string]bool{}
 			for _, name := range cfg.Names() {
+				seen[name] = true
 				out = append(out, map[string]string{"name": name, "about": cfg.Agents[name].About})
+			}
+			// And the named agents the machines say they run (pi-mac on the
+			// Mac): they join after this tool was built, and are asked the
+			// same way.
+			for _, w := range a.HiveWorkers() {
+				if w.Kind == hostAgentNamed && w.Up && !seen[w.Name] {
+					seen[w.Name] = true
+					out = append(out, map[string]string{"name": w.Name, "about": "on " + w.Host})
+				}
 			}
 			b, err := json.Marshal(out)
 			return string(b), err
@@ -444,8 +455,7 @@ func (a *App) registerRemoteTools(svc *backend.Service, cfg backend.RemoteAgents
 			"properties": map[string]any{
 				"agent": map[string]any{
 					"type":        "string",
-					"enum":        cfg.Names(),
-					"description": "Which agent to ask.",
+					"description": "Which agent to ask: a name remote_agent_list gives, including the ones machines run (pi-mac).",
 				},
 				"prompt": map[string]any{
 					"type":        "string",
