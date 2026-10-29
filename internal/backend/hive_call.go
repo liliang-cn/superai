@@ -111,6 +111,9 @@ type workerTarget struct {
 	// pulse, when set, is told about every event the worker streams while it
 	// works, thinned into pulses worth drawing (see Pulser).
 	pulse func(kind, tool string, bytes int)
+	// live, when set, is given what the worker is doing as text lines: the
+	// tools it calls, how they came out, the words it writes.
+	live func(string)
 	// timeout of zero means none. A worker's turn ends when its model stops, not
 	// when a clock does; only an explicit setting cuts one off.
 	timeout time.Duration
@@ -250,6 +253,16 @@ func askWorker(ctx context.Context, t workerTarget, prompt string, progress func
 					pulser.Event(typ, tool, len(content), resultLen)
 					if typ == "partial" {
 						words.add(content)
+					}
+					if t.live != nil {
+						switch typ {
+						case "tool_call":
+							t.live(LiveTool(tool, ev.Payload["args"]))
+						case "tool_result":
+							t.live(LiveResult(ev.Payload["result"]))
+						case "partial":
+							t.live(content)
+						}
 					}
 				}
 				phase := ""

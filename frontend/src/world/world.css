@@ -512,3 +512,27 @@
 .wi-lang { border: 0; border-radius: 8px; padding: 4px 8px; background: rgba(255, 255, 255, 0.7); box-shadow: inset 0 0 0 1px rgba(15, 30, 50, 0.12); font: 500 13px var(--font-sans, system-ui); color: inherit; cursor: pointer; }
 .wc-queen > .msg-byline-engine { display: inline-block; margin-bottom: 4px; }
 .wc-wire { opacity: .7; font-size: 11px; }
+
+/* The pane over a working robot: thin blue lines on pale glass, the same
+   light as the corner figures. */
+.wl-hw { pointer-events: none; transition: opacity 0.6s ease; }
+.wl-hw.gone { opacity: 0; }
+.wl-hw-in { position: absolute; left: 36px; bottom: 8px; width: 240px; padding: 7px 10px; border-radius: 4px; box-sizing: border-box;
+  --holo-ink: #1f4fe0; --holo-dim: rgba(31, 79, 224, 0.6); --holo-glow: rgba(47, 91, 234, 0.35);
+  color: var(--holo-ink); border: 1px solid rgba(47, 91, 234, 0.34);
+  background: repeating-linear-gradient(to bottom, rgba(47, 91, 234, 0.06) 0 1px, transparent 1px 3px), linear-gradient(155deg, rgba(214, 228, 255, 0.7), rgba(230, 238, 255, 0.28));
+  box-shadow: 0 0 14px rgba(47, 91, 234, 0.16), inset 0 0 10px rgba(47, 91, 234, 0.06);
+  font: 500 10.5px/1.45 "Geist Mono", ui-monospace, "PingFang SC", "Noto Sans CJK SC", sans-serif; text-align: left;
+  text-shadow: 0 0 6px var(--holo-glow); animation: wl-hw-in 0.35s ease-out; }
+.wl-hw-in::before { content: ""; position: absolute; left: -36px; bottom: -8px; width: 36px; height: 1px; background: rgba(47, 91, 234, 0.5); transform-origin: 0 0; transform: rotate(0deg); box-shadow: 0 0 6px var(--holo-glow); }
+.wl-hw-body { max-height: 6.2em; overflow: hidden; white-space: pre-wrap; overflow-wrap: anywhere;
+  -webkit-mask-image: linear-gradient(transparent, #000 30%); mask-image: linear-gradient(transparent, #000 30%); }
+.wl-hw-body .tool { font-weight: 700; }
+.wl-hw-body .res { color: var(--holo-dim); }
+.wl-hw-body .res.bad { color: #d0313f; }
+.wl-hw-caret { display: inline-block; width: 5px; height: 1em; margin-left: 2px; vertical-align: text-bottom; background: currentColor; animation: wl-hw-blink 1s steps(2) infinite; }
+@keyframes wl-hw-in { from { opacity: 0; transform: translateY(4px); } }
+@keyframes wl-hw-blink { 50% { opacity: 0; } }
+:root[data-theme="dark"] .wl-hw-in { --holo-ink: #a9c0ff; --holo-dim: rgba(185, 205, 255, 0.8); --holo-glow: rgba(110, 150, 255, 0.5);
+  border-color: rgba(140, 170, 255, 0.4); background: repeating-linear-gradient(to bottom, rgba(140, 170, 255, 0.08) 0 1px, transparent 1px 3px), linear-gradient(155deg, rgba(16, 30, 64, 0.72), rgba(16, 30, 64, 0.3)); }
+@media (prefers-reduced-motion: reduce) { .wl-hw-in { animation: none; } .wl-hw-caret { animation: none; } }

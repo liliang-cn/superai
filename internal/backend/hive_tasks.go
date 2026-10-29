@@ -2,6 +2,7 @@ package backend
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -63,7 +64,11 @@ const (
 	resultKeep = 20000
 	errorKeep  = 2000
 	eventsKeep = 200
+	liveKeep   = 400
 )
+
+// liveEvery is the least time between two publishes of a task's Live text.
+const liveEvery = 200 * time.Millisecond
 
 // TaskEvent is one step in a task's life: when, and what it was doing.
 type TaskEvent struct {
@@ -99,6 +104,14 @@ type HiveTask struct {
 	Result    string      `json:"result,omitempty"`
 	Error     string      `json:"error,omitempty"`
 	Events    []TaskEvent `json:"events,omitempty"`
+	// Live is the tail of what the task is doing right now — the tool being
+	// called with its arguments, how a call came out, the words being written —
+	// for the hologram over the worker. Only while running, only the last
+	// liveKeep characters, and published at most every liveEvery.
+	Live string `json:"live,omitempty"`
+
+	liveAt    time.Time
+	liveTimer *time.Timer
 }
 
 // TaskBoard holds the recent tasks and reports each change.
@@ -232,6 +245,63 @@ func (b *TaskBoard) Progress(id, phase, tool string) {
 	})
 }
 
+// Live appends to what a running task shows as it works, keeping the last few
+// hundred characters. It publishes at most every liveEvery; a change inside
+// that window goes out when the window ends.
+func (b *TaskBoard) Live(id, s string) {
+	if b == nil || id == "" || s == "" {
+		return
+	}
+	b.mu.Lock()
+	var t *HiveTask
+	for _, x := range b.tasks {
+		if x.ID == id {
+			t = x
+			break
+		}
+	}
+	if t == nil || t.State != TaskRunning {
+		b.mu.Unlock()
+		return
+	}
+	r := []rune(t.Live + s)
+	if len(r) > liveKeep {
+		r = r[len(r)-liveKeep:]
+	}
+	t.Live = string(r)
+	if wait := liveEvery - time.Since(t.liveAt); wait > 0 {
+		if t.liveTimer == nil {
+			t.liveTimer = time.AfterFunc(wait, func() { b.flushLive(id) })
+		}
+		b.mu.Unlock()
+		return
+	}
+	t.liveAt = time.Now()
+	c := t.copy()
+	b.mu.Unlock()
+	b.publish(c)
+}
+
+func (b *TaskBoard) flushLive(id string) {
+	b.mu.Lock()
+	var c *HiveTask
+	for _, t := range b.tasks {
+		if t.ID == id {
+			t.liveTimer = nil
+			if t.State == TaskRunning {
+				t.liveAt = time.Now()
+				cp := t.copy()
+				c = &cp
+			}
+			break
+		}
+	}
+	b.mu.Unlock()
+	if c != nil {
+		b.publish(*c)
+	}
+}
+
 // Finish settles a task. Only the first call counts: a task that was cancelled
 // and then reports done a moment later stays cancelled.
 func (b *TaskBoard) Finish(id, state, result, errMsg string) {
@@ -240,7 +310,11 @@ func (b *TaskBoard) Finish(id, state, result, errMsg string) {
 		if t.State != TaskRunning {
 			return false
 		}
-		t.State, t.Phase, t.Tool = state, "", ""
+		t.State, t.Phase, t.Tool, t.Live = state, "", "", ""
+		if t.liveTimer != nil {
+			t.liveTimer.Stop()
+			t.liveTimer = nil
+		}
 		t.EndedAt = time.Now()
 		t.Result, t.Error = clip(result, resultKeep), clip(errMsg, errorKeep)
 		t.note(state, "")
@@ -396,6 +470,7 @@ func (t *HiveTask) note(phase, tool string) {
 // is not changed by the next step.
 func (t *HiveTask) copy() HiveTask {
 	c := *t
+	c.liveTimer = nil
 	c.Events = append([]TaskEvent(nil), t.Events...)
 	return c
 }
@@ -409,6 +484,9 @@ func (t *HiveTask) copy() HiveTask {
 func (b *TaskBoard) Ingest(in HiveTask) {
 	if b == nil || in.ID == "" {
 		return
+	}
+	if r := []rune(in.Live); len(r) > liveKeep {
+		in.Live = string(r[len(r)-liveKeep:])
 	}
 	in.Prompt = clip(in.Prompt, promptKeep)
 	in.Result, in.Error = clip(in.Result, resultKeep), clip(in.Error, errorKeep)
@@ -534,4 +612,24 @@ func (p *Pulser) Event(typ, tool string, content, result int) {
 			p.fn("text", "", n)
 		}
 	}
+}
+
+// LiveTool is the line a tool call adds to a task's Live text.
+func LiveTool(tool string, args any) string {
+	a := ""
+	if args != nil {
+		if b, err := json.Marshal(args); err == nil && string(b) != "null" && string(b) != "{}" {
+			a = " " + string(b)
+		}
+	}
+	return "\n▸ " + tool + clip(a, 120) + "\n"
+}
+
+// LiveResult is the line a tool result adds: how it came out, in a few words.
+func LiveResult(result any) string {
+	if ToolResultFailed(result) {
+		return "◂ ✗ " + clip(toolResultError(result), 100) + "\n"
+	}
+	b, _ := json.Marshal(result)
+	return "◂ " + clip(string(b), 100) + "\n"
 }

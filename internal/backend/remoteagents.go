@@ -421,6 +421,7 @@ func (r *RemoteRunner) Run(ctx context.Context, name, prompt string) (res Remote
 		r.board.OnStop(id, func() { stop(ErrTaskStopped) })
 		target := workerTarget{name: name, wire: agent.Wire, url: agent.URL, token: agent.Token, timeout: limit, taskID: id,
 			pulse: func(kind, tool string, n int) { r.board.Pulse(id, kind, tool, n) },
+			live:  func(s string) { r.board.Live(id, s) },
 			tools: WorkerTraceFrom(ctx)}
 		if r.approve != nil {
 			target.approve = func(ctx context.Context, req map[string]any) bool { return r.approve(ctx, name, req) }

@@ -1161,6 +1161,14 @@ func (a *App) ownTurn(requestID, sessionID, message string, imagePaths []string,
 			}
 			switch ev.Type {
 			case agent.EventTypeToolCall:
+				board.Live(taskID, backend.LiveTool(ev.ToolName, ev.ToolArgs))
+			case agent.EventTypeToolResult:
+				board.Live(taskID, backend.LiveResult(ev.ToolResult))
+			case agent.EventTypePartial:
+				board.Live(taskID, ev.Content)
+			}
+			switch ev.Type {
+			case agent.EventTypeToolCall:
 				board.Progress(taskID, backend.PhaseTool, ev.ToolName)
 			case agent.EventTypeThinking:
 				board.Progress(taskID, backend.PhaseThinking, "")

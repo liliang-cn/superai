@@ -9,6 +9,7 @@ import { earlyError, requestSetup, useReady } from "../lib/ready";
 import { engineByline, visibleAnswer } from "../lib/format";
 import { Response } from "@/components/ai-elements/response";
 import { attachToBubble, onBubbleClick, say, sayDone } from "./bubbles";
+import { holoAdd, holoEnd, startHolo } from "./holo";
 import { focusInWorld } from "./bus";
 import { EventsOn } from "../../wailsjs/runtime";
 import { loadQueenSession, queenSession } from "../lib/queenConsole";
@@ -150,6 +151,7 @@ export default function Command({ view, onConversation, onTyping, hosts }: {
 
   // Our own turns: their words as they stream, the tool in use, and what the
   // model call is stuck on when it is (a queue, a retry, a quiet provider).
+  useEffect(() => { startHolo(); }, []);
   const raw = useRef(new Map<string, string>());
   // What each worker has written for a turn so far, by "request|worker".
   const workText = useRef(new Map<string, string>());
@@ -170,25 +172,26 @@ export default function Command({ view, onConversation, onTyping, hosts }: {
       credit(p);
       if (p.type === "flow") { const tid = traceIdOf(p.content); if (tid) flows.current.set(id, tid); return; }
       // Work the queen handed out is drawn on the worker doing it.
-      if (p.type === "tool_call" && p.tool && p.worker) { patch(id, { step: stepLabel(p.tool, p.args), work: { worker: p.worker, text: workText.current.get(id + "|" + p.worker) ?? "" } }); say("worker:" + p.worker, p.workerTool || p.tool, "think", 60); }
+      if (p.type === "tool_call" && p.tool && p.worker) { patch(id, { step: stepLabel(p.tool, p.args), work: { worker: p.worker, text: workText.current.get(id + "|" + p.worker) ?? "" } }); holoAdd("worker:" + p.worker, "\n▸ " + (p.workerTool || p.tool) + (p.args && Object.keys(p.args).length ? " " + JSON.stringify(p.args).slice(0, 120) : "") + "\n"); }
       else if (p.type === "worker_text" && p.worker && p.content) {
         const k = id + "|" + p.worker;
         const w = (workText.current.get(k) ?? "") + p.content;
         workText.current.set(k, w);
         patch(id, { work: { worker: p.worker, text: w }, step: "" });
-        say("worker:" + p.worker, workTail(w), "say", 60);
+        holoAdd("worker:" + p.worker, p.content);
       }
       else if (p.type === "tool_call" && p.tool) {
         patch(id, { step: stepLabel(p.tool, p.args) });
         say("queen", p.tool, "think", 60);
+        holoAdd("queen", "\n▸ " + p.tool + (p.args && Object.keys(p.args).length ? " " + JSON.stringify(p.args).slice(0, 120) : "") + "\n");
         // A turn in the browser shows the page under what the queen says,
         // live while it runs; the card stays with the bubble to the end.
         if (browserOp(p.tool)) attachToBubble("queen", <BubbleBrowser req={id} />);
       }
       // A call that has answered, or that the end of the turn closed, is no longer in use.
-      else if (p.type === "tool_result") patch(id, { step: "" });
+      else if (p.type === "tool_result") { patch(id, { step: "" }); if (!p.worker) holoAdd("queen", "◂ " + (p.result == null ? "" : JSON.stringify(p.result).slice(0, 100)) + "\n"); }
       else if (p.type === "model_wire") { const k = p.wire?.kind; if (["queued", "retry", "restart", "waiting", "error"].includes(k)) patch(id, { wire: String(p.content ?? "") }); else if (k === "first_byte" || k === "slot" || k === "request" || (k === "response" && p.wire?.status < 400)) patch(id, { wire: "" }); }
-      else if (p.type === "partial" && p.content) { const r = (raw.current.get(id) ?? "") + p.content; raw.current.set(id, r); const v = visibleAnswer(r); patch(id, { live: v, step: "", wire: "" }); if (v) say("queen", v, "say", 60); }
+      else if (p.type === "partial" && p.content) { const r = (raw.current.get(id) ?? "") + p.content; raw.current.set(id, r); const v = visibleAnswer(r); patch(id, { live: v, step: "", wire: "" }); holoAdd("queen", p.content); if (v) say("queen", v, "say", 60); }
     });
     const finish = (id: string, text: string) => {
       const by = engineByline(who.current.get(id) ?? {}) || undefined;
@@ -196,6 +199,7 @@ export default function Command({ view, onConversation, onTyping, hosts }: {
       mineIds.current.delete(id); raw.current.delete(id); who.current.delete(id); flows.current.delete(id);
       for (const k of [...workText.current.keys()]) if (k.startsWith(id + "|")) workText.current.delete(k);
       sayDone("queen", text);
+      holoEnd("queen");
       setLines((l) => [...l, { who: "queen" as const, text, by, req: id, trace }].slice(-12));
       setPending((l) => l.filter((x) => x.id !== id));
     };

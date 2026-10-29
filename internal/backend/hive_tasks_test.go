@@ -514,3 +514,47 @@ func TestARunningOrderStopsByItsID(t *testing.T) {
 		t.Fatal("the worker was not told to stop")
 	}
 }
+
+func TestLiveKeepsTheTailIsThrottledAndEndsWithTheTask(t *testing.T) {
+	b, seen := boardWithLog()
+	id := b.Start("w0", "/x", "go")
+	base := len(seen())
+	b.Live(id, "你好")
+	if got := len(seen()); got != base+1 {
+		t.Fatalf("first live text should publish at once, got %d new", got-base)
+	}
+	for i := 0; i < 50; i++ {
+		b.Live(id, strings.Repeat("字a", 10))
+	}
+	if got := len(seen()); got != base+1 {
+		t.Fatalf("a burst inside the window must not publish, got %d new", got-base-1)
+	}
+	time.Sleep(liveEvery + 150*time.Millisecond)
+	all := seen()
+	if len(all) != base+2 {
+		t.Fatalf("the burst should go out once when the window ends, got %d", len(all)-base-1)
+	}
+	if n := len([]rune(all[len(all)-1].Live)); n != liveKeep {
+		t.Fatalf("live should keep the last %d characters, kept %d", liveKeep, n)
+	}
+	b.Live(id, "tail")
+	b.Finish(id, TaskDone, "ok", "")
+	time.Sleep(liveEvery + 150*time.Millisecond)
+	all = seen()
+	if last := all[len(all)-1]; last.State != TaskDone || last.Live != "" {
+		t.Fatalf("a finished task shows no live text: %+v", last)
+	}
+	b.Live(id, "late")
+	if got, _ := b.Get(id); got.Live != "" {
+		t.Fatalf("a finished task takes no live text, has %q", got.Live)
+	}
+}
+
+func TestLiveLinesNameTheToolAndHowItCameOut(t *testing.T) {
+	if got := LiveTool("bash", map[string]any{"cmd": "ls"}); !strings.Contains(got, "▸ bash") || !strings.Contains(got, `"cmd":"ls"`) {
+		t.Fatalf("tool line: %q", got)
+	}
+	if got := LiveResult(map[string]any{"output": "hi"}); !strings.HasPrefix(got, "◂ ") {
+		t.Fatalf("result line: %q", got)
+	}
+}

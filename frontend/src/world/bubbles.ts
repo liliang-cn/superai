@@ -15,6 +15,8 @@ const actors = new Map<string, THREE.Object3D>();
 
 /** "queen", "worker:<name>", "cli:<agent>", "agent:<name>", "bee:<id>". */
 export function registerActor(key: string, obj: THREE.Object3D) { actors.set(key, obj); }
+/** The robot registered under `key`, if it is in the scene. */
+export const actorOf = (key: string) => actors.get(key);
 export function forgetActor(key: string) { actors.delete(key); speaking.get(key)?.remove(); }
 
 type Bubble = { el: HTMLElement; body: HTMLElement; obj: CSS2DObject; timer: number; md?: { box: HTMLElement; root: Root }; extra?: Root; remove: () => void };
