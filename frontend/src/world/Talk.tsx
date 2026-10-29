@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useStickToBottom } from "../lib/useStickToBottom";
 import { SendIcon } from "lucide-react";
-import { AskRemoteAgent, ChatHistory, FollowUpCLIRun, SendChat, StandingReports, StartCLIRun, WakeStandingAgent } from "../../wailsjs/go/app/App";
+import { AskRemoteAgent, ChatHistory, CLIRunDetail, FollowUpCLIRun, SendChat, StandingReports, StartCLIRun, WakeStandingAgent } from "../../wailsjs/go/app/App";
 import { EventsOn } from "../../wailsjs/runtime";
 import { loadQueenSession, queenSession } from "../lib/queenConsole";
 import { useI18n } from "../lib/i18n";
@@ -150,14 +150,24 @@ export default function Talk({ who, placeholder }: { who: Talker; placeholder: s
     return () => offs.forEach((f) => typeof f === "function" && f());
   }, [key]);
 
-  // A coding run answers when it ends.
+  // A coding run answers when it ends. The end can arrive before StartCLIRun
+  // or FollowUpCLIRun has returned the run's id — a short answer often does —
+  // so ends that match no run yet are kept until the id is known.
+  const ended = useRef(new Map<string, any>());
+  const answered = useRef(new Set<string>());
+  const finish = (r: any) => {
+    if (answered.current.has(r.id)) return;
+    answered.current.add(r.id);
+    setBusy("");
+    push({ who: "it", text: String(r.summary || r.error || r.state), bad: r.state !== "done" });
+  };
   useEffect(() => {
     if (who.kind !== "cli") return;
     return EventsOn("cli:run", (r: any) => {
+      if (!r?.id || r.state === "running") return;
       const th = threads.get(key);
-      if (!th?.run || r?.id !== th.run || r.state === "running") return;
-      setBusy("");
-      push({ who: "it", text: String(r.summary || r.error || r.state), bad: r.state !== "done" });
+      if (th?.run === r.id) finish(r);
+      else ended.current.set(r.id, r);
     }) as unknown as () => void;
   }, [key]);
 
@@ -190,6 +200,11 @@ export default function Talk({ who, placeholder }: { who: Talker; placeholder: s
           th.run = String(run.id);
           threads.set(key, th);
           setBusy(t("Working…"));
+          const early = ended.current.get(th.run);
+          if (early) { ended.current.delete(th.run); finish(early); break; }
+          // Or it ended with no event this view saw: ask once.
+          if (run.state && run.state !== "running") { finish(run); break; }
+          CLIRunDetail(th.run).then((d: any) => { if (d && d.state && d.state !== "running") finish(d); }).catch(() => {});
           break;
         }
         case "bee": {
