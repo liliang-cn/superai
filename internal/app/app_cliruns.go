@@ -378,7 +378,8 @@ func (a *App) startCLIRun(o cliStart) (CLIRun, error) {
 			req.Sandbox = true
 			// -c rather than --sandbox: `codex exec resume` takes no --sandbox.
 			req.ExtraArgs = append(req.ExtraArgs, "--skip-git-repo-check", "-c", `sandbox_mode="workspace-write"`,
-				"-c", "sandbox_workspace_write.network_access=true")
+				"-c", "sandbox_workspace_write.network_access=true",
+				"-c", "sandbox_workspace_write.writable_roots="+tomlStrings(codexWritable(dir, a.cliAllowed(ext.Roots))))
 		}
 	}
 	sess := provider.NewSession()
@@ -602,6 +603,78 @@ func (a *App) cliAllowed(roots []string) []string {
 		}
 	}
 	return allowed
+}
+
+// codexWritable is what Codex's workspace-write sandbox may write besides the
+// run's own directory: every allowed root, and the .git of the repository the
+// run is in. Codex keeps .git read-only even inside a writable root, so
+// without naming it a run could change the code but not commit it, and
+// stopped there.
+func codexWritable(dir string, allowed []string) []string {
+	out := []string{}
+	seen := map[string]bool{}
+	add := func(p string) {
+		if p != "" && !seen[p] {
+			seen[p] = true
+			out = append(out, p)
+		}
+	}
+	for _, r := range allowed {
+		add(r)
+	}
+	for d := dir; d != ""; {
+		g := filepath.Join(d, ".git")
+		if st, err := os.Stat(g); err == nil {
+			if st.IsDir() {
+				add(g)
+			} else if gitdir := worktreeGitDir(g); gitdir != "" {
+				// A worktree: its .git is a file naming its own git dir,
+				// and commits land in the main repository's too.
+				add(gitdir)
+				if b, err := os.ReadFile(filepath.Join(gitdir, "commondir")); err == nil {
+					c := strings.TrimSpace(string(b))
+					if !filepath.IsAbs(c) {
+						c = filepath.Join(gitdir, c)
+					}
+					add(filepath.Clean(c))
+				}
+			}
+			break
+		}
+		up := filepath.Dir(d)
+		if up == d {
+			break
+		}
+		d = up
+	}
+	return out
+}
+
+// worktreeGitDir reads the "gitdir: …" a worktree's .git file holds.
+func worktreeGitDir(file string) string {
+	b, err := os.ReadFile(file)
+	if err != nil {
+		return ""
+	}
+	s, ok := strings.CutPrefix(strings.TrimSpace(string(b)), "gitdir:")
+	if !ok {
+		return ""
+	}
+	s = strings.TrimSpace(s)
+	if !filepath.IsAbs(s) {
+		s = filepath.Join(filepath.Dir(file), s)
+	}
+	return filepath.Clean(s)
+}
+
+// tomlStrings writes a list of strings as a TOML array, for codex -c.
+func tomlStrings(ss []string) string {
+	q := make([]string, len(ss))
+	for i, s := range ss {
+		b, _ := json.Marshal(s) // a JSON string is a TOML basic string
+		q[i] = string(b)
+	}
+	return "[" + strings.Join(q, ",") + "]"
 }
 
 func cliExpandHome(p string) string {
