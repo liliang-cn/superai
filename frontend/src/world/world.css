@@ -217,6 +217,13 @@
 
 /* Talking to a robot, in its card. */
 .wt { display: flex; flex-direction: column; gap: 8px; }
+.wl-callout.wl-callout-full { position: fixed; inset: 0; z-index: 20; transform: none !important; display: grid; place-items: center; background: rgba(22, 32, 43, 0.45); }
+.wl-callout.wl-callout-full .wl-detail { width: min(1000px, calc(100% - 48px)); height: min(800px, calc(100% - 48px)); display: flex; flex-direction: column; animation: none; }
+.wl-callout-full .wl-facts, .wl-callout-full .wi-body > :not(.wt) { display: none; }
+.wl-callout-full .wi-body, .wl-callout-full .wt { flex: 1; min-height: 0; }
+.wl-callout-full .wt-lines { flex: 1; max-height: none; }
+.wl-callout-full .wi-say { margin-top: auto; }
+.wt-tools { margin-bottom: 8px; color: #5f6d77; font-size: 12px; }
 .wt-lines { max-height: 230px; overflow: auto; display: flex; flex-direction: column; gap: 6px; padding: 2px; }
 .wt-lines .wt-line { margin: 0; padding: 7px 10px; border-radius: 10px; font-size: 12.5px; line-height: 1.5; overflow-wrap: anywhere; max-width: 92%; }
 .wt-lines p.wt-line, .wt-lines .wt-plain { white-space: pre-wrap; }

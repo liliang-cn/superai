@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useStickToBottom } from "../lib/useStickToBottom";
 import { SendIcon } from "lucide-react";
-import { AskRemoteAgent, ChatHistory, CLIRunDetail, FollowUpCLIRun, SendChat, StandingReports, StartCLIRun, WakeStandingAgent } from "../../wailsjs/go/app/App";
+import { AskRemoteAgent, ChatHistory, CLIRunDetail, FollowUpCLIRun, HiveTaskDetail, SendChat, StandingReports, StartCLIRun, WakeStandingAgent } from "../../wailsjs/go/app/App";
 import { EventsOn } from "../../wailsjs/runtime";
 import { loadQueenSession, queenSession } from "../lib/queenConsole";
 import { useI18n } from "../lib/i18n";
@@ -22,7 +22,7 @@ export type Talker =
   | { kind: "bee"; id: string };
 
 /** `req` is the queen's request that wrote an answer, for the browser card under it. */
-type Line = { who: "you" | "it"; text: string; bad?: boolean; req?: string };
+type Line = { who: "you" | "it"; text: string; bad?: boolean; req?: string; tools?: string[] };
 
 // Each robot's conversation lasts as long as the app does, so closing its
 // card and opening it again picks up where it was.
@@ -99,8 +99,8 @@ export default function Talk({ who, placeholder }: { who: Talker; placeholder: s
   const push = (l: Line) => {
     if (l.who === "it") sayDone(actorOf(who), l.text);
     const th = threads.get(key) ?? { lines: [] };
-    if (!alive.current) { th.lines = [...th.lines, l].slice(-30); threads.set(key, th); return; }
-    th.lines = [...th.lines, l].slice(-30);
+    if (!alive.current) { th.lines = [...th.lines, l]; threads.set(key, th); return; }
+    th.lines = [...th.lines, l];
     threads.set(key, th);
     setLines(th.lines);
   };
@@ -189,9 +189,15 @@ export default function Talk({ who, placeholder }: { who: Talker; placeholder: s
           mine.current = "";
           break;
         case "worker": case "agent": {
-          const r: any = await AskRemoteAgent(who.name, s);
+          // AskRemoteAgent starts an independent remote request each time. Carry
+          // this thread with it so a follow-up has the same conversational context.
+          const history = lines.filter((l) => !l.bad).map((l) => `${l.who === "you" ? "User" : "Assistant"}: ${l.text}`).join("\n\n");
+          const prompt = history ? `Previous conversation:\n${history}\n\nUser: ${s}\n\nContinue the conversation and answer the latest user message.` : s;
+          const r: any = await AskRemoteAgent(who.name, prompt);
+          const detail: any = r.task_id ? await HiveTaskDetail(r.task_id).catch(() => null) : null;
+          const tools = (detail?.task?.events ?? []).filter((e: any) => e.phase === "tool").map((e: any) => String(e.tool || "tool"));
           setBusy("");
-          push({ who: "it", text: r.failed ? String(r.reason || "failed") : String(r.text ?? ""), bad: !!r.failed });
+          push({ who: "it", text: r.failed ? String(r.reason || "failed") : String(r.text ?? ""), bad: !!r.failed, tools });
           break;
         }
         case "cli": {
@@ -240,7 +246,7 @@ export default function Talk({ who, placeholder }: { who: Talker; placeholder: s
           {lines.map((l, i) => [
             browser(l.req, false),
             l.who === "it" && !l.bad
-              ? <div key={i} className="wt-line wt-it"><Response>{l.text}</Response></div>
+              ? <div key={i} className="wt-line wt-it">{l.tools && l.tools.length > 0 && <div className="wt-tools">{l.tools.map((tool, n) => <div key={n}>⚙ {tool}</div>)}</div>}<Response>{l.text}</Response></div>
               : <div key={i} className={`wt-line wt-plain wt-${l.who}${l.bad ? " bad" : ""}`}>{l.who === "you" ? <SentMessage content={l.text} /> : l.text}</div>,
           ])}
           {liveReq && browser(liveReq, true)}

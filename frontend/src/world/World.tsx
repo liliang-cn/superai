@@ -204,6 +204,8 @@ export default function World({ view, onFlipTheme }: { view: ViewKey; onFlipThem
   }, [view]);
 
   const close = () => { setPicked(null); engine.current?.select(null); worldBus.publish(null); };
+  const [inspectorFull, setInspectorFull] = useState(false);
+  useEffect(() => { setInspectorFull(false); }, [picked?.kind, picked?.id]);
   return (
     <div className="wl-root">
       <div ref={host} className="wl-host" />
@@ -236,8 +238,8 @@ export default function World({ view, onFlipTheme }: { view: ViewKey; onFlipThem
         <Hud view={view} data={data} on={holo} />
       </div>
       <StatsHud hive={hive} runs={runs} on={holo} />
-      <div ref={card} className="wl-callout" style={{ display: picked ? "" : "none" }}>
-        {picked && <Inspector key={picked.kind + ":" + picked.id} picked={picked} data={data} onClose={close} openDash={setDash} open={(to, full) => { if (full) window.dispatchEvent(new CustomEvent("superleo:window", { detail: to })); else navigate(to); }} />}
+      <div ref={card} className={`wl-callout${inspectorFull ? " wl-callout-full" : ""}`} style={{ display: picked ? "" : "none" }}>
+        {picked && <Inspector key={picked.kind + ":" + picked.id} picked={picked} data={data} onClose={close} full={inspectorFull} setFull={setInspectorFull} openDash={setDash} open={(to, full) => { if (full) window.dispatchEvent(new CustomEvent("superleo:window", { detail: to })); else navigate(to); }} />}
       </div>
       {dash && <DashScreen id={dash} onClose={() => setDash("")} />}
       <Command view={view} onConversation={() => window.dispatchEvent(new CustomEvent("superleo:window", { detail: "/" }))} onTyping={(kind, id) => engine.current?.hint(kind, id)} hosts={topo.hosts} />

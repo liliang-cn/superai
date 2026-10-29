@@ -36,8 +36,9 @@ const when = (s?: string) => {
  * something; a machine starts a coding run; an approval is answered here.
  * `open(path, panel)` goes to a page, optionally with its list showing.
  */
-export default function Inspector({ picked, data, onClose, open, openDash }: {
+export default function Inspector({ picked, data, onClose, open, openDash, full, setFull }: {
   picked: Picked; data: WorldData; onClose: () => void; open: (path: string, panel?: boolean) => void;
+  full: boolean; setFull: (full: boolean) => void;
   /** Shows a dashboard full size over the world. */
   openDash?: (id: string) => void;
 }) {
@@ -393,20 +394,20 @@ export default function Inspector({ picked, data, onClose, open, openDash }: {
 
   // Every thing has a page with all it can do; it opens full size, as its
   // screen, over the world.
-  const full: Record<string, string> = {
+  const fullPaths: Record<string, string> = {
     hall: PATHS.home, worker: PATHS.hive, node: PATHS.hive, order: taskPath(picked.id),
     bee: PATHS.agents + "?agent=" + encodeURIComponent(picked.id), machine: PATHS.coding, cli: PATHS.coding, agent: PATHS.coding,
     brain: PATHS.knowledge, skills: PATHS.skills, skill: PATHS.skills, mcphub: PATHS.mcp, mcp: PATHS.mcp,
     dashboard: PATHS.dashboards, records: PATHS.records, event: PATHS.records, reminder: PATHS.records,
     figure: PATHS.stats, settings: PATHS.settings, host: PATHS.hive, service: PATHS.hive,
   };
-  const screen = full[picked.kind] ?? PATHS.tasks;
+  const screen = fullPaths[picked.kind] ?? PATHS.tasks;
   return (
     <aside className="wl-detail">
       <header>
         <div><em>{t(kind)}</em><b>{picked.title}</b></div>
-        {picked.kind !== "settings" && <button title={t("Open full screen")} onClick={() => open(screen, true)}><Maximize2Icon size={14} /></button>}
-        <button title={t("Close")} onClick={onClose}><XIcon size={15} /></button>
+        {picked.kind !== "settings" && !full && <button title={t("Open full screen")} onClick={() => ["worker", "agent", "cli"].includes(picked.kind) ? setFull(true) : open(screen, true)}><Maximize2Icon size={14} /></button>}
+        <button title={t("Close")} onClick={() => full ? setFull(false) : onClose()}><XIcon size={15} /></button>
       </header>
       {rows.length > 0 && (
         <div className="wl-facts">
