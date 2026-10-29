@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   BellIcon, ChevronDownIcon, ChevronUpIcon, DatabaseIcon, ExternalLinkIcon, GlobeIcon, HexagonIcon, LaptopIcon,
-  LogOutIcon, MonitorIcon, NetworkIcon, PauseIcon, PencilIcon, PlayIcon, PlusIcon, RadarIcon, SendIcon,
-  SettingsIcon, ShieldCheckIcon, SparklesIcon, SunIcon, Trash2Icon, WebhookIcon, WrenchIcon,
+  LogOutIcon, MonitorIcon, NetworkIcon, PauseIcon, PencilIcon, PlayIcon, PlusIcon, RadarIcon,
+  SettingsIcon, ShieldCheckIcon, SparklesIcon, SunIcon, Trash2Icon, WrenchIcon,
 } from "lucide-react";
 import { translate, useI18n } from "../lib/i18n";
 import LanguageSettings from "../components/LanguageSettings";
@@ -15,6 +15,8 @@ import BrowserModeCard from "../components/BrowserModeCard";
 import DesktopControlCard from "../components/DesktopControlCard";
 import AddAgentCard from "../components/AddAgentCard";
 import AddWorkerCard from "../components/AddWorkerCard";
+import CodingToolsCard from "../components/settings/CodingToolsCard";
+import ChannelsCard from "../components/settings/ChannelsCard";
 import { ACCENTS } from "../components/ThemePicker";
 import {
   Avatar, Block, Btn, Chips, ConfirmBtn, Group, IconBtn, Menu, Note, Num, Row, Secret, Seg, Select, State, Text, Toggle,
@@ -28,12 +30,10 @@ import {
   CLIProxySignOut,
   CLIProxyStatus,
   CLIProxySubmitPrompt,
-  ExternalAgentsStatus,
   GetSettings,
   OpenInBrowser,
   CheckRemoteAgents,
   PatchSettings,
-  TestWebhook,
   ToolApprovalInfo,
 } from "../../wailsjs/go/app/App";
 import { BrowserOpenURL, EventsOff, EventsOn } from "../../wailsjs/runtime/runtime";
@@ -155,190 +155,6 @@ const SECTIONS: { id: SectionID; label: string; icon: typeof SettingsIcon }[] = 
   { id: "abilities", label: "Abilities", icon: WrenchIcon },
   { id: "notify", label: "Notifications", icon: BellIcon },
 ];
-
-/** The agent CLIs SuperLeo can hand a task to, in the order they are listed. */
-const AGENT_CLIS: { name: string; label: string }[] = [
-  { name: "claude", label: "Claude Code" },
-  { name: "codex", label: "Codex" },
-  { name: "cursor-agent", label: "Cursor Agent" },
-];
-
-/**
- * Handing work to another agent CLI.
- *
- * The switch is not offered blind: every known CLI is listed with what the
- * doctor found, because "installed" is the first thing someone needs to know
- * and the app can answer it without being asked. What it deliberately does not
- * claim is that a listed CLI *works* — they authenticate separately, and one
- * with a dead token still prints a version quite happily. So the row says
- * where the binary is, and the note underneath says the rest is untested.
- */
-function ExternalAgentsCard({
-  ea,
-  onChange,
-  statuses,
-  reached,
-  probing,
-  onRecheck,
-}: {
-  ea: backend.ExternalAgents;
-  onChange: (patch: Partial<backend.ExternalAgents>) => void;
-  statuses: backend.ExternalAgentStatus[];
-  /** What each CLI said when it was last actually asked something, if ever. */
-  reached: app.RemoteAgentStatus[];
-  probing: boolean;
-  onRecheck: () => void;
-}) {
-  const roots = ea.roots ?? [];
-  const binaries = ea.binaries ?? {};
-  const models = ea.models ?? {};
-  const found = (name: string) => statuses.find((st) => st.name === name);
-  const answered = (name: string) => reached.find((st) => st.name === name);
-
-  const setRoot = (i: number, v: string) => {
-    const next = [...roots];
-    next[i] = v;
-    onChange({ roots: next });
-  };
-  const setPair = (key: "binaries" | "models", name: string, v: string) =>
-    onChange({ [key]: { ...(key === "binaries" ? binaries : models), [name]: v } } as Partial<backend.ExternalAgents>);
-
-  return (
-    <div className="card">
-      <div className="card-title">External agents</div>
-
-      <div className="field">
-        <label>Delegate to agent CLIs</label>
-        <div className="toggle" onClick={() => onChange({ enabled: !ea.enabled })} style={{ cursor: "pointer", marginTop: 2 }}>
-          <div className={`switch${ea.enabled ? " on" : ""}`}><div className="knob" /></div>
-          <span style={{ fontSize: 13, color: "var(--text-1)" }}>
-            {ea.enabled ? "On — SuperLeo may hand work to the CLIs below" : "Off — SuperLeo does every task itself"}
-          </span>
-        </div>
-      </div>
-
-      <div className="field">
-        <label>On this machine</label>
-        <div className="ea-agents">
-          {AGENT_CLIS.map((cli) => {
-            const st = found(cli.name);
-            return (
-              <div key={cli.name} className={`ea-agent${st?.installed ? "" : " missing"}`}>
-                <div className="ea-agent-head">
-                  <span className="ea-agent-name">{cli.label}</span>
-                  <span className={`ea-dot${st?.installed ? " on" : ""}`} />
-                  <span className="ea-agent-state">
-                    {probing && !st ? "checking…" : st?.installed ? st.version || "installed" : "not installed"}
-                  </span>
-                </div>
-                {st?.installed && <div className="ea-agent-path" title={st.path}>{st.path}</div>}
-                {/* The other half of "installed". A CLI whose token was
-                    revoked prints its refusal as an answer and exits 0, so
-                    only having asked it something tells you anything — and
-                    when it refuses, its own words name the cause. */}
-                {(() => {
-                  const ans = answered(cli.name);
-                  if (!ans) return null;
-                  return ans.reachable ? (
-                    <span className="hint">answered in {(ans.ms / 1000).toFixed(1)}s</span>
-                  ) : (
-                    <span className="hint ea-bad">did not answer — {ans.detail}</span>
-                  );
-                })()}
-                {ea.enabled && (
-                  <div className="ea-agent-overrides">
-                    <input
-                      className="input"
-                      value={binaries[cli.name] ?? ""}
-                      onChange={(e) => setPair("binaries", cli.name, e.target.value)}
-                      placeholder={st?.installed ? "path override (optional)" : `full path to ${cli.name}`}
-                      autoComplete="off"
-                      spellCheck={false}
-                    />
-                    <input
-                      className="input"
-                      value={models[cli.name] ?? ""}
-                      onChange={(e) => setPair("models", cli.name, e.target.value)}
-                      placeholder="model (optional)"
-                      autoComplete="off"
-                      spellCheck={false}
-                    />
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-        <div className="row" style={{ marginTop: 8 }}>
-          <button className="btn ghost sm" onClick={onRecheck} disabled={probing}>
-            {probing ? "Checking…" : "Save and re-check"}
-          </button>
-        </div>
-      </div>
-
-      {ea.enabled && (
-        <>
-          <div className="field">
-            <label>Directories it may work in</label>
-            <div className="ea-roots">
-              {roots.map((r, i) => (
-                <div key={i} className="ea-root">
-                  <input
-                    className="input"
-                    value={r}
-                    onChange={(e) => setRoot(i, e.target.value)}
-                    placeholder="/Users/you/code/some-repo"
-                    autoComplete="off"
-                    spellCheck={false}
-                  />
-                  <button
-                    type="button"
-                    className="btn ghost sm"
-                    onClick={() => onChange({ roots: roots.filter((_, j) => j !== i) })}
-                  >
-                    {translate("Remove")}
-                  </button>
-                </div>
-              ))}
-            </div>
-            <button
-              type="button"
-              className="btn ghost sm"
-              style={{ alignSelf: "flex-start", marginTop: 8 }}
-              onClick={() => onChange({ roots: [...roots, ""] })}
-            >
-              Add a directory
-            </button>
-          </div>
-
-          <div className="field">
-            <label>Run unattended</label>
-            <div className="toggle" onClick={() => onChange({ unattended: !ea.unattended })} style={{ cursor: "pointer", marginTop: 2 }}>
-              <div className={`switch${ea.unattended ? " on" : ""}`}><div className="knob" /></div>
-              <span style={{ fontSize: 13, color: "var(--text-1)" }}>
-                {ea.unattended
-                  ? "On — a delegated run is not put to you for approval"
-                  : "Off — you are asked before another agent is handed the task"}
-              </span>
-            </div>
-          </div>
-
-          <div className="field">
-            <label>Timeout (seconds)</label>
-            <input
-              className="input"
-              type="number"
-              min={0}
-              value={ea.timeout_seconds ?? 0}
-              onChange={(e) => onChange({ timeout_seconds: Number(e.target.value) })}
-            />
-            <span className="hint">0 = 20 min</span>
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
 
 /**
  * The agents on other machines, each with what it said the last time every
@@ -472,15 +288,9 @@ export default function SettingsView({ onSaved, theme, onTheme, accent, onAccent
   const [editEmbed, setEditEmbed] = useState(false);
   const [adding, setAdding] = useState<"" | "machine" | "link" | "worker">("");
 
-  const [webhookTesting, setWebhookTesting] = useState(false);
-  const [webhookResult, setWebhookResult] = useState<{ ok: boolean; text: string } | null>(null);
-
   const [accounts, setAccounts] = useState<backend.CLIProxyAccount[]>([]);
   const [approval, setApproval] = useState<ApprovalInfo | null>(null);
-  const [agentCLIs, setAgentCLIs] = useState<backend.ExternalAgentStatus[]>([]);
-  const [probing, setProbing] = useState(false);
-  // Kept apart from the CLI probe above: that one looks for a binary and takes
-  // milliseconds, this one asks every agent a question and takes seconds.
+  // What each agent answered when last asked; asking takes seconds and a token.
   const [reachable, setReachable] = useState<app.RemoteAgentStatus[]>([]);
   const [checking, setChecking] = useState(false);
 
@@ -535,38 +345,6 @@ export default function SettingsView({ onSaved, theme, onTheme, accent, onAccent
     setS(fresh);
   };
 
-  async function testWebhook() {
-    setWebhookTesting(true);
-    setWebhookResult(null);
-    try {
-      await flush();
-      const res = await TestWebhook();
-      setWebhookResult(res === "ok" ? { ok: true, text: translate("Delivered") } : { ok: false, text: res });
-    } catch (e) {
-      setWebhookResult({ ok: false, text: String(e) });
-    } finally {
-      setWebhookTesting(false);
-    }
-  }
-
-  const refreshAgentCLIs = () => {
-    setProbing(true);
-    ExternalAgentsStatus()
-      .then(setAgentCLIs)
-      .catch(() => setAgentCLIs([]))
-      .finally(() => setProbing(false));
-  };
-
-  async function recheckAgentCLIs() {
-    setProbing(true);
-    try {
-      await flush();
-    } catch (e: any) {
-      toast.error(String(e?.message || e));
-    }
-    refreshAgentCLIs();
-  }
-
   /** Save, then actually ask every agent something. */
   async function checkReachable() {
     setChecking(true);
@@ -606,7 +384,6 @@ export default function SettingsView({ onSaved, theme, onTheme, accent, onAccent
     CLIProxyProviders().then(setProviders).catch(() => setProviders([]));
     refreshProxy();
     refreshApproval();
-    refreshAgentCLIs();
 
     EventsOn("cliproxy:login", (ev: any) => {
       setLogin(ev);
@@ -883,16 +660,7 @@ export default function SettingsView({ onSaved, theme, onTheme, accent, onAccent
                 />
               </Group>
 
-              {/* CODING TOOLS: replaced by CodingToolsCard */}
-              <ExternalAgentsCard
-                ea={s.external_agents ?? new backend.ExternalAgents()}
-                onChange={(p) => setNested("external_agents", p as Json)}
-                statuses={agentCLIs}
-                probing={probing}
-                reached={reachable}
-                onRecheck={recheckAgentCLIs}
-              />
-              {/* /CODING TOOLS */}
+              <CodingToolsCard />
 
               <Group icon={NetworkIcon} title="Hive" testId="hive-group"
                 action={
@@ -956,34 +724,7 @@ export default function SettingsView({ onSaved, theme, onTheme, accent, onAccent
             <>
               <PairPhoneCard />
 
-              {/* CHANNELS: replaced by ChannelsCard */}
-              <Group icon={WebhookIcon} title="Webhook">
-                <Row label="URL">
-                  <Text mono label="Webhook URL" placeholder="https://example.com/superleo-hook" value={s.webhook_url} onChange={(v) => set("webhook_url", v)} />
-                </Row>
-                <Row label="Secret">
-                  <Secret label="Webhook secret" value={s.webhook_secret} onChange={(v) => set("webhook_secret", v)} />
-                </Row>
-                <Row label="Send a test" sub={webhookResult ? <span className={`st-note ${webhookResult.ok ? "ok" : "bad"}`}>{webhookResult.text}</span> : undefined}>
-                  {webhookTesting && <State tone="busy">Sending…</State>}
-                  <IconBtn icon={SendIcon} label="Send a test" disabled={webhookTesting || !s.webhook_url} onClick={() => void testWebhook()} />
-                </Row>
-              </Group>
-              <Group icon={SendIcon} title="Telegram">
-                <Row label="Bot token">
-                  <Secret label="Bot token" value={s.telegram_bot_token} onChange={(v) => set("telegram_bot_token", v)} />
-                </Row>
-                <Row label="Allowed chats">
-                  <Chips mono items={(s.telegram_allowed_chats ?? []).map(String)} removeLabel="Remove" addLabel="Add a chat ID" placeholder="1669479669"
-                    onRemove={(c) => set("telegram_allowed_chats", (s.telegram_allowed_chats ?? []).filter((x) => String(x) !== c))}
-                    onAdd={(c) => {
-                      const ids = c.split(/[,\s]+/).map((x) => Number(x.trim())).filter((n) => Number.isFinite(n) && n !== 0);
-                      const cur = s.telegram_allowed_chats ?? [];
-                      set("telegram_allowed_chats", [...cur, ...ids.filter((n) => !cur.includes(n))]);
-                    }} />
-                </Row>
-              </Group>
-              {/* /CHANNELS */}
+              <ChannelsCard />
             </>
           )}
         </div>
