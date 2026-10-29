@@ -97,9 +97,17 @@ func ReminderToCron(remindAt, recurrence string) (ReminderSchedule, error) {
 // do something ("提醒我买菜" versus "提醒我看看昨天的部署有没有问题"), and because
 // the agent has the tools to deliver it wherever the user has set up — a message,
 // a mail, a notification.
+// reminderPromptHead is how every ReminderPrompt starts.
+const reminderPromptHead = "This reminder is now due. Reminder: "
+
+// IsReminderPrompt reports whether a scheduled prompt is a reminder's.
+func IsReminderPrompt(prompt string) bool {
+	return strings.HasPrefix(strings.TrimSpace(prompt), reminderPromptHead)
+}
+
 func ReminderPrompt(title string) string {
 	title = strings.TrimSpace(title)
-	return fmt.Sprintf("This reminder is now due. Reminder: %s\n\n"+
+	return fmt.Sprintf(reminderPromptHead+"%s\n\n"+
 		"Tell the user about it in one sentence. If the reminder itself asks you to "+
 		"do something first (look something up, work something out, check something), "+
 		"do that first and tell them the result.", title)

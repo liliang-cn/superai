@@ -114,6 +114,10 @@ func (s *Service) NotifyScheduledRun(ctx context.Context, run agent.PromptRun) {
 		notice.Level = LevelSuccess
 		notice.Message = message
 	}
+	// A reminder is a scheduled prompt too; the channels tell them apart.
+	if run.Err == nil && IsReminderPrompt(run.Prompt) {
+		notice.Event = ChannelEventReminder
+	}
 	s.Notices().Raise(ctx, notice)
 }
 

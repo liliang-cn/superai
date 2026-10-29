@@ -89,6 +89,9 @@ type Notice struct {
 	// Telegram chat the webhook relays to — so the webhook skips it, or every
 	// message would arrive there twice. Every other surface still gets it.
 	External bool `json:"-"`
+	// Event is the channel event this is, when its author knows better than
+	// the guess eventFor makes: a scheduled run that was a reminder.
+	Event string `json:"-"`
 }
 
 // NoticeAction is one button on a notice. Say is the text the app sends to
@@ -270,6 +273,7 @@ func webhookSink(notifier *Notifier) Subscriber {
 		}
 		payload := WebhookPayload{
 			Event:   webhookEventFor(n),
+			Kind:    channelEventFor(n),
 			Title:   n.Title,
 			Message: n.Message,
 			Source:  n.Source,
@@ -296,4 +300,22 @@ func webhookEventFor(n Notice) string {
 		return WebhookEventSchedule
 	}
 	return WebhookEventNotify
+}
+
+// channelEventFor is which of a channel's events a pushed notice is: what its
+// author said, else a failure by its level, a reminder by its kind, a
+// scheduled run by its source, and anything else said mid-task (notify_user,
+// a standing agent's report) is a reminder of something.
+func channelEventFor(n Notice) string {
+	switch {
+	case n.Event != "":
+		return n.Event
+	case n.Level == LevelError:
+		return ChannelEventFailed
+	case n.Kind == KindReminder:
+		return ChannelEventReminder
+	case n.Source != "":
+		return ChannelEventSchedule
+	}
+	return ChannelEventReminder
 }

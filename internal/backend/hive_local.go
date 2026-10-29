@@ -399,6 +399,7 @@ func LocalWorkerSettings(queen Settings, name, joinURL, joinToken, advertise str
 	w.TelegramBotToken = ""
 	w.TelegramAllowedChats = nil
 	w.WebhookURL, w.WebhookSecret = "", ""
+	w.Channels = []Channel{}
 	w.APNs = APNsSettings{}
 	w.CLIProxyEnabled = false
 	w.AvatarPort = 0

@@ -258,6 +258,15 @@ type Settings struct {
 	// starting it open to whoever finds the bot.
 	TelegramAllowedChats []int64 `json:"telegram_allowed_chats"`
 
+	// Channels is where notices go and where messages come in from: Telegram,
+	// Feishu, WeCom, DingTalk, Slack, Bark, generic webhooks (channel.go). The
+	// four fields above mirror its first webhook and first Telegram channel
+	// for clients that predate it. Also kept in channels.json.
+	Channels []Channel `json:"channels"`
+	// channelLegacy is what the four fields above said when the channels
+	// were last settled, so a save can tell which side changed.
+	channelLegacy *channelLegacy
+
 	// ExternalAgents lets SuperLeo hand a task to an agent CLI installed on
 	// this machine. Nested rather than flattened into a dozen top-level keys
 	// so the whole feature is one object a person can read, delete or diff in
@@ -589,6 +598,7 @@ func LoadSettings() (*Settings, error) {
 		s.mergeQueenIdentity()
 		s.mergeAgentLink()
 		s.mergeQueenEngine()
+		s.mergeChannels()
 	}
 	return s, err
 }
@@ -740,6 +750,7 @@ func (s *Settings) Save() error {
 	s.RemoteAgents.normalize()
 	s.normalizeQueen()
 	s.AgentLink.normalize()
+	s.prepareChannels()
 	raw, err := json.MarshalIndent(s, "", "  ")
 	if err != nil {
 		return err
@@ -751,6 +762,9 @@ func (s *Settings) Save() error {
 		return err
 	}
 	if err := s.saveQueenEngine(); err != nil {
+		return err
+	}
+	if err := s.saveChannels(); err != nil {
 		return err
 	}
 	return s.saveAgentLink()

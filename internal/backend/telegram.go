@@ -104,15 +104,18 @@ func NewTelegramBridge(svc *Service, s *Settings) (*TelegramBridge, error) {
 	if svc == nil || s == nil {
 		return nil, nil
 	}
-	token := strings.TrimSpace(s.TelegramBotToken)
-	if token == "" {
+	// The bot is a channel now (channel.go); telegram_bot_token and
+	// telegram_allowed_chats mirror the first one.
+	ch, ok := s.TelegramChannel()
+	if !ok {
 		return nil, nil
 	}
-	if len(s.TelegramAllowedChats) == 0 {
+	token := ch.BotToken
+	if len(ch.AllowedChats) == 0 {
 		return nil, errors.New("telegram_bot_token is set but telegram_allowed_chats is empty: a bot anyone can find would be an agent anyone can run commands with")
 	}
-	allowed := make(map[int64]bool, len(s.TelegramAllowedChats))
-	for _, id := range s.TelegramAllowedChats {
+	allowed := make(map[int64]bool, len(ch.AllowedChats))
+	for _, id := range ch.AllowedChats {
 		allowed[id] = true
 	}
 	return &TelegramBridge{
