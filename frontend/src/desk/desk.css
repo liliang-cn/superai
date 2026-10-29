@@ -161,6 +161,11 @@
 .dk-shell .dk-send:disabled { opacity: .45; box-shadow: none; cursor: default; }
 .dk-shell .dk-send.stop { background: var(--ink); }
 .dk-dark .dk-send.stop { color: #1d1a16; }
+.dk-shell .dk-clip { width: 38px; height: 38px; flex: none; border-radius: 50%; display: grid; place-items: center; color: var(--ink-2); background: transparent; }
+.dk-shell .dk-clip:hover { background: rgba(var(--glass-rgb), .9); color: var(--ink); }
+.dk-shell .dk-clip:disabled { opacity: .45; cursor: default; }
+.dk-files { position: absolute; left: 0; right: 0; bottom: calc(100% + 8px); }
+.dk-files > div { padding: 6px 8px; background: #fff; border-radius: 12px; box-shadow: 0 6px 20px rgba(20, 30, 40, .12); }
 
 /* The live pane: a framed screen and who is driving it. */
 .dk-live { grid-column: 3; grid-row: 1; margin: -42px 14px 12px 0; display: flex; flex-direction: column; min-height: 0; }

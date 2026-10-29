@@ -3,12 +3,15 @@ import { useNavigate } from "react-router-dom";
 import {
   ArrowUpIcon, HexagonIcon, 
   PlusIcon, SquareIcon, SquarePenIcon, CalendarIcon, AlarmClockIcon, TerminalIcon, TriangleAlertIcon, XIcon, ChevronRightIcon,
-  LayoutDashboardIcon, ActivityIcon, GaugeIcon, ScrollTextIcon,
+  LayoutDashboardIcon, ActivityIcon, GaugeIcon, ScrollTextIcon, PaperclipIcon,
 } from "lucide-react";
 import RunTracePanel from "../components/RunTracePanel";
+import TraceChip from "../components/TraceChip";
 import { useI18n } from "../lib/i18n";
 import { getQueenName, queenNamed, queenRef, queenTitle, useQueenName } from "../lib/queenName";
 import { useChat } from "../lib/useChat";
+import { useAttachments } from "../lib/useAttachments";
+import AttachmentChips from "../components/AttachmentChips";
 import { usePulse } from "../components/Reactor";
 import LiveTurn from "./LiveTurn";
 import { ChatTurnBrowser, newestBrowserTurn } from "../components/BrowserCard";
@@ -323,11 +326,14 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
     return dashOf(k)?.name ?? "…";
   };
 
+  const attach = useAttachments();
   const send = () => {
     const t = draft.trim();
-    if (!t) return;
+    if (!t && attach.paths.length === 0) return;
+    const { payload, images } = attach.build(t);
     setDraft("");
-    chat.send(t);
+    attach.clear();
+    chat.send(payload, images);
   };
 
   const pickSession = (id: string) => {
@@ -487,6 +493,7 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
                   : m.cancelled ? <span className="dk-thinking">{t("Stopped.")}</span> : null}
                 {m.cancelled && m.content && <div className="dk-thinking" role="status">{t("Stopped.")}</div>}
                 {m.error && <div className="dk-err">{m.error}</div>}
+                {m.traceId && <TraceChip traceId={m.traceId} session={chat.sessionId} />}
                 {!m.streaming && !m.error && hasRenderableBlock(m.content) && <button className="dk-save-dashboard" onClick={() => {
                   const prompt = [...msgs.slice(0, index)].reverse().find(message => message.role === "user")?.content ?? "";
                   setSaveError(""); setNaming({content:m.content,prompt});
@@ -535,11 +542,14 @@ export default function DeskView({ approvals, openSession, onSessionOpened, atte
               if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(); }
             }}
             onBlur={mentions.close}
+            onPaste={attach.paste}
           />
-          {chat.sending && !draft.trim() ? (
+          {attach.paths.length > 0 && <div className="dk-files"><AttachmentChips paths={attach.paths} onRemove={attach.remove} /></div>}
+          <button type="button" className="dk-clip" onClick={attach.pick} disabled={attach.importing} title={t("Attach")} data-testid="dk-attach"><PaperclipIcon size={17} /></button>
+          {chat.sending && !draft.trim() && attach.paths.length === 0 ? (
             <button type="button" className="dk-send stop" title={t("Stop")} onClick={() => chat.cancel()}><SquareIcon size={14} fill="currentColor" /></button>
           ) : (
-            <button type="submit" className="dk-send" title={t("Send")} disabled={!draft.trim()}><ArrowUpIcon size={18} /></button>
+            <button type="submit" className="dk-send" title={t("Send")} disabled={!draft.trim() && attach.paths.length === 0}><ArrowUpIcon size={18} /></button>
           )}
         </form>
       </section>
