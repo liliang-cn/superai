@@ -14,6 +14,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -229,10 +230,47 @@ func (a *App) MigrateHiveLink() HiveMembership {
 	return a.HiveMembership()
 }
 
-// migrateHiveLink is MigrateHiveLink at the app's start.
+// migrateHiveLink puts this Mac in the hive at the app's start, from what it
+// already has, with nothing asked of the person. The window is a client of
+// the one hive, so the old node beside it is stopped and its place taken
+// (MigrateHiveLink). A Mac with no old node but a window linked to the hive
+// asks the hive for a pairing code with that link and joins by it.
 func (a *App) migrateHiveLink() {
+	// Stopped even for a member: under the same name the two would take the
+	// queen's link from each other, and neither would stay up.
+	if _, ok := readOldNodeConf(); ok && (serviceLoaded(nodeService) || serviceLoaded(agentService)) {
+		if _, err := a.RetireOldNode(); err != nil {
+			slog.Warn("hive: stopping the old node", "error", err)
+		}
+	}
 	if a.isHiveMember() {
 		return
 	}
-	a.MigrateHiveLink()
+	if a.MigrateHiveLink().Joined {
+		return
+	}
+	if err := a.joinByLink(); err != nil {
+		slog.Warn("hive: joining by the window's link", "error", err)
+	}
+}
+
+// joinByLink joins the hive the window is linked to, with a pairing code the
+// hive makes for that link.
+func (a *App) joinByLink() error {
+	l := loadHiveLink()
+	if l == nil {
+		return nil
+	}
+	out, err := callQueen(*l, "AgentJoinCode", nil)
+	if err != nil {
+		return err
+	}
+	j, _ := out.(map[string]any)
+	code, _ := j["code"].(string)
+	if code == "" {
+		msg, _ := j["error"].(string)
+		return fmt.Errorf("the hive made no pairing code: %s", msg)
+	}
+	_, err = a.JoinHive(l.URL, code)
+	return err
 }
