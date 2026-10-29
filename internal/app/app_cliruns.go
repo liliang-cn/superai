@@ -298,6 +298,11 @@ func (a *App) startCLIRun(o cliStart) (CLIRun, error) {
 		return CLIRun{}, err
 	}
 	id := uuid.NewString()
+	// A fresh run nobody placed works in the repository its order names
+	// (cli_cwd_infer.go); a continued one stays where its session is.
+	if strings.TrimSpace(cwd) == "" && session == "" && o.Prev == nil && o.Queen == nil {
+		cwd = inferCLICwd(prompt, a.cliAllowed(ext.Roots))
+	}
 	dir, err := a.cliCwd(cwd, ext.Roots)
 	if err != nil {
 		return CLIRun{}, err
@@ -551,19 +556,7 @@ func runPayload(r *CLIRun) map[string]any {
 // cliCwd resolves where a run works: inside the workspace or one of the
 // configured roots, nowhere else.
 func (a *App) cliCwd(raw string, roots []string) (string, error) {
-	ws := a.workspaceDir()
-	allowed := []string{}
-	for _, r := range append([]string{ws}, roots...) {
-		if r = strings.TrimSpace(r); r == "" {
-			continue
-		}
-		if abs, err := filepath.Abs(cliExpandHome(r)); err == nil {
-			if real, err := filepath.EvalSymlinks(abs); err == nil {
-				abs = real
-			}
-			allowed = append(allowed, abs)
-		}
-	}
+	allowed := a.cliAllowed(roots)
 	if len(allowed) == 0 {
 		return "", errors.New("no workspace is set, so there is nowhere a CLI may run")
 	}
@@ -592,6 +585,23 @@ func (a *App) cliCwd(raw string, roots []string) (string, error) {
 		}
 	}
 	return "", fmt.Errorf("%s is outside the workspace and the allowed roots", raw)
+}
+
+// cliAllowed is the workspace, then the roots, as real absolute paths.
+func (a *App) cliAllowed(roots []string) []string {
+	allowed := []string{}
+	for _, r := range append([]string{a.workspaceDir()}, roots...) {
+		if r = strings.TrimSpace(r); r == "" {
+			continue
+		}
+		if abs, err := filepath.Abs(cliExpandHome(r)); err == nil {
+			if real, err := filepath.EvalSymlinks(abs); err == nil {
+				abs = real
+			}
+			allowed = append(allowed, abs)
+		}
+	}
+	return allowed
 }
 
 func cliExpandHome(p string) string {
