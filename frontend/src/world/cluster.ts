@@ -443,8 +443,8 @@ export const cluster: District<WorldData> = {
     core.rotation.y = 0;
     g.add(core);
     ctx.pickable(core, { kind: "hall", id: "queen", title: queenTitle() });
-    // The dais is the core itself: where this core is set up.
-    ctx.pickable(dais, { kind: "settings", id: "core", title: "This core" });
+    // The dais is the hive's core itself: what it is, to read.
+    ctx.pickable(dais, { kind: "settings", id: "core", title: queenTitle() });
     const queen = robot("queen");
     registerActor("queen", queen);
     // She faces you: she is the one you talk to.

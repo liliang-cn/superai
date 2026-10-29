@@ -7,7 +7,7 @@ import {
   StartCLIRun, WakeStandingAgent,
 } from "../../wailsjs/go/app/App";
 import { type CCActivity, type CLIActivity, type HAService, type Host, type HostAgent } from "../canvas/data";
-import { LANGUAGES, Language, useI18n } from "../lib/i18n";
+import { useI18n } from "../lib/i18n";
 import { queenNamed, queenRef, useQueenName } from "../lib/queenName";
 import { toast } from "../lib/toasts";
 import { PATHS, attentionPath, taskPath } from "../lib/routes";
@@ -41,7 +41,7 @@ export default function Inspector({ picked, data, onClose, open, openDash }: {
   /** Shows a dashboard full size over the world. */
   openDash?: (id: string) => void;
 }) {
-  const { t, language, setLanguage } = useI18n();
+  const { t } = useI18n();
   const queen = useQueenName();
   const [busy, setBusy] = useState("");
   const [text, setText] = useState("");
@@ -286,25 +286,19 @@ export default function Inspector({ picked, data, onClose, open, openDash }: {
       body = <button className="wl-go ghost" onClick={() => open(PATHS.stats, true)}>{t("Open Stats")}<ArrowRightIcon size={14} /></button>;
       break;
     }
-    case "settings":
-      kind = "This core";
-      body = (
-        <>
-        <div className="wi-seg">
-          <span>{t("Language")}</span>
-          <select className="wi-lang" aria-label={t("Language")} value={language} onChange={(e) => setLanguage(e.target.value as Language)}>
-            {LANGUAGES.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-          </select>
-        </div>
-        {(() => { const h = data.hosts?.find((x) => x.agents.some(isCore)); return h ? <HostCard host={h} data={data} withControls={false} /> : null; })()}
-        <div className="wi-acts">
-          <button onClick={() => open(PATHS.settings, true)}>{t("Settings")}</button>
-          <button onClick={() => window.dispatchEvent(new Event("superleo:theme"))}>{t("Theme")}</button>
-          <button onClick={() => open(PATHS.stats, true)}>{t("Stats")}</button>
-        </div>
-        </>
-      );
+    case "settings": {
+      // The queen's dais: what the hive's core is and where it runs, to read.
+      kind = "Hive core";
+      const h = data.hosts?.find((x) => x.agents.some(isCore));
+      const core = h?.agents.find(isCore);
+      if (h) rows.push(["Runs on", h.parent ? `${h.name} · ${data.hosts?.find((x) => x.id === h.parent)?.name ?? h.parent}` : h.name]);
+      if (core?.version) rows.push(["Version", core.version]);
+      const machines = data.hosts?.filter((x) => x.state === "live").length ?? 0;
+      if (machines) rows.push(["Machines", String(machines)]);
+      rows.push(["Workers", String(data.hive.members.length)]);
+      if (core?.mcp?.length) rows.push(["MCP", core.mcp.join(", ")]);
       break;
+    }
     case "host": {
       const h = data.hosts?.find((x) => x.id === picked.id);
       const roles = h ? haRoles(h, data.services ?? []) : { runs: [], standby: [] };
@@ -411,7 +405,7 @@ export default function Inspector({ picked, data, onClose, open, openDash }: {
     <aside className="wl-detail">
       <header>
         <div><em>{t(kind)}</em><b>{picked.title}</b></div>
-        <button title={t("Open full screen")} onClick={() => open(screen, true)}><Maximize2Icon size={14} /></button>
+        {picked.kind !== "settings" && <button title={t("Open full screen")} onClick={() => open(screen, true)}><Maximize2Icon size={14} /></button>}
         <button title={t("Close")} onClick={onClose}><XIcon size={15} /></button>
       </header>
       {rows.length > 0 && (
@@ -420,7 +414,7 @@ export default function Inspector({ picked, data, onClose, open, openDash }: {
             {facts ? <ChevronDownIcon size={13} /> : <ChevronRightIcon size={13} />}
             <span>{facts ? t("Details") : rows.slice(0, 3).map(([k, v]) => `${t(k)} ${t(v)}`).join(" · ")}</span>
           </button>
-          {facts && <dl>{rows.map(([k, v]) => <div key={k}><dt>{t(k)}</dt><dd>{t(v)}</dd></div>)}</dl>}
+          {(facts || picked.kind === "settings") && <dl>{rows.map(([k, v]) => <div key={k}><dt>{t(k)}</dt><dd>{t(v)}</dd></div>)}</dl>}
         </div>
       )}
       <div className="wi-body">{body}</div>
