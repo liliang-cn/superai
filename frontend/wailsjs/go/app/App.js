@@ -178,6 +178,10 @@ export function Deliverables(arg1) {
   return window['go']['app']['App']['Deliverables'](arg1);
 }
 
+export function DesktopRequestAccess() {
+  return window['go']['app']['App']['DesktopRequestAccess']();
+}
+
 export function DesktopStatus() {
   return window['go']['app']['App']['DesktopStatus']();
 }

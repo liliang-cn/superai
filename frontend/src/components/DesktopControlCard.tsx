@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { DesktopStatus, SetDesktopControl } from "../../wailsjs/go/app/App";
+import { DesktopRequestAccess, DesktopStatus, SetDesktopControl } from "../../wailsjs/go/app/App";
 import { backend } from "../../wailsjs/go/models";
 import { translate } from "../lib/i18n";
 
@@ -13,6 +13,9 @@ export default function DesktopControlCard({ onChanged }: { onChanged?: (on: boo
   const [st, setSt] = useState<backend.DesktopStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [asking, setAsking] = useState(false);
+  // Turned on here: the permission is asked for once, as soon as it is up.
+  const [askOnReady, setAskOnReady] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -26,12 +29,32 @@ export default function DesktopControlCard({ onChanged }: { onChanged?: (on: boo
   useEffect(() => {
     void load();
   }, [load]);
-  // Coming up: asked again until it is ready or says why not.
+  const needsAccess = !!st?.enabled && !!st.ready && !!st.accessibility && st.accessibility !== "granted";
+  // Coming up, or waiting for the person in System Settings: asked again
+  // until it is ready and allowed, or says why not.
   useEffect(() => {
-    if (!st?.enabled || st.ready || st.error) return;
-    const t = window.setTimeout(() => void load(), 1500);
+    if (!st?.enabled || st.error || (st.ready && !needsAccess)) return;
+    const t = window.setTimeout(() => void load(), needsAccess ? 2000 : 1500);
     return () => window.clearTimeout(t);
-  }, [st, load]);
+  }, [st, load, needsAccess]);
+
+  const ask = useCallback(async () => {
+    setAsking(true);
+    setErr("");
+    try {
+      await DesktopRequestAccess();
+    } catch (e) {
+      setErr(String(e instanceof Error ? e.message : e));
+    } finally {
+      setAsking(false);
+      void load();
+    }
+  }, [load]);
+  useEffect(() => {
+    if (!askOnReady || !st?.ready) return;
+    setAskOnReady(false);
+    if (needsAccess) void ask();
+  }, [askOnReady, st, needsAccess, ask]);
 
   const on = !!st?.enabled;
   const pick = async (next: boolean) => {
@@ -41,6 +64,7 @@ export default function DesktopControlCard({ onChanged }: { onChanged?: (on: boo
     try {
       await SetDesktopControl(next);
       onChanged?.(next);
+      if (next) setAskOnReady(true);
       await load();
     } catch (e) {
       setErr(String(e instanceof Error ? e.message : e));
@@ -69,6 +93,11 @@ export default function DesktopControlCard({ onChanged }: { onChanged?: (on: boo
           ))}
         </div>
         {(state || err) && <span className="hint" style={bad ? { color: "var(--danger, #c0262f)" } : undefined}>{err || state}</span>}
+        {needsAccess && (
+          <button type="button" className="btn sm" style={{ alignSelf: "flex-start" }} disabled={asking} onClick={() => void ask()} data-testid="desktop-grant">
+            {translate(asking ? "Opening…" : "Grant access")}
+          </button>
+        )}
       </div>
       {on && !!st?.blocked?.length && (
         <div className="field">

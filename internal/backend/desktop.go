@@ -109,9 +109,10 @@ type desktopRuntime struct {
 	ready   atomic.Bool
 	cancel  context.CancelFunc
 
-	mu     sync.Mutex
-	err    string
-	access string
+	mu       sync.Mutex
+	err      string
+	access   string
+	accessAt time.Time
 	// snaps maps a snapshot id to the app it was taken of. A ref names its
 	// snapshot, so an action on a ref is only taken when this service took
 	// that snapshot itself, of an app it may touch.
@@ -143,6 +144,18 @@ func (s *Service) DesktopStatus() DesktopStatus {
 	}
 	st.Enabled = true
 	st.Ready = d.ready.Load()
+	// Until it is granted the person is on their way to System Settings to
+	// grant it, and the page should see the moment they have.
+	if st.Ready {
+		d.mu.Lock()
+		stale := d.access != "granted" && time.Since(d.accessAt) > 2*time.Second
+		d.mu.Unlock()
+		if stale {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			d.checkAccess(ctx)
+			cancel()
+		}
+	}
 	d.mu.Lock()
 	st.Error, st.Accessibility = d.err, d.access
 	d.mu.Unlock()
@@ -174,25 +187,55 @@ func (s *Service) startDesktop(blocked []string) {
 		}
 		// The permission is the OS's and the person grants it; without it
 		// every call fails, so the page says so instead of each tool call.
-		if out, err := d.run(ctx, "permissions"); err == nil {
-			var env struct {
-				Data struct {
-					Accessibility struct {
-						State string `json:"state"`
-					} `json:"accessibility"`
-				} `json:"data"`
-			}
-			if json.Unmarshal(out, &env) == nil {
-				d.mu.Lock()
-				d.access = env.Data.Accessibility.State
-				d.mu.Unlock()
-			}
-		}
+		d.checkAccess(ctx)
 		s.registerDesktopTools(d)
 		d.setErr(nil)
 		d.ready.Store(true)
 		log.Printf("superleo: desktop control %s ready", AgentDesktopVersion)
 	}()
+}
+
+// checkAccess reads the Accessibility permission as agent-desktop sees it.
+// On macOS that is the grant of the app that started it: SuperLeo.
+func (d *desktopRuntime) checkAccess(ctx context.Context) {
+	out, err := d.run(ctx, "permissions")
+	if err != nil {
+		return
+	}
+	var env struct {
+		Data struct {
+			Accessibility struct {
+				State string `json:"state"`
+			} `json:"accessibility"`
+		} `json:"data"`
+	}
+	if json.Unmarshal(out, &env) == nil {
+		d.mu.Lock()
+		d.access, d.accessAt = env.Data.Accessibility.State, time.Now()
+		d.mu.Unlock()
+	}
+}
+
+// DesktopRequestAccess asks the OS for the Accessibility permission desktop
+// control needs: macOS shows its own prompt for SuperLeo, and System
+// Settings opens at the list where it is switched on.
+func (s *Service) DesktopRequestAccess(ctx context.Context) error {
+	d := s.desktop
+	if d == nil || !d.ready.Load() {
+		return errors.New("desktop control is not on")
+	}
+	if _, err := d.run(ctx, "permissions", "--request"); err != nil {
+		return err
+	}
+	d.checkAccess(ctx)
+	d.mu.Lock()
+	granted := d.access == "granted"
+	d.mu.Unlock()
+	if !granted {
+		_, err := d.run(ctx, "permissions", "--guide")
+		return err
+	}
+	return nil
 }
 
 func (s *Service) stopDesktop() {

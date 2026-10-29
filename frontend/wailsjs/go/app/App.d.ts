@@ -94,6 +94,8 @@ export function DeleteStandingAgent(arg1:string):Promise<void>;
 
 export function Deliverables(arg1:string):Promise<Array<agent.Deliverable>>;
 
+export function DesktopRequestAccess():Promise<void>;
+
 export function DesktopStatus():Promise<backend.DesktopStatus>;
 
 export function DetectAgents():Promise<Array<app.DetectedAgent>>;
