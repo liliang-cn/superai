@@ -990,10 +990,10 @@ export const cluster: District<WorldData> = {
           pd.position.set(p.cols.pods[i], SLAB_TOP, p.station && !p.small ? 1.2 : 0.2);
           grp.add(pd);
           ctx.pickable(pd, { kind: "host", id: h.id, title: h.name });
-          const sup = h.agents.filter((a) => a.kind === "superleo").slice(0, 2);
+          const sup = h.agents.filter((a) => a.kind === "superleo");
           sup.forEach((a, k) => {
             const r = robot("worker");
-            r.position.set(pd.position.x + (sup.length > 1 ? (k - 0.5) * 1.3 : 0), SLAB_TOP + 0.2, pd.position.z);
+            r.position.set(pd.position.x + (k - (sup.length - 1) / 2) * Math.min(1.3, 2.6 / Math.max(1, sup.length - 1)), SLAB_TOP + 0.2, pd.position.z);
             r.userData.base = r.position.y;
             grp.add(r);
             ctx.pickable(r, { kind: "worker", id: a.name, title: a.name });
@@ -1058,7 +1058,7 @@ export const cluster: District<WorldData> = {
         // Every agent on this machine stands on its dais, along the front
         // edge; more of them only close the spacing.
         const crew = pl.coreCrew;
-        const step = crew.length > 4 ? 16 : 20;
+        const step = Math.min(20, 150 / Math.max(1, crew.length));
         crew.forEach((a, k) => {
           const n = a.kind === "cli" ? cliName(a) : a.name;
           const r = robot("cli", trim(n));
@@ -1327,7 +1327,7 @@ export const cluster: District<WorldData> = {
             const ccOn = running.flatMap((c) => (term[c].sessions ?? []).filter((s) => s.state !== "idle").map((s) => ({ s, c })));
             const names = [...new Set([...(a.clis ?? []), ...(a.agents ?? []).map((n) => n.name), ...running])];
             // The ones running first, then the best known.
-            const who = names.sort((x, y) => (term[y] ? 1 : 0) - (term[x] ? 1 : 0) || rank(x) - rank(y)).slice(0, 6);
+            const who = names.sort((x, y) => (term[y] ? 1 : 0) - (term[x] ? 1 : 0) || rank(x) - rank(y));
             for (const [n, c] of x.clis) if (!who.includes(n)) { c.label.remove(); g.remove(c.r); x.clis.delete(n); }
             who.forEach((n, k) => {
               let c = x!.clis.get(n);
@@ -1342,7 +1342,7 @@ export const cluster: District<WorldData> = {
                 if (!isCli) registerActor("agent:" + n, r);
               }
               // In a row in front of the machine.
-              const spread = Math.min(2.4, 4.8 / Math.max(1, who.length - 1));
+              const spread = Math.min(2.4, Math.max(4.8, (who.length - 1) * 1.2) / Math.max(1, who.length - 1));
               const ang = (k - (who.length - 1) / 2) * spread * 0.32;
               const local = new THREE.Vector3(Math.sin(ang) * 4.2, 0, 2.6 + Math.cos(ang) * 1.4);
               const world = x!.dev.localToWorld(local.clone()).setY(0);
@@ -1404,7 +1404,7 @@ export const cluster: District<WorldData> = {
               relays.set(rel.name, x);
             }
             x.at = at;
-            const names = (rel.agents ?? []).map((n) => n.name).slice(0, 6);
+            const names = (rel.agents ?? []).map((n) => n.name);
             x.label.set(names.join(" · "), rel.name, "idle");
             for (const [n, b] of x.bots) if (!names.includes(n)) { b.label.remove(); g.remove(b.r); x.bots.delete(n); forgetActor(`agent:${n}.${rel.name}`); }
             const term = rel.cliActivity ?? {};
@@ -1422,7 +1422,8 @@ export const cluster: District<WorldData> = {
               }
               // In a ring on the pad, facing out to the core.
               const ang = (k / Math.max(1, names.length)) * Math.PI * 2 + Math.PI / 2;
-              const world = new THREE.Vector3(Math.cos(ang) * 2.1, 0.22, Math.sin(ang) * 2.1).add(at);
+              const ringR = Math.max(2.1, names.length * 0.42);
+              const world = new THREE.Vector3(Math.cos(ang) * ringR, 0.22, Math.sin(ang) * ringR).add(at);
               b.r.position.copy(world);
               b.r.userData.base = 0.22;
               b.r.lookAt(coreAt.clone().setY(0.22));

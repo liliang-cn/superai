@@ -102,11 +102,11 @@ export interface HostPlan {
 
 const FIRST = ["claude", "codex", "pi", "openclaw", "opencode", "hermes"];
 const rank = (n: string) => { const i = FIRST.indexOf(n); return i < 0 ? 99 : i; };
-/** The best known first, at most `n`: which ones stand there does not move
- *  as their sessions come and go. */
-function best(list: HostAgent[], n: number) {
+/** All of them, the best known first: the order does not move as their
+ *  sessions come and go. Every agent a machine has stands there. */
+function best(list: HostAgent[]) {
   const own = (a: HostAgent) => (a.kind === "cli" ? cliName(a) : a.name);
-  return [...list].sort((x, y) => rank(own(x)) - rank(own(y)) || own(x).localeCompare(own(y))).slice(0, n);
+  return [...list].sort((x, y) => rank(own(x)) - rank(own(y)) || own(x).localeCompare(own(y)));
 }
 
 const PAD = 1.3, GAP = 5;
@@ -149,10 +149,10 @@ export function planHosts(hosts: Host[], services: HAService[]): HostPlan {
       ? (machine.role === "relay" && !others.some((a) => a.kind === "cli") ? "pad" : host.kind === "mac" || host.os === "darwin" ? "laptop" : "desk")
       : others.some((a) => a.kind === "cli") ? (host.kind === "mac" ? "laptop" : "desk") : "";
     const live = others.filter((a) => !isStandby(a));
-    const crew = station ? best(live, 6) : [];
+    const crew = station ? best(live) : [];
     const loose = [
       ...sup.filter((a) => a !== machine),
-      ...(station ? [] : best(live, 4)),
+      ...(station ? [] : best(live)),
       ...others.filter(isStandby),
     ];
     const cols = { station: 0, pods: [] as number[], loose: 0 };
@@ -174,7 +174,7 @@ export function planHosts(hosts: Host[], services: HAService[]): HostPlan {
   ring(plots);
 
   const coreParent = core?.parent ? plots.find((p) => p.host.id === top(core).id) : undefined;
-  const coreCrew = core && !coreIsPlot ? best(core.agents.filter((a) => a.kind !== "superleo" && !isStandby(a)), 8) : [];
+  const coreCrew = core && !coreIsPlot ? best(core.agents.filter((a) => a.kind !== "superleo" && !isStandby(a))) : [];
   const spots = placeServices(services, plots);
   // The core, every plot and every service, in one circle: a pin with room
   // for its label beside it, and the lines bowing out to their standbys.
