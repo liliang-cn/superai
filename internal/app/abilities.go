@@ -86,6 +86,15 @@ func (a *App) helloAbilities() []*agentlinkpb.Ability {
 	return out
 }
 
+// abilitiesOfMember reads the abilities a roster worker (a pod) said in its hello.
+func abilitiesOfMember(m backend.HiveMember) []HostAbility {
+	var out []HostAbility
+	for _, ab := range m.Abilities {
+		out = append(out, HostAbility{ab.Name, ab.About})
+	}
+	return out
+}
+
 // abilitiesFrom reads a Hello's abilities.
 func abilitiesFrom(h *agentlinkpb.Hello) []HostAbility {
 	var out []HostAbility

@@ -94,6 +94,9 @@ func (a *App) delegateCandidates(needs []string) []string {
 		have := m.MCP
 		if have != nil {
 			have = append(append([]string{}, m.MCP...), m.CLIs...)
+			for _, ab := range m.Abilities {
+				have = append(have, ab.Name)
+			}
 		}
 		if backend.HasAll(have, needs) {
 			cs = append(cs, cand{name: m.Name, load: running[m.Name], known: m.MCP != nil})

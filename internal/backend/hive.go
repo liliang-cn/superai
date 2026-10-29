@@ -188,9 +188,19 @@ type HiveHello struct {
 	// CLIs names the coding CLIs installed where the worker runs (claude,
 	// codex, ...), so work that needs one goes to a worker that has it.
 	CLIs []string `json:"clis,omitempty"`
+	// Abilities is what the worker's machine can do for the queen (desktop,
+	// browser, files, exec), so a task that needs one goes to a worker that has
+	// it. Empty is none, or a worker too old to say.
+	Abilities []HiveAbility `json:"abilities,omitempty"`
 	// Term is the latest queen's term this worker has followed
 	// (hive_election.go): a queen on an earlier one is stale.
 	Term int64 `json:"term,omitempty"`
+}
+
+// HiveAbility is one thing a worker's machine can do.
+type HiveAbility struct {
+	Name  string `json:"name"`
+	About string `json:"about,omitempty"`
 }
 
 // HiveWelcome is the queen's answer.
@@ -224,9 +234,11 @@ type HiveMember struct {
 	Host      string    `json:"host,omitempty"`
 	// MCP is what the worker last said it can reach (HiveHello.MCP), and
 	// CLIs the coding CLIs installed where it runs.
-	MCP   []string `json:"mcp"`
-	CLIs  []string `json:"clis,omitempty"`
-	about string
+	MCP  []string `json:"mcp"`
+	CLIs []string `json:"clis,omitempty"`
+	// Abilities is what its machine can do (HiveHello.Abilities).
+	Abilities []HiveAbility `json:"abilities,omitempty"`
+	about     string
 	// State is "live" or "lost", computed when asked rather than stored, so it
 	// cannot go stale between sweeps.
 	State string `json:"state"`
@@ -301,6 +313,7 @@ func (h *Hive) Join(hello HiveHello) (HiveWelcome, error) {
 	m.StartedAt, m.Engine, m.about, m.Node = hello.StartedAt, hello.Engine, hello.About, hello.Node
 	m.Kind, m.Host = hello.Kind, hello.Host
 	m.CLIs = append([]string(nil), hello.CLIs...)
+	m.Abilities = append([]HiveAbility(nil), hello.Abilities...)
 	m.MCP = nil
 	if hello.MCP != nil {
 		m.MCP = append([]string{}, hello.MCP...)
@@ -408,6 +421,9 @@ type Announcer struct {
 	Capabilities func() []string
 	// CLIs, when set, names the coding CLIs installed here.
 	CLIs func() []string
+	// MachineAbilities, when set, names what this machine can do (desktop, browser,
+	// files, exec), asked again for every hello.
+	MachineAbilities func() []HiveAbility
 	// OnPromote, when set, is called when this worker is elected queen
 	// (hive_election.go) with the term it now holds; Run returns after it.
 	// Unset, the worker only waits for its queen to come back.
@@ -552,6 +568,9 @@ func (a *Announcer) Once(ctx context.Context) (HiveWelcome, error) {
 	}
 	if a.CLIs != nil {
 		hello.CLIs = a.CLIs()
+	}
+	if a.MachineAbilities != nil {
+		hello.Abilities = a.MachineAbilities()
 	}
 	body, _ := json.Marshal(hello)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost,

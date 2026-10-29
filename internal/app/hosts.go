@@ -358,7 +358,7 @@ func (a *App) hostsWith(services []backend.HAService) []Host {
 			}
 			about := m.Engine
 			b.agent(x, HostAgent{Name: m.Name, Kind: hostAgentSuperLeo, Role: backend.HiveRoleWorker, About: about,
-				State: m.State, Version: m.Version, MCP: m.MCP})
+				State: m.State, Version: m.Version, MCP: m.MCP, Abilities: abilitiesOfMember(m)})
 		}
 	}
 

@@ -428,6 +428,14 @@ func (a *App) startHive() {
 	}
 	// And the coding CLIs installed here: a Mac worker takes the coding work.
 	ann.CLIs = func() []string { return cliNames(a.localAgentNames()) }
+	// And what this machine can do (exec, files, ...), so the queen can route by ability.
+	ann.MachineAbilities = func() []backend.HiveAbility {
+		var out []backend.HiveAbility
+		for _, ab := range a.cachedAbilities() {
+			out = append(out, backend.HiveAbility{Name: ab.Name, About: ab.About})
+		}
+		return out
+	}
 	// In an electing hive this worker may be picked as the next queen.
 	if electionOn() {
 		ann.OnPromote = func(term int64) { go a.promoteToQueen(term) }
