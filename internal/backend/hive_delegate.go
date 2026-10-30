@@ -47,7 +47,6 @@ const (
 // DelegateToolName is the queen's one route to tool work in max mode.
 const DelegateToolName = "hive_delegate"
 
-
 // MaxDelegateTasks is how many pieces one call takes.
 const MaxDelegateTasks = 20
 

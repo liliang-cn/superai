@@ -487,6 +487,70 @@ func TestAMessageSomeoneIsWaitingForGoesToTheWait(t *testing.T) {
 	time.Sleep(100 * time.Millisecond) // room for a wrong wake to show itself
 }
 
+// The person asking a worker from its card (AskRemoteAgent, the phone, the
+// desktop and the web all call it) reaches the worker as themselves; the
+// queen's own orders reach it as orders.
+func TestAskingAWorkerFromItsCardIsThePersonNotTheQueen(t *testing.T) {
+	sessions := make(chan string, 4)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/events":
+			w.Header().Set("Content-Type", "text/event-stream")
+			w.WriteHeader(http.StatusOK)
+			w.(http.Flusher).Flush()
+			<-r.Context().Done()
+		case "/api/rpc/SendChat":
+			var args []any
+			_ = json.NewDecoder(r.Body).Decode(&args)
+			sessions <- args[0].(string)
+			// No turn started: the ask ends there, having said who it is.
+			http.Error(w, "not a real worker", http.StatusTeapot)
+		default:
+			http.Error(w, "not a real worker", http.StatusTeapot)
+		}
+	}))
+	t.Cleanup(srv.Close)
+	q := &App{settings: &backend.Settings{Hive: backend.HiveSettings{Role: backend.HiveRoleQueen, Name: "q"}}}
+	q.hive = backend.NewHive("q", 10*time.Second)
+	if _, err := q.hive.Join(backend.HiveHello{Protocol: backend.HiveProtocol, Name: "w9", Role: backend.HiveRoleWorker, URL: srv.URL}); err != nil {
+		t.Fatal(err)
+	}
+	next := func() string {
+		select {
+		case s := <-sessions:
+			return s
+		case <-time.After(5 * time.Second):
+			t.Fatal("the worker was never sent a turn")
+			return ""
+		}
+	}
+	q.AskRemoteAgent("w9", "你在干嘛？")
+	if s := next(); !backend.IsDirectAsk(s) {
+		t.Fatalf("a question from the card reached the worker as an order: %q", s)
+	}
+	q.askAgent(context.Background(), "w9", "check the disk")
+	if s := next(); backend.IsDirectAsk(s) || !strings.HasPrefix(s, backend.HiveSessionPrefix) {
+		t.Fatalf("the queen's order reached the worker as %q", s)
+	}
+}
+
+// What the worker reads with the words: an order owes the queen a report;
+// the person asking directly is answered, with no queen in it.
+func TestAWorkerAnswersThePersonAndReportsToTheQueen(t *testing.T) {
+	id := backend.NewTaskID()
+	order := hiveTurnNote(backend.HiveSessionPrefix+id, 2)
+	if !strings.Contains(order, "Report to the queen") || !strings.Contains(order, "2 unread hive message") {
+		t.Fatalf("an order's note lost its report format: %q", order)
+	}
+	direct := hiveTurnNote(backend.HiveDirectSessionPrefix+id, 2)
+	if strings.Contains(direct, "Report to the queen") || strings.Contains(direct, "unread hive message") {
+		t.Fatalf("a direct question was framed as an order: %q", direct)
+	}
+	if !strings.Contains(direct, "talking to you directly") {
+		t.Fatalf("a direct question did not say who is asking: %q", direct)
+	}
+}
+
 func TestAskingAHiveWorkerByNameGoesToTheWorker(t *testing.T) {
 	// A worker is on the hive's roster, not in the remote-agents config; a
 	// direct question to it must still reach it rather than fall through to

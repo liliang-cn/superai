@@ -359,6 +359,8 @@ func beginTurnFlow(ctx context.Context, sessionID, message string) (context.Cont
 // turnKind names the entry point a turn came through by its conversation.
 func turnKind(sessionID string) string {
 	switch {
+	case IsDirectAsk(sessionID):
+		return "hive.direct"
 	case strings.HasPrefix(sessionID, HiveSessionPrefix):
 		return "hive.order"
 	case strings.HasPrefix(sessionID, "dashboard"):

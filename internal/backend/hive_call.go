@@ -126,6 +126,9 @@ type workerTarget struct {
 	// sent back. Without it such a call waits on the worker, where nobody is
 	// looking, until it times out denied.
 	approve func(ctx context.Context, req map[string]any) bool
+	// direct is the person asking the worker themselves, not the queen
+	// ordering it: the worker answers them (HiveDirectSessionPrefix).
+	direct bool
 }
 
 var workerHTTP = &http.Client{
@@ -188,6 +191,9 @@ func askWorker(ctx context.Context, t workerTarget, prompt string, progress func
 		t.taskID = uuid.NewString()
 	}
 	session := HiveSessionPrefix + t.taskID
+	if t.direct {
+		session = HiveDirectSessionPrefix + t.taskID
+	}
 
 	events := make(chan workerEvent, 64)
 	approvals := make(chan map[string]any, 8)

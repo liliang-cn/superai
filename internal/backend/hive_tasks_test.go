@@ -165,6 +165,49 @@ func TestTheOrderKeepsOneUUIDOnBothSides(t *testing.T) {
 	}
 }
 
+// The person asking a worker from its card is not the queen ordering it: the
+// worker's session says so, its turn is a hive.direct flow and not a
+// hive.order, and the order's id still names the task on both sides.
+func TestAPersonAskingAWorkerIsNotAnOrder(t *testing.T) {
+	for _, c := range []struct {
+		name   string
+		ctx    context.Context
+		prefix string
+		kind   string
+		direct bool
+	}{
+		{"queen's order", context.Background(), HiveSessionPrefix, "hive.order", false},
+		{"asked directly", AskedDirectly(context.Background()), HiveDirectSessionPrefix, "hive.direct", true},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			var session string
+			f := newFakeWorker(t, "")
+			f.onSend = func(sess, _ string, w *fakeWorker) string {
+				session = sess
+				go w.emit("chat:done", map[string]any{"requestId": "req-1", "final": "ok"})
+				return "req-1"
+			}
+			b, _ := boardWithLog()
+			run := NewRemoteRunner(RemoteAgents{Enabled: true, Agents: map[string]RemoteAgent{"w0": {URL: f.srv.URL}}})
+			run.SetBoard(b)
+			run.Run(c.ctx, "w0", "你在干嘛？")
+			k := b.Recent()[0]
+			if session != c.prefix+k.ID {
+				t.Fatalf("session %q, want %q", session, c.prefix+k.ID)
+			}
+			if IsDirectAsk(session) != c.direct {
+				t.Fatalf("IsDirectAsk(%q) = %v", session, !c.direct)
+			}
+			if got := turnKind(session); got != c.kind {
+				t.Fatalf("turn kind %q, want %q", got, c.kind)
+			}
+			if id, ok := TaskIDFromSession(session); !ok || id != k.ID {
+				t.Fatalf("could not recover the id: %q %v", id, ok)
+			}
+		})
+	}
+}
+
 func TestOnlyAUUIDSessionNamesATask(t *testing.T) {
 	for _, s := range []string{"hive:foo", "hive:", "chat:abc", "hive:1234", "telegram:1:2"} {
 		if _, ok := TaskIDFromSession(s); ok {

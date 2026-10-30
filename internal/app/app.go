@@ -979,6 +979,26 @@ func (a *App) GraphView() map[string]any {
 	return a.graphs.GraphStatus(ctx, s).Map()
 }
 
+// hiveTurnNote is what a worker adds to the words of a hive: turn, given
+// how much hive mail is waiting. An order gets the mail and the report it
+// owes the queen; the person asking the worker directly gets told it is
+// them, so the answer is to them and not a brief for the queen to pass on.
+func hiveTurnNote(sessionID string, unread int) string {
+	if backend.IsDirectAsk(sessionID) {
+		return "\n\n(The person is talking to you directly, not the queen and not through her. " +
+			"Answer them yourself, as you; do not address the queen or suggest what to reply.)"
+	}
+	note := ""
+	// Mail waiting is mentioned with the order, not put into it: the order
+	// stands alone, and whether the notes bear on it is the worker's call.
+	if unread > 0 {
+		note += fmt.Sprintf("\n\n(You have %d unread hive message(s); hive_inbox shows them.)", unread)
+	}
+	// The queen reads the report and answers the person herself, while
+	// they wait on both: what was asked, without a write-up around it.
+	return note + "\n\n(Report to the queen: what was asked, plainly, without padding. She answers the person.)"
+}
+
 // SendChat streams a chat turn. Streaming output is delivered via Wails events
 // ("chat:event", "chat:done", "chat:error", "chat:cancelled"); avatar
 // lifecycle/emotion events are pushed through the avatar driver.
@@ -1115,14 +1135,7 @@ func (a *App) ownTurn(requestID, sessionID, message string, imagePaths []string,
 		id, _ := backend.TaskIDFromSession(sessionID)
 		taskID = board.StartAs(id, a.hiveName(), "", backend.TaskIn, message)
 		board.OnStop(taskID, func() { a.CancelChat(requestID) })
-		// Mail waiting is mentioned with the order, not put into it: the order
-		// stands alone, and whether the notes bear on it is the worker's call.
-		if n := a.mailbox().Unread(); n > 0 {
-			message += fmt.Sprintf("\n\n(You have %d unread hive message(s); hive_inbox shows them.)", n)
-		}
-		// The queen reads the report and answers the person herself, while
-		// they wait on both: what was asked, without a write-up around it.
-		message += "\n\n(Report to the queen: what was asked, plainly, without padding. She answers the person.)"
+		message += hiveTurnNote(sessionID, a.mailbox().Unread())
 	}
 
 	if taskID == "" {

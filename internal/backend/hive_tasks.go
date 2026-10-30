@@ -29,6 +29,33 @@ import (
 // a person at its keyboard.
 const HiveSessionPrefix = "hive:"
 
+// HiveDirectSessionPrefix marks a conversation a worker opened because the
+// person asked it something directly — its card on the phone, the desktop or
+// the web — with the queen only carrying the words. It is a hive: session
+// all the same (on the board, under the hive's tenant, kept out of the
+// worker's own list), but the worker answers the person, not the queen.
+const HiveDirectSessionPrefix = HiveSessionPrefix + "direct:"
+
+// IsDirectAsk reports whether a worker's session is the person asking it
+// directly rather than an order from the queen.
+func IsDirectAsk(session string) bool {
+	return strings.HasPrefix(session, HiveDirectSessionPrefix)
+}
+
+type directAskKey struct{}
+
+// AskedDirectly marks ctx as the person asking an agent themselves, so a
+// worker it reaches is told so (HiveDirectSessionPrefix) instead of being
+// handed an order.
+func AskedDirectly(ctx context.Context) context.Context {
+	return context.WithValue(ctx, directAskKey{}, true)
+}
+
+func askedDirectly(ctx context.Context) bool {
+	v, _ := ctx.Value(directAskKey{}).(bool)
+	return v
+}
+
 // HiveTenant is the agent-go tenant every order from the hive runs under on a
 // worker, so its runs can be told apart from a person's own turns — and, with
 // CancelTenant, stopped together without touching those.
@@ -158,7 +185,10 @@ func NewTaskID() string { return uuid.NewString() }
 // carries something else is treated as having none, so a stray "hive:foo"
 // cannot become a task's identity.
 func TaskIDFromSession(session string) (string, bool) {
-	id, ok := strings.CutPrefix(session, HiveSessionPrefix)
+	id, ok := strings.CutPrefix(session, HiveDirectSessionPrefix)
+	if !ok {
+		id, ok = strings.CutPrefix(session, HiveSessionPrefix)
+	}
 	if !ok {
 		return "", false
 	}

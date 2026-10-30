@@ -240,8 +240,12 @@ func (a *App) RemoteAgentNames() []map[string]string {
 // answer and never touches the conversation's history — a routed question is
 // addressed to somebody else, and folding its answer into SuperLeo's own
 // session would make the next turn read as if SuperLeo had said it.
+//
+// The person is the one asking — a worker's card on the phone, the desktop
+// or the web — so a hive worker it reaches is told that, and answers them
+// rather than reporting to the queen.
 func (a *App) AskRemoteAgent(name, prompt string) backend.RemoteResult {
-	return a.askAgent(context.Background(), name, prompt)
+	return a.askAgent(backend.AskedDirectly(context.Background()), name, prompt)
 }
 
 // askAgent sends a question to whichever kind of agent the name belongs to.
