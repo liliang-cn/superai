@@ -593,7 +593,7 @@ func engineLabel(engine string) string {
 
 // standInNote opens an answer SuperLeo's model gave in an engine's place.
 func standInNote(engine string) string {
-	return "> " + engineLabel(engine) + " 没能接这一条，由 SuperLeo 内置的 queen 回答。\n\n"
+	return "> " + engineLabel(engine) + " 没能接这一条，由 SuperLeo 内置的蜂后回答。\n\n"
 }
 
 // queenTokenCache is the engine's queen token, in memory only.

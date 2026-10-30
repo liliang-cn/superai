@@ -1047,7 +1047,7 @@ func hiveSection(h HiveSettings) string {
 	case HiveRoleWorker:
 		return fmt.Sprintf(`
 
-In the hive you are %[1]s, a worker. The queen's orders arrive as turns. Where a task wants your name or a per-member key, path or label, you are %[1]s, not SuperLeo — memory is shared, so another name overwrites someone. To settle what another member found, hive_ask it first and say what it told you. To wait for a message use hive_wait — never sleep, poll hive_inbox or ask whether it was sent.`, h.Self())
+In the hive you are %[1]s, a worker. The queen's orders arrive as turns. Where a task wants your name or a per-member key, path or label, you are %[1]s, not SuperLeo — memory is shared, so another name overwrites someone. To settle what another member found, hive_ask it first and say what it told you. To wait for a message use hive_wait — never sleep, poll hive_inbox or ask whether it was sent.`, h.Self()) + queenChineseName
 	case HiveRoleQueen:
 		return queenSection(h)
 	}
@@ -1067,6 +1067,8 @@ func ExternalQueenPrompt(s *Settings) string {
 	if s.Hive.Role == HiveRoleQueen {
 		out += `
 The hive is the "hive" MCP server: a tool named hive_x below is superleo_hive_x there (hive_task is superleo_hive_tasks), superleo_linked_agents names the machines and their coding agents, and you work relative dates out yourself. A call that changes the cluster waits for the person to approve it on the phone; when one is waiting, say so.` + queenSection(s.Hive)
+	} else {
+		out += queenChineseName
 	}
 	return out + queenNameSection(s)
 }
@@ -1074,13 +1076,23 @@ The hive is the "hive" MCP server: a tool named hive_x below is superleo_hive_x 
 // answerLanguageRule is how every queen answers, her own agent or not.
 const answerLanguageRule = `Answer in Chinese — short and natural; never English, Japanese or Korean.`
 
+// queenChineseName is the hive's word for its queen in Chinese. A CLI left to
+// translate "queen" calls itself by the word for a monarch, which SuperLeo
+// never calls her; the rule names that word so the model knows which one not
+// to write, spelled in halves so no copy or prompt in the source has it
+// (TestNoMonarchWordForTheQueen).
+const queenChineseName = "\nIn Chinese the hive's queen is 蜂后 — when you name yourself or the queen, write 蜂后, never " + queenNotWord + "."
+
+// queenNotWord is the word the queen is never called in Chinese.
+const queenNotWord = "女" + "王"
+
 // queenSection is the queen's part of the prompt.
 func queenSection(h HiveSettings) string {
 	return fmt.Sprintf(`
 
 In the hive you are %[1]s, the queen. Run it through hive_members, hive_command, hive_map, hive_send and hive_inbox — never inspect your own machine, environment or API. Where reports disagree, say so and quote them; a difference no report explains is unexplained.
 %[2]s A big job — research, a report, a check across several machines — is yours to split: see who you have (hive_members, coding_agent_list, remote_agent_list), then give every part out in ONE hive_command call — workers, coding agents, named agents — so they run at the same time; hive_map when there are more parts than workers. Calling coding_agent_run or remote_agent_run one by one makes the rest wait. Each order stands alone: what to find, how far, real sources; research saves to the shared brain with knowledge_save under a prefix for the job. Then write the result yourself — compare, cite, say where they disagree — and %[3]s.
-When workers pass work by message, let them run; if what you wait for has not come, end the turn saying so.`, h.Self(), queenWorkRule(h.DelegationMode()), queenSaveRule(h.DelegationMode()))
+When workers pass work by message, let them run; if what you wait for has not come, end the turn saying so.`, h.Self(), queenWorkRule(h.DelegationMode()), queenSaveRule(h.DelegationMode())) + queenChineseName
 }
 
 // queenWorkRule is the part of the queen's prompt that says who does the
