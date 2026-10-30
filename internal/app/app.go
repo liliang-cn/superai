@@ -576,9 +576,10 @@ func (a *App) SaveSettings(s backend.Settings) error {
 		return err
 	}
 	a.mu.Lock()
+	before := a.settings
 	prev := ""
-	if a.settings != nil {
-		prev = a.settings.Hive.QueenEngine
+	if before != nil {
+		prev = before.Hive.QueenEngine
 	}
 	a.mu.Unlock()
 	if err := a.validQueenEngine(&s, prev); err != nil {
@@ -590,6 +591,18 @@ func (a *App) SaveSettings(s backend.Settings) error {
 	a.mu.Lock()
 	a.settings = &s
 	a.mu.Unlock()
+	if s.Hive.QueenEngine != prev {
+		// Who answered last was under the old engine; until a turn says
+		// otherwise, the new one is who the queen thinks with.
+		a.setQueenNow("")
+	}
+	// Another engine for the queen is read by the next turn as it starts;
+	// rebuilding for it would close the service under the turns running on
+	// it and stop them, and the coding runs they started with them.
+	if backend.OnlyQueenEngineDiffers(before, &s) {
+		a.emit("settings:changed", nil)
+		return nil
+	}
 	backend.ApplyProxy(s.Proxy)
 	a.syncProxy()
 	a.rebuild()
@@ -1086,6 +1099,15 @@ func (a *App) hasModel() bool {
 // it answers for when that engine could not take the turn: the answer then
 // opens with a line saying so.
 func (a *App) ownTurn(requestID, sessionID, message string, imagePaths []string, standIn string) {
+	// The queen's figure and the status bar name who is thinking: with an
+	// engine set, this turn is SuperLeo's all the same, and they say so.
+	a.mu.Lock()
+	engineSet := a.settings != nil && a.settings.Hive.Role != backend.HiveRoleWorker && a.settings.Hive.QueenEngine != ""
+	a.mu.Unlock()
+	if engineSet {
+		a.setQueenNow(queenNowSuperLeo)
+	}
+
 	if a.ownTurnFn != nil {
 		a.ownTurnFn(requestID, sessionID, message, standIn)
 		return

@@ -332,7 +332,7 @@
 .wi-seg button { height: 28px; padding: 0 12px; border-radius: 8px; border: 1px solid rgba(22, 32, 43, 0.14); background: #fff; font: 600 12.5px Geist, system-ui; cursor: pointer; }
 .wi-seg button.on { background: #16202b; color: #fff; border-color: #16202b; }
 /* Tokens spent, floating up off whoever spent them. */
-.wl-burn { font: 700 13px "Geist Mono", ui-monospace, monospace; color: #e2412b; text-shadow: 0 0 6px rgba(255, 154, 46, 0.8), 0 1px 0 #fff; white-space: nowrap; pointer-events: none; }
+.wl-burn { font: 700 13px "Geist Mono", ui-monospace, monospace; color: #2f6bff; text-shadow: 0 0 6px rgba(255, 255, 255, 0.9), 0 1px 0 #fff; white-space: nowrap; pointer-events: none; }
 
 /* The figures, on one flat screen at the top left. */
 .wl-hud { display: none; }
@@ -484,7 +484,7 @@
 :root[data-theme="dark"] .wl-stats-who i { background: #4a5764; }
 :root[data-theme="dark"] .wl-screen { background: rgba(8, 12, 17, 0.6); }
 /* Speech bubbles stay white with an ink line: a comic panel reads the same at night. */
-:root[data-theme="dark"] .wl-burn { text-shadow: 0 0 6px rgba(255, 154, 46, 0.8); }
+:root[data-theme="dark"] .wl-burn { color: #7ea2ff; text-shadow: 0 0 6px rgba(47, 107, 255, 0.6); }
 
 /* A host's card: its agents in groups, an MCP list under a SuperLeo. */
 .wi-host { display: flex; flex-direction: column; gap: 4px; }

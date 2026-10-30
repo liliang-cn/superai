@@ -47,6 +47,43 @@ func (s *Settings) mergeQueenEngine() {
 	}
 }
 
+// OnlyQueenEngineDiffers reports whether next is prev with nothing changed
+// but who thinks for the queen: the engines, the fallback and the public URL
+// their runs reach /mcp at. None of those goes into the service — a turn reads
+// them from the settings as it starts — so a save that changes only them has
+// nothing to rebuild, and the turns running on the service carry on.
+func OnlyQueenEngineDiffers(prev, next *Settings) bool {
+	if prev == nil || next == nil {
+		return false
+	}
+	a, okA := withoutQueenEngine(prev)
+	b, okB := withoutQueenEngine(next)
+	return okA && okB && string(a) == string(b)
+}
+
+// withoutQueenEngine is s as it would be saved, with the engine fields blank.
+// A copy through JSON, so tidying it does not touch slices s shares.
+func withoutQueenEngine(s *Settings) ([]byte, bool) {
+	raw, err := json.Marshal(s)
+	if err != nil {
+		return nil, false
+	}
+	var c Settings
+	if json.Unmarshal(raw, &c) != nil {
+		return nil, false
+	}
+	c.ExternalAgents.normalize()
+	c.RemoteAgents.normalize()
+	c.normalizeQueen()
+	c.AgentLink.normalize()
+	if len(c.Channels) == 0 {
+		c.Channels = nil // Save leaves none as an empty list
+	}
+	c.Hive.QueenEngine, c.Hive.QueenFallback, c.Hive.QueenEngines, c.Hive.PublicURL = "", nil, nil, ""
+	out, err := json.Marshal(c)
+	return out, err == nil
+}
+
 // saveQueenEngine writes queenengine.json when any of them is not its
 // default and removes it when all are, so a default chosen here does not
 // shadow what an operator later puts in the Secret.

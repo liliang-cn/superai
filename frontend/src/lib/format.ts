@@ -153,6 +153,13 @@ export function engineLabel(engine: string): string {
   return dot > 0 && dot < engine.length - 1 ? `${name} · ${engine.slice(dot + 1)}` : name;
 }
 
+/** The engine thinking for the queen now, or "" while her turns are SuperLeo's
+ *  own model's — no engine set, or SuperLeo answered the latest one. */
+export function queenThinker(engine?: string, now?: string): string {
+  if (!engine || now === "superleo") return "";
+  return engineLabel(now || engine);
+}
+
 /** Who answered for the queen, as it goes under an answer: the engine
  *  ("Claude Code"), or "SuperLeo" when its own agent answered in the
  *  engine's place. Empty for SuperLeo's own turns, which need no name. */

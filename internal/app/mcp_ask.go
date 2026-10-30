@@ -40,6 +40,8 @@ type askIn struct {
 	Message        string `json:"message" jsonschema:"what to say to SuperLeo, as a person would type it in the chat"`
 	Conversation   string `json:"conversation,omitempty" jsonschema:"conversation id to continue (from a previous answer or superleo_conversations); omit to start a new one"`
 	TimeoutSeconds int    `json:"timeout_seconds,omitempty" jsonschema:"how long to wait for the answer, default 180, at most 600; on timeout the turn keeps running and the answer so far comes back with pending=true"`
+	// caller is the MCP client's own name for itself ("claude-code").
+	caller string
 }
 
 type askTool struct {
@@ -213,6 +215,26 @@ func toolEventFailed(ev *agent.Event) bool {
 	return strings.TrimSpace(ev.Content) != "" || backend.ToolResultFailed(ev.ToolResult)
 }
 
+// askerIsQueenEngine is whether an MCP client calling itself caller is the CLI
+// the queen's first engine runs ("claude-code" for claude.mac).
+func (a *App) askerIsQueenEngine(caller string) bool {
+	caller = strings.ToLower(strings.TrimSpace(caller))
+	if caller == "" {
+		return false
+	}
+	a.mu.Lock()
+	s := a.settings
+	a.mu.Unlock()
+	if s == nil {
+		return false
+	}
+	on := s.Hive.QueenEnginesOn()
+	if len(on) == 0 || on[0] == backend.QueenEngineSuperLeo {
+		return false
+	}
+	return strings.Contains(caller, strings.ToLower(engineCLI(on[0])))
+}
+
 // ask runs one superleo_ask. progress, when not nil, is told what the turn is
 // doing while it is waited on.
 func (a *App) ask(ctx context.Context, in askIn, progress func(string)) (askOut, error) {
@@ -238,9 +260,11 @@ func (a *App) ask(ctx context.Context, in askIn, progress func(string)) (askOut,
 
 	send := a.askFn
 	if send == nil {
-		// SuperLeo's own agent, not the queen engine: whoever asks over MCP is
-		// as likely as not that engine's CLI, and would be answering itself.
-		send = func(session, message string) string { return a.sendChat(session, message, nil, true) }
+		// The person's question, so the queen's engine answers it as it
+		// answers the chat box — unless the one asking is that engine's CLI,
+		// which would be answering itself: SuperLeo's own agent does then.
+		own := a.askerIsQueenEngine(in.caller)
+		send = func(session, message string) string { return a.sendChat(session, message, nil, own) }
 	}
 	requestID := send(conv, msg)
 	st := newAskState(conv, requestID)
@@ -350,6 +374,11 @@ func addAskMCPTools(s *mcp.Server, app *App) {
 		// _meta, so the caller's trace reaches into this one (flow_link.go).
 		if strings.TrimSpace(in.Conversation) == "" {
 			in.Conversation = askNewConversationPrefix + uuid.NewString()
+		}
+		if req != nil && req.Session != nil {
+			if p := req.Session.InitializeParams(); p != nil && p.ClientInfo != nil {
+				in.caller = p.ClientInfo.Name
+			}
 		}
 		answered := acceptMCPFlow(req, in.Conversation)
 		out, err := app.ask(ctx, in, progress)

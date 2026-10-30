@@ -8,7 +8,7 @@ import { hiveHost, isCutOff, useMembership } from "../lib/membership";
 import { useHosts } from "../canvas/data";
 import type { AppStatus } from "../lib/types";
 import { machine } from "../lib/machine";
-import { queenEngineNote } from "../lib/format";
+import { queenEngineNote, queenThinker } from "../lib/format";
 
 /** Runtime status belongs to every desktop page, below its working area. */
 const served = Boolean((window as unknown as Record<string, unknown>).superleoServed);
@@ -47,6 +47,9 @@ export default function DeskStatusBar({ status, loading, codingRuns }: { status:
     return () => { if (typeof off === "function") off(); };
   }, []);
   const queenNote = queenEngineNote(hive.engine, hive.engineNow);
+  // The model shown is the one thinking for the queen: her engine's, when one
+  // takes her turns, not SuperLeo's own model sitting idle beside it.
+  const thinker = queenThinker(hive.engine, hive.engineNow);
   // YOLO: every approval says yes until it is switched off (app_permission.go
   // StartYoloMode). Here, so it is one click from any screen.
   const [yolo, setYolo] = useState(false);
@@ -76,7 +79,8 @@ export default function DeskStatusBar({ status, loading, codingRuns }: { status:
       <i className={`dk-status-dot${disconnected || !loading && !status?.ready ? " bad" : loading ? " pending" : ""}`}/>
       <span>{t(state)}</span><span className="dk-status-backend">{hiveName}</span>
     </span>
-    {runtime.model && <span className="dk-status-model" title={runtime.model}><CpuIcon size={12}/>{runtime.model}</span>}
+    {thinker ? <span className="dk-status-model" title={thinker} data-testid="status-model"><CpuIcon size={12}/>{thinker}</span>
+      : runtime.model && <span className="dk-status-model" title={runtime.model} data-testid="status-model"><CpuIcon size={12}/>{runtime.model}</span>}
     {served && stream === "down" && <span className="dk-status-stream" title={t("Answers and live updates are not arriving; reconnecting.")}><i className="dk-status-dot bad"/>{t("Live updates off")}</span>}
     {queenNote && <span className="dk-status-queen" title={t("SuperLeo answered in the engine's place")}>{t("Queen")}: {queenNote}</span>}
     <button type="button" className={`dk-status-yolo${yolo ? " on" : ""}`} onClick={flipYolo} aria-pressed={yolo}

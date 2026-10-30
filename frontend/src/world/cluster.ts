@@ -523,7 +523,9 @@ export const cluster: District<WorldData> = {
       if (n < 1) return;
       const el = document.createElement("div");
       el.className = "wl-burn";
-      el.textContent = `−${n >= 1000 ? (n / 1000).toFixed(1) + "k" : Math.round(n)} tok`;
+      // How many it used, not a balance going down: a minus in red read as a
+      // negative count.
+      el.textContent = `${n >= 1000 ? (n / 1000).toFixed(1) + "k" : Math.round(n)} tok`;
       const o = new CSS2DObject(el);
       o.position.copy(at);
       g.add(o);

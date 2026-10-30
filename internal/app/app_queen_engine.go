@@ -10,10 +10,11 @@ package app
 // notices, alarms and schedules. Clients see the same chat:event / chat:done
 // they always did, with "engine" on them naming who answered.
 //
-// Only a person's own turns go to the engine. Schedules, dashboards, tiles,
-// the hive's traffic, a voice call (SendCallChat) and superleo_ask all stay
-// with SuperLeo's agent: they are unattended, or cannot wait for a CLI to
-// start, or would have the engine answering itself.
+// Only a person's own turns go to the engine, superleo_ask's among them.
+// Schedules, dashboards, tiles, the hive's traffic, a voice call
+// (SendCallChat) and a superleo_ask from the engine's own CLI stay with
+// SuperLeo's agent: they are unattended, or cannot wait for a CLI to start,
+// or would have the engine answering itself.
 //
 // Each turn is a run of the CLI (app_cliruns.go) given the queen's prompt
 // (backend.ExternalQueenPrompt, the same text her own agent reads), the
@@ -174,9 +175,8 @@ func queenTurn(s *backend.Settings, sessionID string, pictures bool) bool {
 }
 
 // ownSessionPrefixes mark conversations no person is typing in: the hive's
-// orders and mail, superleo_ask's fresh ones, home tiles, terminal Claude Code
-// sessions shown in the app.
-var ownSessionPrefixes = []string{backend.HiveSessionPrefix, HiveMailSessionPrefix, askNewConversationPrefix, "tile-", "cc:"}
+// orders and mail, home tiles, terminal Claude Code sessions shown in the app.
+var ownSessionPrefixes = []string{backend.HiveSessionPrefix, HiveMailSessionPrefix, "tile-", "cc:"}
 
 func personalSession(id string) bool {
 	id = strings.TrimSpace(id)

@@ -2,9 +2,11 @@ package app
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"slices"
@@ -14,6 +16,7 @@ import (
 	"time"
 
 	"github.com/liliang-cn/superleo/internal/backend"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 // A stand-in for the claude CLI: it answers --version, keeps the arguments
@@ -203,7 +206,7 @@ func TestOnlyAPersonsOwnTurnGoesToTheQueenEngine(t *testing.T) {
 		"dashboard:abc":                        "",
 		"tile-k2-x1":                           "",
 		"scheduled":                            "",
-		"mcp-1234":                             "",
+		"mcp-1234":                             "claude.mac",
 		"cc:terminal":                          "",
 		"":                                     "",
 	} {
@@ -656,5 +659,87 @@ func TestHandedHistoryStaysSmall(t *testing.T) {
 	}
 	if handoffText(nil) != "" {
 		t.Fatal("nothing to hand over still made a preamble")
+	}
+}
+
+// superleo_ask is the person asking, so the queen's engine answers it the way
+// it answers the chat box; only when the one asking is that engine's own CLI
+// does SuperLeo answer, or the engine would be answering itself. Either way
+// the queen's figure names who actually answered.
+func TestSuperleoAskGoesToTheEngineUnlessTheEngineAsks(t *testing.T) {
+	h := newEngineHarness(t, fakeClaudeTurn, 0)
+	ask := func(client string) askOut {
+		t.Helper()
+		srv := httptest.NewServer(newMCPHandler(h.a, "test"))
+		defer srv.Close()
+		c := mcp.NewClient(&mcp.Implementation{Name: client, Version: "1"}, nil)
+		ss, err := c.Connect(context.Background(), &mcp.StreamableClientTransport{Endpoint: srv.URL}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer ss.Close()
+		res, err := ss.CallTool(context.Background(), &mcp.CallToolParams{Name: "superleo_ask", Arguments: map[string]any{"message": "今天下午还有什么安排？"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return askResult(t, res)
+	}
+
+	if out := ask("verify"); out.Answer != "hive 里有两个成员。" || len(h.owned()) != 0 {
+		t.Fatalf("superleo_ask did not reach the engine: %+v, own %v", out, h.owned())
+	}
+	if now := h.a.queenEngineNow(); now != "claude" {
+		t.Fatalf("after the engine answered, the queen shows %q", now)
+	}
+
+	if out := ask("claude-code"); out.Answer != "own" || len(h.owned()) != 1 {
+		t.Fatalf("the engine's own CLI was answered by the engine: %+v, own %v", out, h.owned())
+	}
+	if now := h.a.queenEngineNow(); now != queenNowSuperLeo {
+		t.Fatalf("after SuperLeo answered, the queen shows %q", now)
+	}
+}
+
+// Changing who thinks for the queen is not a rebuild: the service the turns
+// run on stays, and so do they and the coding runs they started.
+func TestChangingTheQueenEngineStopsNothing(t *testing.T) {
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
+	bin, _ := fakeClaude(t, "", 0)
+	s := &backend.Settings{
+		WorkspaceDir:   t.TempDir(),
+		ExternalAgents: backend.ExternalAgents{Enabled: true, Binaries: map[string]string{"claude": bin}},
+		Hive:           backend.HiveSettings{Role: backend.HiveRoleQueen, Name: "q"},
+	}
+	a := &App{settings: s}
+	// A rebuild sets buildErr either way, so it staying is no rebuild.
+	a.buildErr = "untouched"
+	stopped := make(chan struct{}, 1)
+	a.trackRun("running", func() { stopped <- struct{}{} })
+	a.setQueenNow(queenNowSuperLeo)
+
+	if _, err := a.SetQueenEngineList(on("claude", "superleo"), "https://ai.example.test"); err != nil {
+		t.Fatal(err)
+	}
+	if a.buildErr != "untouched" {
+		t.Fatalf("the service was rebuilt: %q", a.buildErr)
+	}
+	select {
+	case <-stopped:
+		t.Fatal("a running turn was stopped by changing the engine")
+	default:
+	}
+	if a.settings.Hive.QueenEngine != "claude" {
+		t.Fatalf("engine %q", a.settings.Hive.QueenEngine)
+	}
+	if now := a.queenEngineNow(); now != "" {
+		t.Fatalf("the queen still shows %q from before the change", now)
+	}
+
+	// Anything else changed with it is a rebuild, as before.
+	next := *a.settings
+	next.MaxRounds = 7
+	next.Hive.SetQueenChain(on("superleo"))
+	if backend.OnlyQueenEngineDiffers(a.settings, &next) {
+		t.Fatal("a change to the rounds passed for an engine change")
 	}
 }
