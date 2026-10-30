@@ -55,31 +55,7 @@ func CollectAbilities() HiveAbilities {
 		if !e.IsDir() || strings.HasPrefix(e.Name(), ".") {
 			continue
 		}
-		dir := filepath.Join(root, e.Name())
-		files := map[string]string{}
-		total := 0
-		_ = filepath.WalkDir(dir, func(p string, d os.DirEntry, err error) error {
-			if err != nil {
-				return nil
-			}
-			if d.IsDir() {
-				if d.Name() == ".git" || d.Name() == "node_modules" {
-					return filepath.SkipDir
-				}
-				return nil
-			}
-			if d.Name() == fromQueenMark {
-				return nil
-			}
-			raw, err := os.ReadFile(p)
-			if err != nil || total+len(raw) > maxSkillBytes {
-				return nil
-			}
-			total += len(raw)
-			rel, _ := filepath.Rel(dir, p)
-			files[filepath.ToSlash(rel)] = base64.StdEncoding.EncodeToString(raw)
-			return nil
-		})
+		files := ReadSkillFiles(filepath.Join(root, e.Name()))
 		if _, ok := files["SKILL.md"]; ok {
 			out.Skills[e.Name()] = files
 		}
@@ -94,6 +70,54 @@ func CollectAbilities() HiveAbilities {
 	}
 	out.Hash = abilitiesHash(out)
 	return out
+}
+
+// ReadSkillFiles is a skill's folder as the hive carries it: each file by its
+// path inside, base64-encoded, up to maxSkillBytes in all.
+func ReadSkillFiles(dir string) map[string]string {
+	files := map[string]string{}
+	total := 0
+	_ = filepath.WalkDir(dir, func(p string, d os.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() {
+			if d.Name() == ".git" || d.Name() == "node_modules" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if d.Name() == fromQueenMark {
+			return nil
+		}
+		raw, err := os.ReadFile(p)
+		if err != nil || total+len(raw) > maxSkillBytes {
+			return nil
+		}
+		total += len(raw)
+		rel, _ := filepath.Rel(dir, p)
+		files[filepath.ToSlash(rel)] = base64.StdEncoding.EncodeToString(raw)
+		return nil
+	})
+	return files
+}
+
+// InstallSkillFiles makes files (ReadSkillFiles' shape) this instance's own
+// skill name: not marked as the queen's, so her syncs leave it alone.
+func InstallSkillFiles(name string, files map[string]string) error {
+	name = sanitizeName(name)
+	if name == "" {
+		return fmt.Errorf("name is required")
+	}
+	if _, ok := files["SKILL.md"]; !ok {
+		return fmt.Errorf("a skill needs a SKILL.md")
+	}
+	dir := filepath.Join(DataDir(), "skills", name)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	_, err := writeSkill(dir, files, false)
+	return err
 }
 
 func abilitiesHash(a HiveAbilities) string {
@@ -153,7 +177,7 @@ func ApplyAbilities(ab HiveAbilities, lookPath func(string) (string, error)) (Ap
 				continue // the worker's own skill of the same name wins
 			}
 		}
-		changed, err := writeSkill(dir, files)
+		changed, err := writeSkill(dir, files, true)
 		if err != nil {
 			return out, fmt.Errorf("skill %s: %w", name, err)
 		}
@@ -240,7 +264,9 @@ func localMCPNames() map[string]bool {
 
 // writeSkill makes dir hold exactly files, marked as the queen's. It reports
 // whether anything changed.
-func writeSkill(dir string, files map[string]string) (bool, error) {
+// writeSkill makes dir hold files and nothing else; fromQueen marks it as the
+// queen's, which her next sync may remove.
+func writeSkill(dir string, files map[string]string, fromQueen bool) (bool, error) {
 	want := map[string][]byte{}
 	for rel, b64 := range files {
 		raw, err := base64.StdEncoding.DecodeString(b64)
@@ -272,12 +298,15 @@ func writeSkill(dir string, files map[string]string) (bool, error) {
 			return nil
 		}
 		rel, _ := filepath.Rel(dir, p)
-		if _, ok := want[rel]; !ok && rel != fromQueenMark {
+		if _, ok := want[rel]; !ok && (rel != fromQueenMark || !fromQueen) {
 			_ = os.Remove(p)
 			changed = true
 		}
 		return nil
 	})
+	if !fromQueen {
+		return changed, nil
+	}
 	if _, err := os.Stat(filepath.Join(dir, fromQueenMark)); err != nil {
 		_ = os.WriteFile(filepath.Join(dir, fromQueenMark), []byte("installed from the queen; removed when she removes it\n"), 0o644)
 		changed = true

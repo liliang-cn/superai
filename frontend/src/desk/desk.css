@@ -392,6 +392,9 @@ html[data-desk] body { background: transparent; }
 .dk-status-rows { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
 .dk-st { display: grid; grid-template-columns: 10px 92px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 10px; font-size: 13.5px; }
 .dk-st:hover { background: rgba(var(--glass-rgb), .45); }
+.dk-st[role="button"] { cursor: pointer; }
+.dk-st.on { background: rgba(var(--glass-rgb), .6); }
+.dk-st-kit { padding: 2px 10px 10px 30px; }
 .dk-st i { width: 8px; height: 8px; border-radius: 50%; background: #2fb36d; }
 .dk-st.busy i { background: var(--honey); box-shadow: 0 0 0 3px rgba(var(--honey-rgb), .22); }
 .dk-st.lost i { background: var(--lost); }

@@ -241,6 +241,17 @@ type DelegateResult struct {
 // what to send back. The worker's reply is read by the queen, not the person.
 const delegatePreamble = "The queen hands you this piece of a request. Do it with your own tools and report back what you found or did — the facts, ids, times and results, plainly; she writes the reply to the person.\n\n"
 
+// needsLine tells the worker what a piece was sent to it for: the servers,
+// skills or abilities it has that the piece needs, so it uses those and not
+// some other way round to the same end (a shell for a database it has a
+// server for).
+func needsLine(needs []string) string {
+	if len(needs) == 0 {
+		return ""
+	}
+	return "This piece came to you for " + strings.Join(needs, ", ") + ": do it with those — your MCP server, skill or ability of that name.\n\n"
+}
+
 const selfPreamble = "No worker could take this piece, so do it yourself with your own tools and report back what you found or did — the facts, ids, times and results, plainly.\n\n"
 
 // RunDelegated runs every piece at once, each on its own worker where there
@@ -317,7 +328,7 @@ func RunDelegated(ctx context.Context, env DelegateEnv, tasks []DelegateTask) []
 				if env.Timeout > 0 {
 					actx, cancel = context.WithTimeout(actx, env.Timeout)
 				}
-				out, err := env.Run(actx, w, delegatePreamble+t.Task)
+				out, err := env.Run(actx, w, delegatePreamble+needsLine(t.Needs)+t.Task)
 				timedOut := actx.Err() == context.DeadlineExceeded
 				cancel()
 				if out.Cancelled {

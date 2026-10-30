@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"maps"
 	"net/http"
 	"net/url"
 	"os"
@@ -184,9 +185,15 @@ type HiveHello struct {
 	// the queen sends noted work to a worker that has noted. Nil is a worker
 	// too old to say, which the queen treats as "may have anything".
 	MCP []string `json:"mcp"`
+	// MCPTools names each of those servers' tools, so the queen can tell
+	// which worker has the tool a task needs, not just a server's name.
+	MCPTools map[string][]string `json:"mcp_tools,omitempty"`
 	// CLIs names the coding CLIs installed where the worker runs (claude,
 	// codex, ...), so work that needs one goes to a worker that has it.
 	CLIs []string `json:"clis,omitempty"`
+	// Skills names the skills this worker has, its own and the queen's, so
+	// work that needs one goes to a worker that has it.
+	Skills []string `json:"skills,omitempty"`
 	// Abilities is what the worker's machine can do for the queen (desktop,
 	// browser, files, exec), so a task that needs one goes to a worker that has
 	// it. Empty is none, or a worker too old to say.
@@ -235,6 +242,10 @@ type HiveMember struct {
 	// CLIs the coding CLIs installed where it runs.
 	MCP  []string `json:"mcp"`
 	CLIs []string `json:"clis,omitempty"`
+	// MCPTools is each server's tools, as it last said (HiveHello.MCPTools).
+	MCPTools map[string][]string `json:"mcp_tools,omitempty"`
+	// Skills is what it last said it has (HiveHello.Skills).
+	Skills []string `json:"skills,omitempty"`
 	// Abilities is what its machine can do (HiveHello.Abilities).
 	Abilities []HiveAbility `json:"abilities,omitempty"`
 	about     string
@@ -312,6 +323,8 @@ func (h *Hive) Join(hello HiveHello) (HiveWelcome, error) {
 	m.StartedAt, m.Engine, m.about, m.Node = hello.StartedAt, hello.Engine, hello.About, hello.Node
 	m.Kind, m.Host = hello.Kind, hello.Host
 	m.CLIs = append([]string(nil), hello.CLIs...)
+	m.Skills = append([]string(nil), hello.Skills...)
+	m.MCPTools = maps.Clone(hello.MCPTools)
 	m.Abilities = append([]HiveAbility(nil), hello.Abilities...)
 	m.MCP = nil
 	if hello.MCP != nil {
@@ -420,6 +433,12 @@ type Announcer struct {
 	Capabilities func() []string
 	// CLIs, when set, names the coding CLIs installed here.
 	CLIs func() []string
+	// MCPTools, when set, names each MCP server's tools, asked again for
+	// every hello.
+	MCPTools func() map[string][]string
+	// Skills, when set, names the skills this worker has, asked again for
+	// every hello so one added or removed is said at once.
+	Skills func() []string
 	// MachineAbilities, when set, names what this machine can do (desktop, browser,
 	// files, exec), asked again for every hello.
 	MachineAbilities func() []HiveAbility
@@ -567,6 +586,12 @@ func (a *Announcer) Once(ctx context.Context) (HiveWelcome, error) {
 	}
 	if a.CLIs != nil {
 		hello.CLIs = a.CLIs()
+	}
+	if a.Skills != nil {
+		hello.Skills = a.Skills()
+	}
+	if a.MCPTools != nil {
+		hello.MCPTools = a.MCPTools()
 	}
 	if a.MachineAbilities != nil {
 		hello.Abilities = a.MachineAbilities()

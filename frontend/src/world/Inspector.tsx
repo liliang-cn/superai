@@ -13,6 +13,7 @@ import { toast } from "../lib/toasts";
 import { PATHS, attentionPath, taskPath } from "../lib/routes";
 import { focusInWorld } from "./bus";
 import Talk from "./Talk";
+import WorkerKitCard from "./WorkerKit";
 import MachineHost from "./MachineHost";
 import type { Picked } from "./engine";
 import { clisOf, sessionLine, type WorldData } from "./cluster";
@@ -106,6 +107,7 @@ export default function Inspector({ picked, data, onClose, open, openDash, full,
               ))}
             </ul>
           )}
+          {m?.state !== "lost" && <WorkerKitCard worker={picked.id} />}
         </>
       );
       break;

@@ -428,6 +428,27 @@ func (a *App) startHive() {
 	}
 	// And the coding CLIs installed here: a Mac worker takes the coding work.
 	ann.CLIs = func() []string { return cliNames(a.localAgentNames()) }
+	// And each server's tools, so the queen sees which worker has the tool.
+	ann.MCPTools = func() map[string][]string {
+		out := map[string][]string{}
+		for _, st := range a.MCP() {
+			if !st.Running {
+				continue
+			}
+			for _, t := range st.Tools {
+				out[st.Name] = append(out[st.Name], t.Name)
+			}
+		}
+		return out
+	}
+	// And its skills, so work that needs one goes where it is.
+	ann.Skills = func() []string {
+		out := []string{}
+		for _, sk := range backend.SkillFolders() {
+			out = append(out, sk.Name)
+		}
+		return out
+	}
 	// And what this machine can do (exec, files, ...), so the queen can route by ability.
 	ann.MachineAbilities = func() []backend.HiveAbility {
 		var out []backend.HiveAbility

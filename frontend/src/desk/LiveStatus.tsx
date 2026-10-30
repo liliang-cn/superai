@@ -3,6 +3,7 @@ import type { CodingRun } from "../canvas/tiles";
 import { machine } from "../lib/machine";
 import { useEffect, useState } from "react";
 import { HiveWorkers } from "../../wailsjs/go/app/App";
+import WorkerKitCard from "../world/WorkerKit";
 
 type Worker = { name: string; kind: string; host: string; state: string; up: boolean };
 
@@ -48,6 +49,8 @@ const ago = (iso: string | undefined, now: Date) => (iso ? `${elapsed(iso, now.g
 /** Every member of the hive, one row each: up or not, what it is doing, when
  *  it was last heard from and how long it has been running. */
 export default function LiveStatus({ hive, now, agents, runs }: { hive: Hive; now: Date; agents: LinkedAgent[]; runs: CodingRun[] }) {
+  // A worker's row opens to its card: its own MCP servers and skills.
+  const [open, setOpen] = useState("");
   if (!hive.role) return <OwnWorkers runs={runs} now={now} />;
   const running = new Map(hive.tasks.filter((t) => t.state === "running").map((t) => [t.worker, t]));
   const workers = hive.members.filter((m) => !/queen/.test(m.name));
@@ -81,11 +84,15 @@ export default function LiveStatus({ hive, now, agents, runs }: { hive: Hive; no
         {workers.map((m) => {
           const t = running.get(m.name);
           return (
-            <div key={m.name} className={m.state === "lost" ? "dk-st lost" : t ? "dk-st busy" : "dk-st"}>
-              <i />
-              <b>{short(m.name)}</b>
-              <span className="dk-st-what">{m.state === "lost" ? "Not answering" : t ? oneLine(t.prompt) : "Idle"}</span>
-              <em>{t ? elapsed(t.started_at, now.getTime()) : ago(m.last_seen, now)}</em>
+            <div key={m.name}>
+              <div className={(m.state === "lost" ? "dk-st lost" : t ? "dk-st busy" : "dk-st") + (open === m.name ? " on" : "")}
+                role="button" data-testid={`worker-row-${m.name}`} onClick={() => setOpen(open === m.name ? "" : m.name)}>
+                <i />
+                <b>{short(m.name)}</b>
+                <span className="dk-st-what">{m.state === "lost" ? "Not answering" : t ? oneLine(t.prompt) : "Idle"}</span>
+                <em>{t ? elapsed(t.started_at, now.getTime()) : ago(m.last_seen, now)}</em>
+              </div>
+              {open === m.name && m.state !== "lost" && <div className="dk-st-kit"><WorkerKitCard worker={m.name} /></div>}
             </div>
           );
         })}

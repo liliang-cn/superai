@@ -3,6 +3,7 @@ package backend
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -308,6 +309,30 @@ func (r *RemoteRunner) lookup(name string) (RemoteAgent, bool, bool) {
 		return a, true, false
 	}
 	return RemoteAgent{}, false, false
+}
+
+// CallWorker runs one of a worker's own methods on it — what its own window
+// would call — and decodes the answer into out.
+func (r *RemoteRunner) CallWorker(ctx context.Context, name, method string, args []any, out any) error {
+	a, ok := r.Workers()[name]
+	if !ok {
+		return fmt.Errorf("%s is not a worker of this hive", name)
+	}
+	var w WorkerWire = httpWire{base: strings.TrimRight(a.URL, "/"), token: a.Token}
+	if a.Wire != nil {
+		w = a.Wire
+	}
+	if args == nil {
+		args = []any{}
+	}
+	raw, err := w.Call(ctx, method, args)
+	if err != nil {
+		return fmt.Errorf("%s: %w", name, err)
+	}
+	if out == nil || len(bytes.TrimSpace(raw)) == 0 {
+		return nil
+	}
+	return json.Unmarshal(raw, out)
 }
 
 // Workers is every reachable worker — those named in the settings and those that

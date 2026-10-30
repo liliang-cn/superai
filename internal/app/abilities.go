@@ -135,6 +135,73 @@ func (a *App) abilityRoster() string {
 	return strings.Join(parts, "; ")
 }
 
+// kitRoster is, by live worker, the MCP servers and skills it has that not
+// every live worker has — "w1: mcp sqlite; skills pdf" — for the queen to send
+// a task that needs one where it is. Empty when they all have the same.
+func (a *App) kitRoster() string {
+	ws := a.liveWorkers()
+	if len(ws) == 0 {
+		return ""
+	}
+	count := map[string]int{}
+	for _, w := range ws {
+		for _, n := range slices.Compact(slices.Sorted(slices.Values(append(append([]string{}, w.MCP...), w.Skills...)))) {
+			count[n]++
+		}
+	}
+	var parts []string
+	for _, w := range ws {
+		var mcp, skills []string
+		for _, n := range w.MCP {
+			if count[n] < len(ws) {
+				mcp = append(mcp, n+toolList(w.MCPTools[n]))
+			}
+		}
+		for _, n := range w.Skills {
+			if count[n] < len(ws) {
+				skills = append(skills, n)
+			}
+		}
+		if len(mcp)+len(skills) == 0 {
+			continue
+		}
+		var have []string
+		if len(mcp) > 0 {
+			sort.Strings(mcp)
+			have = append(have, "mcp "+strings.Join(mcp, " "))
+		}
+		if len(skills) > 0 {
+			sort.Strings(skills)
+			have = append(have, "skills "+strings.Join(skills, " "))
+		}
+		parts = append(parts, w.Name+": "+strings.Join(have, ", "))
+	}
+	sort.Strings(parts)
+	return strings.Join(parts, "; ")
+}
+
+// toolList is " (tools a, b, …)" for a server's tools, the first dozen.
+func toolList(tools []string) string {
+	if len(tools) == 0 {
+		return ""
+	}
+	t := slices.Sorted(slices.Values(tools))
+	more := ""
+	if len(t) > 12 {
+		t, more = t[:12], ", …"
+	}
+	return " (tools " + strings.Join(t, ", ") + more + ")"
+}
+
+// workerKitNames is every MCP server and skill a live worker has.
+func (a *App) workerKitNames() []string {
+	var out []string
+	for _, w := range a.liveWorkers() {
+		out = append(append(out, w.MCP...), w.Skills...)
+	}
+	return slices.Compact(slices.Sorted(slices.Values(out)))
+}
+
 // abilityLine is the names of abs, sorted, for a line of text.
 func abilityLine(abs []HostAbility) []string {
 	out := make([]string, 0, len(abs))

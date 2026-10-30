@@ -1579,6 +1579,7 @@ func (a *App) InstallMCPServer(name, command string, args []string, env map[stri
 	if err := svc.InstallMCPServer(context.Background(), name, command, args, env); err != nil {
 		return err.Error()
 	}
+	a.announceNow()
 	return "ok"
 }
 
@@ -1592,6 +1593,7 @@ func (a *App) RemoveMCPServer(name string) string {
 		return err.Error()
 	}
 	a.emit("mcp:changed", map[string]any{"name": name})
+	a.announceNow()
 	return "ok"
 }
 
@@ -1606,6 +1608,7 @@ func (a *App) InstallSkill(name, sourcePath string) string {
 	if err := svc.InstallSkillFromPath(context.Background(), name, sourcePath); err != nil {
 		return err.Error()
 	}
+	a.announceNow()
 	return "ok"
 }
 
@@ -1620,6 +1623,7 @@ func (a *App) RemoveSkill(name string) string {
 	if svc != nil {
 		svc.ReloadSkills(context.Background())
 	}
+	a.announceNow()
 	return "ok"
 }
 

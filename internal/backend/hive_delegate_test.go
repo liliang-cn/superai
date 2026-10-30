@@ -439,3 +439,27 @@ func TestAWorkersWordsReachTheQueenAsItWrites(t *testing.T) {
 		t.Fatalf("words came in %d pieces: %q", len(words), words)
 	}
 }
+
+// A piece sent to a worker for a server it has says so, so the worker uses
+// that server rather than another way round; one without needs says nothing.
+func TestAPieceTellsTheWorkerWhatItCameFor(t *testing.T) {
+	var mu sync.Mutex
+	got := map[string]string{}
+	env := DelegateEnv{
+		Candidates: func(needs []string) []string { return []string{"w1"} },
+		Run: func(_ context.Context, worker, prompt string) (RemoteResult, error) {
+			mu.Lock()
+			defer mu.Unlock()
+			got[prompt[len(prompt)-1:]] = prompt
+			return RemoteResult{Agent: worker, Text: "done"}, nil
+		},
+		SelfName: "q",
+	}
+	RunDelegated(context.Background(), env, []DelegateTask{{Task: "count the stock A", Needs: []string{"sqlite"}}, {Task: "say hi B"}})
+	if p := got["A"]; !strings.Contains(p, "came to you for sqlite") || !strings.HasSuffix(p, "count the stock A") {
+		t.Fatalf("the piece that needs sqlite reached the worker as %q", p)
+	}
+	if p := got["B"]; strings.Contains(p, "came to you for") {
+		t.Fatalf("a piece without needs said what it came for: %q", p)
+	}
+}

@@ -411,7 +411,8 @@ func (s *Service) startBrowser(mode string) {
 			b.setErr(fmt.Errorf("no agent to mount the browser on"))
 			return
 		}
-		s.svc.SetEagerTools(browserEagerTools...)
+		s.browserEager.Store(true)
+		s.refreshEagerTools()
 		// AddMCPServer, not MCP's own add: that starts the process but leaves
 		// its tools out of the search index the model finds MCP tools by.
 		if err := s.svc.AddMCPServer(ctx, BrowserMCPName, bin, []string{"mcp"}, b.env); err != nil {

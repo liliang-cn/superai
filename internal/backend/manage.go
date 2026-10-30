@@ -36,6 +36,7 @@ func (s *Service) InstallMCPServer(ctx context.Context, name, command string, ar
 	if err := s.svc.AddMCPServer(ctx, name, command, args, env); err != nil {
 		return fmt.Errorf("saved, but it did not start: %w", err)
 	}
+	s.refreshEagerTools()
 	return nil
 }
 
@@ -196,6 +197,7 @@ func (s *Service) UninstallMCPServer(name string) error {
 	// agent-go keeps a loaded server in its list until the next build; this
 	// service leaves it out from now on (MCPServers).
 	s.removedMCP.Store(sanitizeName(name), true)
+	s.refreshEagerTools()
 	if s.svc.MCP != nil {
 		_ = s.svc.MCP.StopServer(sanitizeName(name))
 	}

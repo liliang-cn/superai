@@ -10,6 +10,14 @@ export function AddSchedule(arg1, arg2, arg3, arg4) {
   return window['go']['app']['App']['AddSchedule'](arg1, arg2, arg3, arg4);
 }
 
+export function AddWorkerMCP(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['app']['App']['AddWorkerMCP'](arg1, arg2, arg3, arg4, arg5);
+}
+
+export function AddWorkerSkill(arg1, arg2, arg3) {
+  return window['go']['app']['App']['AddWorkerSkill'](arg1, arg2, arg3);
+}
+
 export function AgentJoinCode() {
   return window['go']['app']['App']['AgentJoinCode']();
 }
@@ -24,6 +32,10 @@ export function AnswerCCPermission(arg1, arg2, arg3) {
 
 export function AskRemoteAgent(arg1, arg2) {
   return window['go']['app']['App']['AskRemoteAgent'](arg1, arg2);
+}
+
+export function AskRemoteAgentAs(arg1, arg2, arg3) {
+  return window['go']['app']['App']['AskRemoteAgentAs'](arg1, arg2, arg3);
 }
 
 export function Attention() {
@@ -104,6 +116,10 @@ export function CancelCLIRun(arg1) {
 
 export function CancelChat(arg1) {
   return window['go']['app']['App']['CancelChat'](arg1);
+}
+
+export function CancelRemoteAsk(arg1) {
+  return window['go']['app']['App']['CancelRemoteAsk'](arg1);
 }
 
 export function CancelScheduledRun(arg1) {
@@ -262,6 +278,10 @@ export function GraphView() {
   return window['go']['app']['App']['GraphView']();
 }
 
+export function HiveKit() {
+  return window['go']['app']['App']['HiveKit']();
+}
+
 export function HiveLinkStatus() {
   return window['go']['app']['App']['HiveLinkStatus']();
 }
@@ -352,6 +372,10 @@ export function InstallMCPServer(arg1, arg2, arg3, arg4) {
 
 export function InstallSkill(arg1, arg2) {
   return window['go']['app']['App']['InstallSkill'](arg1, arg2);
+}
+
+export function InstallSkillFiles(arg1, arg2) {
+  return window['go']['app']['App']['InstallSkillFiles'](arg1, arg2);
 }
 
 export function JoinHive(arg1, arg2) {
@@ -642,6 +666,14 @@ export function RemoveSkill(arg1) {
   return window['go']['app']['App']['RemoveSkill'](arg1);
 }
 
+export function RemoveWorkerMCP(arg1, arg2) {
+  return window['go']['app']['App']['RemoveWorkerMCP'](arg1, arg2);
+}
+
+export function RemoveWorkerSkill(arg1, arg2) {
+  return window['go']['app']['App']['RemoveWorkerSkill'](arg1, arg2);
+}
+
 export function RenameDashboard(arg1, arg2) {
   return window['go']['app']['App']['RenameDashboard'](arg1, arg2);
 }
@@ -904,4 +936,8 @@ export function Upcoming() {
 
 export function WakeStandingAgent(arg1, arg2) {
   return window['go']['app']['App']['WakeStandingAgent'](arg1, arg2);
+}
+
+export function WorkerKit(arg1) {
+  return window['go']['app']['App']['WorkerKit'](arg1);
 }

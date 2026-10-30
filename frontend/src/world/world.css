@@ -255,6 +255,14 @@
 .wi-shop-n small { color: #5f6d77; font-size: 11.5px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .wi-get { flex: none; height: 26px; padding: 0 10px; border-radius: 7px; border: 0; background: #16202b; color: #fff; font: 600 12px Geist, system-ui; cursor: pointer; }
 .wi-get:disabled { background: #e9edf2; color: #5f6d77; cursor: default; }
+/* A worker's own MCP servers and skills, on its card. */
+.wi-kit { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.wi-kit .wi-list li { cursor: default; }
+.wi-kit .wi-x { margin-left: auto; }
+.wi-kit em + .wi-x { margin-left: 6px; }
+.wi-x { flex: none; height: 22px; min-width: 22px; padding: 0 6px; border: 0; border-radius: 6px; background: transparent; color: #5f6d77; font: 600 11px Geist, system-ui; display: grid; place-items: center; cursor: pointer; }
+.wi-x:hover { background: #fde8e6; color: #c2362a; }
+.wi-kit-add .wi-kit-name { flex: 0 0 88px; }
 .wi-none { color: #5f6d77; cursor: default !important; }
 .wi-shop li { overflow: visible; padding: 6px 4px; gap: 8px; }
 .wi-shop-n b { line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

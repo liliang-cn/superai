@@ -93,7 +93,7 @@ func (a *App) delegateCandidates(needs []string) []string {
 		roster[m.Name] = true
 		have := m.MCP
 		if have != nil {
-			have = append(append([]string{}, m.MCP...), m.CLIs...)
+			have = append(append(append([]string{}, m.MCP...), m.CLIs...), m.Skills...)
 			for _, ab := range m.Abilities {
 				have = append(have, ab.Name)
 			}
@@ -217,7 +217,7 @@ type delegateToolState struct {
 // workers have changed, so the description the queen's model reads says which
 // worker can do what. Asked per run (queenRunFilter), outside a.mu.
 func (a *App) syncDelegateDescription() {
-	roster := a.abilityRoster()
+	roster := a.abilityRoster() + "\x00" + a.kitRoster()
 	a.delegateTool.mu.Lock()
 	inner, last := a.delegateTool.inner, a.delegateTool.roster
 	if inner == nil || roster == last {
@@ -229,7 +229,8 @@ func (a *App) syncDelegateDescription() {
 	a.addDelegateTool(inner, roster)
 }
 
-func (a *App) addDelegateTool(inner *agent.Service, roster string) {
+func (a *App) addDelegateTool(inner *agent.Service, rosters string) {
+	roster, kits, _ := strings.Cut(rosters, "\x00")
 	abilities := "\n\nA task that needs one machine's own things — its desktop apps (\"open WeChat\"), its browser (the person's Chrome," +
 		" signed-in sites), its files, running commands on it — goes to the SuperLeo on that machine, whole: set worker to it, or put" +
 		" the ability (desktop, browser, files, exec) in needs. It does the task with its own local tools; you do not have them." +
@@ -238,6 +239,11 @@ func (a *App) addDelegateTool(inner *agent.Service, roster string) {
 		abilities += " Right now, by machine: " + roster + "."
 	} else {
 		abilities += " Right now no live worker has said it offers any."
+	}
+	if kits != "" {
+		abilities += "\n\nSome MCP servers and skills only some workers have: " + kits + ". You do not have their tools." +
+			" A task that needs one puts the server's or skill's name in needs (e.g. [\"sqlite\"]), so it goes to a worker that" +
+			" has it and that worker is told to use it; write the task for that tool, not for another way round to the same end."
 	}
 	inner.AddToolWithMetadata(backend.DelegateToolName,
 		"Have workers do the work that needs tools, and get their reports back: noted (calendar, to-dos, notes, goals,"+
@@ -264,7 +270,7 @@ func (a *App) addDelegateTool(inner *agent.Service, roster string) {
 							"task": map[string]any{"type": "string", "description": "One self-contained instruction."},
 							"needs": map[string]any{
 								"type": "array", "items": map[string]any{"type": "string"},
-								"description": "MCP servers the task's tools come from, e.g. [\"noted\"], coding CLIs it needs, e.g. [\"codex\"], and machine abilities, e.g. [\"desktop\"], [\"browser\"].",
+								"description": "MCP servers the task's tools come from, e.g. [\"noted\"], skills it uses, coding CLIs it needs, e.g. [\"codex\"], and machine abilities, e.g. [\"desktop\"], [\"browser\"].",
 							},
 							"worker": map[string]any{"type": "string", "description": "To hand the task to one worker by name (\"openclaw\", \"claude.mac\", \"superleo-worker-1\", or a machine's SuperLeo); omit to let the hive choose."},
 						},
@@ -352,8 +358,9 @@ func (a *App) delegate(ctx context.Context, tasks []backend.DelegateTask, onAssi
 	if s != nil {
 		timeout = s.Hive.DelegateTimeout()
 	}
-	// A task that names a server the queen has needs it, said or not.
-	servers := svc.MCPServersWithTools()
+	// A task that names a server or a skill the queen or a worker has needs
+	// it, said or not.
+	servers := append(svc.MCPServersWithTools(), a.workerKitNames()...)
 	for i := range tasks {
 		if len(tasks[i].Needs) == 0 {
 			tasks[i].Needs = backend.InferNeeds(tasks[i].Task, servers)

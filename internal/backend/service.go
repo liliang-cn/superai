@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unicode/utf8"
 
@@ -43,9 +44,12 @@ type Service struct {
 	svc *agent.Service
 	// browser is the built-in browser (browser.go); nil when it is off.
 	browser *browserRuntime
-	desktop *desktopRuntime
-	sb      sandbox.Sandbox
-	cortex  *cortexdb.DB
+	// browserEager is the browser's tools being among the eager ones
+	// (refreshEagerTools), once it is mounted.
+	browserEager atomic.Bool
+	desktop      *desktopRuntime
+	sb           sandbox.Sandbox
+	cortex       *cortexdb.DB
 	// sharedMem is the read-through store handed to agent-go, which does not
 	// close an injected store; nil unless the namespace is a private one.
 	sharedMem *readThroughMemoryStore
@@ -231,7 +235,7 @@ func NewService(s *Settings) (*Service, error) {
 	// big enough that the rest go behind search: "what's on tomorrow" cost a
 	// worker two model calls just to find list_events — ten seconds of a
 	// twenty-five second answer.
-	cfg.Tooling.EagerTools = eagerNotedTools
+	cfg.Tooling.EagerTools = eagerTools(s, false)
 	// Memory backend: local by default, or the shared CortexDB brain when the
 	// user picked it and an endpoint is known. The shared backend is a remote
 	// store, so the local embedder plays no part in it — the server owns the
@@ -1084,12 +1088,16 @@ When workers pass work by message, let them run; if what you wait for has not co
 func queenWorkRule(mode string) string {
 	switch mode {
 	case DelegationMax:
-		return `You plan, split, route, follow up, merge, handle approvals and talk to the person; workers do the work. While a worker is live your work tools (noted, web search and pages, files, shell, CortexDB research) are withheld and hive_delegate runs them: give it every piece that needs a tool, standing alone, dates already resolved with resolve_datetime, and needs naming the MCP server its tools come from (noted for calendar, to-dos, notes, goals, time, holdings). Independent pieces go in one call and run in parallel on different workers. Answer yourself only for conversation, a clarifying question, your own state (hive_members, hive_task) and composing the reply from the reports; say which worker did what in a few words. If a report says the queen did a piece herself, say why in one line. Without hive_delegate among your tools no worker is live: do the work yourself and say the hive had no free worker.`
+		return `You plan, split, route, follow up, merge, handle approvals and talk to the person; workers do the work. While a worker is live your work tools (noted, web search and pages, files, shell, CortexDB research) are withheld and hive_delegate runs them: give it every piece that needs a tool, standing alone, dates already resolved with resolve_datetime, and needs naming the MCP server its tools come from (noted for calendar, to-dos, notes, goals, time, holdings).` + workerKitRule + ` Independent pieces go in one call and run in parallel on different workers. Answer yourself only for conversation, a clarifying question, your own state (hive_members, hive_task) and composing the reply from the reports; say which worker did what in a few words. If a report says the queen did a piece herself, say why in one line. Without hive_delegate among your tools no worker is live: do the work yourself and say the hive had no free worker.`
 	case DelegationAuto:
-		return `Work that needs a tool (noted, web, files, research) goes to an idle worker with hive_delegate — independent pieces in one call, needs naming the MCP server (noted for calendar and to-dos); do it yourself only when no worker is free or it is one quick read. Conversation and your own state you answer yourself.`
+		return `Work that needs a tool (noted, web, files, research) goes to an idle worker with hive_delegate — independent pieces in one call, needs naming the MCP server (noted for calendar and to-dos).` + workerKitRule + ` Do it yourself only when no worker is free or it is one quick read. Conversation and your own state you answer yourself.`
 	}
 	return `Answer small questions yourself.`
 }
+
+// workerKitRule is how the queen uses a server or skill only some workers
+// have (hive_delegate's description lists them, with their tools).
+const workerKitRule = ` When a server or skill only some workers have fits the request, that is how it is done: write the piece for its tools and put its name in needs, rather than a shell or another way round to the same end.`
 
 func queenSaveRule(mode string) string {
 	if mode == DelegationMax {
@@ -1522,6 +1530,32 @@ const singleUserID = "owner"
 
 // eagerNotedTools are the noted tools an ordinary day of conversation calls:
 // reading the day and the lists, and the few writes people dictate.
+// eagerTools is every tool pattern a request offers up front: noted's
+// everyday tools, the browser's when it is mounted, and on a worker the tools
+// of its own MCP servers — the reason the queen sends it the work that needs
+// them, and a worker that has to search for them finds the wrong ones.
+func eagerTools(s *Settings, browser bool) []string {
+	out := append([]string{}, eagerNotedTools...)
+	if browser {
+		out = append(out, browserEagerTools...)
+	}
+	if s != nil && s.Hive.Role == HiveRoleWorker {
+		for name := range OwnMCPServers() {
+			out = append(out, "mcp_"+sanitizeName(name)+"_*")
+		}
+	}
+	return out
+}
+
+// refreshEagerTools puts eagerTools in force on the running agent, after a
+// server was added or removed or the browser mounted.
+func (s *Service) refreshEagerTools() {
+	if s == nil || s.svc == nil {
+		return
+	}
+	s.svc.SetEagerTools(eagerTools(s.settings, s.browserEager.Load())...)
+}
+
 var eagerNotedTools = []string{
 	"mcp_noted_get_overview", "mcp_noted_list_events", "mcp_noted_list_tasks",
 	"mcp_noted_list_holdings", "mcp_noted_create_event", "mcp_noted_create_task",

@@ -85,6 +85,8 @@ type HostAgent struct {
 	Via string `json:"via,omitempty"`
 	// MCP is the MCP servers a SuperLeo can call, where it has said.
 	MCP []string `json:"mcp,omitempty"`
+	// Skills are a SuperLeo worker's skills.
+	Skills []string `json:"skills,omitempty"`
 	// Abilities is what that SuperLeo's machine can do for the queen: desktop,
 	// browser, files, exec (abilities.go).
 	Abilities []HostAbility `json:"abilities,omitempty"`
@@ -372,7 +374,7 @@ func (a *App) hostsWith(services []backend.HAService) []Host {
 			}
 			about := m.Engine
 			b.agent(x, HostAgent{Name: m.Name, Kind: hostAgentSuperLeo, Role: backend.HiveRoleWorker, About: about,
-				State: m.State, Version: m.Version, MCP: m.MCP, Abilities: abilitiesOfMember(m)})
+				State: m.State, Version: m.Version, MCP: m.MCP, Skills: m.Skills, Abilities: abilitiesOfMember(m)})
 		}
 	}
 
@@ -768,6 +770,9 @@ func (b *hostBook) agent(x *Host, g HostAgent) {
 		if e.MCP == nil {
 			e.MCP = g.MCP
 		}
+		if e.Skills == nil {
+			e.Skills = g.Skills
+		}
 		if e.Abilities == nil {
 			e.Abilities = g.Abilities
 		}
@@ -1039,6 +1044,9 @@ func hostsText(hs []Host) string {
 			}
 			if len(g.MCP) > 0 {
 				fmt.Fprintf(&b, ", mcp %s", strings.Join(g.MCP, " "))
+			}
+			if len(g.Skills) > 0 {
+				fmt.Fprintf(&b, ", skills %s", strings.Join(g.Skills, " "))
 			}
 			if len(g.Abilities) > 0 {
 				fmt.Fprintf(&b, ", can %s", strings.Join(abilityLine(g.Abilities), " "))
