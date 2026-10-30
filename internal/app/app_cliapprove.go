@@ -121,6 +121,11 @@ func (a *App) cliApproveStart(prefer string) *cliApprover {
 				a.cliDecide(w, r, run)
 				return
 			}
+			if len(parts) > 2 && parts[2] == "xcode" {
+				s := a.cliXcodeHandler(run)
+				mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return s }, &mcp.StreamableHTTPOptions{Stateless: true}).ServeHTTP(w, r)
+				return
+			}
 			a.cliApproveHandler(run).ServeHTTP(w, r)
 		})
 		go func() { _ = http.Serve(ln, mux) }()

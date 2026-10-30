@@ -380,6 +380,18 @@ func (a *App) startCLIRun(o cliStart) (CLIRun, error) {
 			req.ExtraArgs = append(req.ExtraArgs, "--skip-git-repo-check", "-c", `sandbox_mode="workspace-write"`,
 				"-c", "sandbox_workspace_write.network_access=true",
 				"-c", "sandbox_workspace_write.writable_roots="+tomlStrings(codexWritable(dir, a.cliAllowed(ext.Roots))))
+			// In an Xcode project, xcodebuild runs here for it: the sandbox
+			// has no way to the simulators or macro plugins (cli_xcode.go).
+			// The URL rides on the approval channel's, so a restart swaps
+			// it with that one.
+			if xcodeRoot(dir) != "" {
+				if approve == "" {
+					if approve, err = a.cliApproveURL(id); err != nil {
+						return CLIRun{}, fmt.Errorf("could not open the approval channel: %w", err)
+					}
+				}
+				req.ExtraArgs = append(req.ExtraArgs, codexXcodeArgs(approve+"/xcode")...)
+			}
 		}
 	}
 	sess := provider.NewSession()
