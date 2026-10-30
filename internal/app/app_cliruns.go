@@ -379,7 +379,8 @@ func (a *App) startCLIRun(o cliStart) (CLIRun, error) {
 			// -c rather than --sandbox: `codex exec resume` takes no --sandbox.
 			req.ExtraArgs = append(req.ExtraArgs, "--skip-git-repo-check", "-c", `sandbox_mode="workspace-write"`,
 				"-c", "sandbox_workspace_write.network_access=true",
-				"-c", "sandbox_workspace_write.writable_roots="+tomlStrings(codexWritable(dir, a.cliAllowed(ext.Roots))))
+				// And in a Go module, go's caches: go build writes them.
+				"-c", "sandbox_workspace_write.writable_roots="+tomlStrings(append(codexWritable(dir, a.cliAllowed(ext.Roots)), goCaches(dir)...)))
 			// In an Xcode project, xcodebuild runs here for it: the sandbox
 			// has no way to the simulators or macro plugins (cli_xcode.go).
 			// The URL rides on the approval channel's, so a restart swaps
