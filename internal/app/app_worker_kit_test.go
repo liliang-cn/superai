@@ -111,6 +111,7 @@ func TestAWorkersCardAddsAndRemovesItsOwnKit(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 	q := kitQueen(t, backend.HiveHello{Name: "w1", URL: srv.URL, MCP: []string{"noted"}})
+	answerCards(t, q, true)
 
 	kit, err := q.AddWorkerMCP("w1", "sqlite", "/usr/local/bin/mcp-sqlite-server", []string{"/data/stock.db"}, nil)
 	if err != nil {
@@ -150,5 +151,111 @@ func TestAWorkersCardAddsAndRemovesItsOwnKit(t *testing.T) {
 	want := []string{"InstallMCPServer", "HiveKit", "InstallSkillFiles", "HiveKit", "RemoveSkill", "HiveKit", "RemoveMCPServer"}
 	if !slices.Equal(calls, want) {
 		t.Fatalf("calls on the worker %v, want %v", calls, want)
+	}
+}
+
+// answerCards answers every approval card on a as it comes, allowing or not,
+// and hands back the cards it answered.
+func answerCards(t *testing.T, a *App, allow bool) func() []map[string]any {
+	t.Helper()
+	var mu sync.Mutex
+	var seen []map[string]any
+	stop := make(chan struct{})
+	t.Cleanup(func() { close(stop) })
+	go func() {
+		for {
+			select {
+			case <-stop:
+				return
+			case <-time.After(2 * time.Millisecond):
+			}
+			for _, p := range a.PendingToolApprovals() {
+				mu.Lock()
+				seen = append(seen, p)
+				mu.Unlock()
+				a.ResolveToolApproval(p["id"].(string), allow)
+			}
+		}
+	}()
+	return func() []map[string]any {
+		mu.Lock()
+		defer mu.Unlock()
+		return append([]map[string]any(nil), seen...)
+	}
+}
+
+// A worker's card adds a server reached by URL — streamable HTTP or SSE, with
+// a token — once the person allows it on an approval card: the worker gets the
+// headers as they were typed, the card shows only the token's last four.
+func TestAWorkersCardAddsAServerByURLOnceAllowed(t *testing.T) {
+	var mu sync.Mutex
+	var installs [][]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		method := strings.TrimPrefix(r.URL.Path, "/api/rpc/")
+		var args []any
+		_ = json.NewDecoder(r.Body).Decode(&args)
+		switch method {
+		case "InstallMCPURLServer":
+			mu.Lock()
+			installs = append(installs, args)
+			mu.Unlock()
+			_ = json.NewEncoder(w).Encode("ok")
+		case "HiveKit":
+			_ = json.NewEncoder(w).Encode(backend.WorkerKit{Worker: "w1",
+				MCP: []backend.KitItem{{Name: "linear", OK: true, Own: true, Tools: []string{"list_issues", "create_issue"}}}})
+		default:
+			http.Error(w, "no such method", http.StatusNotFound)
+		}
+	}))
+	t.Cleanup(srv.Close)
+	q := kitQueen(t, backend.HiveHello{Name: "w1", URL: srv.URL})
+
+	// Said no: nothing reaches the worker.
+	stopNo := answerCards(t, q, false)
+	if _, err := q.AddWorkerMCPURL("w1", "linear", "", "https://mcp.linear.app/mcp", map[string]string{"Authorization": "Bearer lin_api_abcdef1234"}); err == nil ||
+		!strings.Contains(err.Error(), "not allowed") {
+		t.Fatalf("a denied card said %v", err)
+	}
+	if len(stopNo()) != 1 {
+		t.Fatalf("cards asked: %v", stopNo())
+	}
+	mu.Lock()
+	if len(installs) != 0 {
+		t.Fatalf("installed without approval: %v", installs)
+	}
+	mu.Unlock()
+
+	q2 := kitQueen(t, backend.HiveHello{Name: "w1", URL: srv.URL})
+	cards := answerCards(t, q2, true)
+	kit, err := q2.AddWorkerMCPURL("w1", "linear", "streamable-http", "https://mcp.linear.app/mcp", map[string]string{"Authorization": "Bearer lin_api_abcdef1234"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(kit.MCP) != 1 || kit.MCP[0].Name != "linear" || len(kit.MCP[0].Tools) != 2 {
+		t.Fatalf("kit after adding: %+v", kit)
+	}
+	mu.Lock()
+	got := installs
+	mu.Unlock()
+	if len(got) != 1 || got[0][0] != "linear" || got[0][1] != "http" || got[0][2] != "https://mcp.linear.app/mcp" {
+		t.Fatalf("the worker was asked %v", got)
+	}
+	if h, _ := got[0][3].(map[string]any); h["Authorization"] != "Bearer lin_api_abcdef1234" {
+		t.Fatalf("the worker got headers %v", got[0][3])
+	}
+	seen := cards()
+	if len(seen) != 1 || seen[0]["tool"] != "add_mcp_server" {
+		t.Fatalf("cards: %v", seen)
+	}
+	raw, _ := json.Marshal(seen[0])
+	if strings.Contains(string(raw), "abcdef") || !strings.Contains(string(raw), "••••1234") || !strings.Contains(string(raw), "mcp.linear.app") {
+		t.Fatalf("the card shows %s", raw)
+	}
+
+	if _, err := q2.AddWorkerMCPURL("w1", "x", "websocket", "https://a.example/mcp", nil); err == nil {
+		t.Fatal("an unknown transport was taken")
+	}
+	if _, err := q2.AddWorkerMCPURL("nobody", "x", "sse", "https://a.example/sse", nil); err == nil {
+		t.Fatal("a worker not in the hive was asked")
 	}
 }

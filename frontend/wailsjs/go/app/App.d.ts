@@ -12,6 +12,8 @@ export function AddSchedule(arg1:string,arg2:string,arg3:string,arg4:Array<strin
 
 export function AddWorkerMCP(arg1:string,arg2:string,arg3:string,arg4:Array<string>,arg5:Record<string, string>):Promise<backend.WorkerKit>;
 
+export function AddWorkerMCPURL(arg1:string,arg2:string,arg3:string,arg4:string,arg5:Record<string, string>):Promise<backend.WorkerKit>;
+
 export function AddWorkerSkill(arg1:string,arg2:string,arg3:string):Promise<backend.WorkerKit>;
 
 export function AgentJoinCode():Promise<app.AgentJoin>;
@@ -189,6 +191,8 @@ export function ImportFiles(arg1:Array<string>):Promise<Array<string>>;
 export function ImportPastedFile(arg1:string,arg2:string):Promise<string>;
 
 export function InstallMCPServer(arg1:string,arg2:string,arg3:Array<string>,arg4:Record<string, string>):Promise<string>;
+
+export function InstallMCPURLServer(arg1:string,arg2:string,arg3:string,arg4:Record<string, string>):Promise<string>;
 
 export function InstallSkill(arg1:string,arg2:string):Promise<string>;
 

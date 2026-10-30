@@ -1583,6 +1583,23 @@ func (a *App) InstallMCPServer(name, command string, args []string, env map[stri
 	return "ok"
 }
 
+// InstallMCPURLServer adds a server reached by URL (streamable HTTP or SSE,
+// with its headers) and connects to it.
+func (a *App) InstallMCPURLServer(name, transport, url string, headers map[string]string) string {
+	a.mu.Lock()
+	svc := a.svc
+	a.mu.Unlock()
+	if svc == nil {
+		return "backend not ready"
+	}
+	if err := svc.InstallMCPURLServer(context.Background(), name, transport, url, headers); err != nil {
+		return err.Error()
+	}
+	a.emit("mcp:changed", map[string]any{"name": name})
+	a.announceNow()
+	return "ok"
+}
+
 // RemoveMCPServer forgets a server: stopped now, and gone on the next launch too.
 func (a *App) RemoveMCPServer(name string) string {
 	a.mu.Lock()

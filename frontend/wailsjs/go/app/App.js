@@ -14,6 +14,10 @@ export function AddWorkerMCP(arg1, arg2, arg3, arg4, arg5) {
   return window['go']['app']['App']['AddWorkerMCP'](arg1, arg2, arg3, arg4, arg5);
 }
 
+export function AddWorkerMCPURL(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['app']['App']['AddWorkerMCPURL'](arg1, arg2, arg3, arg4, arg5);
+}
+
 export function AddWorkerSkill(arg1, arg2, arg3) {
   return window['go']['app']['App']['AddWorkerSkill'](arg1, arg2, arg3);
 }
@@ -368,6 +372,10 @@ export function ImportPastedFile(arg1, arg2) {
 
 export function InstallMCPServer(arg1, arg2, arg3, arg4) {
   return window['go']['app']['App']['InstallMCPServer'](arg1, arg2, arg3, arg4);
+}
+
+export function InstallMCPURLServer(arg1, arg2, arg3, arg4) {
+  return window['go']['app']['App']['InstallMCPURLServer'](arg1, arg2, arg3, arg4);
 }
 
 export function InstallSkill(arg1, arg2) {

@@ -4,9 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/liliang-cn/agent-go/v3/pkg/mcp"
 )
 
 // Install and removal, shared by the chat tools and the Skills/MCP panels.
@@ -35,6 +38,76 @@ func (s *Service) InstallMCPServer(ctx context.Context, name, command string, ar
 	// single tool of it until a restart.
 	if err := s.svc.AddMCPServer(ctx, name, command, args, env); err != nil {
 		return fmt.Errorf("saved, but it did not start: %w", err)
+	}
+	s.refreshEagerTools()
+	return nil
+}
+
+// MCPTransport is how a server reached by URL is spoken to: "http" for
+// streamable HTTP (also said "streamable-http"), "sse" for the older
+// server-sent events. Empty is http.
+func MCPTransport(t string) (string, error) {
+	switch strings.ToLower(strings.TrimSpace(t)) {
+	case "", "http", "streamable-http", "streamable_http", "streamable":
+		return "http", nil
+	case "sse":
+		return "sse", nil
+	}
+	return "", fmt.Errorf("transport %q is not http or sse", t)
+}
+
+// InstallMCPURLServer persists a server reached by URL — streamable HTTP or
+// SSE, with the headers it wants (a token among them) — and connects to it in
+// this session. A header may name a variable, "Bearer ${TOKEN}", filled in
+// from the environment as every config's are (mcp_env.go).
+func (s *Service) InstallMCPURLServer(ctx context.Context, name, transport, rawURL string, headers map[string]string) error {
+	name = sanitizeName(name)
+	rawURL = strings.TrimSpace(rawURL)
+	if name == "" || rawURL == "" {
+		return fmt.Errorf("name and URL are required")
+	}
+	kind, err := MCPTransport(transport)
+	if err != nil {
+		return err
+	}
+	if u, err := url.Parse(rawURL); err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		return fmt.Errorf("%q is not an http or https URL", rawURL)
+	}
+	clean := map[string]string{}
+	for k, v := range headers {
+		if k = strings.TrimSpace(k); k != "" {
+			clean[k] = strings.TrimSpace(v)
+		}
+	}
+	if len(clean) == 0 {
+		clean = nil
+	}
+	entry := mcpURLEntry{Type: kind, URL: rawURL, Headers: clean}
+	if err := upsertMCPEntry(mcpConfigPath(), name, entry, clean != nil); err != nil {
+		return fmt.Errorf("persist config: %w", err)
+	}
+	if s == nil || s.svc == nil || s.svc.MCP == nil {
+		return nil
+	}
+	raw, _ := json.Marshal(entry)
+	var generic map[string]any
+	_ = json.Unmarshal(raw, &generic)
+	resolved, missing := expandMCPEntry(generic, os.LookupEnv)
+	if len(missing) > 0 {
+		return fmt.Errorf("saved, but it did not start: %s not set", strings.Join(missing, ", "))
+	}
+	cfg := mcp.ServerConfig{Name: name, Description: "MCP server: " + name, Type: mcp.ServerType(kind)}
+	cfg.URL, _ = resolved["url"].(string)
+	if h, ok := resolved["headers"].(map[string]any); ok {
+		cfg.Headers = map[string]string{}
+		for k, v := range h {
+			cfg.Headers[k], _ = v.(string)
+		}
+	}
+	// As with a command server, failing to connect is not failing to add:
+	// the config is written, and it is tried again on the next launch.
+	if err := s.svc.AddMCPServerConfig(ctx, cfg); err != nil {
+		return fmt.Errorf("saved, but it did not connect: %w", err)
 	}
 	s.refreshEagerTools()
 	return nil

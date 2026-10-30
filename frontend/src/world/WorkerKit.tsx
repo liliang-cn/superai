@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { PlusIcon, SearchIcon, XIcon } from "lucide-react";
-import { AddWorkerMCP, AddWorkerSkill, RemoveWorkerMCP, RemoveWorkerSkill, SearchSkills, WorkerKit } from "../../wailsjs/go/app/App";
+import { AddWorkerMCP, AddWorkerMCPURL, AddWorkerSkill, RemoveWorkerMCP, RemoveWorkerSkill, SearchSkills, WorkerKit } from "../../wailsjs/go/app/App";
 import { useI18n } from "../lib/i18n";
 import { toast } from "../lib/toasts";
 import "./world.css";
@@ -17,6 +17,11 @@ export default function WorkerKitCard({ worker }: { worker: string }) {
   const [confirm, setConfirm] = useState("");
   const [name, setName] = useState("");
   const [cmd, setCmd] = useState("");
+  const [byURL, setByURL] = useState(false);
+  const [url, setURL] = useState("");
+  const [transport, setTransport] = useState<"http" | "sse">("http");
+  const [token, setToken] = useState("");
+  const [hdrs, setHdrs] = useState("");
   const [q, setQ] = useState("");
   const [found, setFound] = useState<{ name: string; description: string; path: string }[] | null>(null);
   useEffect(() => {
@@ -49,16 +54,48 @@ export default function WorkerKitCard({ worker }: { worker: string }) {
           </li>
         ))}
       </ul>
-      <form className="wi-say wi-kit-add" onSubmit={(e) => {
-        e.preventDefault();
-        const [command, ...args] = cmd.trim().split(/\s+/);
-        if (!name.trim() || !command) return;
-        void run("addm", () => AddWorkerMCP(worker, name.trim(), command, args, {}), t("Added {name}", { name: name.trim() })).then((ok) => { if (ok) { setName(""); setCmd(""); } });
-      }}>
-        <input className="wi-kit-name" value={name} onChange={(e) => setName(e.target.value)} placeholder={t("Name")} data-testid="kit-mcp-name" />
-        <input value={cmd} onChange={(e) => setCmd(e.target.value)} placeholder={t("Command and arguments")} data-testid="kit-mcp-cmd" />
-        <button type="submit" disabled={!name.trim() || !cmd.trim() || busy === "addm"} title={t("Add")}>{busy === "addm" ? "…" : <PlusIcon size={14} />}</button>
-      </form>
+      <div className="wi-seg wi-kit-mode">
+        <button type="button" className={byURL ? "" : "on"} onClick={() => setByURL(false)} data-testid="kit-mcp-by-cmd">{t("Command")}</button>
+        <button type="button" className={byURL ? "on" : ""} onClick={() => setByURL(true)} data-testid="kit-mcp-by-url">URL</button>
+        {byURL && <>
+          <span />
+          <button type="button" className={transport === "http" ? "on" : ""} onClick={() => setTransport("http")} data-testid="kit-mcp-http">HTTP</button>
+          <button type="button" className={transport === "sse" ? "on" : ""} onClick={() => setTransport("sse")} data-testid="kit-mcp-sse">SSE</button>
+        </>}
+      </div>
+      {!byURL ? (
+        <form className="wi-say wi-kit-add" onSubmit={(e) => {
+          e.preventDefault();
+          const [command, ...args] = cmd.trim().split(/\s+/);
+          if (!name.trim() || !command) return;
+          void run("addm", () => AddWorkerMCP(worker, name.trim(), command, args, {}), t("Added {name}", { name: name.trim() })).then((ok) => { if (ok) { setName(""); setCmd(""); } });
+        }}>
+          <input className="wi-kit-name" value={name} onChange={(e) => setName(e.target.value)} placeholder={t("Name")} data-testid="kit-mcp-name" />
+          <input value={cmd} onChange={(e) => setCmd(e.target.value)} placeholder={t("Command and arguments")} data-testid="kit-mcp-cmd" />
+          <button type="submit" disabled={!name.trim() || !cmd.trim() || busy === "addm"} title={t("Add")}>{busy === "addm" ? "…" : <PlusIcon size={14} />}</button>
+        </form>
+      ) : (
+        <form className="wi-kit-url" onSubmit={(e) => {
+          e.preventDefault();
+          if (!name.trim() || !url.trim()) return;
+          const headers = parseHeaders(hdrs);
+          if (token.trim()) headers["Authorization"] = /^bearer\s/i.test(token.trim()) ? token.trim() : `Bearer ${token.trim()}`;
+          void run("addm", () => AddWorkerMCPURL(worker, name.trim(), transport, url.trim(), headers), t("Added {name}", { name: name.trim() }))
+            .then((ok) => { if (ok) { setName(""); setURL(""); setToken(""); setHdrs(""); } });
+        }}>
+          <div className="wi-say wi-kit-add">
+            <input className="wi-kit-name" value={name} onChange={(e) => setName(e.target.value)} placeholder={t("Name")} data-testid="kit-mcp-name" />
+            <input value={url} onChange={(e) => setURL(e.target.value)} placeholder="https://…/mcp" inputMode="url" data-testid="kit-mcp-url" />
+          </div>
+          <div className="wi-say">
+            <input type="password" value={token} onChange={(e) => setToken(e.target.value)} placeholder={t("Token (optional)")} autoComplete="off" data-testid="kit-mcp-token" />
+            <button type="submit" disabled={!name.trim() || !url.trim() || busy === "addm"} title={t("Add")} data-testid="kit-mcp-add-url">{busy === "addm" ? "…" : <PlusIcon size={14} />}</button>
+          </div>
+          <div className="wi-say">
+            <input value={hdrs} onChange={(e) => setHdrs(e.target.value)} placeholder={t("Headers: Name: value; …")} autoComplete="off" data-testid="kit-mcp-headers" />
+          </div>
+        </form>
+      )}
       <p className="wi-cap">{t("Skills")}</p>
       <ul className="wi-list">
         {kit.skills.map((s) => (
@@ -93,4 +130,16 @@ export default function WorkerKitCard({ worker }: { worker: string }) {
       )}
     </div>
   );
+}
+
+/** "X-Api-Key: abc; X-Org: 7" → { "X-Api-Key": "abc", "X-Org": "7" }. */
+function parseHeaders(text: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const part of text.split(/[;\n]/)) {
+    const i = part.indexOf(":");
+    if (i <= 0) continue;
+    const k = part.slice(0, i).trim();
+    if (k) out[k] = part.slice(i + 1).trim();
+  }
+  return out;
 }

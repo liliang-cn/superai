@@ -331,22 +331,52 @@ func upsertMCPServer(path, name, command string, args []string, env map[string]s
 		Args    []string          `json:"args,omitempty"`
 		Env     map[string]string `json:"env,omitempty"`
 	}
-	file := struct {
-		MCPServers map[string]entry `json:"mcpServers"`
-	}{MCPServers: map[string]entry{}}
-	if raw, err := os.ReadFile(path); err == nil {
-		_ = json.Unmarshal(raw, &file)
-		if file.MCPServers == nil {
-			file.MCPServers = map[string]entry{}
-		}
+	return upsertMCPEntry(path, name, entry{Type: "stdio", Command: command, Args: args, Env: env}, false)
+}
+
+// mcpURLEntry is a server reached by URL as mcpServers.json keeps it.
+type mcpURLEntry struct {
+	Type    string            `json:"type"`
+	URL     string            `json:"url"`
+	Headers map[string]string `json:"headers,omitempty"`
+}
+
+// upsertMCPEntry puts one entry into mcpServers.json under name and leaves
+// every other entry, and every other key, as it was: a server reached by URL
+// keeps its url and headers when a command one is added beside it. secret
+// keeps the file to its owner, for an entry with a token in it.
+func upsertMCPEntry(path, name string, entry any, secret bool) error {
+	top, servers, err := readMCPConfig(path)
+	if os.IsNotExist(err) {
+		top, servers, err = map[string]json.RawMessage{}, map[string]json.RawMessage{}, nil
 	}
-	file.MCPServers[name] = entry{Type: "stdio", Command: command, Args: args, Env: env}
-	out, err := json.MarshalIndent(file, "", "  ")
+	if err != nil {
+		return err
+	}
+	b, err := json.Marshal(entry)
+	if err != nil {
+		return err
+	}
+	servers[name] = b
+	if top["mcpServers"], err = json.Marshal(servers); err != nil {
+		return err
+	}
+	out, err := json.MarshalIndent(top, "", "  ")
 	if err != nil {
 		return err
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
-	return os.WriteFile(path, out, 0o644)
+	mode := os.FileMode(0o644)
+	if fi, err := os.Stat(path); err == nil {
+		mode = fi.Mode().Perm()
+	}
+	if secret {
+		mode = 0o600
+	}
+	if err := os.WriteFile(path, out, mode); err != nil {
+		return err
+	}
+	return os.Chmod(path, mode)
 }
