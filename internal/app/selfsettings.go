@@ -240,6 +240,12 @@ func (a *App) selfSectionState(sec string, cfg *backend.Settings) map[string]any
 		return out
 	case "notifications":
 		return map[string]any{"channels": a.ListChannels()}
+	case "bees":
+		bees := []map[string]any{}
+		for _, b := range a.selfStandingAgents() {
+			bees = append(bees, map[string]any{"id": b.ID, "name": b.Name, "goal": b.Goal, "watch": b.Watch, "paused": b.Paused})
+		}
+		return map[string]any{"bees": bees}
 	case "approval":
 		info := a.ToolApprovalInfo(0)
 		out := map[string]any{"enabled": info["enabled"], "yolo": info["yolo"], "wait_seconds": info["waitSeconds"]}
@@ -402,7 +408,7 @@ func (a *App) checkSelfChanges(changes []selfChange) error {
 	queen := false
 	for _, c := range changes {
 		if backend.IsVirtualSelfKey(c.Key) {
-			if err := checkVirtual(c); err != nil {
+			if err := a.checkVirtual(c); err != nil {
 				return err
 			}
 			continue
@@ -547,7 +553,11 @@ func parseLocalHive(raw any) (localHiveValue, error) {
 	return v, nil
 }
 
-func checkVirtual(c selfChange) error {
+func (a *App) checkVirtual(c selfChange) error {
+	if id, field, ok := beeKey(c.Key); ok {
+		_, err := a.beeChanged(id, field, c.Value)
+		return err
+	}
 	switch c.Key {
 	case "local_hive":
 		_, err := parseLocalHive(c.Value)
@@ -557,6 +567,14 @@ func checkVirtual(c selfChange) error {
 }
 
 func (a *App) applyVirtual(c selfChange) error {
+	if id, field, ok := beeKey(c.Key); ok {
+		sp, err := a.beeChanged(id, field, c.Value)
+		if err != nil {
+			return err
+		}
+		_, err = a.SaveStandingAgent(sp)
+		return err
+	}
 	switch c.Key {
 	case "local_hive":
 		v, err := parseLocalHive(c.Value)
@@ -567,6 +585,78 @@ func (a *App) applyVirtual(c selfChange) error {
 		return err
 	}
 	return fmt.Errorf("unknown setting %q", c.Key)
+}
+
+// beeKey splits bees.<id>.<field>.
+func beeKey(key string) (id, field string, ok bool) {
+	rest, ok := strings.CutPrefix(key, "bees.")
+	if !ok {
+		return "", "", false
+	}
+	i := strings.LastIndexByte(rest, '.')
+	if i <= 0 {
+		return "", "", false
+	}
+	return rest[:i], rest[i+1:], true
+}
+
+// beeChanged is the bee id as it is now with field set to raw: the spec the
+// Bees panel would save.
+func (a *App) beeChanged(id, field string, raw any) (AgentSpec, error) {
+	h := a.standing()
+	h.mu.Lock()
+	sp, ok := h.specs[id]
+	h.mu.Unlock()
+	if !ok {
+		return sp, fmt.Errorf("no bee %q; standing_agents lists them", id)
+	}
+	switch field {
+	case "goal":
+		s, _ := raw.(string)
+		if s = strings.TrimSpace(s); s == "" {
+			return sp, errors.New("a bee's goal cannot be empty: say what it should keep true")
+		}
+		sp.Goal = s
+	case "watch":
+		w, err := beeWatch(raw)
+		if err != nil {
+			return sp, err
+		}
+		sp.Watch = w
+	default:
+		return sp, fmt.Errorf("a bee has no setting %q: goal or watch", field)
+	}
+	return sp, nil
+}
+
+// beeWatch reads a scope: a list of strings, one string, or null for none.
+func beeWatch(raw any) ([]string, error) {
+	var items []any
+	switch t := raw.(type) {
+	case nil:
+		return nil, nil
+	case string:
+		items = []any{t}
+	case []string:
+		for _, s := range t {
+			items = append(items, s)
+		}
+	case []any:
+		items = t
+	default:
+		return nil, errors.New(`watch: want a list of strings, e.g. ["pods in namespace superleo"]`)
+	}
+	var out []string
+	for _, it := range items {
+		s, ok := it.(string)
+		if !ok {
+			return nil, errors.New(`watch: want a list of strings, e.g. ["pods in namespace superleo"]`)
+		}
+		if s = strings.TrimSpace(s); s != "" {
+			out = append(out, s)
+		}
+	}
+	return out, nil
 }
 
 // --- what a change is shown as ---

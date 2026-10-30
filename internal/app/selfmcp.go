@@ -143,6 +143,36 @@ func selfTools() []selfTool {
 			},
 		},
 		{
+			Name: "standing_agent_update", Title: "Change a bee's goal or scope",
+			Description: "Change a bee's goal (what it keeps true) and/or its scope (watch: what it looks at, e.g. [\"pods in namespace superleo\"]) by the id standing_agents gave. " +
+				"Nothing else about it changes: name, schedule, permissions and notes stay. A bee acts on its own when it wakes, so the change is put to the person " +
+				"on an approval card like settings_set's boundary keys; the answer has needs_approval with an id and nothing changes until they say yes; " +
+				"settings_get {\"request\": id} shows the outcome. Do not send the person to the Bees page for this.",
+			Params: map[string]any{
+				"id":    map[string]any{"type": "string", "description": "the bee's id, from standing_agents"},
+				"goal":  map[string]any{"type": "string", "description": "the new goal"},
+				"watch": map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "the new scope, what it watches; [] clears it"},
+			},
+			Required: []string{"id"},
+			RunBy: func(a *App, by string, args map[string]any) (any, error) {
+				id := strings.TrimSpace(str(args["id"]))
+				if id == "" {
+					return nil, fmt.Errorf("id is empty: call standing_agents for the ids")
+				}
+				changes := map[string]any{}
+				if g, ok := args["goal"]; ok {
+					changes["bees."+id+".goal"] = g
+				}
+				if w, ok := args["watch"]; ok {
+					changes["bees."+id+".watch"] = w
+				}
+				if len(changes) == 0 {
+					return nil, fmt.Errorf("nothing to change: give goal, watch or both")
+				}
+				return a.selfSetSettings(by, map[string]any{"changes": changes})
+			},
+		},
+		{
 			Name: "devices", Title: "Paired devices", ReadOnly: true,
 			Description: "The phones, desktops and agents paired with this SuperLeo, with when each was paired and last seen.",
 			Run: func(a *App, _ map[string]any) (any, error) {

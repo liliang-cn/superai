@@ -216,6 +216,12 @@ func selfKeys() []SelfKey {
 		{Key: "hive.join_token", Section: "hive", Tier: ap, Desc: "The token a worker joins with (secret)."},
 		{Key: "local_hive", Section: "hive", Tier: ap, Virtual: true, Desc: `This machine runs a hive of local workers: {"enabled", "min_workers", "max_workers"}.`},
 
+		// --- bees ---
+		// A bee acts on its own when it wakes: what it is for and what it
+		// looks at are what it does unasked, so a change is the person's.
+		{Key: "bees.*.goal", Section: "bees", Tier: ap, Virtual: true, Desc: "One bee's goal, what it keeps true, by the id standing_agents gives (standing_agent_update sets it)."},
+		{Key: "bees.*.watch", Section: "bees", Tier: ap, Virtual: true, Desc: `One bee's scope, what it watches: a list, e.g. ["pods in namespace superleo"]; null clears it.`},
+
 		// --- notifications ---
 		{Key: "webhook_url", Section: "notifications", Tier: w, Desc: "Where a notice is POSTed (mirrors the first webhook channel). Blank turns it off."},
 		{Key: "channels.*.enabled", Section: "notifications", Tier: w, Desc: "Switch one notification channel on or off, by its id."},

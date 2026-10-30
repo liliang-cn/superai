@@ -162,6 +162,9 @@ func TestEveryBoundaryKeyWaitsForApproval(t *testing.T) {
 		if !k.Virtual && !backend.IsSettingsPath(k.Key) {
 			continue // a key whose field has not landed yet
 		}
+		if strings.Contains(k.Key, "*") {
+			continue // one per bee: standing_update_test.go
+		}
 		v, ok := samples[k.Key]
 		if !ok {
 			t.Errorf("no sample value for boundary key %s", k.Key)
