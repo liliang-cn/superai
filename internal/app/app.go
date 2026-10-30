@@ -74,6 +74,8 @@ type App struct {
 	queenToken queenTokenCache
 	// queenNow is the engine taking the queen's turns now (app_queen_engine.go).
 	queenNow queenNowState
+	// hermesWarm is where getting hermes ready stands (hermes_warm.go).
+	hermesWarm hermesWarmState
 	// electedTerm is the term this instance was elected queen in, for the
 	// roster made when it takes over (app_election.go).
 	electedTerm int64
@@ -352,6 +354,8 @@ func (a *App) boot() {
 	a.rebuild()
 	// The coding runs that were going when SuperLeo last stopped.
 	a.recoverCLIRuns()
+	// Hermes's environment, built now rather than in someone's first turn.
+	a.warmHermes("start")
 
 	// Permission is requested at startup, not when a timer fires: by then the
 	// user is typically not at the machine, which is the whole point of a

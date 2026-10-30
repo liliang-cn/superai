@@ -423,6 +423,9 @@ func (a *App) routeToEngine(requestID, sessionID, engine, message string, busy b
 		}
 
 		a.emit("chat:event", tag(map[string]any{"type": "state_update", "content": "starting " + label + "…"}))
+		if engineCLI(eng) == "hermes" && a.hermesWarming() {
+			a.emit("chat:event", tag(map[string]any{"type": "state_update", "content": label + " is still getting its environment ready; the first answer takes longer"}))
+		}
 		mu.Lock()
 		runID = ""
 		mu.Unlock()

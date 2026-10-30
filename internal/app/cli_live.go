@@ -29,6 +29,7 @@ package app
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -102,6 +103,7 @@ func (l *cliLive) file(ext string) string {
 }
 func (l *cliLive) outPath() string  { return l.file(fmt.Sprintf(".%d.out", l.Seg)) }
 func (l *cliLive) exitPath() string { return l.file(fmt.Sprintf(".%d.exit", l.Seg)) }
+func (l *cliLive) errPath() string  { return l.file(fmt.Sprintf(".%d.err", l.Seg)) }
 func (l *cliLive) eventsPath() string {
 	return l.file(".events")
 }
@@ -119,7 +121,22 @@ type cliDriver struct {
 	calls map[string]string // call id → tool name, to label results
 	off   int64             // how far into the current segment's output has been read
 	gone  bool              // finished: nothing more is written
+
+	errLines int    // stderr lines read, for a CLI whose stderr is kept apart
+	errLast  string // the last of them
 }
+
+// cliStderrApart is whether a CLI's stderr is kept out of its output. Hermes
+// prints its answer, and only its answer, on stdout as plain text; on stderr
+// it says what it does around that, a first launch's dependency install
+// among it ("→ Installing Python dependencies…"). Read together they made
+// one answer, install and all. Kept apart, those lines go to the log and the
+// run's events, never into what the person reads.
+func cliStderrApart(agent string) bool { return agent == "hermes" }
+
+// cliStderrEvents is how many stderr lines a run keeps as events; the log
+// has all of them.
+const cliStderrEvents = 40
 
 func newCLIDriver(a *App, run *CLIRun, live *cliLive, provider agentexec.Provider, sess agentexec.Session) *cliDriver {
 	live.Run = summaryOf(run)
@@ -212,6 +229,18 @@ func (d *cliDriver) launch(spec agentexec.CommandSpec) (<-chan int, error) {
 	cmd.Dir = spec.WorkDir
 	// Stdin is /dev/null: these CLIs read stdin when it is not a terminal.
 	cmd.Stdout, cmd.Stderr = out, out
+	if cliStderrApart(d.run.Agent) {
+		d.mu.Lock()
+		errPath := d.live.errPath()
+		d.errLines, d.errLast = 0, ""
+		d.mu.Unlock()
+		errOut, err := os.OpenFile(errPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
+		if err != nil {
+			return nil, err
+		}
+		defer errOut.Close()
+		cmd.Stderr = errOut
+	}
 	if err := cmd.Start(); err != nil {
 		return nil, err
 	}
@@ -284,7 +313,7 @@ const (
 // was picked up after a restart.
 func (d *cliDriver) follow(ctx context.Context, wait <-chan int, off int64) (segEnd, int) {
 	d.mu.Lock()
-	outPath, exitPath, pid := d.live.outPath(), d.live.exitPath(), d.live.PID
+	outPath, exitPath, errPath, pid := d.live.outPath(), d.live.exitPath(), d.live.errPath(), d.live.PID
 	d.mu.Unlock()
 	f, err := os.Open(outPath)
 	if err != nil {
@@ -294,6 +323,25 @@ func (d *cliDriver) follow(ctx context.Context, wait <-chan int, off int64) (seg
 	defer f.Close()
 	if _, err := f.Seek(off, io.SeekStart); err != nil {
 		return segVanished, -1
+	}
+	// A CLI whose stderr is apart: read alongside, a line at a time. Picked
+	// up after a restart (no wait), what is there already was read before.
+	var errs *stderrTail
+	if cliStderrApart(d.run.Agent) {
+		errs = &stderrTail{path: errPath}
+		if wait == nil {
+			if fi, err := os.Stat(errPath); err == nil {
+				errs.off = fi.Size()
+			}
+		}
+		defer errs.close()
+	}
+	pump := func(final bool) {
+		if errs != nil {
+			for _, l := range errs.lines(final) {
+				d.stderrLine(l)
+			}
+		}
 	}
 	buf := make([]byte, 64<<10)
 	ended, end, code := false, segExited, 0
@@ -309,6 +357,7 @@ func (d *cliDriver) follow(ctx context.Context, wait <-chan int, off int64) (seg
 		if rerr != nil && rerr != io.EOF {
 			return segVanished, -1
 		}
+		pump(ended)
 		if ended {
 			return end, code
 		}
@@ -345,6 +394,76 @@ func (d *cliDriver) follow(ctx context.Context, wait <-chan int, off int64) (seg
 				}
 			}
 		}
+	}
+}
+
+// stderrLine is one line a CLI said on its kept-apart stderr: to the log
+// always, to the run's events while there are not too many.
+func (d *cliDriver) stderrLine(line string) {
+	line = strings.TrimSpace(line)
+	if line == "" {
+		return
+	}
+	d.mu.Lock()
+	n := d.errLines
+	d.errLines++
+	d.errLast = line
+	d.mu.Unlock()
+	slog.Info("cli run: stderr", "run", d.run.ID, "agent", d.run.Agent, "line", cliClip(line, 500))
+	if n < cliStderrEvents {
+		d.a.addCLIEvent(d.run, CLIRunEvent{Kind: "note", Text: cliClip(line, 300)})
+	}
+}
+
+// stderrTail reads a file on from where it was left, a line at a time; a
+// carriage return ends a line too, as a progress line redrawn in place does.
+type stderrTail struct {
+	path string
+	f    *os.File
+	off  int64
+	part []byte
+}
+
+func (t *stderrTail) lines(final bool) []string {
+	if t.f == nil {
+		f, err := os.Open(t.path)
+		if err != nil {
+			return nil
+		}
+		if _, err := f.Seek(t.off, io.SeekStart); err != nil {
+			_ = f.Close()
+			return nil
+		}
+		t.f = f
+	}
+	buf := make([]byte, 16<<10)
+	for {
+		n, err := t.f.Read(buf)
+		t.off += int64(n)
+		t.part = append(t.part, buf[:n]...)
+		if n == 0 || err != nil {
+			break
+		}
+	}
+	var out []string
+	for {
+		i := bytes.IndexAny(t.part, "\r\n")
+		if i < 0 {
+			break
+		}
+		out = append(out, string(t.part[:i]))
+		t.part = t.part[i+1:]
+	}
+	if final && len(t.part) > 0 {
+		out = append(out, string(t.part))
+		t.part = nil
+	}
+	return out
+}
+
+func (t *stderrTail) close() {
+	if t.f != nil {
+		_ = t.f.Close()
 	}
 }
 
@@ -477,7 +596,7 @@ func (d *cliDriver) resume(ctx context.Context) (<-chan int, error) {
 // out of it, and finishes the run the way it ended.
 func (d *cliDriver) finish(ctx context.Context, code int, failure error) {
 	d.mu.Lock()
-	sess, calls, outPath := d.sess, d.calls, d.live.outPath()
+	sess, calls, outPath, errLast := d.sess, d.calls, d.live.outPath(), d.errLast
 	d.mu.Unlock()
 	output, _ := os.ReadFile(outPath)
 	result, tail, finErr := sess.Finalize(context.Background(), output, code)
@@ -503,6 +622,9 @@ func (d *cliDriver) finish(ctx context.Context, code int, failure error) {
 			run.Error = run.Summary
 			if run.Error == "" {
 				run.Error = cliLastLine(string(output))
+			}
+			if run.Error == "" {
+				run.Error = errLast // a CLI whose stderr is apart says why there
 			}
 		default:
 			run.State = "done"

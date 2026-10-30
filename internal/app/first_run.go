@@ -24,6 +24,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/liliang-cn/agentexec"
 	"github.com/liliang-cn/superleo/internal/backend"
 )
 
@@ -80,6 +81,9 @@ func (a *App) DetectAgents() []DetectedAgent {
 	}
 	a.mu.Unlock()
 	found := installedCLIs(overrides)
+	if slices.ContainsFunc(found, func(c agentexec.Installed) bool { return c.Name == "hermes" }) {
+		a.warmHermes("found")
+	}
 	out := make([]DetectedAgent, len(found))
 	var wg sync.WaitGroup
 	for i, c := range found {

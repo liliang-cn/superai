@@ -36,6 +36,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -442,22 +443,54 @@ func personHermesHome() string {
 }
 
 // hermesQueenHome is a hermes home whose config.yaml is cfg, one per cfg,
-// in this app's data. JSON is YAML.
+// in this app's data, sharing the dependency environment every such home
+// does (hermesShareInstalls). JSON is YAML.
 func hermesQueenHome(cfg map[string]any) (string, error) {
 	body, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
 		return "", err
 	}
 	sum := sha256.Sum256(body)
-	dir := filepath.Join(backend.DataDir(), "queen-engine", "hermes", hex.EncodeToString(sum[:6]))
+	dir := filepath.Join(hermesQueenRoot(), hex.EncodeToString(sum[:6]))
 	path := filepath.Join(dir, "config.yaml")
-	if old, err := os.ReadFile(path); err == nil && bytes.Equal(old, body) {
-		return dir, nil
+	if old, err := os.ReadFile(path); err != nil || !bytes.Equal(old, body) {
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			return "", err
+		}
+		if err := os.WriteFile(path, body, 0o600); err != nil {
+			return "", err
+		}
 	}
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return "", err
+	hermesShareInstalls(dir)
+	return dir, nil
+}
+
+// hermesQueenRoot holds the hermes homes of SuperLeo's own.
+func hermesQueenRoot() string { return filepath.Join(backend.DataDir(), "queen-engine", "hermes") }
+
+// hermesInstallsDir is the dependency environment every hermes home of
+// SuperLeo's shares. Hermes keeps one per home (<home>/installs), and a home
+// new to it builds its own on its first launch: ten minutes of installing
+// before the first answer, and again for every new set of servers. Each home's
+// installs is a link to this one, which warmHermes fills at start.
+func hermesInstallsDir() string { return filepath.Join(hermesQueenRoot(), "installs") }
+
+// hermesShareInstalls points a home's installs at the shared one. A home from
+// before, with an environment of its own, keeps it; where links cannot be made
+// (Windows without the right), the home builds its own as it did.
+func hermesShareInstalls(home string) {
+	shared := hermesInstallsDir()
+	link := filepath.Join(home, "installs")
+	if _, err := os.Lstat(link); err == nil {
+		return
 	}
-	return dir, os.WriteFile(path, body, 0o600)
+	if err := os.MkdirAll(shared, 0o700); err != nil {
+		slog.Warn("hermes: could not make the shared dependency directory", "dir", shared, "error", err)
+		return
+	}
+	if err := os.Symlink(shared, link); err != nil {
+		slog.Warn("hermes: this home builds its own dependencies", "home", home, "error", err)
+	}
 }
 
 // queenAgentsInstalled are the CLIs installed here that can think for the
