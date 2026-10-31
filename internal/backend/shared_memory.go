@@ -6,7 +6,9 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
+	"github.com/liliang-cn/agent-go/v3/pkg/config"
 	"github.com/liliang-cn/agent-go/v3/pkg/domain"
 	"github.com/liliang-cn/agent-go/v3/pkg/store"
 	"google.golang.org/grpc"
@@ -15,6 +17,31 @@ import (
 // sharedNamespaceDefault is the namespace every other client of the shared
 // brain writes to: openclaw, Claude Code, Codex, the desktop app, noted's sync.
 const sharedNamespaceDefault = "default"
+
+// sharedRecallTimeout is how long a turn waits for the shared brain's recall.
+//
+// agent-go's default is 2s. On the queen that dropped memory from 33 of 80
+// turns in a day: a standing wake's query is its whole brief, and the brain
+// took 1.5s to search the hive and default namespaces for one, 2.6–3.1s when
+// the two hourly wakes started together — so that pair never got memory at
+// all. A person's question is short and comes back in about 0.1s, so this only
+// costs anything when the brain is stuck, and the 24s stall the deadline is
+// there for is still cut off.
+const sharedRecallTimeout = 5 * time.Second
+
+// applySharedMemoryConfig points cfg's memory at the shared CortexDB brain.
+func applySharedMemoryConfig(cfg *config.Config, s *Settings) {
+	cfg.Memory.StoreType = store.CortexRemoteStoreType
+	cfg.Memory.DSN = s.SharedMemoryEndpointResolved()
+	cfg.Memory.Options = map[string]string{
+		"namespace": s.SharedMemoryNamespace,
+		"scope":     "global",
+	}
+	if tok := s.SharedMemoryTokenResolved(); tok != "" {
+		cfg.Memory.Options["token"] = tok
+	}
+	cfg.Memory.RecallTimeoutMs = int(sharedRecallTimeout / time.Millisecond)
+}
 
 // errReadOnlyMemory refuses a write aimed at a memory this store only reads.
 var errReadOnlyMemory = errors.New("shared memory: that memory belongs to another namespace and is read-only here")

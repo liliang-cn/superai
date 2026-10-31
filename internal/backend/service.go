@@ -243,15 +243,7 @@ func NewService(s *Settings) (*Service, error) {
 	useShared := s.UseSharedMemory()
 	switch {
 	case useShared:
-		cfg.Memory.StoreType = store.CortexRemoteStoreType
-		cfg.Memory.DSN = s.SharedMemoryEndpointResolved()
-		cfg.Memory.Options = map[string]string{
-			"namespace": s.SharedMemoryNamespace,
-			"scope":     "global",
-		}
-		if tok := s.SharedMemoryTokenResolved(); tok != "" {
-			cfg.Memory.Options["token"] = tok
-		}
+		applySharedMemoryConfig(cfg, s)
 	case embedder != nil:
 		cfg.Memory.StoreType = config.MemoryStoreTypeGraphFlow
 	}
