@@ -743,3 +743,60 @@ func TestChangingTheQueenEngineStopsNothing(t *testing.T) {
 		t.Fatal("a change to the rounds passed for an engine change")
 	}
 }
+
+// The Mac's node served claude.mac before the desktop did: core resumed its
+// sessions with the node's workspace, which the desktop does not run in, and
+// every turn failed in 0.1s. Such a run works in this machine's workspace as
+// a new session; the directory is not let in for it.
+func TestAQueenRunFromADirectoryNotAllowedHereWorksInTheWorkspace(t *testing.T) {
+	t.Setenv("SUPERLEO_HOME", t.TempDir())
+	bin, dir := fakeClaude(t, fakeClaudeTurn, 0)
+	ws, elsewhere := t.TempDir(), t.TempDir()
+	if err := os.MkdirAll(filepath.Join(ws, "proj"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	a := &App{settings: &backend.Settings{WorkspaceDir: ws,
+		ExternalAgents: backend.ExternalAgents{Enabled: true, Unattended: true, Binaries: map[string]string{"claude": bin}}}}
+	real := func(p string) string {
+		r, err := filepath.EvalSymlinks(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return r
+	}
+	finished := func(id string) bool {
+		for _, r := range a.CLIRuns() {
+			if r.ID == id {
+				return r.State != "running"
+			}
+		}
+		return false
+	}
+
+	kit := QueenKit{Args: queenLeanArgs, Env: map[string]string{queenTokenEnv: "t"},
+		Servers: map[string]any{"hive": map[string]any{"type": "http", "url": "http://127.0.0.1:43999/mcp",
+			"headers": map[string]any{"Authorization": "Bearer ${SUPERLEO_QUEEN_TOKEN}"}}}}
+	for n, c := range []struct {
+		cwd, wantCwd, wantResume string
+	}{
+		{elsewhere, ws, ""},
+		{filepath.Join(ws, "gone"), ws, ""},
+		{filepath.Join(ws, "proj"), filepath.Join(ws, "proj"), "sess-old"},
+		{"", ws, "sess-old"},
+	} {
+		run, err := a.StartQueenCLIRun(QueenRunRequest{Agent: "claude", Prompt: "hi", Cwd: c.cwd, Session: "sess-old", Kit: kit})
+		if err != nil {
+			t.Fatalf("%q: %v", c.cwd, err)
+		}
+		if run.Cwd != real(c.wantCwd) {
+			t.Fatalf("%q ran in %s, want %s", c.cwd, run.Cwd, c.wantCwd)
+		}
+		waitFor(t, "the run to finish", func() bool { return finished(run.ID) })
+		if got := argAfter(fakeArgs(t, dir, n+1), "--resume"); got != c.wantResume {
+			t.Fatalf("%q resumed %q, want %q", c.cwd, got, c.wantResume)
+		}
+	}
+	if roots := a.cliAllowed(a.settings.ExternalAgents.Roots); len(roots) != 1 {
+		t.Fatalf("the roots grew: %v", roots)
+	}
+}

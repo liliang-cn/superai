@@ -135,8 +135,35 @@ func (a *App) StartQueenCLIRun(r QueenRunRequest) (CLIRun, error) {
 		return CLIRun{}, fmt.Errorf("%s cannot think for the queen", r.Agent)
 	}
 	kit := r.Kit
-	return a.startCLIRun(cliStart{Agent: r.Agent, Prompt: r.Prompt, Cwd: r.Cwd, Model: r.Model, Ask: r.Ask,
-		Session: r.Session, Queen: &kit, Origin: "the queen, thinking in a coding agent"})
+	cwd, session := a.queenRunPlace(r)
+	return a.startCLIRun(cliStart{Agent: r.Agent, Prompt: r.Prompt, Cwd: cwd, Model: r.Model, Ask: r.Ask,
+		Session: session, Queen: &kit, Origin: "the queen, thinking in a coding agent"})
+}
+
+// queenRunPlace is where another machine's queen run works here, and the
+// session it resumes. The queen's runs have no project: the other machine
+// sends back the directory its last run here reported, to stay with that
+// run's session. One this machine does not run in — reported by another
+// SuperLeo that served this machine's name before (the Mac's node, before
+// the desktop took over), or a root since taken out — is not a reason to
+// fail every turn: the run works in this machine's workspace instead, as a
+// new session, since the old one was kept under that other directory. The
+// directory is never let in for it.
+func (a *App) queenRunPlace(r QueenRunRequest) (cwd, session string) {
+	if strings.TrimSpace(r.Cwd) == "" {
+		return "", r.Session
+	}
+	a.mu.Lock()
+	var roots []string
+	if a.settings != nil {
+		roots = a.settings.ExternalAgents.Roots
+	}
+	a.mu.Unlock()
+	if _, err := a.cliCwd(r.Cwd, roots); err != nil {
+		slog.Warn("queen run: working in the workspace as a new session", "cwd", r.Cwd, "reason", err)
+		return "", ""
+	}
+	return r.Cwd, r.Session
 }
 
 // queenEngineFor is the engine a turn goes to, or "" for this app's model.
