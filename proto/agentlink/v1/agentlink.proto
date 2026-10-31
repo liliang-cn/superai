@@ -69,6 +69,11 @@ message Hello {
   // desktop, browser, files, exec. Core's queen routes a piece of work that
   // needs one to a worker that has it. Unset from an older agent.
   repeated Ability abilities = 13;
+  // Whether this is a desktop SuperLeo with a model of its own that thinks
+  // for core's queen when she picks it ("superleo.<name>"): a queen run
+  // whose agent is "superleo" is a turn of its own agent. Unset from an
+  // agent too old to do it.
+  bool queen_engine = 14;
 }
 
 message Ability {

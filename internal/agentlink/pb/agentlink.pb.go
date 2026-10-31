@@ -277,7 +277,12 @@ type Hello struct {
 	// What this machine can do for core beyond running CLIs and agents:
 	// desktop, browser, files, exec. Core's queen routes a piece of work that
 	// needs one to a worker that has it. Unset from an older agent.
-	Abilities     []*Ability `protobuf:"bytes,13,rep,name=abilities,proto3" json:"abilities,omitempty"`
+	Abilities []*Ability `protobuf:"bytes,13,rep,name=abilities,proto3" json:"abilities,omitempty"`
+	// Whether this is a desktop SuperLeo with a model of its own that thinks
+	// for core's queen when she picks it ("superleo.<name>"): a queen run
+	// whose agent is "superleo" is a turn of its own agent. Unset from an
+	// agent too old to do it.
+	QueenEngine   bool `protobuf:"varint,14,opt,name=queen_engine,json=queenEngine,proto3" json:"queen_engine,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -401,6 +406,13 @@ func (x *Hello) GetAbilities() []*Ability {
 		return x.Abilities
 	}
 	return nil
+}
+
+func (x *Hello) GetQueenEngine() bool {
+	if x != nil {
+		return x.QueenEngine
+	}
+	return false
 }
 
 type Ability struct {
@@ -866,7 +878,7 @@ const file_agentlink_v1_agentlink_proto_rawDesc = "" +
 	"\awelcome\x18\x01 \x01(\v2\x1e.superleo.agentlink.v1.WelcomeH\x00R\awelcome\x121\n" +
 	"\x04call\x18\x02 \x01(\v2\x1b.superleo.agentlink.v1.CallH\x00R\x04call\x121\n" +
 	"\x04ping\x18\x03 \x01(\v2\x1b.superleo.agentlink.v1.PingH\x00R\x04pingB\x06\n" +
-	"\x04kind\"\xf4\x02\n" +
+	"\x04kind\"\x97\x03\n" +
 	"\x05Hello\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
 	"\x04host\x18\x02 \x01(\tR\x04host\x12\x0e\n" +
@@ -881,7 +893,8 @@ const file_agentlink_v1_agentlink_proto_rawDesc = "" +
 	" \x01(\tR\x06parent\x12\x1b\n" +
 	"\x06thinks\x18\v \x01(\bH\x00R\x06thinks\x88\x01\x01\x12\x10\n" +
 	"\x03mcp\x18\f \x03(\tR\x03mcp\x12<\n" +
-	"\tabilities\x18\r \x03(\v2\x1e.superleo.agentlink.v1.AbilityR\tabilitiesB\t\n" +
+	"\tabilities\x18\r \x03(\v2\x1e.superleo.agentlink.v1.AbilityR\tabilities\x12!\n" +
+	"\fqueen_engine\x18\x0e \x01(\bR\vqueenEngineB\t\n" +
 	"\a_thinks\"3\n" +
 	"\aAbility\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +

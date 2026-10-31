@@ -126,6 +126,11 @@ func (a *App) StartQueenCLIRun(r QueenRunRequest) (CLIRun, error) {
 			return CLIRun{}, fmt.Errorf("%s is not a variable the queen's servers use", k)
 		}
 	}
+	// "superleo" is this app's own agent, on the desktop
+	// (queen_engine_desktop.go).
+	if r.Agent == desktopEngineAgent {
+		return a.startDesktopQueenRun(r)
+	}
 	if !canThinkForQueen(r.Agent) {
 		return CLIRun{}, fmt.Errorf("%s cannot think for the queen", r.Agent)
 	}
@@ -294,7 +299,7 @@ func (a *App) routeToEngine(requestID, sessionID, engine, message string, busy b
 		// busy: the conversation's own session is still answering, so this
 		// turn starts one of its own and is handed the conversation instead.
 		// A CLI that keeps no session (hermes) is new to every turn.
-		if prev := a.lastChatRun(sessionID, eng, true); prev != nil && !busy && queenCLIs[engineCLI(eng)].Resumes {
+		if prev := a.lastChatRun(sessionID, eng, true); prev != nil && !busy && queenEngineTraits(eng).Resumes {
 			o.Thread, o.Session, o.Cwd, o.Model, o.Prev = prev.Thread, prev.Session, prev.Cwd, prev.Model, prev
 		}
 		// What was said here that the engine's session did not hear goes in
@@ -325,7 +330,7 @@ func (a *App) routeToEngine(requestID, sessionID, engine, message string, busy b
 		// before anything was done: a signed-out Claude writes its refusal
 		// that way, then fails the turn (exiting 0), and the refusal is not
 		// the person's answer.
-		holds := !queenCLIs[engineCLI(eng)].Streams
+		holds := !queenEngineTraits(eng).Streams
 		held, holding := "", false
 		flush := func() {
 			if holding {
@@ -495,6 +500,11 @@ func (a *App) queenEngineNow() string {
 
 // queenKitFor puts together what the engine is handed for one turn.
 func (a *App) queenKitFor(engine string, s *backend.Settings) (*QueenKit, error) {
+	// A desktop SuperLeo thinks with its own agent, prompt and tools: it is
+	// handed the turn and nothing else.
+	if isDesktopEngineID(engine) {
+		return &QueenKit{}, nil
+	}
 	_, _, remote := splitRemoteCLI(engine)
 	var base string
 	if remote {
@@ -588,6 +598,9 @@ func engineLabel(engine string) string {
 		agent = engine
 	}
 	name := agentLabel(agent)
+	if ok && agent == desktopEngineAgent {
+		name = "SuperLeo"
+	}
 	if ok {
 		name += " · " + host
 	}
@@ -685,6 +698,9 @@ func (a *App) QueenEngines() map[string]any {
 				choices = append(choices, QueenEngineChoice{Name: name + "." + h, Label: engineLabel(name + "." + h), Online: true})
 			}
 		}
+	}
+	for _, d := range a.desktopEngines() {
+		choices = append(choices, QueenEngineChoice{Name: d.ID, Label: d.Label, Online: true})
 	}
 	cur := strings.TrimSpace(s.Hive.QueenEngine)
 	if cur != "" && !slices.ContainsFunc(choices, func(c QueenEngineChoice) bool { return c.Name == cur }) {

@@ -75,7 +75,11 @@ func (a *App) QueenEngineList() QueenEngineListing {
 	listed := map[string]bool{}
 	for _, e := range s.Hive.QueenChain() {
 		info, ok := have[e.Engine]
-		if !ok {
+		switch {
+		case ok:
+		case isDesktopEngineID(e.Engine):
+			info = a.desktopEngineAway(e.Engine)
+		default:
 			info = queenEngineAway(e.Engine)
 		}
 		info.Enabled = e.Enabled
@@ -154,6 +158,11 @@ func (a *App) queenEnginesThere(s *backend.Settings) map[string]QueenEngineInfo 
 				out[id] = QueenEngineInfo{ID: id, Label: agentLabel(n), Where: host, State: "online"}
 			}
 		}
+	}
+	// The desktop SuperLeos linked now that think for the queen with their
+	// own agent (queen_engine_desktop.go).
+	for _, d := range a.desktopEngines() {
+		out[d.ID] = d
 	}
 	return out
 }
@@ -272,7 +281,7 @@ func (a *App) validQueenEngine(next *backend.Settings, prev string) error {
 			continue
 		}
 		if !e.Enabled {
-			if !canThinkForQueen(engineCLI(e.Engine)) {
+			if !canBeQueenEngine(e.Engine) {
 				return fmt.Errorf("%s cannot think for the queen: Claude Code, Codex, pi and Hermes can", e.Engine)
 			}
 			continue
@@ -289,6 +298,13 @@ func (a *App) validQueenEngine(next *backend.Settings, prev string) error {
 
 // validQueenEngineOne checks one engine that is new to the list.
 func (a *App) validQueenEngineOne(next *backend.Settings, engine string) error {
+	if isDesktopEngineID(engine) {
+		if _, ok := a.desktopEngine(engine); !ok {
+			_, host, _ := splitRemoteCLI(engine)
+			return fmt.Errorf("no desktop SuperLeo called %s that thinks for the queen is linked right now", host)
+		}
+		return nil
+	}
 	agentName, host, remote := splitRemoteCLI(engine)
 	if !remote {
 		agentName = engine

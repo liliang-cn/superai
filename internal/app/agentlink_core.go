@@ -61,6 +61,14 @@ type agentConn struct {
 
 func (c *agentConn) name() string { return c.hello.GetName() }
 
+// helloNow is the agent's latest Hello: a changed one replaces it while the
+// stream is up.
+func (c *agentConn) helloNow() *agentlinkpb.Hello {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.hello
+}
+
 // alive says whether the connection is still the agent's.
 func (c *agentConn) alive() bool {
 	select {

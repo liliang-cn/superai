@@ -74,6 +74,11 @@ type App struct {
 	queenToken queenTokenCache
 	// queenNow is the engine taking the queen's turns now (app_queen_engine.go).
 	queenNow queenNowState
+	// desktop is whether this is the windowed app, which thinks for core's
+	// queen when she picks it; desktopTurnFn, when set, stands in for its
+	// model's turn there (queen_engine_desktop.go). A test sets both.
+	desktop       bool
+	desktopTurnFn func(ctx context.Context, sessionID, message string, emit func(*agent.Event)) (backend.TurnResult, error)
 	// hermesWarm is where getting hermes ready stands (hermes_warm.go).
 	hermesWarm hermesWarmState
 	// electedTerm is the term this instance was elected queen in, for the
@@ -308,6 +313,7 @@ func NewApp() *App {
 // GetStatus so the Settings page can fix the config and rebuild.
 func (a *App) Startup(ctx context.Context) {
 	a.ctx = ctx
+	a.desktop = true
 	a.launchedKeepRunning.Store(KeepRunningWanted())
 	a.refreshMember()
 	a.startHiveLink()

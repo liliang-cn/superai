@@ -289,6 +289,10 @@ func (a *App) startCLIRun(o cliStart) (CLIRun, error) {
 	if prompt == "" {
 		return CLIRun{}, errors.New("the prompt is empty")
 	}
+	if name, host, ok := splitRemoteCLI(agent); ok && name == desktopEngineAgent {
+		o.Prompt = prompt
+		return a.startDesktopEngineRun(o, host)
+	}
 	if name, host, ok := splitRemoteCLI(agent); ok && a.isRemoteCLI(agent) {
 		o.Agent, o.Prompt = name, prompt
 		return a.startRemoteCLIRun(o, host)
